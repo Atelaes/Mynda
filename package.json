@@ -1,0 +1,25 @@
+{
+  "name": "mynda",
+  "version": "1.0.0",
+  "description": "A media library and player app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "electron": "9.0.5",
+    "electron-builder": "^22.7.0"
+  },
+  "build": {
+    "appId": "com.torvor.mynda",
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

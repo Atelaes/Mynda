@@ -1,0 +1,140 @@
+<html>
+  <head>
+    <meta charset='UTF-8'>
+    <script type="text/javascript" src="../babel.min.js"></script>
+    <script type="text/javascript" src="../react.development.js"></script>
+    <script type="text/javascript" src="../react-dom.development.js"></script>
+    <script type="text/javascript" src="../library.json"></script>
+    <script type="text/babel" src="FrontEnd.js"></script>
+    <style>
+      #grid-container {
+        display:grid;
+        grid-template:  "header header"
+                        "library details"
+                        "library details";
+        justify-content: stretch;
+      }
+      #nav-bar {
+        grid-area: header;
+      }
+      #movie-table {
+        grid-area: library;
+      }
+      #details-pane {
+        grid-area: details;
+      }
+
+      #nav-bar {
+        border: solid 1px black;
+        width: 100%;
+      }
+      /* #nav-bar::after {
+        clear:both;
+      } */
+      #playlist-nav {
+        padding-left:0px;
+      }
+      /* playlist tabs */
+      #playlist-nav li {
+        list-style-type: none;
+        float:left;
+        padding-left:10px;
+        padding-right:10px;
+        margin-left: 3px;
+        background-color:#CCCCCC;
+        user-select: none;
+      }
+      #playlist-nav li:hover {
+        color:white;
+        background-color:black;
+      }
+      #search-field {
+        margin-left: 3px;
+      }
+      th, tr, td {
+        border-width:0px;
+      }
+      #movie-table {
+        border: 1px solid black;
+        border-collapse: collapse;
+        /* float: left; */
+        width: 100%;
+
+      }
+      #movie-table th, #playlist-nav li {
+        cursor:pointer;
+      }
+      #movie-table th:hover {
+        background-color:black;
+        color:white;
+      }
+      .movie-row .dateadded, #movie-table .year {
+        font-family: monospace;
+        font-size: 12pt;
+      }
+      .movie-row .centered {
+        text-align: center;
+      }
+      .movie-row:hover {
+        background-color:#DDDDDD;
+      }
+      /* edit widgets are little graphical editors, such as the rating stars and the checkmark in the table rows that respond to mouseover and click events */
+      .edit-widget {
+        list-style: none;
+        padding: 0px;
+        margin: 0px;
+      }
+      .edit-widget.over {
+        opacity:.6;
+      }
+      .edit-widget li {
+        display: inline;
+        cursor:pointer;
+        user-select: none;
+      }
+      #collections-container {
+        margin-left:-10px;
+      }
+      #collections-container *.hidden {
+        display:none;
+      }
+      .collection {
+        margin-left:10px;
+      }
+      .collection h1 {
+        display:block;
+        background-color:#CCCCCC;
+        margin:0px;
+        margin-top:2px;
+        margin-bottom:2px;
+        padding:2px;
+        padding-left:5px;
+        font-size:12pt;
+        text-transform: uppercase;
+        font-weight:350;
+        font-family: Helvetica, Arial, sans-serif;
+        cursor:pointer;
+        user-select: none;
+      }
+      /* add right-facing triangle icon to the h1 of a collapsed collection div */
+      .collection.collapsed > :first-child::before {
+        content:"\25B8";
+        padding-right:3px;
+      }
+      /* add down-facing triangle icon to the h1 of an expanded collection div */
+      .collection.expanded > :first-child::before {
+        content:"\25BE";
+        padding-right:3px;
+      }
+      #details-pane {
+        border: solid 1px black;
+        /* float: right; */
+        /* width: 33.8%; */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+    </div>
+  </body>
+</html>

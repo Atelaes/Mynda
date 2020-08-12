@@ -1,0 +1,245 @@
+library = {
+  "playlists" : [
+    {
+      "id" : 0,
+      "name" : "Movies",
+      "filterFunction" : "video.kind === 'movie'",
+      "view" : "hierarchical"
+    },
+    {
+      "id" : 1,
+      "name" : "Shows",
+      "filterFunction" : "video.kind === 'show'",
+      "view" : "hierarchical"
+    },
+    {
+      "id" : 2,
+      "name" : "Sci-Fi",
+      "filterFunction" : "video.tags.match(/sci-fi/i)",
+      "view" : "flat"
+    }
+  ],
+  "collections" : [
+    {
+      "name" : "Marvel Cinematic Universe",
+      "collections" : [
+        {
+          "name" : "Avengers Movies",
+          "videos" : [
+            { "id":2, "order":1 }
+          ]
+        },
+        {
+          "name" : "Phases",
+          "collections" : [
+            {
+              "name" : "Phase 1",
+              "videos" : [
+                { "id":2, "order":6 },
+                { "id":3, "order":1 }
+              ]
+            }
+          ]
+        },
+        {
+          "name" : "Characters",
+          "collections" : [
+            {
+              "name" : "Iron Man",
+              "videos" : [
+                { "id":3, "order":1 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name" : "Star Trek: The Next Generation",
+      "collections" : [
+        {
+          "name" : "Season 5",
+          "videos" : [
+            { "id" : 4, "order" : 25}
+          ]
+        }
+      ]
+    },
+    {
+      "name" : "Matrix Movies",
+      "videos" : [
+        { "id" : 0, "order" : 1}
+      ]
+    }
+  ],
+  "media" : [
+    {
+      "id" : 0,
+      "title" : "The Matrix",
+      "year" : "1999",
+      "director" : "The Wachowskis",
+      "directorsort" : "Wachowskis",
+      "cast" : [
+        "Keanu \"Whoa\" Reeves",
+        "Carrie-Anne Moss",
+        "Lawrence Fishburne"
+      ],
+      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "genre" : "Sci-Fi",
+      "tags" : "sci-fi action cyber-punk 90s",
+      "seen" : true,
+      "position" : 1836,
+      "rating" : 3,
+      "dateadded" : "946684800",
+      "kind" : "movie",
+      "filename" : "~/Movies/thematrix.mp4",
+      "collections" : [
+        {
+          "name" : "Matrix Movies",
+          "order" : 1
+        }
+      ]
+    },
+    {
+      "id" : 1,
+      "title" : "The Seventh Seal",
+      "year" : "1957",
+      "director" : "Ingmar Bergman",
+      "directorsort" : "Bergman, Ingmar",
+      "cast" : [
+        "Max Von Sydow",
+        "Gunnar Bjornstrand",
+        "Bibi Andersson"
+      ],
+      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "genre" : "Drama",
+      "tags" : "drama existentialist philosophical 50s b&w ",
+      "seen" : false,
+      "position" : 0,
+      "rating" : 5,
+      "dateadded" : "1053388800",
+      "kind" : "movie",
+      "filename" : "~/Movies/seventhseal.mkv"
+    },
+    {
+      "id" : 2,
+      "title" : "The Avengers",
+      "year" : "2012",
+      "director" : "Joss Whedon",
+      "directorsort" : "Whedon, Joss",
+      "cast" : [
+        "Robert Downey Jr.",
+        "Chris Hemsworth",
+        "Chris Evans"
+      ],
+      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "genre" : "Action",
+      "tags" : "sci-fi action super-hero marvel ensemble fun 00s",
+      "seen" : true,
+      "position" : 3724,
+      "rating" : 4,
+      "dateadded" : "1383523200",
+      "kind" : "movie",
+      "filename" : "~/Movies/TheAvengers.divx",
+      "collections" : [
+        {
+          "name" : "Marvel Cinematic Universe",
+          "collections" : [
+            {
+              "name" : "Avengers Movies",
+              "order" : 1
+            },
+            {
+              "name" : "Phases",
+              "collections" : [
+                {
+                  "name" : "Phase 1",
+                  "order" : 6
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id" : 3,
+      "title" : "Iron Man",
+      "year" : "2008",
+      "director" : "Jon Favreau",
+      "directorsort" : "Favreau, Jon",
+      "cast" : [
+        "Robert Downey Jr.",
+        "Gwyneth Paltrow"
+      ],
+      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "genre" : "Action",
+      "tags" : "sci-fi action super-hero marvel fun 00s",
+      "seen" : false,
+      "position" : 3724,
+      "rating" : 1,
+      "dateadded" : "1283523200",
+      "kind" : "movie",
+      "filename" : "~/Movies/Iron Man.mp4",
+      "collections" : [
+        {
+          "name" : "Marvel Cinematic Universe",
+          "collections" : [
+            {
+              "name" : "Characters",
+              "collections" : [
+                {
+                  "name" : "Iron Man",
+                  "order" : 1
+                }
+              ]
+            },
+            {
+              "name" : "Phases",
+              "collections" : [
+                {
+                  "name" : "Phase 1",
+                  "order" : 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id" : 4,
+      "title" : "The Inner Light",
+      "year" : "1992",
+      "director" : "Peter Lauritson",
+      "directorsort" : "Lauritson, Peter",
+      "cast" : [
+        "Patrick Stewart",
+        "Jonathan Frakes",
+        "Gates McFadden",
+        "Geordi \"Holodeck\" LaForge",
+        "Woof"
+      ],
+      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "genre" : "Sci-Fi",
+      "tags" : "sci-fi drama space 90s",
+      "seen" : true,
+      "position" : 42,
+      "rating" : 5,
+      "dateadded" : "1313525600",
+      "kind" : "show",
+      "filename" : "~/TV Shows/Star Trek TNG/Season 5/25 - The Inner Light.mpeg",
+      "collections" : [
+        {
+          "name" : "Star Trek: The Next Generation",
+          "collections" : [
+            {
+              "name" : "Season 5",
+              "order" : 25
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
