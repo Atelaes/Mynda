@@ -31,6 +31,7 @@
       }
       #library-pane {
         grid-area: library;
+        overflow: scroll;
       }
       #details-pane {
         grid-area: details;
@@ -141,13 +142,33 @@
         margin:0px;
         list-style: none;
       }
+      .detail {
+        margin-bottom:8px;
+        margin-left:5%;
+        margin-right:5%;
+      }
+      .detail .label {
+        font-weight:bold;
+      }
       #detail-title {
+        --size: 35pt;
+        --padding: 30px;
         text-align:center;
-        font-size:20pt;
+        font-size:25pt;
+        height:var(--size);
+        position: relative;
+        bottom: calc(var(--size) + var(--padding));
+        padding-top:var(--padding);
+        margin-bottom:calc(-1 * (var(--size) + var(--padding)));
+        margin-left:0px;
+        margin-right:0px;
+        background: linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,255,255,1) 15%, rgba(255,255,255,0) 100%);
       }
       #detail-artwork {
         max-height:50vh;
         overflow:hidden;
+        margin-left:0px;
+        margin-right:0px;
       }
       #detail-artwork img {
         width:100%;
@@ -158,11 +179,14 @@
         border:1px solid black;
         border-radius:4px;
         overflow:hidden;
+        margin: auto;
+        margin-bottom:15px;
       }
       #detail-position .position-inner {
         height:100%;
         background-color:gray;
-      }    </style>
+      }
+    </style>
   </head>
   <body>
     <div id="root">

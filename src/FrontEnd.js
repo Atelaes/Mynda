@@ -547,14 +547,14 @@ class MynLibDetails extends React.Component {
     try {
       const movie = this.props.movie
       details = (<ul>
-          <li id="detail-artwork"><img src={movie.artwork} /></li>
-          <li id="detail-title">{movie.title}</li>
-          <li id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
-          <li id="detail-description">{movie.description}</li>
-          <li id="detail-director">Director: {movie.director}</li>
-          <li id="detail-cast">Cast: {movie.cast.join(", ")}</li>
-          <li id="detail-tags">Tags: {movie.tags}</li>
-          <li id="detail-lastseen">Last Seen: {this.lastseenDisplayDate(movie.lastseen)}</li>
+          <li className="detail" id="detail-artwork"><img src={movie.artwork} /></li>
+          <li className="detail" id="detail-title">{movie.title}</li>
+          <li className="detail" id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
+          <li className="detail" id="detail-description">{movie.description}</li>
+          <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
+          <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
+          <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags}</li>
+          <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.lastseenDisplayDate(movie.lastseen)}</li>
         </ul>);
     } catch (error) {
       details = <div>No Details</div>
