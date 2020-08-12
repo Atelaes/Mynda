@@ -526,6 +526,22 @@ class MynLibDetails extends React.Component {
 
   }
 
+  lastseenDisplayDate(lastseen) {
+    let date;
+    let displaydate = "";
+    if (lastseen === null) {
+      return "(never)";
+    }
+    try {
+      date = new Date(parseInt(lastseen) * 1000);
+      displaydate = date.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+    } catch(e) {
+      console.log("MynLibDetails: could not resolve date for lastseen: " + e.toString());
+      displaydate = "";
+    }
+    return displaydate;
+  }
+
   render() {
     let details
     try {
@@ -536,12 +552,13 @@ class MynLibDetails extends React.Component {
           <li id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
           <li id="detail-description">{movie.description}</li>
           <li id="detail-director">Director: {movie.director}</li>
-          <li id="detail-cast">Cast: {movie.cast}</li>
+          <li id="detail-cast">Cast: {movie.cast.join(", ")}</li>
           <li id="detail-tags">Tags: {movie.tags}</li>
-          <li id="detail-seen">Last Seen: {movie.lastseen}</li>
+          <li id="detail-lastseen">Last Seen: {this.lastseenDisplayDate(movie.lastseen)}</li>
         </ul>);
     } catch (error) {
-      details = <div>No Details: {error.toString()}</div>
+      details = <div>No Details</div>
+      // console.log(error.toString());
     }
 
     return  (<aside id="details-pane">

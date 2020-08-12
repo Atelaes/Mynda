@@ -7,6 +7,10 @@
     <script type="text/javascript" src="../library.json"></script>
     <script type="text/babel" src="FrontEnd.js"></script>
     <style>
+      body {
+        padding:0px;
+        margin:0px;
+      }
       .collection h1, #movie-table th, #playlist-nav li, .edit-widget li, .movie-row {
         cursor: pointer;
         user-select: none;
@@ -31,7 +35,6 @@
       #details-pane {
         grid-area: details;
       }
-
       #nav-bar {
         border: solid 1px black;
         width: 100%;
@@ -138,10 +141,28 @@
         margin:0px;
         list-style: none;
       }
+      #detail-title {
+        text-align:center;
+        font-size:20pt;
+      }
+      #detail-artwork {
+        max-height:50vh;
+        overflow:hidden;
+      }
       #detail-artwork img {
         width:100%;
       }
-    </style>
+      #detail-position .position-outer {
+        width:80%;
+        height:8px;
+        border:1px solid black;
+        border-radius:4px;
+        overflow:hidden;
+      }
+      #detail-position .position-inner {
+        height:100%;
+        background-color:gray;
+      }    </style>
   </head>
   <body>
     <div id="root">
