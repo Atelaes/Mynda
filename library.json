@@ -15,7 +15,7 @@ library = {
     {
       "id" : 2,
       "name" : "Sci-Fi",
-      "filterFunction" : "video.tags.match(/sci-fi/i)",
+      "filterFunction" : "video.tags.match(/(?:^| )sci-fi(?: |$)/i)",
       "view" : "flat"
     }
   ],
@@ -113,7 +113,7 @@ library = {
       ],
       "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
       "genre" : "Drama",
-      "tags" : "drama existentialist philosophical 50s b&w ",
+      "tags" : "drama existentialist philosophical 50s b&w",
       "seen" : false,
       "position" : 0,
       "rating" : 5,
