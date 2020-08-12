@@ -13,16 +13,19 @@
       }
 
       #grid-container {
+        width:100vw;
+        height:100vh;
         display:grid;
-        grid-template:  "header header"
-                        "library details"
-                        "library details";
+        grid-template:  "header  header"  1fr
+                        "library details" 10fr
+                      / 7fr      3fr;
         justify-content: stretch;
+        gap: 5px;
       }
       #nav-bar {
         grid-area: header;
       }
-      #movie-table {
+      #library-pane {
         grid-area: library;
       }
       #details-pane {
@@ -129,8 +132,14 @@
       }
       #details-pane {
         border: solid 1px black;
-        /* float: right; */
-        /* width: 33.8%; */
+      }
+      #details-pane ul {
+        padding:0px;
+        margin:0px;
+        list-style: none;
+      }
+      #detail-artwork img {
+        width:100%;
       }
     </style>
   </head>

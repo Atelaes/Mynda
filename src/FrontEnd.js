@@ -11,24 +11,25 @@ class MynLibraryView extends React.Component {
       filteredVideos : [],
       view : "flat", // whether to display a flat table or a hierarchical view
       detailId: null,
-      detailObject: {}
+      detailMovie: {}
 
     }
 
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
+    this.showDetails = this.showDetails.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
   }
 
   showDetails(id, e) {
-    let details = {};
+    let detailMovie = {};
     try {
-      details = this.state.filteredVideos.filter(id => playlist.id === id)[0]
+      detailMovie = this.state.filteredVideos.filter(video => video.id === id)[0]
     } catch(error) {
       console.log("Error: could not find video " + id)
     }
-    this.setState({detailId: id, detailObject: details});
+    this.setState({detailId: id, detailMovie: detailMovie});
   }
 
   // filter the movies we'll hand off to the table component
@@ -64,7 +65,7 @@ class MynLibraryView extends React.Component {
   }
 
   render () {
-    return (<div id='grid-container'> <MynLibNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} /> <MynLibTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} /> <MynLibDetails movie={this.state.detailObject}/> </div>);
+    return (<div id='grid-container'> <MynLibNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} /> <MynLibTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynLibDetails movie={this.state.detailMovie} /> </div>);
   }
 }
 
@@ -170,7 +171,7 @@ class MynLibTableContainer extends React.Component {
         }
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" /></div></div>)
+        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
       } else {
         return null;
       }
@@ -188,17 +189,21 @@ class MynLibTableContainer extends React.Component {
   }
 
   render() {
+    let content = null;
     if (this.props.view === "hierarchical") {
       this.createCollectionsMap();
-      return (
-        <div id="collections-container">{this.state.hierarchy}</div>
-      )
+
+      content = (<div id="collections-container">{this.state.hierarchy}</div>)
+
     } else if (this.props.view === "flat") {
-      return (<MynLibTable movies={this.props.movies} view={this.props.view} />)
+
+      content = (<MynLibTable movies={this.props.movies} view={this.props.view} showDetails={this.props.showDetails} />)
+
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
       return null
     }
+    return (<div id="library-pane">{content}</div>);
   }
 }
 
@@ -223,6 +228,7 @@ class MynLibTable extends React.Component {
   }
 
   rowHovered(id, e) {
+    this.props.showDetails(id, e);
     // console.log("function called, movie id=" + id);
   }
 
@@ -524,16 +530,16 @@ class MynLibDetails extends React.Component {
     let details
     try {
       const movie = this.props.movie
-      details = <ul>
-          {/*<li id="detail-artwork"><img src="{this.props.artwork}" /></li>*/}
+      details = (<ul>
+          <li id="detail-artwork"><img src={movie.artwork} /></li>
           <li id="detail-title">{movie.title}</li>
-          {/*}<li id="detail-position"><div className="position-outer"><div className="position-inner" style="width:{movie.position / movie.duration * 100}%" /></div></li>*/}
+          <li id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
           <li id="detail-description">{movie.description}</li>
           <li id="detail-director">Director: {movie.director}</li>
           <li id="detail-cast">Cast: {movie.cast}</li>
           <li id="detail-tags">Tags: {movie.tags}</li>
           <li id="detail-seen">Last Seen: {movie.lastseen}</li>
-        </ul>;
+        </ul>);
     } catch (error) {
       details = <div>No Details: {error.toString()}</div>
     }

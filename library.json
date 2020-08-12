@@ -92,6 +92,7 @@ library = {
       "rating" : 3,
       "dateadded" : "946684800",
       "kind" : "movie",
+      "artwork" : "../artwork/thematrix.jpg",
       "filename" : "~/Movies/thematrix.mp4",
       "collections" : [
         {
@@ -119,6 +120,7 @@ library = {
       "rating" : 5,
       "dateadded" : "1053388800",
       "kind" : "movie",
+      "artwork" : "../artwork/MV5BM2I1ZWU4YjMtYzU0My00YmMzLWFmNTAtZDJhZGYwMmI3YWQ5XkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SY1000_CR0,0,666,1000_AL_.jpg",
       "filename" : "~/Movies/seventhseal.mkv"
     },
     {
@@ -141,6 +143,7 @@ library = {
       "dateadded" : "1383523200",
       "kind" : "movie",
       "filename" : "~/Movies/TheAvengers.divx",
+      "artwork" : "../artwork/The_Avengers.jpg",
       "collections" : [
         {
           "name" : "Marvel Cinematic Universe",
@@ -180,6 +183,7 @@ library = {
       "rating" : 1,
       "dateadded" : "1283523200",
       "kind" : "movie",
+      "artwork" : "../artwork/Iron_Man.jpg",
       "filename" : "~/Movies/Iron Man.mp4",
       "collections" : [
         {
@@ -228,6 +232,7 @@ library = {
       "rating" : 5,
       "dateadded" : "1313525600",
       "kind" : "show",
+      "artwork" : "../artwork/theinnerlight.jpg",
       "filename" : "~/TV Shows/Star Trek TNG/Season 5/25 - The Inner Light.mpeg",
       "collections" : [
         {
