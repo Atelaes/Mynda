@@ -116,6 +116,7 @@ class MynLibTableContainer extends React.Component {
   }
 
   createCollectionsMap() {
+    console.log("Creating new collections map");
     this.state.hierarchy = this.props.collections.map(collection => (this.findCollections(collection)));
   }
 
@@ -164,11 +165,18 @@ class MynLibTableContainer extends React.Component {
         // console.log('movies: ' + JSON.stringify(movies) + '\nVideos from collection: ' + JSON.stringify(videos));
         try {
           // add the 'order' property to each movie for this collection
-          movies.map(movie => (movie.order = videos.filter(collectionVideo => (collectionVideo.id === movie.id))[0].order));
+          // (making a deep copy of each movie object)
+          movies = movies.map(movie => {
+            const movieCopy = JSON.parse(JSON.stringify(movie));
+            movieCopy.order = videos.filter(collectionVideo => (collectionVideo.id === movieCopy.id))[0].order;
+            // console.log(JSON.stringify(movieCopy));
+            return movieCopy;
+          });
           // console.log(JSON.stringify(movies))
         } catch(e) {
           console.log('Error assigning order to videos in collection ' + object.name + ': ' + e.toString());
         }
+        // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
         return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
@@ -262,9 +270,9 @@ class MynLibTable extends React.Component {
     displaydate = displaydate.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
     // let seenmark = movie.seen ? "\u2714" : "\u2718"
 
-    if (movie.order === undefined) {
-      movie.order = null;
-    }
+    // if (movie.order === undefined) {
+    //   movie.order = null;
+    // }
 
     return (
       <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)}>
@@ -311,6 +319,7 @@ class MynLibTable extends React.Component {
   }
 
   componentDidMount(props) {
+    // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
     this.onChange();
   }
 
