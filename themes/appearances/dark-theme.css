@@ -1,4 +1,19 @@
+@font-face {
+  font-family: Dorsa;
+  src: url('../_fonts/Dorsa-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: HKGrotesk;
+  src: url('../_fonts/HKGrotesk-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
+  --main-font: HKGrotesk, Helvetica, sans-serif;
+  --big-title-font: Dorsa, Helvetica, sans-serif;
+
   --dark-bg: #1e2126;
   --med-bg: #24272e;
   --medlight-bg: #2d313a;
@@ -13,7 +28,7 @@
 
 body {
   --main-bg: var(--dark-bg);
-  --pane-bg: var(--med-bg);
+  --pane-bg: var(--dark-bg); /*var(--med-bg);*/
 
   --textinput-bg: var(--medlight-bg);
   --textinput-text: var(--dim-text);
@@ -39,18 +54,21 @@ body {
 }
 
 #movie-table {
-  --th-bg : rgba(0,0,0,0);
-  --th-bg-hover : var(--light-bg);
+  --th-bg: rgba(0,0,0,0);
+  --th-bg-hover: rgba(0,0,0,0); /*var(--light-bg);*/
   --th-text: var(--dim-text);
-  --th-text-hover : var(--bright-text);
+  --th-text-hover: var(--bright-text);
 
   --movie-row-bg-hover: var(--light-bg);
   --movie-row-text-hover: var(--bright-text);
 }
 
 #details-pane {
+  --detailspane-bg: var(--med-bg);
+
   --detailtitle-text: var(--bright-text);
-  --detailtitle-bg: linear-gradient(0deg, var(--pane-bg) 15%, var(--med-bg-rgba0) 100%);
+  --detailtitle-bg: linear-gradient(0deg, var(--detailspane-bg) 30%, var(--med-bg-rgba0) 100%);
+  --detailtitle-font-size: 50pt;
 
   --detailposition-border: 1px solid var(--dim-text);
   --detailposition-bg: var(--dark-bg);

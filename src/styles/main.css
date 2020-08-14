@@ -1,12 +1,28 @@
 @import url('../../themes/appearances/dark-theme.css');
 @import url('../../themes/layouts/default-layout-theme.css');
 
+:root {
+  overflow-x:hidden;
+  scrollbar-width: none;
+}
+:root ::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   background-color: var(--main-bg);
   color: var(--main-text);
   padding:0px;
   margin:0px;
+  font-family: var(--main-font);
+  overflow-x:hidden;
+  overflow-y:hidden;
+  scrollbar-width: none;
 }
+body ::-webkit-scrollbar {
+  display: none;
+}
+
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
@@ -86,7 +102,6 @@ th, tr, td {
 }
 
 #movie-table {
-  border: 1px solid black;
   border-collapse: collapse;
   width: 100%;
 }
@@ -169,13 +184,21 @@ th, tr, td {
 /*************************************/
 
 #details-pane {
-  border: solid 1px black;
+  background-color: var(--detailspane-bg);
+  overflow-x:hidden;
+  overflow-y:scroll;
+  scrollbar-width: none;
 }
+#details-pane ::-webkit-scrollbar {
+  display: none;
+}
+
 #details-pane ul {
   padding:0px;
   margin:0px;
   list-style: none;
 }
+
 .detail {
   margin-bottom:8px;
   margin-left:5%;
@@ -185,15 +208,16 @@ th, tr, td {
   font-weight:bold;
 }
 #detail-title {
-  --size: 35pt;
   --padding: 30px;
   text-align:center;
   font-size:25pt;
-  height:var(--size);
+  font-family: var(--big-title-font);
+  font-size: var(--detailtitle-font-size);
+  height: var(--detailtitle-font-size);
   position: relative;
-  bottom: calc(var(--size) + var(--padding));
+  bottom: calc(var(--detailtitle-font-size) + var(--padding));
   padding-top:var(--padding);
-  margin-bottom:calc(-1 * (var(--size) + var(--padding)));
+  margin-bottom:calc(-1 * (var(--detailtitle-font-size) + var(--padding)));
   margin-left:0px;
   margin-right:0px;
   color: var(--detailtitle-text);
@@ -209,14 +233,15 @@ th, tr, td {
   width:100%;
 }
 #detail-position .position-outer {
-  width:80%;
-  height:8px;
+  width:60%;
+  height:.3em;
   border: var(--detailposition-border);
   background-color: var(--detailposition-bg);
-  border-radius:4px;
+  border-radius:999px;
   overflow:hidden;
   margin: auto;
-  margin-bottom:15px;
+  margin-top:.2em;
+  margin-bottom:.8em;
 }
 #detail-position .position-inner {
   height:100%;

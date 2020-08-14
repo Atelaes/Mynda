@@ -4,7 +4,7 @@ library = {
       "id" : 0,
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
-      "view" : "hierarchical"
+      "view" : "flat"
     },
     {
       "id" : 1,
@@ -114,7 +114,7 @@ library = {
         "Gunnar Bjornstrand",
         "Bibi Andersson"
       ],
-      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
       "genre" : "Drama",
       "tags" : "drama existentialist philosophical 50s b&w",
       "seen" : false,
