@@ -1,0 +1,64 @@
+:root {
+  --dark-bg: #1e2126;
+  --med-bg: #24272e;
+  --medlight-bg: #2d313a;
+  --light-bg: #363b45;
+
+  --med-bg-rgba0: rgba(36,39,46,0);
+
+  --main-text: #a1a9b7;
+  --bright-text: #cfd4dc;
+  --dim-text: #7e848f;
+}
+
+body {
+  --main-bg: var(--dark-bg);
+  --pane-bg: var(--med-bg);
+
+  --textinput-bg: var(--medlight-bg);
+  --textinput-text: var(--dim-text);
+  --textinput-border: 2px solid var(--light-bg);
+  --textinput-borderradius: 999px;
+  --textinput-padding: 0px .5em 0px .5em;
+}
+
+#nav-bar {
+  --playlisttab-bg: var(--light-bg);
+  --playlisttab-bg-hover: var(--main-text);
+  --playlisttab-text: var(--main-text);
+  --playlisttab-text-hover: var(--pane-bg);
+}
+
+#library-pane {
+   --collection-bg: var(--light-bg);
+   --collection-bg-hover: var(--main-text);
+   --collection-text: var(--main-text);
+   --collection-text-hover: var(--pane-bg);
+
+   --dropdownarrow-color: var(--bright-text);
+}
+
+#movie-table {
+  --th-bg : rgba(0,0,0,0);
+  --th-bg-hover : var(--light-bg);
+  --th-text: var(--dim-text);
+  --th-text-hover : var(--bright-text);
+
+  --movie-row-bg-hover: var(--light-bg);
+  --movie-row-text-hover: var(--bright-text);
+}
+
+#details-pane {
+  --detailtitle-text: var(--bright-text);
+  --detailtitle-bg: linear-gradient(0deg, var(--pane-bg) 15%, var(--med-bg-rgba0) 100%);
+
+  --detailposition-border: 1px solid var(--dim-text);
+  --detailposition-bg: var(--dark-bg);
+  --detailpositioninner-bg: var(--light-bg);
+}
+
+/******************************************/
+
+#detail-title {
+  text-shadow: 0px 0px .2em #000000;
+}

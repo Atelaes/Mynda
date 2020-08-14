@@ -1,0 +1,7 @@
+#grid-container {
+  grid-template:  "header  header"  1fr
+                  "library details" 11fr
+                / 7fr      3fr;
+  justify-content: stretch;
+  gap: 5px;
+}
