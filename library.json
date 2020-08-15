@@ -255,6 +255,30 @@ library = {
           ]
         }
       ]
+    },
+    {
+      "id" : 5,
+      "title" : "The Adventures of Buckaroo Banzai Across the 8th Dimension",
+      "year" : "1984",
+      "director" : "W.D. Richter",
+      "directorsort" : "Richter, W.D.",
+      "cast" : [
+        "Peter Weller",
+        "John Lithgow",
+        "Ellen Barkin"
+      ],
+      "description" : "Adventurer, brain surgeon, rock musician Buckaroo Banzai and his crime-fighting team, the Hong Kong Cavaliers, must stop evil alien invaders from the eighth dimension who are planning to conquer Earth.",
+      "genre" : "Sci-Fi",
+      "tags" : "sci-fi aliens 80s B-movie",
+      "seen" : false,
+      "position" : 0,
+      "duration" : 2700,
+      "rating" : 2,
+      "dateadded" : "1303525600",
+      "lastseen" : "756092300",
+      "kind" : "movie",
+      "artwork" : "../artwork/MV5BMmE1OWZjYjctYzZlNi00YmEyLTg4YWYtZDc4NTE2ODZlYzhhXkEyXkFqcGdeQXVyNzc5MjA3OA@@._V1_SY1000_CR0,0,651,1000_AL_.jpg",
+      "filename" : "~/Movies/Buckaroo.mp4",
     }
   ]
 }

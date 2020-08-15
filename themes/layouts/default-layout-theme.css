@@ -1,11 +1,31 @@
+:root {
+  --header-row-size: 1fr;
+  --libdetail-row-size: 11fr;
+  --lib-col-size: 70%;
+  --details-col-size: 30%;
+}
+
 #grid-container {
-  grid-template:  "header  header"  1fr
-                  "library details" 11fr
-                / 7fr      3fr;
+  grid-template:  "header  header"  var(--header-row-size)
+                  "library details" var(--libdetail-row-size)
+                / var(--lib-col-size) var(--details-col-size);
   justify-content: stretch;
   gap: 0px;
 }
 
 #search-field {
-  float:right;
+  position: absolute;
+  top:.7em;
+  right:1em;
+}
+
+#playlist-nav {
+  padding:0px;
+  margin:0px;
+  height:100%;
+  /* width:var(--lib-col-size); */
+  display:flex;
+  flex-flow: row nowrap;
+  justify-content: flex-start;
+  align-items: flex-end;
 }

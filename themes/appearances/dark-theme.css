@@ -14,6 +14,7 @@
   --main-font: HKGrotesk, Helvetica, sans-serif;
   --big-title-font: Dorsa, Helvetica, sans-serif;
 
+  --darker-bg: #181a1e;
   --dark-bg: #1e2126;
   --med-bg: #24272e;
   --medlight-bg: #2d313a;
@@ -28,7 +29,12 @@
 
 body {
   --main-bg: var(--dark-bg);
-  --pane-bg: var(--dark-bg); /*var(--med-bg);*/
+  --pane-bg-0: var(--med-bg);
+  --pane-bg-1: var(--darker-bg);
+
+  --nav-bg: var(--pane-bg-1);
+  --library-bg: var(--main-bg);
+  --details-bg: var(--pane-bg-1);
 
   --textinput-bg: var(--medlight-bg);
   --textinput-text: var(--dim-text);
@@ -38,36 +44,42 @@ body {
 }
 
 #nav-bar {
-  --playlisttab-bg: var(--light-bg);
-  --playlisttab-bg-hover: var(--main-text);
+  --playlisttab-bg: var(--pane-bg-0);
+  --playlisttab-bg-hover: var(--playlisttab-bg);
   --playlisttab-text: var(--main-text);
-  --playlisttab-text-hover: var(--pane-bg);
+  --playlisttab-text-hover: var(--bright-text);
+  --playlisttab-borderwidth: .1em .1em 0em 0em;
+  --playlisttab-borderstyle: solid;
+  --playlisttab-bordercolor: var(--medlight-bg);
+  --playlisttab-boxshadow: /*.5em .5em .5em rgba(0,0,0,.5)*/;
 }
 
 #library-pane {
    --collection-bg: var(--light-bg);
    --collection-bg-hover: var(--main-text);
    --collection-text: var(--main-text);
-   --collection-text-hover: var(--pane-bg);
+   --collection-text-hover: var(--library-bg);
 
    --dropdownarrow-color: var(--bright-text);
 }
 
 #movie-table {
-  --th-bg: rgba(0,0,0,0);
-  --th-bg-hover: rgba(0,0,0,0); /*var(--light-bg);*/
+  --th-bg: var(--pane-bg-0);
+  --th-bg-hover: var(--th-bg); /*var(--light-bg);*/
   --th-text: var(--dim-text);
   --th-text-hover: var(--bright-text);
 
+  --movie-row-bg: var(--library-bg);
   --movie-row-bg-hover: var(--light-bg);
   --movie-row-text-hover: var(--bright-text);
+
+  --tablecell-ellipsis-grad: linear-gradient(90deg, var(--med-bg-rgba0) 0%, var(--movie-row-bg) 100%);
+  --tablecell-ellipsis-grad-hover: linear-gradient(90deg, var(--med-bg-rgba0) 0%, var(--movie-row-bg-hover) 100%);
 }
 
 #details-pane {
-  --detailspane-bg: var(--med-bg);
-
   --detailtitle-text: var(--bright-text);
-  --detailtitle-bg: linear-gradient(0deg, var(--detailspane-bg) 30%, var(--med-bg-rgba0) 100%);
+  --detailtitle-bg: linear-gradient(0deg, var(--details-bg) 5%, rgba(0,0,0,.6) 60%, rgba(0,0,0,0) 100%);
   --detailtitle-font-size: 50pt;
 
   --detailposition-border: 1px solid var(--dim-text);
@@ -79,4 +91,13 @@ body {
 
 #detail-title {
   text-shadow: 0px 0px .2em #000000;
+}
+
+#playlist-nav li {
+  border-radius: 0em .5em 0em 0em;
+}
+#playlist-nav::after {
+  content:"";
+  border-top: .1em var(--playlisttab-borderstyle) var(--playlisttab-bordercolor);
+  flex-grow:1;
 }

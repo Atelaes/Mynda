@@ -277,13 +277,13 @@ class MynLibTable extends React.Component {
     return (
       <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)}>
         <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
-        <td className="title">{movie.title}</td>
+        <td className="title">{movie.title.replace(/\s/g,"\u00A0")}</td>
         <td className="year centered">{movie.year}</td>
-        <td className="director">{movie.director}</td>
-        <td className="genre">{movie.genre}</td>
+        <td className="director">{movie.director.replace(/\s/g,"\u00A0")}</td>
+        <td className="genre">{movie.genre.replace(/\s/g,"\u00A0")}</td>
         <td className="seen centered"><MynLibSeenCheckmark movie={movie} /></td>
         <td className="rating centered"><MynLibRatingStars movie={movie} /></td>
-        <td className="dateadded centered">{displaydate}</td>
+        <td className="dateadded centered">{displaydate.replace(/\s/g,"\u00A0")}</td>
       </tr>
     )})
 

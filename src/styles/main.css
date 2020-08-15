@@ -51,11 +51,11 @@ input[type=text] {
 
 #nav-bar {
   grid-area: header;
-  background-color: var(--pane-bg);
+  background-color: var(--nav-bg);
 }
 #library-pane {
   grid-area: library;
-  background-color: var(--pane-bg);
+  background-color: var(--library-bg);
   overflow-y: scroll;
   scrollbar-width: none;
 }
@@ -64,25 +64,28 @@ input[type=text] {
 }
 #details-pane {
   grid-area: details;
-  background-color: var(--pane-bg);
+  background-color: var(--details-bg);
 }
 
 /*************************************/
 /*############# NAV PANE ############*/
 /*************************************/
 
+/* <ul> that holds the playlist links */
 #playlist-nav {
-  padding-left:0px;
 }
-/* playlist tabs */
+/* <li>'s that are the playlist links/tabs */
 #playlist-nav li {
   list-style-type: none;
-  float:left;
   padding-left:10px;
   padding-right:10px;
-  margin-left: 3px;
+  /* margin-left: 3px; */
   background-color:var(--playlisttab-bg);
   color:var(--playlisttab-text);
+  border-width: var(--playlisttab-borderwidth);
+  border-style: var(--playlisttab-borderstyle);
+  border-color: var(--playlisttab-bordercolor);
+  box-shadow: var(--playlisttab-boxshadow);
   user-select: none;
 }
 #playlist-nav li:hover {
@@ -115,6 +118,35 @@ th, tr, td {
 }
 .movie-row {
   height: 2.2em;
+  background-color:var(--movie-row-bg);
+}
+.movie-row:hover {
+  background-color: var(--movie-row-bg-hover);
+  color: var(--movie-row-text-hover);
+}
+
+.movie-row .title {
+  overflow:hidden;
+  max-width:15em;
+  position: relative; /* necessary for the positioning of the ellipsis gradient */
+}
+/* ellipsis gradient */
+.movie-row .title::after, .movie-row:hover .title::after {
+  display: inline-block;
+  /* border:1px solid red; */
+  content: "";
+  width: 1em;
+  position: absolute;
+  top:0px;
+  right: 0px;
+  /* width: 100%; */
+  height: 100%;
+}
+.movie-row .title::after {
+  background: var(--tablecell-ellipsis-grad);
+}
+.movie-row:hover .title::after {
+  background: var(--tablecell-ellipsis-grad-hover);
 }
 .movie-row .dateadded, #movie-table .year {
   font-family: monospace;
@@ -123,10 +155,7 @@ th, tr, td {
 .movie-row .centered {
   text-align: center;
 }
-.movie-row:hover {
-  background-color: var(--movie-row-bg-hover);
-  color: var(--movie-row-text-hover);
-}
+
 /* edit widgets are little graphical editors, such as the rating stars and the checkmark in the table rows that respond to mouseover and click events */
 .edit-widget {
   list-style: none;
@@ -184,7 +213,6 @@ th, tr, td {
 /*************************************/
 
 #details-pane {
-  background-color: var(--detailspane-bg);
   overflow-x:hidden;
   overflow-y:scroll;
   scrollbar-width: none;
@@ -208,9 +236,8 @@ th, tr, td {
   font-weight:bold;
 }
 #detail-title {
-  --padding: 30px;
+  --padding: 100px;
   text-align:center;
-  font-size:25pt;
   font-family: var(--big-title-font);
   font-size: var(--detailtitle-font-size);
   height: var(--detailtitle-font-size);
