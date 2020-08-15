@@ -84,7 +84,7 @@ library = {
         "Carrie-Anne Moss",
         "Lawrence Fishburne"
       ],
-      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "description" : "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.",
       "genre" : "Sci-Fi",
       "tags" : "sci-fi action cyber-punk 90s",
       "seen" : true,
@@ -114,7 +114,7 @@ library = {
         "Gunnar Bjornstrand",
         "Bibi Andersson"
       ],
-      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "description" : "A man seeks answers about life, death, and the existence of God as he plays chess against the Grim Reaper during the Black Plague. A man seeks answers about life, death, and the existence of God as he plays chess against the Grim Reaper during the Black Plague. A man seeks answers about life, death, and the existence of God as he plays chess against the Grim Reaper during the Black Plague. This is a long description.",
       "genre" : "Drama",
       "tags" : "drama existentialist philosophical 50s b&w",
       "seen" : false,
@@ -138,7 +138,7 @@ library = {
         "Chris Hemsworth",
         "Chris Evans"
       ],
-      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "description" : "Earth's mightiest heroes must come together and learn to fight as a team if they are going to stop the mischievous Loki and his alien army from enslaving humanity.",
       "genre" : "Action",
       "tags" : "sci-fi action super-hero marvel ensemble fun 00s",
       "seen" : true,
@@ -181,7 +181,7 @@ library = {
         "Robert Downey Jr.",
         "Gwyneth Paltrow"
       ],
-      "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
+      "description" : "After being held captive in an Afghan cave, billionaire engineer Tony Stark creates a unique weaponized suit of armor to fight evil.",
       "genre" : "Action",
       "tags" : "sci-fi action super-hero marvel fun 00s",
       "seen" : false,

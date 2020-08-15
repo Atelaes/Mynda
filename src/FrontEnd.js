@@ -80,8 +80,8 @@ class MynLibNav extends React.Component {
   render() {
     return (<div id="nav-bar">
         <ul id="playlist-nav">
-          {this.props.playlists.map(playlist => (
-            <li key={playlist.id} onClick={(e) => this.props.setPlaylist(playlist.id,e)}>{playlist.name}</li>
+          {this.props.playlists.map((playlist, index) => (
+            <li key={playlist.id} style={{zIndex: 9999 - index}} onClick={(e) => this.props.setPlaylist(playlist.id,e)}>{playlist.name}</li>
           ))}
         </ul>
         <div id="search-field">Search: <input type="text" /></div>
@@ -277,13 +277,13 @@ class MynLibTable extends React.Component {
     return (
       <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)}>
         <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
-        <td className="title">{movie.title.replace(/\s/g,"\u00A0")}</td>
-        <td className="year centered">{movie.year}</td>
-        <td className="director">{movie.director.replace(/\s/g,"\u00A0")}</td>
-        <td className="genre">{movie.genre.replace(/\s/g,"\u00A0")}</td>
+        <td className="title"><div class="table-title-text">{movie.title}</div></td>
+        <td className="year centered mono">{movie.year}</td>
+        <td className="director">{movie.director}</td>
+        <td className="genre">{movie.genre}</td>
         <td className="seen centered"><MynLibSeenCheckmark movie={movie} /></td>
         <td className="rating centered"><MynLibRatingStars movie={movie} /></td>
-        <td className="dateadded centered">{displaydate.replace(/\s/g,"\u00A0")}</td>
+        <td className="dateadded centered mono">{displaydate}</td>
       </tr>
     )})
 
@@ -557,7 +557,7 @@ class MynLibDetails extends React.Component {
       const movie = this.props.movie
       details = (<ul>
           <li className="detail" id="detail-artwork"><img src={movie.artwork} /></li>
-          <li className="detail" id="detail-title">{movie.title}</li>
+          <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
           <li className="detail" id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
           <li className="detail" id="detail-description">{movie.description}</li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
