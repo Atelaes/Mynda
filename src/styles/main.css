@@ -99,7 +99,20 @@ input[type=text] {
 #playlist-nav li:hover {
   background-color:var(--playlisttab-bg-hover);
   color:var(--playlisttab-text-hover);
+  border-width: var(--playlisttab-borderwidth-hover);
+  border-style: var(--playlisttab-borderstyle-hover);
+  border-color: var(--playlisttab-bordercolor-hover);
 }
+#playlist-nav li.selected {
+  background-color: var(--playlisttab-bg-selected);
+  background: var(--playlisttab-bgimg-selected);
+  color:var(--playlisttab-text-selected);
+  border-width: var(--playlisttab-borderwidth-selected);
+  border-style: var(--playlisttab-borderstyle-selected);
+  border-color: var(--playlisttab-bordercolor-selected);
+  box-shadow: var(--playlisttab-boxshadow-selected);
+}
+
 #search-field {
 }
 
@@ -182,6 +195,9 @@ th, tr, td {
 .movie-row .dateadded {
   font-size: var(--movie-row-date-font-size) !important;
 }
+.movie-row .year {
+  font-size: var(--movie-row-year-font-size) !important;
+}
 
 #movie-table .mono {
   font-family: var(--table-cell-monofont);
@@ -254,6 +270,7 @@ th, tr, td {
   overflow-x:hidden;
   overflow-y:scroll;
   scrollbar-width: none;
+  font-size: var(--details-font-size);
 }
 #details-pane ::-webkit-scrollbar {
   display: none;
@@ -273,6 +290,8 @@ th, tr, td {
 }
 .detail .label {
   font-weight:bold;
+  font-size: var(--detaillabel-font-size);
+  font-style: var(--detaillabel-font-style);
 }
 #detail-title {
   --padding: 100px;

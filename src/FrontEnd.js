@@ -52,16 +52,20 @@ class MynLibraryView extends React.Component {
   }
 
   // called from the nav component to change the current playlist
-  setPlaylist(id,e) {
+  setPlaylist(id,element) {
     // this.state.currentPlaylistID = id
     this.setState({filteredVideos : this.playlistFilter(id), view : this.state.playlists.filter(playlist => playlist.id == id)[0].view})
+    Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
+    element.classList.add('selected');
     // alert(this.state.currentPlaylistID)
   }
 
   // set the initial playlist
   componentDidMount(props) {
-    let playlist = library.playlists[0];
-    this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
+    // let playlist = library.playlists[0];
+    // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
+    // this.setPlaylist(playlist.id, document.getElementById('playlist-nav').getElementsByTagName('li')[0]);
+    document.getElementById('playlist-nav').getElementsByTagName('li')[0].click();
   }
 
   render () {
@@ -81,10 +85,10 @@ class MynLibNav extends React.Component {
     return (<div id="nav-bar">
         <ul id="playlist-nav">
           {this.props.playlists.map((playlist, index) => (
-            <li key={playlist.id} style={{zIndex: 9999 - index}} onClick={(e) => this.props.setPlaylist(playlist.id,e)}>{playlist.name}</li>
+            <li key={playlist.id} style={{zIndex: 9999 - index}} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field">Search: <input type="text" /></div>
+        <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." /></div>
       </div>)
   }
 }
@@ -277,7 +281,7 @@ class MynLibTable extends React.Component {
     return (
       <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)}>
         <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
-        <td className="title"><div class="table-title-text">{movie.title}</div></td>
+        <td className="title"><div className="table-title-text">{movie.title}</div></td>
         <td className="year centered mono">{movie.year}</td>
         <td className="director">{movie.director}</td>
         <td className="genre">{movie.genre}</td>

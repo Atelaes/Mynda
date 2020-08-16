@@ -77,6 +77,7 @@
 }
 
 :root {
+  /* font styling */
   --main-font: HKGrotesk, Helvetica, sans-serif;
   --main-font-size: 20pt;
   --main-font-weight: normal;
@@ -90,7 +91,12 @@
   --table-cell-monofont-size: calc(var(--main-font-size) * 13 / 12);
   --table-cell-monofont-weight: 300;
   --movie-row-date-font-size: calc(var(--main-font-size) * 5 / 6);
+  --movie-row-year-font-size: calc(var(--main-font-size) * 7 / 8);
+  --details-font-size: calc(var(--main-font-size) * 5 / 6);
+  --detaillabel-font-size: var(--main-font-size);
+  --detaillabel-font-style: normal;
 
+  /* background colors */
   --darker-bg: #181a1e;
   --dark-bg: #1e2126;
   --med-bg: #24272e;
@@ -105,7 +111,7 @@
   --light-bg-rgba0: rgba(54,59,69,0);
   --lighter-bg-rgba0: rgba(70,76,89,0);
 
-
+  /* text colors */
   --main-text: #b6b9bf; /*#a1a9b7;*/
   --bright-text: #d8dde5; /*#cfd4dc;*/
   --dim-text: #8b929e; /*#7e848f;*/
@@ -125,19 +131,30 @@ body {
   --textinput-text: var(--dim-text);
   --textinput-border: .1em solid var(--light-bg);
   --textinput-borderradius: 999px;
-  --textinput-padding: 0em .5em 0em .5em;
+  --textinput-padding: 0em 1.2em 0em .5em;
 }
 
 #nav-bar {
   --playlisttab-bg: var(--pane-bg-0);
   --playlisttab-bg-hover: var(--playlisttab-bg);
+  --playlisttab-bg-selected: var(--playlisttab-bg);
+  --playlisttab-bgimg-selected: linear-gradient(-20deg, var(--playlisttab-bg) 50%, var(--medlight-bg) 115%);
   --playlisttab-text: var(--main-text);
   --playlisttab-text-hover: var(--bright-text);
+  --playlisttab-text-selected: var(--playlisttab-text);
   --playlisttab-borderwidth-width: .1em;
-  --playlisttab-borderwidth: var(--playlisttab-borderwidth-width) var(--playlisttab-borderwidth-width) 0em 0em;
+  --playlisttab-borderwidth: var(--playlisttab-borderwidth-width) var(--playlisttab-borderwidth-width) var(--playlisttab-borderwidth-width) 0em;
+  --playlisttab-borderwidth-hover: var(--playlisttab-borderwidth);
+  --playlisttab-borderwidth-selected: var(--playlisttab-borderwidth-width);
   --playlisttab-borderstyle: solid;
-  --playlisttab-bordercolor: var(--medlight-bg);
+  --playlisttab-borderstyle-hover: var(--playlisttab-borderstyle);
+  --playlisttab-borderstyle-selected: var(--playlisttab-borderstyle);
+  --playlisttab-bordercolor: var(--medlight-bg) var(--medlight-bg) var(--playlisttab-bordercolor-selected-color) var(--medlight-bg);
+  --playlisttab-bordercolor-hover: var(--playlisttab-bordercolor);
+  --playlisttab-bordercolor-selected-color: var(--lighter-bg);
+  --playlisttab-bordercolor-selected: var(--playlisttab-bordercolor-selected-color) var(--playlisttab-bordercolor-selected-color) var(--playlisttab-bg) var(--playlisttab-bordercolor-selected-color);
   --playlisttab-boxshadow: .2em -.2em .15em .05em rgba(24,26,30,.2);
+  --playlisttab-boxshadow-selected: var(--playlisttab-boxshadow), -.2em -.2em .15em .05em rgba(24,26,30,.2);
   --playlisttab-padding: .2em .7em .2em .7em;
 }
 
@@ -189,7 +206,7 @@ body {
 
   --detailtags-font-style: italic;
 
-  --detaildescrip-font-size: calc(var(--main-font-size) * 5 / 6);
+  --detaildescrip-font-size: inherit;
 }
 
 /******************************************/
@@ -200,13 +217,26 @@ body {
   padding-left: 1.4em !important;
   margin-left: -.7em;
 }
-#playlist-nav li:nth-of-type(1n + 0) {
-  z-index: calc(999 - n);
+#playlist-nav li.selected {
+  border-radius: .5em .5em 0em 0em;
+  padding-left: .7em !important;
+  margin-left: calc(-1 * var(--playlisttab-borderwidth-selected));
+  z-index:10000 !important;
 }
-#playlist-nav::after {
+/* the below is not supported yet. It would removing the right border of the previous tab
+in order to keep the tabs from shifting over when we apply a left border to the selected tab.
+in lieu of that, we will use a negative margin on the selected element instead (in the above block) to compensate for the extra border */
+/*#playlist-nav li:has(+ (#playlist-nav li.selected)) { /* the tab to the left of the selected tab */
+  /*border-width: var(--playlisttab-borderwidth-width) 0em var(--playlisttab-borderwidth-width) 0em;
+} */
+#playlist-nav::after { /* line extending to the right of the tabs */
   content:"";
-  border-top: var(--playlisttab-borderwidth-width) var(--playlisttab-borderstyle) var(--playlisttab-bordercolor);
+  border-top: var(--playlisttab-borderwidth-width) var(--playlisttab-borderstyle) var(--playlisttab-bordercolor-selected-color);
   flex-grow:1;
+}
+
+#search-label {
+  display:none;
 }
 
 #movie-table .mono {
@@ -233,4 +263,19 @@ body {
   100% {
     transform: translateX(-120%);
   }
+}
+
+/* search magnifying glass */
+#search-field::after {
+  content:"";
+  position:absolute;
+  right:0px;
+  top:0px;
+  height:100%;
+  width:.8em;
+  background-image: url('../../images/mag-icon_white.png');
+  background-position: 0% 50%;
+  background-repeat: no-repeat;
+  background-size:.6em .6em;
+  opacity:.25;
 }
