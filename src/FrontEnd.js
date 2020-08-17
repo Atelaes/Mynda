@@ -240,8 +240,37 @@ class MynLibTable extends React.Component {
   }
 
   rowHovered(id, e) {
+    // show details in details pane
     this.props.showDetails(id, e);
-    // console.log("function called, movie id=" + id);
+  }
+
+  rowOut(id, e) {
+    // hide details in details pane
+    // this.props.showDetails(null, e);
+  }
+
+  titleHovered(e) {
+    // console.log("enter");
+    e.stopPropagation();
+    // detect if the movie title is too long for the table cell
+    // and if so, add the 'overflow' class during mouseover
+    // so the css can show the whole thing, however it wants to handle that
+    if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
+      let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
+      if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
+        titleDiv.classList.add('overflow');
+      }
+    }
+  }
+
+  titleOut(e) {
+    // console.log("leave");
+    e.stopPropagation();
+    // remove the 'overflow' class in case it was added
+    if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
+      let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
+      titleDiv.classList.remove('overflow');
+    }
   }
 
   requestSort(key) {
@@ -279,9 +308,9 @@ class MynLibTable extends React.Component {
     // }
 
     return (
-      <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)}>
+      <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)} onMouseOut={(e) => this.rowOut(movie.id,e)}>
         <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
-        <td className="title"><div className="table-title-text">{movie.title}</div></td>
+        <td className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>
         <td className="year centered mono">{movie.year}</td>
         <td className="director">{movie.director}</td>
         <td className="genre">{movie.genre}</td>
@@ -553,6 +582,17 @@ class MynLibDetails extends React.Component {
       displaydate = "";
     }
     return displaydate;
+  }
+
+  componentDidUpdate(oldProps) {
+    try {
+      let titleDiv = document.getElementById('detail-title').getElementsByClassName('detail-title-text')[0];
+      if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
+        titleDiv.classList.add('overflow');
+      }
+    } catch(e) {
+      
+    }
   }
 
   render() {

@@ -60,7 +60,14 @@ library = {
         {
           "name" : "Season 5",
           "videos" : [
-            { "id" : 4, "order" : 25}
+            { "id" : 4, "order" : 25},
+            { "id" : 6, "order" : 26}
+          ]
+        },
+        {
+          "name" : "Season 6",
+          "videos" : [
+            { "id" : 7, "order" : 1}
           ]
         }
       ]
@@ -279,6 +286,83 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/MV5BMmE1OWZjYjctYzZlNi00YmEyLTg4YWYtZDc4NTE2ODZlYzhhXkEyXkFqcGdeQXVyNzc5MjA3OA@@._V1_SY1000_CR0,0,651,1000_AL_.jpg",
       "filename" : "~/Movies/Buckaroo.mp4",
+    },
+    {
+      "id" : 6,
+      "title" : "Time's Arrow: Part I",
+      "year" : "1992",
+      "director" : "Les Landau",
+      "directorsort" : "Landau, Les",
+      "cast" : [
+        "Patrick Stewart",
+        "Whoopi Goldberg",
+        "Jonathan Frakes",
+        "Gates McFadden",
+        "LeVar Burton",
+        "Michael Dorn's Forehead Loaf"
+      ],
+      "description" : "Captain Picard and his archaeological curiosity are called upon by scientists from Earth when they find evidence to support beliefs that aliens had visited Earth in the late 1800s.",
+      "genre" : "Sci-Fi",
+      "tags" : "sci-fi drama space 90s",
+      "seen" : true,
+      "position" : 2134,
+      "duration" : 2700,
+      "rating" : 4,
+      "dateadded" : "1323525600",
+      "lastseen" : "956692300",
+      "kind" : "show",
+      "artwork" : "../artwork/MV5BNjU1N2VjNGEtYWQ1Yi00ZjYxLTlhMjMtZDM3OGNhMjI1ZjljXkEyXkFqcGdeQXVyMjQ3MjU3NTU@._V1_SY1000_CR0,0,1329,1000_AL_.jpg",
+      "filename" : "~/TV Shows/Star Trek TNG/Season 5/26 - Times Arrow Part 1.mpeg",
+      "collections" : [
+        {
+          "name" : "Star Trek: The Next Generation",
+          "collections" : [
+            {
+              "name" : "Season 5",
+              "order" : 26
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id" : 7,
+      "title" : "Time's Arrow: Part II",
+      "year" : "1992",
+      "director" : "Les Landau",
+      "directorsort" : "Landau, Les",
+      "cast" : [
+        "Patrick Stewart",
+        "Whoopi Goldberg",
+        "Jonathan Frakes",
+        "Gates McFadden",
+        "LeVar Burton",
+        "Michael Dorn",
+        "Mark Twain"
+      ],
+      "description" : "Captain Picard and crew follow Data back to the late 1800s to get him back, only to find the suspected alien visitors killing people of that time.",
+      "genre" : "Sci-Fi",
+      "tags" : "sci-fi drama space 90s",
+      "seen" : false,
+      "position" : 0,
+      "duration" : 2700,
+      "rating" : 4,
+      "dateadded" : "1323525600",
+      "lastseen" : null,
+      "kind" : "show",
+      "artwork" : "../artwork/MV5BNDY0OTY1YjAtYzQxOS00YjFhLTliNjctOTYzNWU4YmRhZjhmXkEyXkFqcGdeQXVyMjQ3MjU3NTU@._V1_UY268_CR87,0,182,268_AL_.jpg",
+      "filename" : "~/TV Shows/Star Trek TNG/Season 6/01 - Times Arrow Part 2.mpeg",
+      "collections" : [
+        {
+          "name" : "Star Trek: The Next Generation",
+          "collections" : [
+            {
+              "name" : "Season 6",
+              "order" : 1
+            }
+          ]
+        }
+      ]
     }
   ]
 }

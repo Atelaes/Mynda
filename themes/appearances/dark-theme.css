@@ -328,20 +328,39 @@ in lieu of that, we will use a negative margin on the selected element instead (
 .detail-title-text {
   text-shadow: 0em 0em .2em #000000;
   white-space: nowrap;
-
-  /* marquee effect */
-  /* animation: scroll-left 7s ease-in infinite;
-  animation-delay: 2s;
-  animation-direction: alternate;
-  animation-fill-mode: both; */
 }
 
-@keyframes scroll-left {
+/* add marquee effect to detail title if it's too long */
+/* .detail-title-text.overflow {
+  animation: details-scroll-left 7s ease-in infinite;
+  animation-delay: 2s;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+} */
+
+@keyframes details-scroll-left {
   0% {
     transform: translateX(0%);
   }
   100% {
     transform: translateX(-120%);
+  }
+}
+
+.table-title-text.overflow {
+  /* marquee effect */
+  animation: table-scroll-left 5s ease-in infinite;
+  animation-delay: 0s;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+}
+
+@keyframes table-scroll-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-90%);
   }
 }
 
