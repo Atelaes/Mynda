@@ -85,7 +85,7 @@ class MynLibNav extends React.Component {
     return (<div id="nav-bar">
         <ul id="playlist-nav">
           {this.props.playlists.map((playlist, index) => (
-            <li key={playlist.id} style={{zIndex: 9999 - index}} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
+            <li key={playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
         <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." /></div>

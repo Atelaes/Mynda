@@ -4,7 +4,7 @@ library = {
       "id" : 0,
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
-      "view" : "flat"
+      "view" : "hierarchical"
     },
     {
       "id" : 1,

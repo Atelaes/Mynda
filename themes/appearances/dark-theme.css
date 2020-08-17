@@ -5,6 +5,12 @@
 
 @font-face {
   font-family: HKGrotesk;
+  src: url('../_fonts/HKGrotesk-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: HKGrotesk;
   src: url('../_fonts/HKGrotesk-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
@@ -12,13 +18,13 @@
 @font-face {
   font-family: HKGrotesk;
   src: url('../_fonts/HKGrotesk-Medium.ttf') format('truetype');
-  font-weight: 500 600;
+  font-weight: 500;
   font-style: normal;
 }
 @font-face {
   font-family: HKGrotesk;
-  src: url('../_fonts/HKGrotesk-Light.ttf') format('truetype');
-  font-weight: 300;
+  src: url('../_fonts/HKGrotesk-SemiBold.ttf') format('truetype');
+  font-weight: 600;
   font-style: normal;
 }
 @font-face {
@@ -83,7 +89,7 @@
   --main-font-weight: normal;
   --big-title-font: Dorsa, Helvetica, sans-serif;
   --playlist-tab-font: var(--main-font);
-  --playlist-tab-font-size: ;
+  --playlist-tab-font-size: inherit;
   --playlist-tab-font-weight: 500;
   --th-font: WireOne, Helvetica, sans-serif;
   --th-font-size: calc(var(--main-font-size) * 5 / 3);
@@ -92,7 +98,14 @@
   --table-cell-monofont-weight: 300;
   --movie-row-date-font-size: calc(var(--main-font-size) * 5 / 6);
   --movie-row-year-font-size: calc(var(--main-font-size) * 7 / 8);
+  --collectionheader-font: var(--main-font);
+  --collectionheader-font-size: var(--main-font-size);
+  --collectionheader-font-weight: 600;
+  --collectionheader-font-style: inherit;
   --details-font-size: calc(var(--main-font-size) * 5 / 6);
+  --detailtitle-font-size: calc(var(--main-font-size) * 25 / 6);
+  --detailtags-font-style: italic;
+  --detaildescrip-font-size: inherit;
   --detaillabel-font-size: var(--main-font-size);
   --detaillabel-font-style: normal;
 
@@ -115,9 +128,9 @@
   --main-text: #b6b9bf; /*#a1a9b7;*/
   --bright-text: #d8dde5; /*#cfd4dc;*/
   --dim-text: #8b929e; /*#7e848f;*/
-}
+/* } */
 
-body {
+/* body { */
   --main-bg: var(--dark-bg);
   --pane-bg-0: var(--med-bg);
   --pane-bg-1: var(--darker-bg);
@@ -126,17 +139,19 @@ body {
   --library-bg: var(--main-bg);
   --details-bg: var(--pane-bg-1);
 
-  --textinput-font-size: calc(var(--main-font-size) * 3 / 4);
+  --textinput-font-size: calc(var(--main-font-size));/* * 3 / 4);*/
+  --textinput-height: calc(var(--textinput-font-size) * 7 / 5);
   --textinput-bg: var(--med-bg);
   --textinput-text: var(--dim-text);
-  --textinput-border: .1em solid var(--light-bg);
+  --textinput-border: .12em solid var(--light-bg);
   --textinput-borderradius: 999px;
   --textinput-padding: 0em 1.2em 0em .5em;
-}
+/* } */
+  --searchfield-height: var(--textinput-height);
 
-#nav-bar {
+/* #nav-bar { */
   --playlisttab-bg: var(--pane-bg-0);
-  --playlisttab-bg-hover: var(--playlisttab-bg);
+  --playlisttab-bg-hover: var(--medlight-bg);
   --playlisttab-bg-selected: var(--playlisttab-bg);
   --playlisttab-bgimg-selected: linear-gradient(-20deg, var(--playlisttab-bg) 50%, var(--medlight-bg) 115%);
   --playlisttab-text: var(--main-text);
@@ -156,18 +171,23 @@ body {
   --playlisttab-boxshadow: .2em -.2em .15em .05em rgba(24,26,30,.2);
   --playlisttab-boxshadow-selected: var(--playlisttab-boxshadow), -.2em -.2em .15em .05em rgba(24,26,30,.2);
   --playlisttab-padding: .2em .7em .2em .7em;
-}
+/* } */
 
-#library-pane {
-   --collection-bg: var(--light-bg);
-   --collection-bg-hover: var(--main-text);
-   --collection-text: var(--main-text);
-   --collection-text-hover: var(--library-bg);
+/* #library-pane { */
+  --collection-marginleft: .7em;
 
-   --dropdownarrow-color: var(--bright-text);
-}
+  --collectionheader-bg: var(--lighter-bg);
+  --collectionheader-bg-hover: var(--lighter-bg);
+  --collectionheader-text: var(--library-bg);
+  --collectionheader-text-hover: var(--library-bg);
+  --collectionheader-margin-bottom: 3px; /* one of the few times we use pixels instead of em's, because in this case, consistency is more important than scalability */
+  --collectionheader-margin: 0em 0em var(--collectionheader-margin-bottom) 0em;
+  --collectionheader-padding: .5em 0em .5em .5em;
 
-#movie-table {
+  --dropdownarrow-color: var(--collectionheader-text);
+/* } */
+
+/* #movie-table { */
   --th-bg: var(--pane-bg-0);
   --th-bg-hover: var(--th-bg); /*var(--light-bg);*/
   --th-text: var(--dim-text);
@@ -193,58 +213,118 @@ body {
 
   --editwidget-text-hover: ;
   --editwidget-opacity-hover: .3;
-}
+/* } */
 
-#details-pane {
+/* #details-pane { */
   --detailtitle-text: var(--bright-text);
   --detailtitle-bg: linear-gradient(0deg, var(--details-bg) 5%, rgba(0,0,0,.6) 60%, rgba(0,0,0,0) 100%);
-  --detailtitle-font-size: calc(var(--main-font-size) * 25 / 6);
 
   --detailposition-border: .075em solid var(--lighter-bg);
   --detailposition-bg: var(--dark-bg);
   --detailpositioninner-bg: var(--lighter-bg);
 
-  --detailtags-font-style: italic;
-
-  --detaildescrip-font-size: inherit;
 }
 
 /******************************************/
 
-
+/* extend the playlist tabs to the left so they slip behind the tab to their left, creating an overlap effect */
 #playlist-nav li {
   border-radius: 0em .5em 0em 0em;
   padding-left: 1.4em !important;
   margin-left: -.7em;
 }
+
+/* undo overlap effect for selected tab */
 #playlist-nav li.selected {
   border-radius: .5em .5em 0em 0em;
   padding-left: .7em !important;
   margin-left: calc(-1 * var(--playlisttab-borderwidth-selected));
   z-index:10000 !important;
 }
-/* the below is not supported yet. It would removing the right border of the previous tab
+
+/* the below is not supported yet. It would remove the right border of the previous tab
 in order to keep the tabs from shifting over when we apply a left border to the selected tab.
 in lieu of that, we will use a negative margin on the selected element instead (in the above block) to compensate for the extra border */
 /*#playlist-nav li:has(+ (#playlist-nav li.selected)) { /* the tab to the left of the selected tab */
   /*border-width: var(--playlisttab-borderwidth-width) 0em var(--playlisttab-borderwidth-width) 0em;
 } */
-#playlist-nav::after { /* line extending to the right of the tabs */
+
+/* specifically set a selected tab of a hierarchical playlist to match the collection header background */
+#playlist-nav li.selected.hierarchical {
+  background-image: none !important;
+  background-color: var(--collectionheader-bg) !important;
+  border-bottom: var(--playlisttab-borderwidth-width) solid var(--collectionheader-bg);
+  color: var(--collectionheader-text);
+  font-weight: calc(var(--playlist-tab-font-weight) + 200);
+}
+
+/* line extending to the right of the tabs to match the tab borders */
+#playlist-nav::after {
   content:"";
   border-top: var(--playlisttab-borderwidth-width) var(--playlisttab-borderstyle) var(--playlisttab-bordercolor-selected-color);
   flex-grow:1;
 }
 
+/* get rid of the word "Search: " preceding the search text box */
 #search-label {
   display:none;
 }
 
+/* bump the table right up to the collection header in hierarchical playlists */
+.collection #movie-table {
+  margin-top: calc(-1 * var(--collectionheader-margin-bottom));
+}
+
+/* add a little inset shadow over the first child collection of an open collection header element */
+.collection.expanded .collection:first-of-type h1 {
+  box-shadow: inset -.5em .2em .3em .0em rgba(0,0,0,.5);
+  width: calc(100% + .5em); /* so we can't see the shadow on the right vertical side */
+}
+
+/* remove the margin from the first child collection of an open collection header */
+.collection.expanded .collection:first-of-type {
+  margin-top: calc(-1 * var(--collectionheader-margin-bottom));
+}
+
+/* .collection.collapsed h1 {
+  box-shadow: none;
+  margin-bottom: var(--collectionheader-margin-bottom);
+} */
+
+
+/* make the dateadded text spacing skinnier */
 #movie-table .mono {
   word-spacing: -.3em;
   /* position: relative;
   bottom: 0.5px; */
 }
 
+/* add right-facing triangle icon to the h1 of a collapsed collection div */
+.collection.collapsed > :first-child::before {
+  content:"\25B8";
+  padding-right:.2em;
+  color: var(--dropdownarrow-color);
+}
+.collection.collapsed > :first-child:hover::before { /* and the same thing hovered */
+  content:"\25B8";
+  padding-right:.2em;
+  color: var(--dim-text);
+  text-shadow: 0em 0em .2em var(--dark-bg);
+}
+/* add down-facing triangle icon to the h1 of an expanded collection div */
+.collection.expanded > :first-child::before {
+  content:"\25BE";
+  padding-right:.2em;
+  color: var(--dropdownarrow-color);
+}
+.collection.expanded > :first-child:hover::before { /* and the same thing hovered */
+  content:"\25BE";
+  padding-right:.2em;
+  color: var(--dim-text);
+  text-shadow: 0em 0em .2em var(--dark-bg);
+}
+
+/* add slight black shadow to big title text in details pane */
 .detail-title-text {
   text-shadow: 0em 0em .2em #000000;
   white-space: nowrap;
@@ -265,17 +345,17 @@ in lieu of that, we will use a negative margin on the selected element instead (
   }
 }
 
-/* search magnifying glass */
+/* add search-field magnifying glass icon */
 #search-field::after {
   content:"";
   position:absolute;
-  right:0px;
+  right:calc(var(--textinput-height) * -.1);
   top:0px;
   height:100%;
-  width:.8em;
+  width: calc(var(--textinput-height));
   background-image: url('../../images/mag-icon_white.png');
   background-position: 0% 50%;
   background-repeat: no-repeat;
-  background-size:.6em .6em;
+  background-size:calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
   opacity:.25;
 }
