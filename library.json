@@ -1,4 +1,22 @@
 library = {
+  "settings" : {
+    "watchfolders" : [
+      {
+        "path" : "/some/path",
+        "watch" : true,
+        "defaults" : {
+          "kind" : "movie"
+        }
+      },
+      {
+        "path" : "/some/other/path",
+        "watch" : false,
+        "defaults" : {
+          "kind" : "show"
+        }
+      }
+    ]
+  },
   "playlists" : [
     {
       "id" : 0,

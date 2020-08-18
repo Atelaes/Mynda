@@ -330,3 +330,28 @@ th, tr, td {
 #detail-description {
   font-size: var(--detaildescrip-font-size);
 }
+
+#settings-pane {
+  position:absolute;
+  top:15%;
+  left:15%;
+  z-index:999999;
+
+  width:70%;
+  height:70%;
+  background-color:rgba(30,30,30,.85);
+  padding: 2em;
+  box-sizing:border-box;
+}
+
+#close-settings-button {
+  cursor:pointer;
+  user-select: none;
+  position:absolute;
+  top: -.5em;
+  right: -.5em;
+  /* background-color:#444444;
+  border-radius: 999px;
+  width:1em;
+  height:1em; */
+}

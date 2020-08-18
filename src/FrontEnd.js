@@ -1,6 +1,6 @@
 //const React = require('React');
 
-class MynLibraryView extends React.Component {
+class Mynda extends React.Component {
   constructor(props) {
     super(props)
 
@@ -8,11 +8,12 @@ class MynLibraryView extends React.Component {
       videos : library.media,
       playlists : library.playlists,
       collections : library.collections,
+      settings: library.settings,
       filteredVideos : [],
       view : "flat", // whether to display a flat table or a hierarchical view
       detailId: null,
-      detailMovie: {}
-
+      detailMovie: {},
+      settingsPane: null
     }
 
     this.render = this.render.bind(this);
@@ -20,6 +21,8 @@ class MynLibraryView extends React.Component {
     this.setPlaylist = this.setPlaylist.bind(this);
     this.showDetails = this.showDetails.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
+    this.showSettings = this.showSettings.bind(this);
+    this.hideSettings = this.hideSettings.bind(this);
   }
 
   showDetails(id, e) {
@@ -60,6 +63,14 @@ class MynLibraryView extends React.Component {
     // alert(this.state.currentPlaylistID)
   }
 
+  showSettings() {
+    this.setState({"settingsPane" : <MynSettings settings={this.state.settings} hideFunction={this.hideSettings}/>});
+  }
+
+  hideSettings() {
+    this.setState({"settingsPane" : null});
+  }
+
   // set the initial playlist
   componentDidMount(props) {
     // let playlist = library.playlists[0];
@@ -69,12 +80,12 @@ class MynLibraryView extends React.Component {
   }
 
   render () {
-    return (<div id='grid-container'> <MynLibNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} /> <MynLibTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynLibDetails movie={this.state.detailMovie} /> </div>);
+    return (<div id='grid-container'> <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} showSettings={this.showSettings}/> <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynDetails movie={this.state.detailMovie} /> {this.state.settingsPane}</div>);
   }
 }
 
 // ###### Nav bar: contains playlist tabs and search field ###### //
-class MynLibNav extends React.Component {
+class MynNav extends React.Component {
   constructor(props) {
     super(props)
 
@@ -89,12 +100,15 @@ class MynLibNav extends React.Component {
           ))}
         </ul>
         <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." /></div>
+        <div id="settings-button" onClick={() => this.props.showSettings()}>{"\u2699"}</div>
       </div>)
   }
 }
 
-// ###### Table Container: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
-class MynLibTableContainer extends React.Component {
+
+
+// ###### Table Container: parent of MynTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
+class MynTableContainer extends React.Component {
   constructor(props) {
     super(props)
 
@@ -182,8 +196,8 @@ class MynLibTableContainer extends React.Component {
         }
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
-        // then hand them off to MynLibTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
+        // then hand them off to MynTable with an initial sort by 'order'
+        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
       } else {
         return null;
       }
@@ -209,7 +223,7 @@ class MynLibTableContainer extends React.Component {
 
     } else if (this.props.view === "flat") {
 
-      content = (<MynLibTable movies={this.props.movies} view={this.props.view} showDetails={this.props.showDetails} />)
+      content = (<MynTable movies={this.props.movies} view={this.props.view} showDetails={this.props.showDetails} />)
 
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
@@ -220,7 +234,7 @@ class MynLibTableContainer extends React.Component {
 }
 
 // ###### Table: contains list of movies in the selected playlist ###### //
-class MynLibTable extends React.Component {
+class MynTable extends React.Component {
   constructor(props) {
     super(props)
     this.render = this.render.bind(this);
@@ -314,8 +328,8 @@ class MynLibTable extends React.Component {
         <td className="year centered mono">{movie.year}</td>
         <td className="director">{movie.director}</td>
         <td className="genre">{movie.genre}</td>
-        <td className="seen centered"><MynLibSeenCheckmark movie={movie} /></td>
-        <td className="rating centered"><MynLibRatingStars movie={movie} /></td>
+        <td className="seen centered"><MynSeenCheckmark movie={movie} /></td>
+        <td className="rating centered"><MynRatingStars movie={movie} /></td>
         <td className="dateadded centered mono">{displaydate}</td>
       </tr>
     )})
@@ -328,7 +342,7 @@ class MynLibTable extends React.Component {
     // if (this.props.movies.filter(movie => (movie.order === undefined || movie.order === null)).length == this.props.movies.length) {
       // if none of the movies handed to us have an "order" property
       //    (not within the collections property, but a top-level "order" property—
-      //    this property does not exist in the library JSON, but is assigned by MynLibTableContainer
+      //    this property does not exist in the library JSON, but is assigned by MynTableContainer
       //    in the case of showing a hierarchical view)
       // then hide the 'order' column with CSS
     if (this.props.view === 'flat') {
@@ -384,7 +398,7 @@ class MynLibTable extends React.Component {
 }
 
 // ######  ###### //
-class MynLibGraphicalEditWidget extends React.Component {
+class MynGraphicalEditWidget extends React.Component {
   constructor(props) {
     super(props)
 
@@ -441,7 +455,7 @@ class MynLibGraphicalEditWidget extends React.Component {
 }
 
 // ######  ###### //
-class MynLibRatingStars extends MynLibGraphicalEditWidget {
+class MynRatingStars extends MynGraphicalEditWidget {
   constructor(props) {
     super(props)
 
@@ -473,7 +487,7 @@ class MynLibRatingStars extends MynLibGraphicalEditWidget {
 }
 
 // ######  ###### //
-class MynLibSeenCheckmark extends MynLibGraphicalEditWidget {
+class MynSeenCheckmark extends MynGraphicalEditWidget {
   constructor(props) {
     super(props)
 
@@ -496,7 +510,7 @@ class MynLibSeenCheckmark extends MynLibGraphicalEditWidget {
 }
 
 // // ######  ###### //
-// class MynLibStars extends React.Component {
+// class MynStars extends React.Component {
 //   constructor(props) {
 //     super(props)
 //
@@ -560,7 +574,7 @@ class MynLibSeenCheckmark extends MynLibGraphicalEditWidget {
 // }
 
 // ###### Details pane: contains details of the hovered/clicked video ###### //
-class MynLibDetails extends React.Component {
+class MynDetails extends React.Component {
   constructor(props) {
     super(props)
 
@@ -578,7 +592,7 @@ class MynLibDetails extends React.Component {
       date = new Date(parseInt(lastseen) * 1000);
       displaydate = date.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
     } catch(e) {
-      console.log("MynLibDetails: could not resolve date for lastseen: " + e.toString());
+      console.log("MynDetails: could not resolve date for lastseen: " + e.toString());
       displaydate = "";
     }
     return displaydate;
@@ -591,7 +605,7 @@ class MynLibDetails extends React.Component {
         titleDiv.classList.add('overflow');
       }
     } catch(e) {
-      
+
     }
   }
 
@@ -620,6 +634,63 @@ class MynLibDetails extends React.Component {
   }
 }
 
+class MynSettings extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      settingView: null
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  setView(view) {
+    let views = {
+      folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
+      themes : (<MynSettingsThemes />)
+    }
+    this.setState({settingView : views[view]});
+  }
+
+  componentDidMount(props) {
+    this.setView('folders');
+  }
+
+  render() {
+    return (<div id="settings-pane">
+      <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
+      <ul>
+        <li onClick={() => this.setView("folders")}>Folders</li>
+        <li onClick={() => this.setView("themes")}>Themes</li>
+      </ul>
+      <div id="settings-content">{this.state.settingView}</div>
+    </div>)
+  }
+}
+
+class MynSettingsFolders extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (<h1>I'm a Folders!!!</h1>)
+  }
+
+}
+
+class MynSettingsThemes extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (<h1>I'm a Themee!!!</h1>)
+  }
+
+}
 
 
-ReactDOM.render(<MynLibraryView />, document.getElementById('root'));
+
+ReactDOM.render(<Mynda />, document.getElementById('root'));

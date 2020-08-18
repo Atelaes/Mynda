@@ -378,3 +378,17 @@ in lieu of that, we will use a negative margin on the selected element instead (
   background-size:calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
   opacity:.25;
 }
+
+#settings-button {
+  position:absolute;
+  top:0px;
+  right: 500px;
+  font-size:50pt;
+  cursor:pointer;
+  user-select:none;
+
+}
+
+#settings-pane {
+
+}
