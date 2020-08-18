@@ -8,16 +8,19 @@ class MynLibraryView extends React.Component {
       videos : library.media,
       playlists : library.playlists,
       collections : library.collections,
-      filteredVideos : [],
+      filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
+      playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
       detailId: null,
-      detailMovie: {}
-
+      detailMovie: {},
+      currentPlaylistID : null,
+      prevQuery: ''
     }
 
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
+    this.search = this.search.bind(this);
     this.showDetails = this.showDetails.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
   }
@@ -53,11 +56,83 @@ class MynLibraryView extends React.Component {
 
   // called from the nav component to change the current playlist
   setPlaylist(id,element) {
-    // this.state.currentPlaylistID = id
-    this.setState({filteredVideos : this.playlistFilter(id), view : this.state.playlists.filter(playlist => playlist.id == id)[0].view})
+    if (!element) {
+      element = document.getElementById("playlist-" + id);
+    }
+    let videos = this.playlistFilter(id);
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : this.state.playlists.filter(playlist => playlist.id == id)[0].view, currentPlaylistID : id})
+    // this.setState({}); // filteredVideos is what is actually displayed
     Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
     element.classList.add('selected');
-    // alert(this.state.currentPlaylistID)
+  }
+
+  // called when the search input is changed
+  // change the filteredVideos state variable to those videos that match query
+  search(e) {
+    let query = e.target.value;
+    if (query != "") {
+      this.setState({ filteredVideos : this.searchFilter(query) });
+    } else {
+      // if the field is empty, reset to the full playlist
+      this.setPlaylist(this.state.currentPlaylistID);
+    }
+  }
+
+  // filter videos in current playlist to match search query
+  searchFilter(query) {
+    // the below optimization might fail in the case of a copy-paste situation, so we need a more robust solution
+    // // if a character is deleted, we need to search all the movies in the playlist again,
+    // // but if a character is added, we only need to search the movies we've already filtered
+    // const videos = query.length < this.state.prevQuery.length ? this.state.playlistVideos : this.state.filteredVideos;
+    const videos = this.state.playlistVideos;
+    return videos.filter((video) => {
+      query = query.replace(/\s+/,' ').replace(/^\s|\s$/,''); // eliminate multiple white-space characters and leading/trailing whitespace
+      const subQueries = query.split(' ');
+      // console.log('search terms: ' + subQueries);
+
+      queryLoop: for (let i=0; i<subQueries.length; i++) {
+        let regex = new RegExp(subQueries[i],'i');
+        let flag = false;
+
+        // Object.keys(video).forEach((key) => {
+        fieldLoop: for (const field in video) {
+          switch(field) {
+            // the first group of fields are just a simple string search
+            case "title":
+            case "year":
+            case "director":
+            case "description":
+            case "genre":
+            case "tags":
+              if (regex.test(video[field])) {
+                flag = true;
+                break fieldLoop;
+              }
+              break;
+            // cast is an array
+            case "cast":
+              for(let i=0; i<video[field].length; i++) {
+                if (regex.test(video[field])) {
+                  flag = true;
+                  break fieldLoop;
+                }
+              }
+              break;
+            // the remaining fields are ones we do not want to search
+            default:
+              break;
+          }
+        }
+        // if the results are false on any of the query terms (sub-queries),
+        // we want to return false
+        if (flag == false) {
+          return false;
+        }
+      }
+      // if we're here, all the search terms were found somewhere in this video
+      // so return true
+      return true;
+    });
   }
 
   // set the initial playlist
@@ -68,8 +143,12 @@ class MynLibraryView extends React.Component {
     document.getElementById('playlist-nav').getElementsByTagName('li')[0].click();
   }
 
+  componentDidUpdate() {
+    // console.log('results: ' + this.state.filteredVideos.map((video) => video.title));
+  }
+
   render () {
-    return (<div id='grid-container'> <MynLibNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} /> <MynLibTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynLibDetails movie={this.state.detailMovie} /> </div>);
+    return (<div id='grid-container'> <MynLibNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} /> <MynLibTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynLibDetails movie={this.state.detailMovie} /> </div>);
   }
 }
 
@@ -85,10 +164,10 @@ class MynLibNav extends React.Component {
     return (<div id="nav-bar">
         <ul id="playlist-nav">
           {this.props.playlists.map((playlist, index) => (
-            <li key={playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
+            <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." /></div>
+        <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /></div>
       </div>)
   }
 }
@@ -591,7 +670,7 @@ class MynLibDetails extends React.Component {
         titleDiv.classList.add('overflow');
       }
     } catch(e) {
-      
+
     }
   }
 
