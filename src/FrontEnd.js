@@ -660,7 +660,7 @@ class MynSettings extends React.Component {
   render() {
     return (<div id="settings-pane">
       <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
-      <ul>
+      <ul id="settings-tabs">
         <li onClick={() => this.setView("folders")}>Folders</li>
         <li onClick={() => this.setView("themes")}>Themes</li>
       </ul>
