@@ -145,7 +145,7 @@
   --textinput-text: var(--dim-text);
   --textinput-border: .12em solid var(--light-bg);
   --textinput-borderradius: 999px;
-  --textinput-padding: 0em 1.2em 0em .5em;
+  --textinput-padding: 0em 1.4em 0em .5em;
 /* } */
   --searchfield-height: var(--textinput-height);
 
@@ -365,7 +365,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 /* add search-field magnifying glass icon */
-#search-field::after {
+#search-field.empty::after {
   content:"";
   position:absolute;
   right:calc(var(--textinput-height) * -.1);
@@ -376,5 +376,21 @@ in lieu of that, we will use a negative margin on the selected element instead (
   background-position: 0% 50%;
   background-repeat: no-repeat;
   background-size:calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
+  opacity:.25;
+}
+
+/* when there's text in the box, change the magnifying glass to an x */
+#search-field.filled::after {
+  content:"\2715";
+  color:white;
+  position:absolute;
+  right:calc(var(--textinput-height) * -.1);
+  top:0px;
+  height:100%;
+  width: calc(var(--textinput-height));
+  /* background-image: url('../../images/mag-icon_white.png');
+  background-position: 0% 50%;
+  background-repeat: no-repeat;
+  background-size:calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6); */
   opacity:.25;
 }

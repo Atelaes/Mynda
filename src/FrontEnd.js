@@ -71,8 +71,17 @@ class MynLibraryView extends React.Component {
   search(e) {
     let query = e.target.value;
     if (query != "") {
+      // change the classes of the parent element to help with styling
+      e.target.parentNode.classList.add('filled');
+      e.target.parentNode.classList.remove('empty');
+
+      // if the query is not empty, filter the videos
       this.setState({ filteredVideos : this.searchFilter(query) });
     } else {
+      // change the classes of the parent element to help with styling
+      e.target.parentNode.classList.remove('filled');
+      e.target.parentNode.classList.add('empty');
+
       // if the field is empty, reset to the full playlist
       this.setPlaylist(this.state.currentPlaylistID);
     }
@@ -121,14 +130,16 @@ class MynLibraryView extends React.Component {
             // the remaining fields are ones we do not want to search
             default:
               break;
-          }
-        }
+          } // end switch
+        } // end fieldLoop
+
         // if the results are false on any of the query terms (sub-queries),
         // we want to return false
         if (flag == false) {
           return false;
         }
-      }
+      } // end queryLoop
+
       // if we're here, all the search terms were found somewhere in this video
       // so return true
       return true;
@@ -167,7 +178,7 @@ class MynLibNav extends React.Component {
             <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /></div>
+        <div id="search-field" className="empty"><span id="search-label">Search: </span><input type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /></div>
       </div>)
   }
 }
