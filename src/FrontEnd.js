@@ -171,6 +171,12 @@ class MynLibNav extends React.Component {
     this.render = this.render.bind(this);
   }
 
+  clearSearch(e) {
+    const input = document.getElementById("search-input");
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true })); // necessary to trigger the search function
+  }
+
   render() {
     return (<div id="nav-bar">
         <ul id="playlist-nav">
@@ -178,7 +184,7 @@ class MynLibNav extends React.Component {
             <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field" className="empty"><span id="search-label">Search: </span><input type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /></div>
+        <div id="search-field" className="empty"><span id="search-label">Search: </span><input id="search-input" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
       </div>)
   }
 }
