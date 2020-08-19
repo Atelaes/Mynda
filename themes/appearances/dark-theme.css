@@ -378,3 +378,14 @@ in lieu of that, we will use a negative margin on the selected element instead (
     transform: translateX(-90%);
   }
 }
+
+/* make the empty stars a little dimmer */
+.star.empty {
+  opacity: var(--editwidget-opacity-hover);
+}
+
+/* but when they're hovered, make them the same as the filled stars,
+   which will be dimmed to the same amount */
+.stars:hover .star.empty {
+  opacity:1;
+}

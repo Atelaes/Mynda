@@ -568,12 +568,15 @@ class MynRatingStars extends MynGraphicalEditWidget {
     let stars = [];
     let char = "";
     for (let i=1; i<=5; i++) {
+      let starClass = "star ";
       if (i <= rating) {
         char="\u2605";
+        starClass += "filled";
       } else {
         char="\u2606";
+        starClass += "empty";
       }
-      stars.push(<li className="star" key={i} onMouseOver={(e) => this.mouseOver(i,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(i,e)}>{char}</li>);
+      stars.push(<li className={starClass} key={i} onMouseOver={(e) => this.mouseOver(i,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(i,e)}>{char}</li>);
     }
     this.setState({displayGraphic : stars});
   }
