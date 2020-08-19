@@ -15,7 +15,26 @@ library = {
           "kind" : "show"
         }
       }
-    ]
+    ],
+    "themes" : {
+      "appearances" : [
+        {
+          "name" : "Dark Theme",
+          "path" : "../themes/appearances/dark-theme.css",
+          "dependencies" : {
+            "fonts" : [],
+            "images" : []
+          }
+        }
+      ],
+      "layouts" : [
+        {
+          "name" : "Default Layout Theme",
+          "path" : "../themes/layouts/default-layout-theme.css",
+          "dependencies" : {}
+        }
+      ]
+    }
   },
   "playlists" : [
     {

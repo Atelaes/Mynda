@@ -64,7 +64,7 @@ class Mynda extends React.Component {
   }
 
   showSettings() {
-    this.setState({"settingsPane" : <MynSettings settings={this.state.settings} hideFunction={this.hideSettings}/>});
+    this.setState({"settingsPane" : <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={this.hideSettings}/>});
   }
 
   hideSettings() {
@@ -639,6 +639,12 @@ class MynSettings extends React.Component {
     super(props)
 
     this.state = {
+      views: {
+        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
+        playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
+        collections : (<MynSettingsCollections collections={this.props.collections} />),
+        themes : (<MynSettingsThemes themes={this.props.settings.themes} />)
+      },
       settingView: null
     }
 
@@ -646,11 +652,7 @@ class MynSettings extends React.Component {
   }
 
   setView(view) {
-    let views = {
-      folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
-      themes : (<MynSettingsThemes />)
-    }
-    this.setState({settingView : views[view]});
+    this.setState({settingView : this.state.views[view]});
   }
 
   componentDidMount(props) {
@@ -658,16 +660,24 @@ class MynSettings extends React.Component {
   }
 
   render() {
+    const tabs = [];
+    Object.keys(this.state.views).forEach((tab) => {
+      tabs.push(<li key={tab} onClick={() => this.setView(tab)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
+    });
+
     return (<div id="settings-pane">
       <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
       <ul id="settings-tabs">
-        <li onClick={() => this.setView("folders")}>Folders</li>
-        <li onClick={() => this.setView("themes")}>Themes</li>
+        {tabs}
       </ul>
       <div id="settings-content">{this.state.settingView}</div>
     </div>)
   }
 }
+
+// <li onClick={() => this.setView("folders")}>Folders</li>
+// <li onClick={() => this.setView("themes")}>Themes</li>
+
 
 class MynSettingsFolders extends React.Component {
   constructor(props) {
@@ -680,6 +690,27 @@ class MynSettingsFolders extends React.Component {
 
 }
 
+class MynSettingsPlaylists extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (<h1>I'm a Playlists!!!</h1>)
+  }
+}
+
+class MynSettingsCollections extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (<h1>I'm a Collections!!!</h1>)
+  }
+}
+
+
 class MynSettingsThemes extends React.Component {
   constructor(props) {
     super(props);
@@ -688,7 +719,6 @@ class MynSettingsThemes extends React.Component {
   render() {
     return (<h1>I'm a Themee!!!</h1>)
   }
-
 }
 
 
