@@ -37,10 +37,6 @@ body ::-webkit-scrollbar {
   user-select: none;
 }
 
-#search-field {
-  height: var(--searchfield-height);
-}
-
 input[type=text] {
   font-size: var(--textinput-font-size);
   height: var(--textinput-height);
@@ -118,8 +114,43 @@ input[type=text] {
   box-shadow: var(--playlisttab-boxshadow-selected);
 }
 
+/* search input container */
 #search-field {
+  height: var(--searchfield-height);
 }
+
+/* when the search field is empty, optionally display an icon on the right side of it */
+/* this is simply an empty div; we must populate it with an icon */
+#search-field.empty #search-clear-button {
+  position: var(--searchicon-position);
+  top: var(--searchicon-top);
+  bottom: var(--searchicon-bottom);
+  left: var(--searchicon-left);
+  right: var(--searchicon-right);
+  height: var(--searchicon-height);
+  width: var(--searchicon-width);
+  background: var(--searchicon-background-empty);
+  background-size: var(--searchicon-bg-size);
+  opacity:var(--searchicon-opacity);
+}
+
+/* when the search field has text, optionally display an icon on the right side of it */
+/* this is simply an empty div; we must populate it with an icon */
+/* when clicked, this div will clear the search field */
+#search-field.filled #search-clear-button {
+  position: var(--searchicon-position);
+  top: var(--searchicon-top);
+  bottom: var(--searchicon-bottom);
+  left: var(--searchicon-left);
+  right: var(--searchicon-right);
+  height: var(--searchicon-height);
+  width: var(--searchicon-width);
+  background: var(--searchicon-background-filled);
+  background-size: var(--searchicon-bg-size);
+  opacity:var(--searchicon-opacity);
+  cursor:pointer;
+}
+
 
 /*************************************/
 /*########## LIBRARY PANE ###########*/

@@ -145,9 +145,24 @@
   --textinput-text: var(--dim-text);
   --textinput-border: .12em solid var(--light-bg);
   --textinput-borderradius: 999px;
-  --textinput-padding: 0em 1.2em 0em .5em;
+  --textinput-padding: 0em 1.4em 0em .5em;
 /* } */
   --searchfield-height: var(--textinput-height);
+
+  --searchicon-opacity: .25;
+  --searchicon-empty: url('../../images/mag-icon_white.png');
+  --searchicon-filled: url('../../images/x-icon_white.png');
+  --searchicon-position: absolute;
+  --searchicon-top: 0em;
+  --searchicon-bottom: inherit;
+  --searchicon-left: inherit;
+  --searchicon-right: calc(var(--textinput-height) * -.1);
+  --searchicon-height: var(--searchfield-height);
+  --searchicon-width: var(--textinput-height);
+  --searchicon-background-empty: rgba(0,0,0,0) var(--searchicon-empty) no-repeat 0% 50%;
+  --searchicon-background-filled: rgba(0,0,0,0) var(--searchicon-filled) no-repeat 0% 50%;
+  --searchicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
+
 
 /* #nav-bar { */
   --playlisttab-bg: var(--pane-bg-0);
@@ -362,19 +377,4 @@ in lieu of that, we will use a negative margin on the selected element instead (
   100% {
     transform: translateX(-90%);
   }
-}
-
-/* add search-field magnifying glass icon */
-#search-field::after {
-  content:"";
-  position:absolute;
-  right:calc(var(--textinput-height) * -.1);
-  top:0px;
-  height:100%;
-  width: calc(var(--textinput-height));
-  background-image: url('../../images/mag-icon_white.png');
-  background-position: 0% 50%;
-  background-repeat: no-repeat;
-  background-size:calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
-  opacity:.25;
 }

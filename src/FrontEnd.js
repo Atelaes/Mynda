@@ -10,16 +10,20 @@ class Mynda extends React.Component {
       playlists : library.playlists,
       collections : library.collections,
       settings: library.settings,
-      filteredVideos : [],
+      filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
+      playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
       detailId: null,
       detailMovie: {},
+      currentPlaylistID : null,
+      prevQuery: '',
       settingsPane: null
     }
 
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
+    this.search = this.search.bind(this);
     this.showDetails = this.showDetails.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.showSettings = this.showSettings.bind(this);
@@ -57,15 +61,98 @@ class Mynda extends React.Component {
 
   // called from the nav component to change the current playlist
   setPlaylist(id,element) {
-    // this.state.currentPlaylistID = id
-    this.setState({filteredVideos : this.playlistFilter(id), view : this.state.playlists.filter(playlist => playlist.id == id)[0].view})
+    if (!element) {
+      element = document.getElementById("playlist-" + id);
+    }
+    let videos = this.playlistFilter(id);
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : this.state.playlists.filter(playlist => playlist.id == id)[0].view, currentPlaylistID : id})
+    // this.setState({}); // filteredVideos is what is actually displayed
     Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
     element.classList.add('selected');
-    // alert(this.state.currentPlaylistID)
+  }
+
+  // called when the search input is changed
+  // change the filteredVideos state variable to those videos that match query
+  search(e) {
+    let query = e.target.value;
+    if (query != "") {
+      // change the classes of the parent element to help with styling
+      e.target.parentNode.classList.add('filled');
+      e.target.parentNode.classList.remove('empty');
+
+      // if the query is not empty, filter the videos
+      this.setState({ filteredVideos : this.searchFilter(query) });
+    } else {
+      // change the classes of the parent element to help with styling
+      e.target.parentNode.classList.remove('filled');
+      e.target.parentNode.classList.add('empty');
+
+      // if the field is empty, reset to the full playlist
+      this.setPlaylist(this.state.currentPlaylistID);
+    }
+  }
+
+  // filter videos in current playlist to match search query
+  searchFilter(query) {
+    // the below optimization might fail in the case of a copy-paste situation, so we need a more robust solution
+    // // if a character is deleted, we need to search all the movies in the playlist again,
+    // // but if a character is added, we only need to search the movies we've already filtered
+    // const videos = query.length < this.state.prevQuery.length ? this.state.playlistVideos : this.state.filteredVideos;
+    const videos = this.state.playlistVideos;
+    return videos.filter((video) => {
+      query = query.replace(/\s+/,' ').replace(/^\s|\s$/,''); // eliminate multiple white-space characters and leading/trailing whitespace
+      const subQueries = query.split(' ');
+      // console.log('search terms: ' + subQueries);
+
+      queryLoop: for (let i=0; i<subQueries.length; i++) {
+        let regex = new RegExp(subQueries[i],'i');
+        let flag = false;
+
+        // Object.keys(video).forEach((key) => {
+        fieldLoop: for (const field in video) {
+          switch(field) {
+            // the first group of fields are just a simple string search
+            case "title":
+            case "year":
+            case "director":
+            case "description":
+            case "genre":
+            case "tags":
+              if (regex.test(video[field])) {
+                flag = true;
+                break fieldLoop;
+              }
+              break;
+            // cast is an array
+            case "cast":
+              for(let i=0; i<video[field].length; i++) {
+                if (regex.test(video[field])) {
+                  flag = true;
+                  break fieldLoop;
+                }
+              }
+              break;
+            // the remaining fields are ones we do not want to search
+            default:
+              break;
+          } // end switch
+        } // end fieldLoop
+
+        // if the results are false on any of the query terms (sub-queries),
+        // we want to return false
+        if (flag == false) {
+          return false;
+        }
+      } // end queryLoop
+
+      // if we're here, all the search terms were found somewhere in this video
+      // so return true
+      return true;
+    });
   }
 
   showSettings() {
-    this.setState({"settingsPane" : <MynSettings settings={this.state.settings} hideFunction={this.hideSettings}/>});
+    this.setState({"settingsPane" : <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={this.hideSettings}/>});
   }
 
   hideSettings() {
@@ -80,8 +167,12 @@ class Mynda extends React.Component {
     document.getElementById('playlist-nav').getElementsByTagName('li')[0].click();
   }
 
+  componentDidUpdate() {
+    // console.log('results: ' + this.state.filteredVideos.map((video) => video.title));
+  }
+
   render () {
-    return (<div id='grid-container'> <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} showSettings={this.showSettings}/> <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynDetails movie={this.state.detailMovie} /> {this.state.settingsPane}</div>);
+    return (<div id='grid-container'> <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/> <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynDetails movie={this.state.detailMovie} /> {this.state.settingsPane}</div>);
   }
 }
 
@@ -93,14 +184,20 @@ class MynNav extends React.Component {
     this.render = this.render.bind(this);
   }
 
+  clearSearch(e) {
+    const input = document.getElementById("search-input");
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true })); // necessary to trigger the search function
+  }
+
   render() {
     return (<div id="nav-bar">
         <ul id="playlist-nav">
           {this.props.playlists.map((playlist, index) => (
-            <li key={playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
+            <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field"><span id="search-label">Search: </span><input type="text" placeholder="Search..." /></div>
+        <div id="search-field" className="empty"><span id="search-label">Search: </span><input id="search-input" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
         <div id="settings-button" onClick={() => this.props.showSettings()}>{"\u2699"}</div>
       </div>)
   }
@@ -414,7 +511,7 @@ class MynGraphicalEditWidget extends React.Component {
 
   updateValue(value, event) {
     console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
-    event.stopPropagation(); // clicking on the stars should not trigger a click on the whole row
+    event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     this.props.movie[this.state.property] = value;
     event.target.parentNode.classList.remove('over');
   }
@@ -427,7 +524,7 @@ class MynGraphicalEditWidget extends React.Component {
   mouseOut(target,event) {
     this.updateGraphic(this.props.movie[this.state.property]);
     target.classList.remove('over');
-    // console.log("RATING OUT: " + target.classList)
+    // console.log("mouse out: " + target.classList)
     try{
       event.stopPropagation();
     } catch(error) {
@@ -510,70 +607,6 @@ class MynSeenCheckmark extends MynGraphicalEditWidget {
   // }
 }
 
-// // ######  ###### //
-// class MynStars extends React.Component {
-//   constructor(props) {
-//     super(props)
-//
-//     this.state = {
-//       displayStars : [],
-//     }
-//
-//     this.render = this.render.bind(this);
-//   }
-//
-//   updateRating(rating, event) {
-//     console.log("Rated " + this.props.movie.title + " " + rating + " stars!");
-//     event.stopPropagation(); // clicking on the stars should not trigger a click on the whole row
-//     this.props.movie.rating = rating;
-//     event.target.parentNode.classList.remove('over');
-//   }
-//
-//   ratingOver(rating,event) {
-//     this.updateStars(rating);
-//     event.target.parentNode.classList.add('over');
-//   }
-//
-//   ratingOut(target,event) {
-//     this.updateStars(this.props.movie.rating);
-//     target.classList.remove('over');
-//     // console.log("RATING OUT: " + target.classList)
-//     try{
-//       event.stopPropagation();
-//     } catch(error) {
-//       // console.log("called from <ul>");
-//     }
-//   }
-//
-//   componentDidMount(props) {
-//     this.updateStars(this.props.movie.rating);
-//   }
-//
-//   componentDidUpdate(oldProps) {
-//     if (oldProps.movie.rating !== this.props.movie.rating) {
-//       this.updateStars(this.props.movie.rating);
-//     }
-//   }
-//
-//   updateStars(rating) {
-//     let stars = [];
-//     let char = "";
-//     for (let i=1; i<=5; i++) {
-//       if (i <= rating) {
-//         char="\u2605";
-//       } else {
-//         char="\u2606";
-//       }
-//       stars.push(<li className="star" key={i} onMouseOver={(e) => this.ratingOver(i,e)} onMouseOut={(e) => this.ratingOut(e.target.parentNode,e)} onClick={(e) => this.updateRating(i,e)}>{char}</li>);
-//     }
-//     this.setState({displayStars : stars});
-//   }
-//
-//   render() {
-//     return (<ul className="stars" onMouseOut={(e) => this.ratingOut(e.target)}>{this.state.displayStars}</ul>);
-//   }
-// }
-
 // ###### Details pane: contains details of the hovered/clicked video ###### //
 class MynDetails extends React.Component {
   constructor(props) {
@@ -640,18 +673,43 @@ class MynSettings extends React.Component {
     super(props)
 
     this.state = {
+      views: {
+        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
+        playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
+        collections : (<MynSettingsCollections collections={this.props.collections} />),
+        themes : (<MynSettingsThemes themes={this.props.settings.themes} />)
+      },
       settingView: null
     }
 
     this.render = this.render.bind(this);
   }
 
-  setView(view) {
-    let views = {
-      folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
-      themes : (<MynSettingsThemes />)
+  setView(view,event) {
+    this.setState({settingView : this.state.views[view]});
+
+    // remove "selected" class from all the tabs
+    try {
+      Array.from(document.getElementById("settings-tabs").getElementsByClassName("tab")).map((tab) => {
+        tab.classList.remove("selected");
+      });
+    } catch(e) {
+      console.log('There was an error updating classes for the settings tabs: ' + e.toString());
     }
-    this.setState({settingView : views[view]});
+
+    // add "selected" class to the clicked tab
+    let element;
+    try {
+      element = event.target;
+    } catch(e) {
+      // if no event was passed, try to get the element from the view name
+      try {
+        element = document.getElementById('settings-tab-' + view);
+      } catch(e) {
+        console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
+      }
+    }
+    element.classList.add("selected");
   }
 
   componentDidMount(props) {
@@ -659,16 +717,24 @@ class MynSettings extends React.Component {
   }
 
   render() {
+    const tabs = [];
+    Object.keys(this.state.views).forEach((tab) => {
+      tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
+    });
+
     return (<div id="settings-pane">
       <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
       <ul id="settings-tabs">
-        <li onClick={() => this.setView("folders")}>Folders</li>
-        <li onClick={() => this.setView("themes")}>Themes</li>
+        {tabs}
       </ul>
       <div id="settings-content">{this.state.settingView}</div>
     </div>)
   }
 }
+
+// <li onClick={() => this.setView("folders")}>Folders</li>
+// <li onClick={() => this.setView("themes")}>Themes</li>
+
 
 class MynSettingsFolders extends React.Component {
   constructor(props) {
@@ -693,6 +759,27 @@ class MynSettingsFolders extends React.Component {
 
 }
 
+class MynSettingsPlaylists extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (<h1>I'm a Playlists!!!</h1>)
+  }
+}
+
+class MynSettingsCollections extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    return (<h1>I'm a Collections!!!</h1>)
+  }
+}
+
+
 class MynSettingsThemes extends React.Component {
   constructor(props) {
     super(props);
@@ -701,7 +788,6 @@ class MynSettingsThemes extends React.Component {
   render() {
     return (<h1>I'm a Themee!!!</h1>)
   }
-
 }
 
 
