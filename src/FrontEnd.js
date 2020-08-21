@@ -510,7 +510,7 @@ class MynGraphicalEditWidget extends React.Component {
 
   updateValue(value, event) {
     console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
-    event.stopPropagation(); // clicking on the stars should not trigger a click on the whole row
+    event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     this.props.movie[this.state.property] = value;
     event.target.parentNode.classList.remove('over');
   }
@@ -523,7 +523,7 @@ class MynGraphicalEditWidget extends React.Component {
   mouseOut(target,event) {
     this.updateGraphic(this.props.movie[this.state.property]);
     target.classList.remove('over');
-    // console.log("RATING OUT: " + target.classList)
+    // console.log("mouse out: " + target.classList)
     try{
       event.stopPropagation();
     } catch(error) {
@@ -684,8 +684,31 @@ class MynSettings extends React.Component {
     this.render = this.render.bind(this);
   }
 
-  setView(view) {
+  setView(view,event) {
     this.setState({settingView : this.state.views[view]});
+
+    // remove "selected" class from all the tabs
+    try {
+      Array.from(document.getElementById("settings-tabs").getElementsByClassName("tab")).map((tab) => {
+        tab.classList.remove("selected");
+      });
+    } catch(e) {
+      console.log('There was an error updating classes for the settings tabs: ' + e.toString());
+    }
+
+    // add "selected" class to the clicked tab
+    let element;
+    try {
+      element = event.target;
+    } catch(e) {
+      // if no event was passed, try to get the element from the view name
+      try {
+        element = document.getElementById('settings-tab-' + view);
+      } catch(e) {
+        console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
+      }
+    }
+    element.classList.add("selected");
   }
 
   componentDidMount(props) {
@@ -695,7 +718,7 @@ class MynSettings extends React.Component {
   render() {
     const tabs = [];
     Object.keys(this.state.views).forEach((tab) => {
-      tabs.push(<li key={tab} onClick={() => this.setView(tab)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
+      tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
     });
 
     return (<div id="settings-pane">
