@@ -1,4 +1,5 @@
 //const React = require('React');
+const { ipcRenderer } = require('electron')
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -675,7 +676,19 @@ class MynSettingsFolders extends React.Component {
   }
 
   render() {
-    return (<h1>I'm a Folders!!!</h1>)
+    return (<div id="folder-options"><h1>Folders</h1>
+      <div>
+        <button onClick={() => ipcRenderer.send('select-watchfolder')}>Add a folder: </button>
+        <label htmlFor="folder-watchlist-check">Watchfolder?</label><input type="checkbox" id="folder-watchlist-check" />
+        <label htmlFor="folder-default-type">Default type: </label>
+        <select id="folder-default-type">
+          <option value="none"></option>
+          <option value="movie">Movie</option>
+          <option value="show">Show</option>
+        </select>
+      </div>
+    </div>
+    )
   }
 
 }
