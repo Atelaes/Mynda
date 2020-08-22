@@ -717,6 +717,7 @@ class MynSettings extends React.Component {
   }
 
   render() {
+    // console.log(JSON.stringify(this.props.settings));
     const tabs = [];
     Object.keys(this.state.views).forEach((tab) => {
       tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
@@ -739,11 +740,33 @@ class MynSettings extends React.Component {
 class MynSettingsFolders extends React.Component {
   constructor(props) {
     super(props);
+
+  }
+
+  editWatched(event, index) {
+    console.log("toggled 'watch' for index " + index);
+  };
+
+  editRemove(path, index) {
+    console.log("user wants to remove " + path + " which is at index " + index);
+  }
+
+  displayFolders() {
+    return this.props.folders.map((folder, index) => (
+      <tr key={index}>
+        <td><input type="checkbox" checked={folder.watch} onChange={(e) => this.editWatched(e,index)} className="" /></td>
+        <td>{folder.path}</td>
+        <td>{folder.defaults.kind}</td>
+        <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button>
+        </td>
+      </tr>
+    ));
   }
 
   render() {
-    return (<div id="folder-options"><h1>Folders</h1>
-      <div>
+    // console.log(JSON.stringify(this.props.folders));
+    return (<div id="folder-settings"><h1>Folders</h1>
+      <div id="folder-settings-select">
         <button onClick={() => ipcRenderer.send('select-watchfolder')}>Add a folder: </button>
         <label htmlFor="folder-watchlist-check">Watchfolder?</label><input type="checkbox" id="folder-watchlist-check" />
         <label htmlFor="folder-default-type">Default type: </label>
@@ -752,6 +775,21 @@ class MynSettingsFolders extends React.Component {
           <option value="movie">Movie</option>
           <option value="show">Show</option>
         </select>
+      </div>
+      <div id="folder-settings-folders">
+        <table>
+          <thead>
+            <tr>
+              <th>Watched</th>
+              <th>Path</th>
+              <th>Default Kind</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {this.displayFolders()}
+          </tbody>
+        </table>
       </div>
     </div>
     )

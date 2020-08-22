@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "uuid": "^8.3.0"
   },
   "devDependencies": {
     "electron": "9.0.5",
