@@ -164,7 +164,7 @@
   --searchicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
 
 
-/* #nav-bar { */
+/* #nav-pane { */
   --playlisttab-bg: var(--pane-bg-0);
   --playlisttab-bg-hover: var(--medlight-bg);
   --playlisttab-bg-selected: var(--playlisttab-bg);

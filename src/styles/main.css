@@ -57,7 +57,7 @@ input[type=text] {
   display:grid;
 }
 
-#nav-bar {
+#nav-pane {
   grid-area: header;
   background-color: var(--nav-bg);
 }

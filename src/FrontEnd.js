@@ -172,7 +172,14 @@ class Mynda extends React.Component {
   }
 
   render () {
-    return (<div id='grid-container'> <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/> <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynDetails movie={this.state.detailMovie} /> {this.state.settingsPane}</div>);
+    return (
+      <div id='grid-container'>
+        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/>
+        <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} />
+        <MynDetails movie={this.state.detailMovie} />
+        {this.state.settingsPane}
+      </div>
+    );
   }
 }
 
@@ -191,7 +198,7 @@ class MynNav extends React.Component {
   }
 
   render() {
-    return (<div id="nav-bar">
+    return (<div id="nav-pane">
         <ul id="playlist-nav">
           {this.props.playlists.map((playlist, index) => (
             <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
@@ -674,7 +681,7 @@ class MynSettings extends React.Component {
 
     this.state = {
       views: {
-        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
+        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.kinds} />),
         playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
         collections : (<MynSettingsCollections collections={this.props.collections} />),
         themes : (<MynSettingsThemes themes={this.props.settings.themes} />)
@@ -742,7 +749,7 @@ class MynSettingsFolders extends React.Component {
     super(props);
 
     this.state = {
-      existingFolders : null,
+      existingFolders : [],
       folderToAdd: null
     }
     ipcRenderer.on('settings-watchfolder-selected', (event, args) => {
@@ -750,12 +757,25 @@ class MynSettingsFolders extends React.Component {
     })
   }
 
+  // create JSX for an options dropdown of the possible media kinds
+  formFieldKindOptions() {
+    let options = this.props.kinds.map((kind) => (
+      <option key={kind} value={kind}>{kind.replace(/\b\w/g,(letter) => letter.toUpperCase())}</option>
+    ));
+    options.unshift(<option key="none" value="none">(none)</option>);
+    return options;
+  }
+
   editWatched(event, index) {
-    console.log("toggled 'watch' for index " + index);
+    console.log("user toggled 'watch' for index " + index);
   };
 
   editRemove(path, index) {
     console.log("user wants to remove " + path + " which is at index " + index);
+  }
+
+  editKind(event, index) {
+    console.log("user wants to change 'kind' to " + event.target.value + " for folder at index " + index);
   }
 
   changeTargetFolder(folder) {
@@ -773,21 +793,18 @@ class MynSettingsFolders extends React.Component {
   }
 
   displayFolders() {
-    return this.props.folders.map((folder, index) => (
+    return this.state.existingFolders.map((folder, index) => (
       <tr key={index}>
         <td><input type="checkbox" checked={folder.watch} onChange={(e) => this.editWatched(e,index)} className="" /></td>
         <td>{folder.path}</td>
-        <td>{folder.defaults.kind}</td>
-        <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button>
-        </td>
+        <td><select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select></td>
+        <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
       </tr>
     ));
   }
 
   componentDidMount() {
-    //let theExistingFolders =
-    this.setState({existingFolders: this.displayFolders()})
-
+    this.setState({existingFolders: this.props.folders})
   }
 
 
@@ -795,16 +812,14 @@ class MynSettingsFolders extends React.Component {
     // console.log(JSON.stringify(this.props.folders));
     return (<div id="folder-settings"><h1>Folders</h1>
       <div>
-        <input type='text' id='folder-settings-add-address' value={this.state.folderToAdd || 'Select a directory'} style={{paddingRight: "75px"}} onChange={(e) => this.changeTargetFolder(e.target.value)}/>
+        <input type='text' id='folder-settings-add-address' value={this.state.folderToAdd || ''} placeholder="Select a directory..." style={{paddingRight: "75px"}} onChange={(e) => this.changeTargetFolder(e.target.value)} />
         <button onClick={() => ipcRenderer.send('settings-watchfolder-select')} style={{marginLeft: '-75px'}}>Browse</button>
         <label htmlFor="folder-watchlist-check">Watchfolder?</label><input type="checkbox" id="folder-watchlist-check" />
         <label htmlFor="folder-default-type">Default type: </label>
         <select id="folder-default-type">
-          <option value="none"></option>
-          <option value="movie">Movie</option>
-          <option value="show">Show</option>
+          {this.formFieldKindOptions()}
         </select>
-       <button onClick={this.submitFolderToServer} >Add</button>
+       <button onClick={this.submitFolderToServer}>Add</button>
       </div>
       <div id="folder-settings-folders">
         <table>
@@ -817,7 +832,7 @@ class MynSettingsFolders extends React.Component {
             </tr>
           </thead>
           <tbody>
-            {this.state.existingFolders}
+            {this.displayFolders()}
           </tbody>
         </table>
       </div>
