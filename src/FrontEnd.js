@@ -741,6 +741,13 @@ class MynSettingsFolders extends React.Component {
   constructor(props) {
     super(props);
 
+    this.state = {
+      existingFolders : null,
+      folderToAdd: null
+    }
+    ipcRenderer.on('settings-watchfolder-selected', (event, args) => {
+      this.changeTargetFolder(args);
+    })
   }
 
   editWatched(event, index) {
@@ -749,6 +756,20 @@ class MynSettingsFolders extends React.Component {
 
   editRemove(path, index) {
     console.log("user wants to remove " + path + " which is at index " + index);
+  }
+
+  changeTargetFolder(folder) {
+    this.setState({folderToAdd: folder});
+    console.log('Changed target folder to ' + folder);
+  }
+
+  submitFolderToServer() {
+    let folderAddress = document.getElementById("folder-settings-add-address").value;
+    let watchBoolean = document.getElementById("folder-watchlist-check").checked;
+    let defaultType = document.getElementById("folder-default-type").value;
+    let submitObject = {address: folderAddress, boolean: watchBoolean, type: defaultType};
+    console.log(submitObject);
+    ipcRenderer.send('settings-watchfolder-add', submitObject)
   }
 
   displayFolders() {
@@ -763,11 +784,19 @@ class MynSettingsFolders extends React.Component {
     ));
   }
 
+  componentDidMount() {
+    //let theExistingFolders =
+    this.setState({existingFolders: this.displayFolders()})
+
+  }
+
+
   render() {
     // console.log(JSON.stringify(this.props.folders));
     return (<div id="folder-settings"><h1>Folders</h1>
-      <div id="folder-settings-select">
-        <button onClick={() => ipcRenderer.send('select-watchfolder')}>Add a folder: </button>
+      <div>
+        <input type='text' id='folder-settings-add-address' value={this.state.folderToAdd || 'Select a directory'} style={{paddingRight: "75px"}} onChange={(e) => this.changeTargetFolder(e.target.value)}/>
+        <button onClick={() => ipcRenderer.send('settings-watchfolder-select')} style={{marginLeft: '-75px'}}>Browse</button>
         <label htmlFor="folder-watchlist-check">Watchfolder?</label><input type="checkbox" id="folder-watchlist-check" />
         <label htmlFor="folder-default-type">Default type: </label>
         <select id="folder-default-type">
@@ -775,6 +804,7 @@ class MynSettingsFolders extends React.Component {
           <option value="movie">Movie</option>
           <option value="show">Show</option>
         </select>
+       <button onClick={this.submitFolderToServer} >Add</button>
       </div>
       <div id="folder-settings-folders">
         <table>
@@ -787,7 +817,7 @@ class MynSettingsFolders extends React.Component {
             </tr>
           </thead>
           <tbody>
-            {this.displayFolders()}
+            {this.state.existingFolders}
           </tbody>
         </table>
       </div>

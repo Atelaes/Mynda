@@ -24,12 +24,14 @@ function createWindow() {
 
 }
 
-ipcMain.on('select-watchfolder', (event) => {
-  console.log('watchfolder method fired!')
+ipcMain.on('settings-watchfolder-select', (event) => {
   let options = {properties: ['openDirectory']};
   dialog.showOpenDialog(null, options).then(result => {
-  console.log(result.canceled)
-  console.log(result.filePaths)
+  event.sender.send('settings-watchfolder-selected', result.filePaths[0]);
 }).catch(err => {
   console.log(err)
 })})
+
+ipcMain.on('settings-watchfolder-add', (event, arg) => {
+  console.log(arg);
+})
