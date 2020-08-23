@@ -76,16 +76,16 @@ class Mynda extends React.Component {
   search(e) {
     let query = e.target.value;
     if (query != "") {
-      // change the classes of the parent element to help with styling
-      e.target.parentNode.classList.add('filled');
-      e.target.parentNode.classList.remove('empty');
+      // change the classes of the element to help with styling
+      e.target.classList.add('filled');
+      e.target.classList.remove('empty');
 
       // if the query is not empty, filter the videos
       this.setState({ filteredVideos : this.searchFilter(query) });
     } else {
-      // change the classes of the parent element to help with styling
-      e.target.parentNode.classList.remove('filled');
-      e.target.parentNode.classList.add('empty');
+      // change the classes of the element to help with styling
+      e.target.classList.remove('filled');
+      e.target.classList.add('empty');
 
       // if the field is empty, reset to the full playlist
       this.setPlaylist(this.state.currentPlaylistID);
@@ -204,7 +204,7 @@ class MynNav extends React.Component {
             <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field" className="empty"><span id="search-label">Search: </span><input id="search-input" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
+        <div id="search-field" className="input-container"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
         <div id="settings-button" onClick={() => this.props.showSettings()}>{"\u2699"}</div>
       </div>)
   }
@@ -781,12 +781,21 @@ class MynSettingsFolders extends React.Component {
   changeTargetFolder(folder) {
     this.setState({folderToAdd: folder});
     console.log('Changed target folder to ' + folder);
+
+    const inputField = document.getElementById('folder-settings-choose-path');
+    if (folder == "") {
+      inputField.classList.remove('filled');
+      inputField.classList.add('empty');
+    } else {
+      inputField.classList.remove('empty');
+      inputField.classList.add('filled');
+    }
   }
 
   submitFolderToServer() {
-    let folderAddress = document.getElementById("folder-settings-add-address").value;
-    let watchBoolean = document.getElementById("folder-watchlist-check").checked;
-    let defaultType = document.getElementById("folder-default-type").value;
+    let folderAddress = document.getElementById("folder-settings-choose-path").value;
+    let watchBoolean = document.getElementById("folder-settings-choose-watched").checked;
+    let defaultType = document.getElementById("folder-settings-choose-kind").value;
     let submitObject = {address: folderAddress, boolean: watchBoolean, type: defaultType};
     console.log(submitObject);
     ipcRenderer.send('settings-watchfolder-add', submitObject)
@@ -811,12 +820,15 @@ class MynSettingsFolders extends React.Component {
   render() {
     // console.log(JSON.stringify(this.props.folders));
     return (<div id="folder-settings"><h1>Folders</h1>
-      <div>
-        <input type='text' id='folder-settings-add-address' value={this.state.folderToAdd || ''} placeholder="Select a directory..." style={{paddingRight: "75px"}} onChange={(e) => this.changeTargetFolder(e.target.value)} />
-        <button onClick={() => ipcRenderer.send('settings-watchfolder-select')} style={{marginLeft: '-75px'}}>Browse</button>
-        <label htmlFor="folder-watchlist-check">Watchfolder?</label><input type="checkbox" id="folder-watchlist-check" />
-        <label htmlFor="folder-default-type">Default type: </label>
-        <select id="folder-default-type">
+      <div id="folder-settings-choose">
+        <div className="input-container">
+          <input type="text" id="folder-settings-choose-path" className="empty" value={this.state.folderToAdd || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
+          <div className="input-clear-button" onClick={() => this.changeTargetFolder('')}></div>
+        </div>
+        <button onClick={() => ipcRenderer.send('settings-watchfolder-select')}>Browse</button>
+        <label htmlFor="folder-settings-choose-watched">Watchfolder?</label><input type="checkbox" id="folder-settings-choose-watched" />
+        <label htmlFor="folder-settings-choose-kind">Default kind: </label>
+        <select id="folder-settings-choose-kind">
           {this.formFieldKindOptions()}
         </select>
        <button onClick={this.submitFolderToServer}>Add</button>

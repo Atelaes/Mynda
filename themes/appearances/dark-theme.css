@@ -146,25 +146,27 @@
   --textinput-border: .12em solid var(--light-bg);
   --textinput-borderradius: 999px;
   --textinput-padding: 0em 1.4em 0em .5em;
+
+  --inputicon-opacity: .25;
+  --inputicon-empty: none;
+  --inputicon-filled: url('../../images/x-icon_white.png');
+  --inputicon-position: absolute;
+  --inputicon-top: 0em;
+  --inputicon-bottom: inherit;
+  --inputicon-left: inherit;
+  --inputicon-right: calc(var(--textinput-height) * -.1);
+  --inputicon-height: var(--textinput-height);
+  --inputicon-width: var(--textinput-height);
+  --inputicon-background-empty: rgba(0,0,0,0) var(--inputicon-empty) no-repeat 0% 50%;
+  --inputicon-background-filled: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
+  --inputicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
 /* } */
-  --searchfield-height: var(--textinput-height);
-
-  --searchicon-opacity: .25;
-  --searchicon-empty: url('../../images/mag-icon_white.png');
-  --searchicon-filled: url('../../images/x-icon_white.png');
-  --searchicon-position: absolute;
-  --searchicon-top: 0em;
-  --searchicon-bottom: inherit;
-  --searchicon-left: inherit;
-  --searchicon-right: calc(var(--textinput-height) * -.1);
-  --searchicon-height: var(--searchfield-height);
-  --searchicon-width: var(--textinput-height);
-  --searchicon-background-empty: rgba(0,0,0,0) var(--searchicon-empty) no-repeat 0% 50%;
-  --searchicon-background-filled: rgba(0,0,0,0) var(--searchicon-filled) no-repeat 0% 50%;
-  --searchicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
-
 
 /* #nav-pane { */
+  --searchfield-height: var(--textinput-height);
+  --searchicon-empty: url('../../images/mag-icon_white.png');
+  --searchicon-background-empty: rgba(0,0,0,0) var(--searchicon-empty) no-repeat 0% 50%;
+
   --playlisttab-bg: var(--pane-bg-0);
   --playlisttab-bg-hover: var(--medlight-bg);
   --playlisttab-bg-selected: var(--playlisttab-bg);

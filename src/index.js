@@ -9,8 +9,8 @@ app.whenReady().then(createWindow);
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1440,
+    height: 900,
     webPreferences: {
         nodeIntegration: true
     }
