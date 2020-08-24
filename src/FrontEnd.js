@@ -152,19 +152,25 @@ class Mynda extends React.Component {
   }
 
   showSettings() {
+    Array.from(document.getElementsByClassName('pane')).map((pane) => {
+      pane.classList.add('blurred');
+    });
     this.setState({"settingsPane" : <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={this.hideSettings}/>});
   }
 
   hideSettings() {
     this.setState({"settingsPane" : null});
+    Array.from(document.getElementsByClassName('pane')).map((pane) => {
+      pane.classList.remove('blurred');
+    });
   }
 
   // set the initial playlist
   componentDidMount(props) {
     // let playlist = library.playlists[0];
     // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
-    // this.setPlaylist(playlist.id, document.getElementById('playlist-nav').getElementsByTagName('li')[0]);
-    document.getElementById('playlist-nav').getElementsByTagName('li')[0].click();
+    // this.setPlaylist(playlist.id, document.getElementById('nav-playlists').getElementsByTagName('li')[0]);
+    document.getElementById('nav-playlists').getElementsByTagName('li')[0].click();
   }
 
   componentDidUpdate() {
@@ -175,7 +181,7 @@ class Mynda extends React.Component {
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/>
-        <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} />
+        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} />
         {this.state.settingsPane}
       </div>
@@ -183,7 +189,7 @@ class Mynda extends React.Component {
   }
 }
 
-// ###### Nav bar: contains playlist tabs and search field ###### //
+// ###### Nav Pane: contains playlist tabs and search field ###### //
 class MynNav extends React.Component {
   constructor(props) {
     super(props)
@@ -198,22 +204,24 @@ class MynNav extends React.Component {
   }
 
   render() {
-    return (<div id="nav-pane">
-        <ul id="playlist-nav">
+    return (<div id="nav-pane" className="pane">
+        <ul id="nav-playlists">
           {this.props.playlists.map((playlist, index) => (
             <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field" className="input-container"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
-        <div id="settings-button" onClick={() => this.props.showSettings()}>{"\u2699"}</div>
+        <div id="nav-controls">
+          <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
+          <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
+        </div>
       </div>)
   }
 }
 
 
 
-// ###### Table Container: parent of MynTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
-class MynTableContainer extends React.Component {
+// ###### Library Pane: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
+class MynLibrary extends React.Component {
   constructor(props) {
     super(props)
 
@@ -301,8 +309,8 @@ class MynTableContainer extends React.Component {
         }
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
-        // then hand them off to MynTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
+        // then hand them off to MynLibTable with an initial sort by 'order'
+        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
       } else {
         return null;
       }
@@ -328,18 +336,18 @@ class MynTableContainer extends React.Component {
 
     } else if (this.props.view === "flat") {
 
-      content = (<MynTable movies={this.props.movies} view={this.props.view} showDetails={this.props.showDetails} />)
+      content = (<MynLibTable movies={this.props.movies} view={this.props.view} showDetails={this.props.showDetails} />)
 
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
       return null
     }
-    return (<div id="library-pane">{content}</div>);
+    return (<div id="library-pane" className="pane">{content}</div>);
   }
 }
 
 // ###### Table: contains list of movies in the selected playlist ###### //
-class MynTable extends React.Component {
+class MynLibTable extends React.Component {
   constructor(props) {
     super(props)
     this.render = this.render.bind(this);
@@ -447,7 +455,7 @@ class MynTable extends React.Component {
     // if (this.props.movies.filter(movie => (movie.order === undefined || movie.order === null)).length == this.props.movies.length) {
       // if none of the movies handed to us have an "order" property
       //    (not within the collections property, but a top-level "order" property—
-      //    this property does not exist in the library JSON, but is assigned by MynTableContainer
+      //    this property does not exist in the library JSON, but is assigned by MynLibrary
       //    in the case of showing a hierarchical view)
       // then hide the 'order' column with CSS
     if (this.props.view === 'flat') {
@@ -617,7 +625,7 @@ class MynSeenCheckmark extends MynGraphicalEditWidget {
   // }
 }
 
-// ###### Details pane: contains details of the hovered/clicked video ###### //
+// ###### Details Pane: contains details of the hovered/clicked video ###### //
 class MynDetails extends React.Component {
   constructor(props) {
     super(props)
@@ -672,12 +680,13 @@ class MynDetails extends React.Component {
       // console.log(error.toString());
     }
 
-    return  (<aside id="details-pane">
+    return  (<aside id="details-pane" className="pane">
               {details}
             </aside>)
   }
 }
 
+// ###### Settings Pane: allows user to edit settings. Only appears when user clicks to open it ###### //
 class MynSettings extends React.Component {
   constructor(props) {
     super(props)
@@ -733,13 +742,15 @@ class MynSettings extends React.Component {
       tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
     });
 
-    return (<div id="settings-pane">
-      <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
-      <ul id="settings-tabs">
-        {tabs}
-      </ul>
-      <div id="settings-content">{this.state.settingView}</div>
-    </div>)
+    return (
+      <div id="settings-pane" className="pane">
+        <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
+        <ul id="settings-tabs">
+          {tabs}
+        </ul>
+        <div id="settings-content">{this.state.settingView}</div>
+      </div>
+    );
   }
 }
 
