@@ -34,7 +34,13 @@ library = {
           "dependencies" : {}
         }
       ]
-    }
+    },
+    "kinds" : [
+      "movie",
+      "show",
+      "documentary",
+      "stand-up"
+    ]
   },
   "playlists" : [
     {

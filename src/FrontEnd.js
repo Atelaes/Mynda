@@ -1,4 +1,5 @@
 //const React = require('React');
+const { ipcRenderer } = require('electron')
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -75,16 +76,16 @@ class Mynda extends React.Component {
   search(e) {
     let query = e.target.value;
     if (query != "") {
-      // change the classes of the parent element to help with styling
-      e.target.parentNode.classList.add('filled');
-      e.target.parentNode.classList.remove('empty');
+      // change the classes of the element to help with styling
+      e.target.classList.add('filled');
+      e.target.classList.remove('empty');
 
       // if the query is not empty, filter the videos
       this.setState({ filteredVideos : this.searchFilter(query) });
     } else {
-      // change the classes of the parent element to help with styling
-      e.target.parentNode.classList.remove('filled');
-      e.target.parentNode.classList.add('empty');
+      // change the classes of the element to help with styling
+      e.target.classList.remove('filled');
+      e.target.classList.add('empty');
 
       // if the field is empty, reset to the full playlist
       this.setPlaylist(this.state.currentPlaylistID);
@@ -171,7 +172,14 @@ class Mynda extends React.Component {
   }
 
   render () {
-    return (<div id='grid-container'> <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/> <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} /> <MynDetails movie={this.state.detailMovie} /> {this.state.settingsPane}</div>);
+    return (
+      <div id='grid-container'>
+        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/>
+        <MynTableContainer movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} />
+        <MynDetails movie={this.state.detailMovie} />
+        {this.state.settingsPane}
+      </div>
+    );
   }
 }
 
@@ -190,13 +198,13 @@ class MynNav extends React.Component {
   }
 
   render() {
-    return (<div id="nav-bar">
+    return (<div id="nav-pane">
         <ul id="playlist-nav">
           {this.props.playlists.map((playlist, index) => (
             <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
           ))}
         </ul>
-        <div id="search-field" className="empty"><span id="search-label">Search: </span><input id="search-input" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
+        <div id="search-field" className="input-container"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
         <div id="settings-button" onClick={() => this.props.showSettings()}>{"\u2699"}</div>
       </div>)
   }
@@ -510,7 +518,7 @@ class MynGraphicalEditWidget extends React.Component {
 
   updateValue(value, event) {
     console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
-    event.stopPropagation(); // clicking on the stars should not trigger a click on the whole row
+    event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     this.props.movie[this.state.property] = value;
     event.target.parentNode.classList.remove('over');
   }
@@ -523,7 +531,7 @@ class MynGraphicalEditWidget extends React.Component {
   mouseOut(target,event) {
     this.updateGraphic(this.props.movie[this.state.property]);
     target.classList.remove('over');
-    // console.log("RATING OUT: " + target.classList)
+    // console.log("mouse out: " + target.classList)
     try{
       event.stopPropagation();
     } catch(error) {
@@ -609,70 +617,6 @@ class MynSeenCheckmark extends MynGraphicalEditWidget {
   // }
 }
 
-// // ######  ###### //
-// class MynStars extends React.Component {
-//   constructor(props) {
-//     super(props)
-//
-//     this.state = {
-//       displayStars : [],
-//     }
-//
-//     this.render = this.render.bind(this);
-//   }
-//
-//   updateRating(rating, event) {
-//     console.log("Rated " + this.props.movie.title + " " + rating + " stars!");
-//     event.stopPropagation(); // clicking on the stars should not trigger a click on the whole row
-//     this.props.movie.rating = rating;
-//     event.target.parentNode.classList.remove('over');
-//   }
-//
-//   ratingOver(rating,event) {
-//     this.updateStars(rating);
-//     event.target.parentNode.classList.add('over');
-//   }
-//
-//   ratingOut(target,event) {
-//     this.updateStars(this.props.movie.rating);
-//     target.classList.remove('over');
-//     // console.log("RATING OUT: " + target.classList)
-//     try{
-//       event.stopPropagation();
-//     } catch(error) {
-//       // console.log("called from <ul>");
-//     }
-//   }
-//
-//   componentDidMount(props) {
-//     this.updateStars(this.props.movie.rating);
-//   }
-//
-//   componentDidUpdate(oldProps) {
-//     if (oldProps.movie.rating !== this.props.movie.rating) {
-//       this.updateStars(this.props.movie.rating);
-//     }
-//   }
-//
-//   updateStars(rating) {
-//     let stars = [];
-//     let char = "";
-//     for (let i=1; i<=5; i++) {
-//       if (i <= rating) {
-//         char="\u2605";
-//       } else {
-//         char="\u2606";
-//       }
-//       stars.push(<li className="star" key={i} onMouseOver={(e) => this.ratingOver(i,e)} onMouseOut={(e) => this.ratingOut(e.target.parentNode,e)} onClick={(e) => this.updateRating(i,e)}>{char}</li>);
-//     }
-//     this.setState({displayStars : stars});
-//   }
-//
-//   render() {
-//     return (<ul className="stars" onMouseOut={(e) => this.ratingOut(e.target)}>{this.state.displayStars}</ul>);
-//   }
-// }
-
 // ###### Details pane: contains details of the hovered/clicked video ###### //
 class MynDetails extends React.Component {
   constructor(props) {
@@ -740,7 +684,7 @@ class MynSettings extends React.Component {
 
     this.state = {
       views: {
-        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders}/>),
+        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.kinds} />),
         playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
         collections : (<MynSettingsCollections collections={this.props.collections} />),
         themes : (<MynSettingsThemes themes={this.props.settings.themes} />)
@@ -751,8 +695,31 @@ class MynSettings extends React.Component {
     this.render = this.render.bind(this);
   }
 
-  setView(view) {
+  setView(view,event) {
     this.setState({settingView : this.state.views[view]});
+
+    // remove "selected" class from all the tabs
+    try {
+      Array.from(document.getElementById("settings-tabs").getElementsByClassName("tab")).map((tab) => {
+        tab.classList.remove("selected");
+      });
+    } catch(e) {
+      console.log('There was an error updating classes for the settings tabs: ' + e.toString());
+    }
+
+    // add "selected" class to the clicked tab
+    let element;
+    try {
+      element = event.target;
+    } catch(e) {
+      // if no event was passed, try to get the element from the view name
+      try {
+        element = document.getElementById('settings-tab-' + view);
+      } catch(e) {
+        console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
+      }
+    }
+    element.classList.add("selected");
   }
 
   componentDidMount(props) {
@@ -760,9 +727,10 @@ class MynSettings extends React.Component {
   }
 
   render() {
+    // console.log(JSON.stringify(this.props.settings));
     const tabs = [];
     Object.keys(this.state.views).forEach((tab) => {
-      tabs.push(<li key={tab} onClick={() => this.setView(tab)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
+      tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
     });
 
     return (<div id="settings-pane">
@@ -782,10 +750,109 @@ class MynSettings extends React.Component {
 class MynSettingsFolders extends React.Component {
   constructor(props) {
     super(props);
+
+    this.state = {
+      existingFolders : [],
+      folderToAdd: null
+    }
+    ipcRenderer.on('settings-watchfolder-selected', (event, args) => {
+      this.changeTargetFolder(args);
+    })
   }
 
+  // create JSX for an options dropdown of the possible media kinds
+  formFieldKindOptions() {
+    let options = this.props.kinds.map((kind) => (
+      <option key={kind} value={kind}>{kind.replace(/\b\w/g,(letter) => letter.toUpperCase())}</option>
+    ));
+    options.unshift(<option key="none" value="none">(none)</option>);
+    return options;
+  }
+
+  editWatched(event, index) {
+    console.log("user toggled 'watch' for index " + index);
+  };
+
+  editRemove(path, index) {
+    console.log("user wants to remove " + path + " which is at index " + index);
+  }
+
+  editKind(event, index) {
+    console.log("user wants to change 'kind' to " + event.target.value + " for folder at index " + index);
+  }
+
+  changeTargetFolder(folder) {
+    this.setState({folderToAdd: folder});
+    console.log('Changed target folder to ' + folder);
+
+    const inputField = document.getElementById('folder-settings-choose-path');
+    if (folder == "") {
+      inputField.classList.remove('filled');
+      inputField.classList.add('empty');
+    } else {
+      inputField.classList.remove('empty');
+      inputField.classList.add('filled');
+    }
+  }
+
+  submitFolderToServer() {
+    let folderAddress = document.getElementById("folder-settings-choose-path").value;
+    let watchBoolean = document.getElementById("folder-settings-choose-watched").checked;
+    let defaultType = document.getElementById("folder-settings-choose-kind").value;
+    let submitObject = {address: folderAddress, boolean: watchBoolean, type: defaultType};
+    console.log(submitObject);
+    ipcRenderer.send('settings-watchfolder-add', submitObject)
+  }
+
+  displayFolders() {
+    return this.state.existingFolders.map((folder, index) => (
+      <tr key={index}>
+        <td><input type="checkbox" checked={folder.watch} onChange={(e) => this.editWatched(e,index)} className="" /></td>
+        <td>{folder.path}</td>
+        <td><select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select></td>
+        <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
+      </tr>
+    ));
+  }
+
+  componentDidMount() {
+    this.setState({existingFolders: this.props.folders})
+  }
+
+
   render() {
-    return (<h1>I'm a Folders!!!</h1>)
+    // console.log(JSON.stringify(this.props.folders));
+    return (<div id="folder-settings"><h1>Folders</h1>
+      <div id="folder-settings-choose">
+        <div className="input-container">
+          <input type="text" id="folder-settings-choose-path" className="empty" value={this.state.folderToAdd || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
+          <div className="input-clear-button" onClick={() => this.changeTargetFolder('')}></div>
+        </div>
+        <button onClick={() => ipcRenderer.send('settings-watchfolder-select')}>Browse</button>
+        <label htmlFor="folder-settings-choose-watched">Watchfolder?</label><input type="checkbox" id="folder-settings-choose-watched" />
+        <label htmlFor="folder-settings-choose-kind">Default kind: </label>
+        <select id="folder-settings-choose-kind">
+          {this.formFieldKindOptions()}
+        </select>
+       <button onClick={this.submitFolderToServer}>Add</button>
+      </div>
+      <div id="folder-settings-folders">
+        <table>
+          <thead>
+            <tr>
+              <th>Watched</th>
+              <th>Path</th>
+              <th>Default Kind</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {this.displayFolders()}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    )
   }
 
 }
