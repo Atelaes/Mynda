@@ -32,7 +32,7 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-.collection h1, #movie-table th, #playlist-nav li, .edit-widget li, .movie-row {
+.collection h1, #movie-table th, #nav-playlists li, .edit-widget li, .movie-row {
   cursor: pointer;
   user-select: none;
 }
@@ -116,10 +116,10 @@ input + .input-clear-button {
 /*************************************/
 
 /* <ul> that holds the playlist links */
-#playlist-nav {
+#nav-playlists {
 }
 /* <li>'s that are the playlist links/tabs */
-#playlist-nav li {
+#nav-playlists li {
   font-family: var(--playlist-tab-font);
   font-size: var(--playlist-tab-font-size);
   font-weight: var(--playlist-tab-font-weight);
@@ -133,14 +133,14 @@ input + .input-clear-button {
   box-shadow: var(--playlisttab-boxshadow);
   user-select: none;
 }
-#playlist-nav li:hover {
+#nav-playlists li:hover {
   background-color:var(--playlisttab-bg-hover);
   color:var(--playlisttab-text-hover);
   border-width: var(--playlisttab-borderwidth-hover);
   border-style: var(--playlisttab-borderstyle-hover);
   border-color: var(--playlisttab-bordercolor-hover);
 }
-#playlist-nav li.selected {
+#nav-playlists li.selected {
   background-color: var(--playlisttab-bg-selected);
   background-image: var(--playlisttab-bgimg-selected);
   color: var(--playlisttab-text-selected);
@@ -150,14 +150,39 @@ input + .input-clear-button {
   box-shadow: var(--playlisttab-boxshadow-selected);
 }
 
+#nav-controls {
+  height: var(--navchrome-height);
+}
+
+#nav-controls .controls {
+  margin: var(--navcontrolschildren-margin);
+}
+
 /* search input container */
 #search-field {
   height: var(--searchfield-height);
 }
-
 #search-field input.empty + .input-clear-button {
   background: var(--searchicon-background-empty);
   /* background-size: var(--inputicon-bg-size); */
+}
+
+#settings-button {
+  cursor:pointer;
+  user-select:none;
+  opacity: var(--settingsicon-opacity);
+  height: var(--settingsicon-height);
+  width: var(--settingsicon-width);
+  background: var(--settingsicon-background);
+  background-size: var(--settingsicon-bg-size);
+
+  padding: var(--settingsicon-padding);
+  margin: var(--settingsicon-margin);
+  border: var(--settingsicon-border);
+}
+
+#settings-button:hover {
+  opacity: var(--settingsicon-opacity-hover);
 }
 
 /*************************************/
@@ -368,4 +393,50 @@ th, tr, td {
 }
 #detail-description {
   font-size: var(--detaildescrip-font-size);
+}
+
+/*************************************/
+/*########## SETTINGS PANE ##########*/
+/*************************************/
+
+
+#settings-pane {
+  background-color:rgba(30,30,30,.9);
+}
+
+#close-settings-button {
+  cursor:pointer;
+  user-select: none;
+  position:absolute;
+  top: -.6em;
+  right: -.6em;
+  background-color:#222;
+  border-radius: 999px;
+  line-height:1em;
+  text-align: center;
+  width:1em;
+  height:1em;
+  padding:.2em;
+}
+#settings-tabs {
+  padding:0px;
+  margin:0px;
+  /* width:var(--lib-col-size); */
+  display:flex;
+  flex-flow: row nowrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+#settings-tabs li {
+  list-style-type: none;
+  padding:.1em .5em .1em .5em;
+  border:1px solid gray;
+  cursor:pointer;
+
+}
+#settings-tabs .selected {
+  background-color:#444444;
+}
+#settings-content {
+  padding: 1em;
 }

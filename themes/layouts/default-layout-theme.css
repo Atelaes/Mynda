@@ -1,8 +1,18 @@
 :root {
-  --header-row-size: 8.3%; /* 1fr */
-  --libdetail-row-size: 91.7%; /* 11fr */
+  --header-row-size: 2.5em; /* 1fr */
+  --libdetail-row-size: calc(100vh - var(--header-row-size)); /* 11fr */
   --lib-col-size: 70%;
   --details-col-size: 30%;
+
+  --navcontrols-top: calc(var(--header-row-size) / 2 - (var(--navcontrols-height) / 2));
+
+  --settings-zindex: 999999;
+  --settings-width-factor: .7;
+  --settings-height-factor: .8;
+  --settings-width: calc(var(--settings-width-factor) * 100%);
+  --settings-height: calc(var(--settings-height-factor) * 100%);
+  --settings-left: calc((100% - var(--settings-width)) / 2);
+  --settings-top: calc((100% - var(--settings-height)) / 2);
 }
 
 #grid-container {
@@ -13,19 +23,58 @@
   gap: 0px;
 }
 
-#search-field {
-  position: absolute;
-  top: calc(var(--header-row-size) / 2 - (var(--searchfield-height) / 2));
-  right: .8em;
+.pane {
+  position:relative;
 }
 
-#playlist-nav {
+#nav-controls {
+  position: absolute;
+  top: var(--navcontrols-top);
+  right: 0em;
+  display:flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+#nav-playlists {
   padding:0px;
   margin:0px;
   height:100%;
   /* width:var(--lib-col-size); */
-  display:flex;
+  display: flex;
   flex-flow: row nowrap;
   justify-content: flex-start;
   align-items: flex-end;
+}
+
+#settings-pane {
+  z-index: var(--settings-zindex);
+  position: absolute;
+  width: var(--settings-width);
+  height: var(--settings-height);
+  top: var(--settings-top);
+  left: var(--settings-left);
+  box-sizing: border-box;
+}
+
+/* so that everything appears above the ::before element which obscures the background */
+#settings-pane * {
+  position: relative;
+  z-index: calc(var(--settings-zindex) + 1);
+}
+
+#close-settings-button {
+  z-index: calc(var(--settings-zindex) + 2);
+}
+
+/* transparent element to obscure the other panes in the background */
+#settings-pane::before {
+  content: "";
+  z-index: calc(var(--settings-zindex) - 1);
+  display: block;
+  position: absolute;
+  left: calc(1 / var(--settings-width-factor) * var(--settings-left) * -1);
+  top: calc(1 / var(--settings-height-factor) * var(--settings-top) * -1);
+  width: 100vw;
+  height: 100vh;
 }

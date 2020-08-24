@@ -163,9 +163,24 @@
 /* } */
 
 /* #nav-pane { */
-  --searchfield-height: var(--textinput-height);
+  --navcontrols-height: var(--textinput-height);
+  --navcontrolschildren-margin: 0em var(--navcontrols-top) 0em 0em;
+
+  --searchfield-height: var(--navcontrols-height);
   --searchicon-empty: url('../../images/mag-icon_white.png');
   --searchicon-background-empty: rgba(0,0,0,0) var(--searchicon-empty) no-repeat 0% 50%;
+
+  --settingsicon-image: url('../../images/settings-icon_white.png');
+  --settingsicon-opacity: .3;
+  --settingsicon-opacity-hover: calc(var(--settingsicon-opacity) + .4);
+  --settingsicon-height: var(--inputicon-height);
+  --settingsicon-width: var(--inputicon-width);
+  --settingsicon-background: rgba(0,0,0,0) var(--settingsicon-image) no-repeat 0% 50%;
+  --settingsicon-bg-size: var(--textinput-height) var(--textinput-height);
+  --settingsicon-padding: initial;
+  --settingsicon-margin: inherit;
+  --settingsicon-border: initial;
+
 
   --playlisttab-bg: var(--pane-bg-0);
   --playlisttab-bg-hover: var(--medlight-bg);
@@ -245,14 +260,14 @@
 /******************************************/
 
 /* extend the playlist tabs to the left so they slip behind the tab to their left, creating an overlap effect */
-#playlist-nav li {
+#nav-playlists li {
   border-radius: 0em .5em 0em 0em;
   padding-left: 1.4em !important;
   margin-left: -.7em;
 }
 
 /* undo overlap effect for selected tab */
-#playlist-nav li.selected {
+#nav-playlists li.selected {
   border-radius: .5em .5em 0em 0em;
   padding-left: .7em !important;
   margin-left: calc(-1 * var(--playlisttab-borderwidth-selected));
@@ -262,12 +277,12 @@
 /* the below is not supported yet. It would remove the right border of the previous tab
 in order to keep the tabs from shifting over when we apply a left border to the selected tab.
 in lieu of that, we will use a negative margin on the selected element instead (in the above block) to compensate for the extra border */
-/*#playlist-nav li:has(+ (#playlist-nav li.selected)) { /* the tab to the left of the selected tab */
+/*#nav-playlists li:has(+ (#nav-playlists li.selected)) { /* the tab to the left of the selected tab */
   /*border-width: var(--playlisttab-borderwidth-width) 0em var(--playlisttab-borderwidth-width) 0em;
 } */
 
 /* specifically set a selected tab of a hierarchical playlist to match the collection header background */
-#playlist-nav li.selected.hierarchical {
+#nav-playlists li.selected.hierarchical {
   background-image: none !important;
   background-color: var(--collectionheader-bg) !important;
   border-bottom: var(--playlisttab-borderwidth-width) solid var(--collectionheader-bg);
@@ -276,7 +291,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 /* line extending to the right of the tabs to match the tab borders */
-#playlist-nav::after {
+#nav-playlists::after {
   content:"";
   border-top: var(--playlisttab-borderwidth-width) var(--playlisttab-borderstyle) var(--playlisttab-bordercolor-selected-color);
   flex-grow:1;
@@ -379,4 +394,21 @@ in lieu of that, we will use a negative margin on the selected element instead (
   100% {
     transform: translateX(-90%);
   }
+}
+
+/* make the empty stars a little dimmer */
+.star.empty {
+  opacity: var(--editwidget-opacity-hover);
+}
+
+/* but when they're hovered, make them the same as the filled stars,
+   which will be dimmed to the same amount */
+.stars:hover .star.empty {
+  opacity:1;
+}
+
+/* actually blur all the 'blurred' panes (i.e. when the settings pane is up,
+   blur the other panes behind it) */
+.pane.blurred {
+  filter: blur(.15em);
 }
