@@ -4,12 +4,13 @@ const { ipcRenderer } = require('electron')
 class Mynda extends React.Component {
   constructor(props) {
     super(props)
-
+    let library = this.props.library.data;
+    console.log(library);
     this.state = {
-      videos : [],
-      playlists : [],
-      collections : [],
-      settings: {},
+      videos : library.media,
+      playlists : library.playlists,
+      collections : library.collections,
+      settings: library.settings,
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
@@ -31,7 +32,7 @@ class Mynda extends React.Component {
   }
 
   loadLibrary() {
-    const library = ipcRenderer.sendSync('load-library');
+    const library = this.props.library;
     this.setState({
       videos : library.media,
       playlists : library.playlists,
@@ -177,7 +178,7 @@ class Mynda extends React.Component {
 
   // set the initial playlist
   componentDidMount(props) {
-    this.loadLibrary();
+    //this.loadLibrary();
     // let playlist = library.playlists[0];
     // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
     // this.setPlaylist(playlist.id, document.getElementById('nav-playlists').getElementsByTagName('li')[0]);
@@ -926,6 +927,6 @@ class MynSettingsThemes extends React.Component {
   }
 }
 
-
-
-ReactDOM.render(<Mynda />, document.getElementById('root'));
+ipcRenderer.on('lib-init-load', (event, message) => {
+      ReactDOM.render(<Mynda library={message}/>, document.getElementById('root'));
+    })

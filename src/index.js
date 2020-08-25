@@ -72,20 +72,27 @@ function createWindow() {
         nodeIntegration: true
     }
   })
-  win.webContents.openDevTools()
+  win.webContents.openDevTools();
   //var child = cp.spawn('ffplay', ['E:\\DVD Movies\\Moana.mp4']);
 
-  win.loadFile('src/index.html')
+  win.loadFile('src/index.html');
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('lib-init-load', library)
+  });
 
 }
 
 //Takes a full folder address and looks for videos in it,
 //adding any it finds to the library
-function findVideosFromFolder(folder) {
-  const videoExtensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'wmv', 'flv', 'avchd', 'ogv', 'ogg', 'drc', 'mts', 'm2ts', 'ts', 'qt', 'yuv', 'rm', 'rmvb', 'viv', 'asf', 'amv', 'm4p', 'm4v', 'mpg', 'mp2', 'mpeg', 'mpe', 'mpv', 'm2v', 'svi', '3gp', '3g2', 'mxf', 'roq', 'nsv', 'f4v', 'f4p', 'f4a', 'f4b']
+function findVideosFromFolder(folder, type) {
+  const videoExtensions = [
+    '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'drc',  'f4a',  'f4b', 'f4p',
+    'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
+    'mpe', 'mpeg', 'mpg',  'mpv', 'mts', 'mxf', 'nsv',  'ogg',  'ogv', 'qt',
+    'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv',  'yuv'
+  ]
   if (isDVDRip(folder)) {
-    addDVDRip(folder)
-    counter++;
+    addDVDRip(folder, type);
   } else {
     fs.readdir(folder, {withFileTypes : true}, function (err, components) {
       //handling error
@@ -97,12 +104,11 @@ function findVideosFromFolder(folder) {
         let compAddress = path.join(folder, component.name);
         if (component.isDirectory()) {
           //console.log('Going through a DVD folder');
-          findVideosFromFolder(compAddress);
+          findVideosFromFolder(compAddress, type);
         } else {
           let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
           if (videoExtensions.includes(fileExt)) {
             addVideoFile(compAddress);
-            counter++;
           }
         }
       }
@@ -136,21 +142,22 @@ function isDVDRip(folder) {
 }
 
 //Takes a full directory address and adds it to library
-function addDVDRip(folder) {
+function addDVDRip(folder, type) {
   if (isAlreadyInLibrary(folder)) {
     return;
   } else {
     addObj = {};
     addObj.filename = folder;
     addObj.title = path.basename(folder);
+    addObj.kind = type;
     library.data.media.push(addObj);
     library.set('media', library.data.media)
-    console.log('Added DVD rip (' + counter + '): ' + addObj.title);
+    console.log('Added DVD rip: ' + addObj.title);
   }
 }
 
 //Takes a full file address and adds it to library
-function addVideoFile(file) {
+function addVideoFile(file, type) {
   if (isAlreadyInLibrary(file)) {
     return;
   } else {
@@ -158,9 +165,10 @@ function addVideoFile(file) {
     addObj.filename = file;
     let fileExt = path.extname(file)
     addObj.title = path.basename(file, fileExt);
+    addObj.kind = type;
     library.data.media.push(addObj);
     library.set('media', library.data.media)
-    console.log('Added Movie (' + counter + '): ' + addObj.title);
+    console.log('Added Movie: ' + addObj.title);
 
   }
 }
@@ -188,7 +196,7 @@ ipcMain.on('settings-watchfolder-select', (event) => {
 
 ipcMain.on('settings-watchfolder-add', (event, arg) => {
   //Add to library
-  findVideosFromFolder(arg['address'], arg['type']);
+  findVideosFromFolder(arg['address'], arg['type'].toLowerCase());
 })
 
 ipcMain.on('load-library', (event) => {
