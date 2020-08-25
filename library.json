@@ -37,9 +37,7 @@ library = {
     },
     "kinds" : [
       "movie",
-      "show",
-      "documentary",
-      "stand-up"
+      "show"
     ]
   },
   "playlists" : [

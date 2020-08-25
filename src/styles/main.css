@@ -196,6 +196,10 @@ th, tr, td {
   border-collapse: collapse;
   width: 100%;
 }
+#movie-table thead {
+  /* position:fixed; */
+}
+
 #movie-table th {
   background-color: var(--th-bg);
   color: var(--th-text);

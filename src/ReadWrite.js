@@ -10,9 +10,9 @@ class ReadWrite {
     const userDataPath = (electron.app || electron.remote.app).getPath('userData');
     console.log(userDataPath);
     // We'll use the `configName` property to set the file name and path.join to bring it all together as a string
-    this.path = path.join(userDataPath, opts.configName + '.json');
+    this.path = path.join(userDataPath, opts.configName + '.' + opts.extension);
 
-    this.data = parseDataFile(this.path, opts.defaults);
+    this.data = this._parseDataFile(this.path, opts.defaults);
   }
 
   // This will just return the property on the `data` object
@@ -23,22 +23,34 @@ class ReadWrite {
   // ...and this will set it
   set(key, val) {
     this.data[key] = val;
-    // Wait, I thought using the node.js' synchronous APIs was bad form?
-    // We're not writing a server so there's not nearly the same IO demand on the process
-    // Also if we used an async API and our app was quit before the asynchronous write had a chance to complete,
-    // we might lose that data. Note that in a real app, we would try/catch this.
-    fs.writeFileSync(this.path, JSON.stringify(this.data));
+    try {
+      fs.writeFileSync(this.path, JSON.stringify(this.data));
+    } catch(e) {
+      console.log("Error writing to file: " + e.toString());
+    }
   }
-}
 
-function parseDataFile(filePath, defaults) {
-  // We'll try/catch it in case the file doesn't exist yet, which will be the case on the first application run.
-  // `fs.readFileSync` will return a JSON string which we then parse into a Javascript object
-  try {
-    return JSON.parse(fs.readFileSync(filePath));
-  } catch(error) {
-    // if there was some kind of error, return the passed in defaults instead.
-    return defaults;
+  _parseDataFile(filePath, defaults) {
+    // We'll try/catch it in case the file doesn't exist yet, which will be the case on the first application run.
+    // `fs.readFileSync` will return a JSON string which we then parse into a Javascript object
+    try {
+      return JSON.parse(fs.readFileSync(filePath));
+    } catch(error) {
+      // if there was some kind of error, return the passed in defaults instead.
+      console.log("No file found, creating default file");
+
+      // Object.keys(defaults).forEach((key) => {
+      //   this.set(key, defaults[key]);
+      // });
+      try {
+        fs.writeFileSync(this.path, JSON.stringify(defaults));
+      } catch(e) {
+        console.log("Error writing to file: " + e.toString());
+      }
+
+
+      return defaults;
+    }
   }
 }
 

@@ -6,10 +6,10 @@ class Mynda extends React.Component {
     super(props)
 
     this.state = {
-      videos : library.media,
-      playlists : library.playlists,
-      collections : library.collections,
-      settings: library.settings,
+      videos : [],
+      playlists : [],
+      collections : [],
+      settings: {},
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
@@ -28,6 +28,16 @@ class Mynda extends React.Component {
     this.componentDidMount = this.componentDidMount.bind(this);
     this.showSettings = this.showSettings.bind(this);
     this.hideSettings = this.hideSettings.bind(this);
+  }
+
+  loadLibrary() {
+    const library = ipcRenderer.sendSync('load-library');
+    this.setState({
+      videos : library.media,
+      playlists : library.playlists,
+      collections : library.collections,
+      settings: library.settings
+    });
   }
 
   showDetails(id, e) {
@@ -167,10 +177,15 @@ class Mynda extends React.Component {
 
   // set the initial playlist
   componentDidMount(props) {
+    this.loadLibrary();
     // let playlist = library.playlists[0];
     // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
     // this.setPlaylist(playlist.id, document.getElementById('nav-playlists').getElementsByTagName('li')[0]);
-    document.getElementById('nav-playlists').getElementsByTagName('li')[0].click();
+    try {
+      document.getElementById('nav-playlists').getElementsByTagName('li')[0].click();
+    } catch(e) {
+      console.log("Error displaying first playlist: no playlists found? " + e.toString());
+    }
   }
 
   componentDidUpdate() {
@@ -773,10 +788,16 @@ class MynSettingsFolders extends React.Component {
 
   // create JSX for an options dropdown of the possible media kinds
   formFieldKindOptions() {
-    let options = this.props.kinds.map((kind) => (
-      <option key={kind} value={kind}>{kind.replace(/\b\w/g,(letter) => letter.toUpperCase())}</option>
-    ));
-    options.unshift(<option key="none" value="none">(none)</option>);
+    let options;
+    try {
+      options = this.props.kinds.map((kind) => (
+        <option key={kind} value={kind}>{kind.replace(/\b\w/g,(letter) => letter.toUpperCase())}</option>
+      ));
+      options.unshift(<option key="none" value="none">(none)</option>);
+    } catch(e) {
+      console.log("Unable to find list of media kinds in library: " + e.toString());
+      // should display error message to user
+    }
     return options;
   }
 
@@ -816,14 +837,20 @@ class MynSettingsFolders extends React.Component {
   }
 
   displayFolders() {
-    return this.state.existingFolders.map((folder, index) => (
-      <tr key={index}>
-        <td><input type="checkbox" checked={folder.watch} onChange={(e) => this.editWatched(e,index)} className="" /></td>
-        <td>{folder.path}</td>
-        <td><select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select></td>
-        <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
-      </tr>
-    ));
+    let folders;
+    try {
+      folders = this.state.existingFolders.map((folder, index) => (
+        <tr key={index}>
+          <td><input type="checkbox" checked={folder.watch} onChange={(e) => this.editWatched(e,index)} className="" /></td>
+          <td>{folder.path}</td>
+          <td><select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select></td>
+          <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
+        </tr>
+      ));
+    } catch(e) {
+      console.log("Error finding watchfolders from library: " + e.toString());
+    }
+    return folders;
   }
 
   componentDidMount() {
