@@ -3,16 +3,21 @@ const { ipcMain, dialog } = require('electron')
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const ReadWrite = require("./ReadWrite.js");
-let counter = 0;
+//const ReadWrite = require("./ReadWrite.js");
+const Library = require("./Library.js");
 
 const app = electron.app;
-let library = {} //{"settings" : {}, "playlists" : [], "collections" : [], "media" : []};
+/*let library = new Library;
+console.log(library.test);
+library.add(1, 0);
+console.log(library.test);*/
+
 const BrowserWindow = electron.BrowserWindow;
 
-app.whenReady().then(loadLibrary).then(createWindow);
+app.whenReady().then(createWindow);
 
 function loadLibrary() {
+  /*
   let defaultLibrary = {
     "settings" : {
       "watchfolders" : [],
@@ -58,10 +63,12 @@ function loadLibrary() {
     "media" : []
   };
 
+  let trialLibrary = new TrialLibraryClass();
+  console.log('Library trial: ' + trialLibrary.env);
   // load library; if no library is found, create default library
   library = new ReadWrite({configName: 'library', extension: 'json', defaults: defaultLibrary });
   console.log(app.getPath('userData'));  //userData.set('working', 'Hell yeah!');
-  // library.set('settings',['hi','there']);
+  // library.set('settings',['hi','there']);*/
 }
 
 function createWindow() {
@@ -77,7 +84,7 @@ function createWindow() {
 
   win.loadFile('src/index.html');
   win.webContents.on('did-finish-load', () => {
-    win.webContents.send('lib-init-load', library)
+    //win.webContents.send('lib-init-load', library)
   });
 
 }
