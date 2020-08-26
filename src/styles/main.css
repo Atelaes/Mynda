@@ -399,48 +399,92 @@ th, tr, td {
   font-size: var(--detaildescrip-font-size);
 }
 
+#edit-button {
+  display: inline-block;
+  cursor:pointer;
+  user-select: none;
+  position: var(--editbutton-position);
+  top: var(--editbutton-top);
+  bottom: var(--editbutton-bottom);
+  left: var(--editbutton-left);
+  right: var(--editbutton-right);
+  background: var(--editbutton-bg);
+  background-color: var(--editbutton-bgcolor);
+  color: var(--editbutton-text);
+  margin: var(--editbutton-margin);
+  padding: var(--editbutton-padding);
+  border: var(--editbutton-border);
+  border-radius: var(--editbutton-borderradius);
+  box-shadow: var(--editbutton-boxshadow);
+  font-size: var(--editbutton-font-size);
+  font-weight: var(--editbutton-font-weight);
+  font-family: var(--editbutton-font);
+  font-style: var(--editbutton-font-style);
+}
+
+#edit-button:hover {
+  background: var(--editbutton-bg-hover);
+  background-color: var(--editbutton-bgcolor-hover);
+  color: var(--editbutton-text-hover);
+  border: var(--editbutton-border-hover);
+}
+
+/*************************************/
+/*######### OPENABLE PANES ##########*/
+/*************************************/
+/* Openable panes are a class of panes
+   that don't appear until a button is
+   clicked. E.g. the settings pane and
+   the editor pane */
+
+.openable-pane {
+  background-color: var(--openable-bgcolor);
+}
+
+.openable-close-btn {
+  cursor:pointer;
+  user-select: none;
+  position: var(--openable-closebtn-position);
+  top: var(--openable-closebtn-top);
+  bottom: var(--openable-closebtn-bottom);
+  left: var(--openable-closebtn-left);
+  right: var(--openable-closebtn-right);
+  background: var(--openable-closebtn-bg);
+  background-color: var(--openable-closebtn-bg-color);
+  border: var(--openable-closebtn-border);
+  border-radius: var(--openable-closebtn-borderradius);
+  line-height: var(--openable-closebtn-lineheight);
+  text-align: var(--openable-closebtn-textalign);
+  width: var(--openable-closebtn-width);
+  height: var(--openable-closebtn-height);
+  padding: var(--openable-closebtn-padding);
+  margin: var(--openable-closebtn-padding);
+}
+
+
 /*************************************/
 /*########## SETTINGS PANE ##########*/
 /*************************************/
 
 
 #settings-pane {
-  background-color:rgba(30,30,30,.9);
 }
 
-#close-settings-button {
-  cursor:pointer;
-  user-select: none;
-  position:absolute;
-  top: -.6em;
-  right: -.6em;
-  background-color:#222;
-  border-radius: 999px;
-  line-height:1em;
-  text-align: center;
-  width:1em;
-  height:1em;
-  padding:.2em;
-}
 #settings-tabs {
-  padding:0px;
-  margin:0px;
-  /* width:var(--lib-col-size); */
-  display:flex;
-  flex-flow: row nowrap;
-  justify-content: flex-start;
-  align-items: flex-start;
+  padding: var(--settingstabs-container-padding);
+  margin: var(--settingstabs-container-margin);
 }
 #settings-tabs li {
   list-style-type: none;
-  padding:.1em .5em .1em .5em;
-  border:1px solid gray;
   cursor:pointer;
-
+  user-select: none;
+  padding: var(--settingstabs-padding);
+  margin: var(--settingstabs-margin);
+  border: var(--settingstabs-border);
 }
 #settings-tabs .selected {
-  background-color:#444444;
+  background-color: var(--settingstabs-bgcolor-selected);
 }
 #settings-content {
-  padding: 1em;
+  padding: var(--settingscontent-padding);
 }

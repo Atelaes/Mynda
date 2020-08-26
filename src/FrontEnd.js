@@ -6,10 +6,11 @@ class Mynda extends React.Component {
     super(props)
 
     this.state = {
-      videos : [],
-      playlists : [],
-      collections : [],
-      settings: {},
+      videos : library.media,
+      playlists : library.playlists,
+      collections : library.collections,
+      settings: library.settings,
+
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
@@ -17,7 +18,9 @@ class Mynda extends React.Component {
       detailMovie: {},
       currentPlaylistID : null,
       prevQuery: '',
-      settingsPane: null
+
+      settingsPane: null,
+      editorPane: null
     }
 
     this.render = this.render.bind(this);
@@ -26,8 +29,8 @@ class Mynda extends React.Component {
     this.search = this.search.bind(this);
     this.showDetails = this.showDetails.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
-    this.showSettings = this.showSettings.bind(this);
-    this.hideSettings = this.hideSettings.bind(this);
+    // this.showSettings = this.showSettings.bind(this);
+    // this.hideSettings = this.hideSettings.bind(this);
   }
 
   loadLibrary() {
@@ -161,15 +164,30 @@ class Mynda extends React.Component {
     });
   }
 
-  showSettings() {
+  showOpenablePane(name) {
+    // apply 'blurred' class to all other panes
     Array.from(document.getElementsByClassName('pane')).map((pane) => {
       pane.classList.add('blurred');
     });
-    this.setState({"settingsPane" : <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={this.hideSettings}/>});
+
+    let stateObj = {};
+    switch(name) {
+      case "settingsPane":
+        stateObj[name] = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={() => {this.hideOpenablePane(name)}}/>
+        break;
+      case "editorPane":
+        stateObj[name] = <MynEditor video={this.state.detailMovie} hideFunction={() => {this.hideOpenablePane(name)}}/>
+        break;
+    };
+    this.setState(stateObj);
   }
 
-  hideSettings() {
-    this.setState({"settingsPane" : null});
+  hideOpenablePane(name) {
+    let stateObj = {};
+    stateObj[name] = null;
+    this.setState(stateObj);
+
+    // remove 'blurred' class from all panes
     Array.from(document.getElementsByClassName('pane')).map((pane) => {
       pane.classList.remove('blurred');
     });
@@ -177,7 +195,7 @@ class Mynda extends React.Component {
 
   // set the initial playlist
   componentDidMount(props) {
-    this.loadLibrary();
+    // this.loadLibrary();
     // let playlist = library.playlists[0];
     // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
     // this.setPlaylist(playlist.id, document.getElementById('nav-playlists').getElementsByTagName('li')[0]);
@@ -195,10 +213,11 @@ class Mynda extends React.Component {
   render () {
     return (
       <div id='grid-container'>
-        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={this.showSettings}/>
+        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} />
-        <MynDetails movie={this.state.detailMovie} />
+        <MynDetails movie={this.state.detailMovie} showEditor={() => {this.showOpenablePane("editorPane")}}/>
         {this.state.settingsPane}
+        {this.state.editorPane}
       </div>
     );
   }
@@ -677,10 +696,12 @@ class MynDetails extends React.Component {
   }
 
   render() {
-    let details
+    let details;
+    let editBtn;
     try {
       const movie = this.props.movie
-      details = (<ul>
+      details = (
+        <ul>
           <li className="detail" id="detail-artwork"><img src={movie.artwork} /></li>
           <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
           <li className="detail" id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
@@ -689,24 +710,54 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
           <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags}</li>
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.lastseenDisplayDate(movie.lastseen)}</li>
-        </ul>);
+        </ul>
+      );
+
+      editBtn = (<div id="edit-button" onClick={() => this.props.showEditor()}>Edit</div>);
     } catch (error) {
       details = <div>No Details</div>
       // console.log(error.toString());
     }
 
-    return  (<aside id="details-pane" className="pane">
-              {details}
-            </aside>)
+    return  (
+      <aside id="details-pane" className="pane">
+        {editBtn}
+        {details}
+      </aside>
+    )
   }
 }
 
-// ###### Settings Pane: allows user to edit settings. Only appears when user clicks to open it ###### //
-class MynSettings extends React.Component {
+class MynOpenablePane extends React.Component {
   constructor(props) {
     super(props)
 
     this.state = {
+      paneID: ''
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  // child class must supply 'content' variable when calling super.render()
+  render(content) {
+    return (
+      <div id={this.state.paneID} className="pane openable-pane">
+        <div className="openable-close-btn" onClick={() => this.props.hideFunction(this.state.paneID)}>{"\u2715"}</div>
+        {content}
+      </div>
+    );
+  }
+}
+
+// ###### Settings Pane: allows user to edit settings. Only appears when user clicks to open it ###### //
+class MynSettings extends MynOpenablePane {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      paneID: 'settingsPane',
+
       views: {
         folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.kinds} />),
         playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
@@ -716,7 +767,7 @@ class MynSettings extends React.Component {
       settingView: null
     }
 
-    this.render = this.render.bind(this);
+    // this.render = this.render.bind(this);
   }
 
   setView(view,event) {
@@ -743,29 +794,38 @@ class MynSettings extends React.Component {
         console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
       }
     }
-    element.classList.add("selected");
+    try {
+      element.classList.add("selected");
+    } catch(e) {
+    }
   }
 
-  componentDidMount(props) {
-    this.setView('folders');
-  }
-
-  render() {
-    // console.log(JSON.stringify(this.props.settings));
+  createContentJSX() {
     const tabs = [];
     Object.keys(this.state.views).forEach((tab) => {
       tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
     });
 
     return (
-      <div id="settings-pane" className="pane">
-        <div id="close-settings-button" onClick={() => this.props.hideFunction()}>{"\u2715"}</div>
-        <ul id="settings-tabs">
-          {tabs}
-        </ul>
-        <div id="settings-content">{this.state.settingView}</div>
-      </div>
+        <div>
+          <ul id="settings-tabs">
+            {tabs}
+          </ul>
+          <div id="settings-content">{this.state.settingView}</div>
+        </div>
     );
+  }
+
+  componentDidMount(props) {
+    // set the view to the 'folders' tab
+    this.setView('folders');
+  }
+
+  componentDidUpdate(props) {
+  }
+
+  render() {
+    return super.render(this.createContentJSX());
   }
 }
 
@@ -926,6 +986,27 @@ class MynSettingsThemes extends React.Component {
   }
 }
 
+// ###### Editor: overlayed pane for editing video information (tagging) ###### //
+class MynEditor extends MynOpenablePane {
+  constructor(props) {
+    super(props)
 
+    this.state = {
+      paneID: 'editorPane'
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  createContentJSX() {
+    return (
+      <div>{this.props.video.title}</div>
+    );
+  }
+
+  render() {
+    return super.render(this.createContentJSX());
+  }
+}
 
 ReactDOM.render(<Mynda />, document.getElementById('root'));
