@@ -998,9 +998,108 @@ class MynEditor extends MynOpenablePane {
     this.render = this.render.bind(this);
   }
 
+  edit(event) {
+    console.log('Editing ' + event.target.parentNode.classList);
+  }
+
   createContentJSX() {
+    const video = this.props.video;
+    let fields = [];
+    Object.keys(video).forEach((property, index) => {
+      let JSX;
+      switch(property) {
+        // non-editable fields
+        case 'id':
+        case 'duration':
+        case 'filename':
+          break;
+
+        case 'tags':
+          JSX = (
+            <div key={index}>
+              <span>Tags: tags list, </span>
+              <input type="text" placeholder="+ btn brings this up" list="used-tags" />
+              <datalist id="used-tags">
+                <option value="fun">fun</option>
+                <option value="90s">90s</option>
+              </datalist>
+            </div>
+          );
+          break;
+
+        case 'artwork':
+          JSX = (
+            <div key={index}>
+              Artwork: <img src={video[property]} width="100" /> and a browse interface
+            </div>
+          );
+          break;
+
+        case 'cast':
+          JSX = (
+            <div key={index}>
+              Cast: cast list with x's and a + button
+            </div>);
+          break;
+
+        case 'genre':
+        case 'kind':
+          JSX = (
+            <div key={index}>
+              {property}:
+              <select>
+                <option value="value0">value0</option>
+                <option value="value1">value1</option>
+                <option value="value2">value2</option>
+              </select>
+            </div>
+          );
+          break;
+
+        case 'dateadded':
+        case 'lastseen':
+          JSX = (
+            <div key={index}>
+              {property}: Some kind of date editor
+            </div>
+          );
+          break;
+
+        case 'seen':
+        case 'rating':
+          JSX = (
+            <div key={index}>
+              {property}: graphical edit widget
+            </div>
+          );
+          break;
+
+        case 'collections':
+        JSX = (
+          <div key={index}>
+            Collections: I really don't know yet...
+          </div>
+        );
+        break;
+
+        // default case creates a simple text input field
+        default:
+          JSX = (
+            <div key={index} className={'edit-field ' + property}>
+              <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
+              <input type="text" value={video[property]} placeholder={'[' + property + ']'} onChange={(e) => this.edit(e)} />
+            </div>
+          );
+      }
+
+
+      fields.push(JSX);
+    });
+
     return (
-      <div>{this.props.video.title}</div>
+      <div>
+        {fields}
+      </div>
     );
   }
 

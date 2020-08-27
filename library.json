@@ -173,7 +173,8 @@ library = {
       "lastseen" : "1056692300",
       "kind" : "movie",
       "artwork" : "../artwork/MV5BM2I1ZWU4YjMtYzU0My00YmMzLWFmNTAtZDJhZGYwMmI3YWQ5XkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SY1000_CR0,0,666,1000_AL_.jpg",
-      "filename" : "~/Movies/seventhseal.mkv"
+      "filename" : "~/Movies/seventhseal.mkv",
+      "collections" : []
     },
     {
       "id" : 2,
@@ -327,6 +328,7 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/MV5BMmE1OWZjYjctYzZlNi00YmEyLTg4YWYtZDc4NTE2ODZlYzhhXkEyXkFqcGdeQXVyNzc5MjA3OA@@._V1_SY1000_CR0,0,651,1000_AL_.jpg",
       "filename" : "~/Movies/Buckaroo.mp4",
+      "collections" : []
     },
     {
       "id" : 6,
