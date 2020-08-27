@@ -129,6 +129,7 @@
   --main-text: #b6b9bf; /*#a1a9b7;*/
   --bright-text: #d8dde5; /*#cfd4dc;*/
   --dim-text: #8b929e; /*#7e848f;*/
+  --dimmer-text: #4f5259;
 /* } */
 
 /* body { */
@@ -145,9 +146,12 @@
   --textinput-bg: var(--med-bg);
   --textinput-text: var(--dim-text);
   --textinput-border-width: .12em;
-  --textinput-border: var(--textinput-border-width) solid var(--light-bg);
+  --textinput-border-color: var(--light-bg);
+  --textinput-border: var(--textinput-border-width) solid var(--textinput-border-color);
   --textinput-borderradius: 999px;
   --textinput-padding: 0em 1.4em 0em .5em;
+  --textinput-text-placeholder: var(--dimmer-text); /*var(--textinput-border-color);*/
+  --textinput-text-placeholder-opacity: 1;
 
   --inputicon-opacity: .25;
   --inputicon-empty: none;
@@ -262,10 +266,6 @@
   --detailtitle-text: var(--bright-text);
   --detailtitle-bg: linear-gradient(0deg, var(--details-bg) 5%, rgba(0,0,0,.6) 60%, rgba(0,0,0,0) 100%);
 
-  --detailposition-border: .075em solid var(--lighter-bg);
-  --detailposition-bg: var(--dark-bg);
-  --detailpositioninner-bg: var(--lighter-bg);
-
   --editbutton-position: absolute;
   --editbutton-top: .3em;
   --editbutton-bottom: initial;
@@ -307,6 +307,15 @@
   --openable-closebtn-height: 1em;
   --openable-closebtn-padding: .2em;
   --openable-closebtn-margin: initial;
+
+  /* editor pane */
+
+  --positionwidget-border: .075em solid var(--lighter-bg);
+  --positionwidget-bg: var(--dark-bg);
+  --positionwidgetinner-bg: var(--lighter-bg);
+  --positionwidget-width: 8em;
+  --positionwidget-height: .4em; /*.3em;*/
+
 }
 
 /******************************************/

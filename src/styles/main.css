@@ -48,6 +48,11 @@ input[type=text] {
   padding: var(--textinput-padding);
 }
 
+input[type=text]::placeholder {
+  color:var(--textinput-text-placeholder);
+  /* opacity: var(--textinput-text-placeholder-opacity); */
+}
+
 /* when an input field is empty, optionally display an icon on the right side of it */
 /* in order to display an icon, override the 'background' property with an image */
 /* this is simply an empty div; we must populate it with an icon */
@@ -282,20 +287,6 @@ th, tr, td {
   text-align: center;
 }
 
-/* edit widgets are little graphical editors, such as the rating stars and the checkmark in the table rows that respond to mouseover and click events */
-.edit-widget {
-  list-style: none;
-  padding: 0px;
-  margin: 0px;
-}
-.edit-widget.over {
-  color: var(--editwidget-text-hover);
-  opacity: var(--editwidget-opacity-hover);
-}
-.edit-widget li {
-  display: inline;
-}
-
 #collections-container {
   margin-left: calc(-1 * var(--collection-marginleft));
 }
@@ -380,17 +371,8 @@ th, tr, td {
 #detail-position .position-outer {
   width:60%;
   height:.3em;
-  border: var(--detailposition-border);
-  background-color: var(--detailposition-bg);
-  border-radius:999px;
-  overflow:hidden;
-  margin: auto;
   margin-top:.2em;
   margin-bottom:.8em;
-}
-#detail-position .position-inner {
-  height:100%;
-  background-color: var(--detailpositioninner-bg);
 }
 #detail-tags {
   font-style: var(--detailtags-font-style);
@@ -487,4 +469,38 @@ th, tr, td {
 }
 #settings-content {
   padding: var(--settingscontent-padding);
+}
+
+/*************************************/
+/*########### EDITOR PANE ###########*/
+/*************************************/
+
+/* edit widgets are little graphical editors, such as the rating stars and the checkmark
+   that respond to mouseover and click events. These widgets are used in the editor pane
+   but also in the movie table rows */
+.edit-widget {
+  list-style: none;
+  padding: 0px;
+  margin: 0px;
+}
+.edit-widget.over {
+  color: var(--editwidget-text-hover);
+  opacity: var(--editwidget-opacity-hover);
+}
+.edit-widget li {
+  display: inline;
+}
+
+.edit-widget .position-outer {
+  width: var(--positionwidget-width);
+  height: var(--positionwidget-height);
+  border: var(--positionwidget-border);
+  background-color: var(--positionwidget-bg);
+  border-radius:999px;
+  overflow:hidden;
+  margin: auto;
+}
+.edit-widget .position-inner {
+  height:100%;
+  background-color: var(--positionwidgetinner-bg);
 }

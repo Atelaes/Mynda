@@ -475,8 +475,8 @@ class MynLibTable extends React.Component {
         <td className="year centered mono">{movie.year}</td>
         <td className="director">{movie.director}</td>
         <td className="genre">{movie.genre}</td>
-        <td className="seen centered"><MynSeenCheckmark movie={movie} /></td>
-        <td className="rating centered"><MynRatingStars movie={movie} /></td>
+        <td className="seen centered"><MynEditSeenWidget movie={movie} /></td>
+        <td className="rating centered"><MynEditRatingWidget movie={movie} /></td>
         <td className="dateadded centered mono">{displaydate}</td>
       </tr>
     )})
@@ -544,121 +544,6 @@ class MynLibTable extends React.Component {
   }
 }
 
-// ######  ###### //
-class MynGraphicalEditWidget extends React.Component {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      displayGraphic : [],
-      property : "property",
-      className : "class"
-    }
-
-    this.render = this.render.bind(this);
-  }
-
-  updateValue(value, event) {
-    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
-    event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
-    this.props.movie[this.state.property] = value;
-    event.target.parentNode.classList.remove('over');
-  }
-
-  mouseOver(value,event) {
-    this.updateGraphic(value);
-    event.target.parentNode.classList.add('over');
-  }
-
-  mouseOut(target,event) {
-    this.updateGraphic(this.props.movie[this.state.property]);
-    target.classList.remove('over');
-    // console.log("mouse out: " + target.classList)
-    try{
-      event.stopPropagation();
-    } catch(error) {
-      // console.log("called from <ul>");
-    }
-  }
-
-  componentDidMount(props) {
-    this.setState({className : this.state.className + " edit-widget"})
-    this.updateGraphic(this.props.movie[this.state.property]);
-  }
-
-  componentDidUpdate(oldProps) {
-    if (oldProps.movie[this.state.property] !== this.props.movie[this.state.property]) {
-      this.updateGraphic(this.props.movie[this.state.property]);
-    }
-  }
-
-  // updateGraphic(graphic) {
-  //   this.setState({displayGraphic : graphic});
-  // }
-
-  render() {
-    return (<ul className={this.state.className} onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayGraphic}</ul>);
-  }
-}
-
-// ######  ###### //
-class MynRatingStars extends MynGraphicalEditWidget {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      property : "rating",
-      className : "stars"
-    }
-
-    this.render = this.render.bind(this);
-  }
-
-  updateGraphic(rating) {
-    let stars = [];
-    let char = "";
-    for (let i=1; i<=5; i++) {
-      let starClass = "star ";
-      if (i <= rating) {
-        char="\u2605";
-        starClass += "filled";
-      } else {
-        char="\u2606";
-        starClass += "empty";
-      }
-      stars.push(<li className={starClass} key={i} onMouseOver={(e) => this.mouseOver(i,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(i,e)}>{char}</li>);
-    }
-    this.setState({displayGraphic : stars});
-  }
-
-  // render() {
-  //   return (<ul className="stars" onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayStars}</ul>);
-  // }
-}
-
-// ######  ###### //
-class MynSeenCheckmark extends MynGraphicalEditWidget {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      property : "seen",
-      className : "checkmarkContainer"
-    }
-
-    this.render = this.render.bind(this);
-  }
-
-  updateGraphic(seen) {
-    let graphic = <li className="checkmark" onMouseOver={(e) => this.mouseOver(!this.props.movie.seen,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(!this.props.movie.seen,e)}>{seen ? "\u2714" : "\u2718"}</li>;
-    this.setState({displayGraphic : graphic});
-  }
-
-  // render() {
-  //   return (<ul className="stars" onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayStars}</ul>);
-  // }
-}
-
 // ###### Details Pane: contains details of the hovered/clicked video ###### //
 class MynDetails extends React.Component {
   constructor(props) {
@@ -704,7 +589,7 @@ class MynDetails extends React.Component {
         <ul>
           <li className="detail" id="detail-artwork"><img src={movie.artwork} /></li>
           <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
-          <li className="detail" id="detail-position"><div className="position-outer"><div className="position-inner" style={{width:(movie.position / movie.duration * 100) + "%"}} /></div></li>
+          <li className="detail" id="detail-position"><MynEditPositionWidget movie={movie} /></li>
           <li className="detail" id="detail-description">{movie.description}</li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
           <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
@@ -1004,101 +889,206 @@ class MynEditor extends MynOpenablePane {
 
   createContentJSX() {
     const video = this.props.video;
-    let fields = [];
-    Object.keys(video).forEach((property, index) => {
-      let JSX;
-      switch(property) {
-        // non-editable fields
-        case 'id':
-        case 'duration':
-        case 'filename':
-          break;
 
-        case 'tags':
-          JSX = (
-            <div key={index}>
-              <span>Tags: tags list, </span>
-              <input type="text" placeholder="+ btn brings this up" list="used-tags" />
-              <datalist id="used-tags">
-                <option value="fun">fun</option>
-                <option value="90s">90s</option>
-              </datalist>
-            </div>
-          );
-          break;
+    /* TITLE */
+    let title = (
+      <div className='edit-field title'>
+        <div className="edit-field-name">Title: </div>
+        <div className="edit-field-editor">
+          <input type="text" value={video.title} placeholder={'[Title]'} onChange={(e) => this.edit(e)} />
+        </div>
+      </div>
+    );
 
-        case 'artwork':
-          JSX = (
-            <div key={index}>
-              Artwork: <img src={video[property]} width="100" /> and a browse interface
-            </div>
-          );
-          break;
+    /* YEAR */
+    let year = (
+      <div className='edit-field year'>
+        <div className="edit-field-name">Year: </div>
+        <div className="edit-field-editor">
+          <input type="text" value={video.year} placeholder={'[Year]'} onChange={(e) => this.edit(e)} />
+        </div>
+      </div>
+    );
 
-        case 'cast':
-          JSX = (
-            <div key={index}>
-              Cast: cast list with x's and a + button
-            </div>);
-          break;
+    /* DIRECTOR */
+    let director = (
+      <div className='edit-field director'>
+        <div className="edit-field-name">Director: </div>
+        <div className="edit-field-editor">
+          <input type="text" value={video.director} placeholder={'[Director]'} onChange={(e) => this.edit(e)} />
+        </div>
+      </div>
+    );
 
-        case 'genre':
-        case 'kind':
-          JSX = (
-            <div key={index}>
-              {property}:
-              <select>
-                <option value="value0">value0</option>
-                <option value="value1">value1</option>
-                <option value="value2">value2</option>
-              </select>
-            </div>
-          );
-          break;
+    /* DIRECTORSORT */
+    let directorsort = (
+      <div className='edit-field directorsort'>
+        <div className="edit-field-name">Director Sort: </div>
+        <div className="edit-field-editor">
+          <input type="text" value={video.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.edit(e)} />
+        </div>
+      </div>
+    );
 
-        case 'dateadded':
-        case 'lastseen':
-          JSX = (
-            <div key={index}>
-              {property}: Some kind of date editor
-            </div>
-          );
-          break;
+    /* DESCRIPTION */
+    let description = (
+      <div className='edit-field description'>
+        <div className="edit-field-name">Description: </div>
+        <div className="edit-field-editor">
+          <textarea value={video.description} placeholder={'[Description]'} onChange={(e) => this.edit(e)} />
+        </div>
+      </div>
+    );
 
-        case 'seen':
-        case 'rating':
-          JSX = (
-            <div key={index}>
-              {property}: graphical edit widget
-            </div>
-          );
-          break;
+    /* TAGS */
+    let tags = (
+      <div className='edit-field tags'>
+        <div className="edit-field-name">Tags: </div>
+        <div className="edit-field-editor">
+          <span>tags list, </span>
+          <input type="text" placeholder="+ btn brings this up" list="used-tags" />
+          <datalist id="used-tags">
+            <option value="fun">fun</option>
+            <option value="90s">90s</option>
+          </datalist>
+        </div>
+      </div>
+    );
 
-        case 'collections':
-        JSX = (
-          <div key={index}>
-            Collections: I really don't know yet...
-          </div>
-        );
-        break;
+    /* ARTWORK */
+    let artwork = (
+      <div className='edit-field artwork'>
+        <div className="edit-field-name">Artwork: </div>
+        <div className="edit-field-editor">
+          <img src={video.artwork} width="100" />
+          [and a browse interface]
+        </div>
+      </div>
+    );
 
-        // default case creates a simple text input field
-        default:
-          JSX = (
-            <div key={index} className={'edit-field ' + property}>
-              <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
-              <input type="text" value={video[property]} placeholder={'[' + property + ']'} onChange={(e) => this.edit(e)} />
-            </div>
-          );
-      }
+    /* CAST */
+    let cast = (
+      <div className='edit-field cast'>
+        <div className="edit-field-name">Cast: </div>
+        <div className="edit-field-editor">
+          [cast list with x's and a + button]
+        </div>
+      </div>
+    );
 
+    /* GENRE */
+    let genre = (
+      <div className='edit-field genre'>
+        <div className='edit-field-name'>Genre: </div>
+        <div className="edit-field-editor">
+          <select>
+            <option value="sci-fi">sci-fi</option>
+            <option value="action">action</option>
+            <option value="drama">drama</option>
+          </select>
+        </div>
+      </div>
+    );
 
-      fields.push(JSX);
-    });
+    /* KIND */
+    let kind = (
+      <div className='edit-field kind'>
+        <div className='edit-field-name'>Kind: </div>
+        <div className="edit-field-editor">
+          <select>
+            <option value="movie">movie</option>
+            <option value="show">show</option>
+            <option value="stand-up">stand-up</option>
+            <option value="instructional">instructional</option>
+          </select>
+        </div>
+      </div>
+    );
+
+    /* DATEADDED */
+    let dateadded = (
+      <div className='edit-field dateadded'>
+        <div className='edit-field-name'>Date Added: </div>
+        <div className="edit-field-editor">
+          [Some kind of date editor]
+        </div>
+      </div>
+    );
+
+    /* LASTSEEN */
+    let lastseen = (
+      <div className='edit-field lastseen'>
+        <div className='edit-field-name'>Last Seen: </div>
+        <div className="edit-field-editor">
+          [Some kind of date editor]
+        </div>
+      </div>
+    );
+
+    /* SEEN */
+    let seen = (
+      <div className='edit-field seen'>
+        <div className='edit-field-name'>Seen: </div>
+        <div className="edit-field-editor">
+          <MynEditSeenWidget movie={video} />
+        </div>
+      </div>
+    );
+
+    /* POSITION */
+    let position = (
+      <div className='edit-field position'>
+        <div className='edit-field-name'>Position: </div>
+        <div className="edit-field-editor">
+          <MynEditPositionWidget movie={video} />
+        </div>
+      </div>
+    );
+
+    /* RATING */
+    let rating = (
+      <div className='edit-field rating'>
+        <div className='edit-field-name'>Rating: </div>
+        <div className="edit-field-editor">
+          <MynEditRatingWidget movie={video} />
+        </div>
+      </div>
+    );
+
+    /* COLLECTIONS */
+    let collections = (
+      <div className='edit-field collections'>
+        <div className='edit-field-name'>Collections: </div>
+        <div className="edit-field-editor">
+          [I really don't know yet...]
+        </div>
+      </div>
+    );
+
+          // JSX = (
+          //   <div key={index} className={'edit-field ' + property}>
+          //     <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
+          //     <input type="text" value={video[property]} placeholder={'[' + property + ']'} onChange={(e) => this.edit(e)} />
+          //   </div>
 
     return (
       <div>
-        {fields}
+        {title}
+        {description}
+        {year}
+        {director}
+        {directorsort}
+        {cast}
+        {genre}
+        {tags}
+        {kind}
+        {rating}
+        {seen}
+        {lastseen}
+        {position}
+        {dateadded}
+        {artwork}
+        {collections}
       </div>
     );
   }
@@ -1107,5 +1097,206 @@ class MynEditor extends MynOpenablePane {
     return super.render(this.createContentJSX());
   }
 }
+
+// ######  ###### //
+class MynEditWidget extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      displayGraphic : [],
+      property : "property",
+      className : "class"
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  // finds first element with targetClass, either the element itself,
+  // or the nearest of its ancestors; this prevents bubbling problems
+  findNearestOfClass(element, targetClass) {
+    while (!element.classList.contains(targetClass) && (element = element.parentElement));
+    return element;
+  }
+
+  updateValue(value, event) {
+    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
+    event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
+    this.props.movie[this.state.property] = value;
+    // event.target.parentNode.classList.remove('over');
+    this.findNearestOfClass(event.target,"edit-widget").classList.remove('over');
+  }
+
+  mouseOver(value,event) {
+    this.updateGraphic(value);
+    // event.target.parentNode.classList.add('over');
+    this.findNearestOfClass(event.target,"edit-widget").classList.add('over');
+  }
+
+  mouseOut(target,event) {
+    this.updateGraphic(this.props.movie[this.state.property]);
+    target.classList.remove('over');
+    // console.log("mouse out: " + target.classList)
+    // try{
+    //   event.stopPropagation();
+    // } catch(error) {
+    //   // console.log("called from <ul>");
+    // }
+  }
+
+  componentDidMount(props) {
+    this.setState({className : this.state.className + " edit-widget"})
+    this.updateGraphic(this.props.movie[this.state.property]);
+  }
+
+  componentDidUpdate(oldProps) {
+    if (oldProps.movie[this.state.property] !== this.props.movie[this.state.property]) {
+      this.updateGraphic(this.props.movie[this.state.property]);
+    }
+  }
+
+  // updateGraphic(graphic) {
+  //   this.setState({displayGraphic : graphic});
+  // }
+
+  render() {
+    // return (<ul className={this.state.className} onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayGraphic}</ul>);
+    return (<ul className={this.state.className}>{this.state.displayGraphic}</ul>);
+  }
+}
+
+// ######  ###### //
+class MynEditWidgetCheckmark extends MynEditWidget {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      className : "checkmarkContainer"
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  updateGraphic(value) {
+    let graphic = <li className="checkmark" onMouseOver={(e) => this.mouseOver(!this.props.movie[this.state.property],e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(!this.props.movie[this.state.property],e)}>{value ? "\u2714" : "\u2718"}</li>;
+    this.setState({displayGraphic : graphic});
+  }
+
+  // render() {
+  //   return (<ul className="stars" onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayStars}</ul>);
+  // }
+}
+
+// ######  ###### //
+class MynEditSeenWidget extends MynEditWidgetCheckmark {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      property : "seen"
+    }
+
+    this.render = this.render.bind(this);
+  }
+}
+
+// ######  ###### //
+class MynEditRatingWidget extends MynEditWidget {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      property : "rating",
+      className : "stars"
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  updateGraphic(rating) {
+    let stars = [];
+    let char = "";
+    for (let i=1; i<=5; i++) {
+      let starClass = "star ";
+      if (i <= rating) {
+        char="\u2605";
+        starClass += "filled";
+      } else {
+        char="\u2606";
+        starClass += "empty";
+      }
+      stars.push(<li className={starClass} key={i} onMouseOver={(e) => this.mouseOver(i,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(i,e)}>{char}</li>);
+    }
+    this.setState({displayGraphic : stars});
+  }
+
+  // render() {
+  //   return (<ul className="stars" onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayStars}</ul>);
+  // }
+}
+
+// ######  ###### //
+class MynEditPositionWidget extends MynEditWidget {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      property : "position",
+      className : "position",
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  // finds first element with targetClass, either the element itself,
+  // or the nearest of its ancestors; this prevents bubbling problems
+  findNearestOfClass(element, targetClass) {
+    while (!element.classList.contains(targetClass) && (element = element.parentElement));
+    return element;
+  }
+
+  getPositionFromMouse(event) {
+    let target = this.findNearestOfClass(event.target,'position-outer');
+    let widgetX = window.scrollX + target.getBoundingClientRect().left;
+    let widgetWidth = target.clientWidth;
+    let mouseX = event.clientX;
+
+    let position = (mouseX - widgetX) / widgetWidth * this.props.movie.duration;
+
+    // console.log(
+    //   'mouseX: ' + mouseX + '\n' +
+    //   'widgetX: ' + widgetX + '\n' +
+    //   // 'offsetLeft: ' + event.target.offsetLeft + '\n' +
+    //   'widgetWidth: ' + widgetWidth + '\n' +
+    //   '(mouseX - widgetX) / widgetWidth == ' + position / this.props.movie.duration
+    // );
+
+    return position;
+  }
+
+  updatePosition(event) {
+    this.mouseOver(this.getPositionFromMouse(event),event);
+  }
+
+  updateGraphic(position) {
+    position = Math.min(Math.max(position,0),this.props.movie.duration);
+    let graphic = (
+      <div className="position-outer"
+        onMouseMove={(e) => this.updatePosition(e)}
+        onMouseLeave={(e) => this.mouseOut(this.findNearestOfClass(event.target,'position-outer').parentElement,e)}
+        onClick={(e) => this.updateValue(position,e)} >
+          <div className="position-inner" style={{width:(position / this.props.movie.duration * 100) + "%"}} />
+      </div>
+    );
+
+    this.setState({displayGraphic : graphic});
+  }
+
+  // componentDidMount(props) {
+  //   // ReactDOM.findDOMNode(this.refs.outer)
+  //   return super.componentDidMount(props);
+  // }
+}
+
 
 ReactDOM.render(<Mynda />, document.getElementById('root'));
