@@ -1,5 +1,6 @@
 //const React = require('React');
 const { ipcRenderer } = require('electron')
+const cloneDeep = require('lodash.clonedeep');
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -878,12 +879,36 @@ class MynEditor extends MynOpenablePane {
 
     this.state = {
       paneID: 'editor-pane',
-      data: props.video
+      data: cloneDeep(props.video)
     }
 
     this.render = this.render.bind(this);
     this.handleChange = this.handleChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
+    this.revertChanges = this.revertChanges.bind(this);
+    this.saveChanges = this.saveChanges.bind(this);
+  }
+
+  handleChange(value,prop) {
+    // console.log('Editing ' + prop);
+    let update = this.state.data;
+    update[prop] = value;
+    this.setState({data : update});
+  }
+
+  revertChanges(event) {
+    // console.log('reverting...');
+    event.preventDefault();
+    this.setState({data : cloneDeep(this.props.video)});
+  }
+
+  saveChanges(event) {
+    // console.log('saving...');
+    event.preventDefault();
+    alert('Submitted: ' + JSON.stringify(this.state.data));
+
+    Object.keys(this.state.data).forEach((property) => {
+      // update values in library here
+    });
   }
 
   createContentJSX() {
@@ -894,7 +919,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field title'>
         <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
-          <input type="text" name="text" value={this.state.data.title} placeholder={'[Title]'} onChange={(e) => this.handleChange(e,'title')} />
+          <input type="text" name="text" value={this.state.data.title} placeholder={'[Title]'} onChange={(e) => this.handleChange(e.target.value,'title')} />
         </div>
       </div>
     );
@@ -904,7 +929,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field year'>
         <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
-          <input type="text" name="year" value={this.state.data.year} placeholder={'[Year]'} onChange={(e) => this.handleChange(e)} />
+          <input type="text" name="year" value={this.state.data.year} placeholder={'[Year]'} onChange={(e) => this.handleChange(e.target.value,'year')} />
         </div>
       </div>
     );
@@ -914,7 +939,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field director'>
         <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
-          <input type="text" name="director" value={this.state.data.director} placeholder={'[Director]'} onChange={(e) => this.handleChange(e)} />
+          <input type="text" name="director" value={this.state.data.director} placeholder={'[Director]'} onChange={(e) => this.handleChange(e.target.value,'director')} />
         </div>
       </div>
     );
@@ -924,7 +949,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field directorsort'>
         <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
-          <input type="text" name="directorsort" value={this.state.data.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.handleChange(e)} />
+          <input type="text" name="directorsort" value={this.state.data.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.handleChange(e.target.value,'directorsort')} />
         </div>
       </div>
     );
@@ -934,7 +959,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field description'>
         <label className="edit-field-name" htmlFor="description">Description: </label>
         <div className="edit-field-editor">
-          <textarea name="description" value={this.state.data.description} placeholder={'[Description]'} onChange={(e) => this.handleChange(e)} />
+          <textarea name="description" value={this.state.data.description} placeholder={'[Description]'} onChange={(e) => this.handleChange(e.target.value,'description')} />
         </div>
       </div>
     );
@@ -971,7 +996,8 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field cast'>
         <label className="edit-field-name" htmlFor="cast">Cast: </label>
         <div className="edit-field-editor">
-          [cast list with x's and a + button]
+          <MynEditListWidget movie={this.state.data} property="cast" update={this.handleChange} />
+          <MynEditAddToList movie={this.state.data} property="cast" update={this.handleChange} validator={/^[a-zA-Z0-9_\s\-\.']+$/} options={null} />
         </div>
       </div>
     );
@@ -1073,7 +1099,7 @@ class MynEditor extends MynOpenablePane {
 
     return (
       <div id="edit-container">
-        <form onSubmit={this.handleSubmit}>
+        <form onSubmit={this.saveChanges}>
           {title}
           {description}
           {year}
@@ -1090,25 +1116,12 @@ class MynEditor extends MynOpenablePane {
           {dateadded}
           {artwork}
           {collections}
+          <button onClick={(e) => this.revertChanges(e)}>Revert to current values</button>
           <input type="submit" value="Save" />
         </form>
       </div>
     );
   }
-
-  handleChange(event,prop) {
-    console.log('Editing ' + prop);
-    let update = this.state.data;
-    update[prop] = event.target.value;
-    this.setState({data : update});
-  }
-
-  handleSubmit(event) {
-    event.preventDefault();
-    alert('Submitted: ' + JSON.stringify(this.state.data));
-    
-  }
-
 
   render() {
     return super.render(this.createContentJSX());
@@ -1116,7 +1129,7 @@ class MynEditor extends MynOpenablePane {
 }
 
 // ######  ###### //
-class MynEditWidget extends React.Component {
+class MynEditGraphicalWidget extends React.Component {
   constructor(props) {
     super(props)
 
@@ -1185,7 +1198,7 @@ class MynEditWidget extends React.Component {
 }
 
 // ######  ###### //
-class MynEditWidgetCheckmark extends MynEditWidget {
+class MynEditWidgetCheckmark extends MynEditGraphicalWidget {
   constructor(props) {
     super(props)
 
@@ -1220,7 +1233,7 @@ class MynEditSeenWidget extends MynEditWidgetCheckmark {
 }
 
 // ######  ###### //
-class MynEditRatingWidget extends MynEditWidget {
+class MynEditRatingWidget extends MynEditGraphicalWidget {
   constructor(props) {
     super(props)
 
@@ -1255,7 +1268,7 @@ class MynEditRatingWidget extends MynEditWidget {
 }
 
 // ######  ###### //
-class MynEditPositionWidget extends MynEditWidget {
+class MynEditPositionWidget extends MynEditGraphicalWidget {
   constructor(props) {
     super(props)
 
@@ -1317,5 +1330,106 @@ class MynEditPositionWidget extends MynEditWidget {
   // }
 }
 
+// ######  ###### //
+class MynEditListWidget extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      list: []
+    }
+
+    this.render = this.render.bind(this);
+    this.updateList = this.updateList.bind(this);
+  }
+
+  // finds first element with targetClass, either the element itself,
+  // or the nearest of its ancestors; this prevents bubbling problems
+  // by ensuring that we know which element we're operating on,
+  // instead of relying on event.target, which could be a child element
+  findNearestOfClass(element, targetClass) {
+    while (!element.classList.contains(targetClass) && (element = element.parentElement));
+    return element;
+  }
+
+  updateList(list) {
+    this.setState({ list : list });
+    this.props.update(list,this.props.property);
+  }
+
+  deleteItem(index) {
+    var temp = this.state.list;
+    temp.splice(index, 1);
+    this.updateList(temp);
+  }
+
+  displayList() {
+    return this.state.list.map((item, index) => (
+      <li key={index} className="list-widget-item">{item}<div className="list-widget-delete-item" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>
+    ));
+  }
+
+  componentDidMount(props) {
+    this.updateList(this.props.movie[this.props.property]);
+  }
+
+  componentDidUpdate(oldProps) {
+    if (oldProps.movie[this.props.property] !== this.props.movie[this.props.property]) {
+      this.updateList(this.props.movie[this.props.property]);
+    }
+  }
+
+  render() {
+    // return (<ul className={this.state.className} onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayGraphic}</ul>);
+    return (<ul className={this.props.property}>{this.displayList()}</ul>);
+  }
+}
+
+// ######  ###### //
+
+//<MynEditAddToList
+//movie={this.state.data}
+//property="cast"
+//validator={/.*/g}
+//options={null} />
+class MynEditAddToList extends MynEditListWidget {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      id : "edit-add-" + props.property
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  addItem(event) {
+    const input = document.getElementById(this.state.id);
+    const item = input.value;
+    if (this.props.validator.test(item)) {
+      let temp = this.state.list;
+      try {
+        temp.push(item);
+      } catch(e) {
+        temp = [item];
+      }
+      this.updateList(temp);
+      input.value = '';
+    } else {
+      console.log('validation error!');
+      // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
+    }
+    event.preventDefault();
+  }
+
+  render() {
+    return (
+      <div>
+        <input type="text" id={this.state.id} placeholder="Add..." minLength="1" />
+        <button onClick={(e) => this.addItem(e)}>Add</button>
+      </div>
+    );
+  }
+}
 
 ReactDOM.render(<Mynda />, document.getElementById('root'));
