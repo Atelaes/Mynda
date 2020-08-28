@@ -641,7 +641,7 @@ class MynSettings extends MynOpenablePane {
     super(props)
 
     this.state = {
-      paneID: 'settingsPane',
+      paneID: 'settings-pane',
 
       views: {
         folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.kinds} />),
@@ -877,14 +877,13 @@ class MynEditor extends MynOpenablePane {
     super(props)
 
     this.state = {
-      paneID: 'editorPane'
+      paneID: 'editor-pane',
+      data: props.video
     }
 
     this.render = this.render.bind(this);
-  }
-
-  edit(event) {
-    console.log('Editing ' + event.target.parentNode.classList);
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
   }
 
   createContentJSX() {
@@ -893,9 +892,9 @@ class MynEditor extends MynOpenablePane {
     /* TITLE */
     let title = (
       <div className='edit-field title'>
-        <div className="edit-field-name">Title: </div>
+        <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
-          <input type="text" value={video.title} placeholder={'[Title]'} onChange={(e) => this.edit(e)} />
+          <input type="text" name="text" value={this.state.data.title} placeholder={'[Title]'} onChange={(e) => this.handleChange(e,'title')} />
         </div>
       </div>
     );
@@ -903,9 +902,9 @@ class MynEditor extends MynOpenablePane {
     /* YEAR */
     let year = (
       <div className='edit-field year'>
-        <div className="edit-field-name">Year: </div>
+        <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
-          <input type="text" value={video.year} placeholder={'[Year]'} onChange={(e) => this.edit(e)} />
+          <input type="text" name="year" value={this.state.data.year} placeholder={'[Year]'} onChange={(e) => this.handleChange(e)} />
         </div>
       </div>
     );
@@ -913,9 +912,9 @@ class MynEditor extends MynOpenablePane {
     /* DIRECTOR */
     let director = (
       <div className='edit-field director'>
-        <div className="edit-field-name">Director: </div>
+        <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
-          <input type="text" value={video.director} placeholder={'[Director]'} onChange={(e) => this.edit(e)} />
+          <input type="text" name="director" value={this.state.data.director} placeholder={'[Director]'} onChange={(e) => this.handleChange(e)} />
         </div>
       </div>
     );
@@ -923,9 +922,9 @@ class MynEditor extends MynOpenablePane {
     /* DIRECTORSORT */
     let directorsort = (
       <div className='edit-field directorsort'>
-        <div className="edit-field-name">Director Sort: </div>
+        <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
-          <input type="text" value={video.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.edit(e)} />
+          <input type="text" name="directorsort" value={this.state.data.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.handleChange(e)} />
         </div>
       </div>
     );
@@ -933,9 +932,9 @@ class MynEditor extends MynOpenablePane {
     /* DESCRIPTION */
     let description = (
       <div className='edit-field description'>
-        <div className="edit-field-name">Description: </div>
+        <label className="edit-field-name" htmlFor="description">Description: </label>
         <div className="edit-field-editor">
-          <textarea value={video.description} placeholder={'[Description]'} onChange={(e) => this.edit(e)} />
+          <textarea name="description" value={this.state.data.description} placeholder={'[Description]'} onChange={(e) => this.handleChange(e)} />
         </div>
       </div>
     );
@@ -943,10 +942,10 @@ class MynEditor extends MynOpenablePane {
     /* TAGS */
     let tags = (
       <div className='edit-field tags'>
-        <div className="edit-field-name">Tags: </div>
+        <label className="edit-field-name" htmlFor="tags">Tags: </label>
         <div className="edit-field-editor">
           <span>tags list, </span>
-          <input type="text" placeholder="+ btn brings this up" list="used-tags" />
+          <input type="text" name="tags" placeholder="+ btn brings this up" list="used-tags" />
           <datalist id="used-tags">
             <option value="fun">fun</option>
             <option value="90s">90s</option>
@@ -958,10 +957,11 @@ class MynEditor extends MynOpenablePane {
     /* ARTWORK */
     let artwork = (
       <div className='edit-field artwork'>
-        <div className="edit-field-name">Artwork: </div>
+        <label className="edit-field-name" htmlFor="artwork">Artwork: </label>
         <div className="edit-field-editor">
-          <img src={video.artwork} width="100" />
-          [and a browse interface]
+          <img src={this.state.data.artwork} width="100" />
+          <button name="artwork">[browse]</button>
+
         </div>
       </div>
     );
@@ -969,7 +969,7 @@ class MynEditor extends MynOpenablePane {
     /* CAST */
     let cast = (
       <div className='edit-field cast'>
-        <div className="edit-field-name">Cast: </div>
+        <label className="edit-field-name" htmlFor="cast">Cast: </label>
         <div className="edit-field-editor">
           [cast list with x's and a + button]
         </div>
@@ -979,9 +979,9 @@ class MynEditor extends MynOpenablePane {
     /* GENRE */
     let genre = (
       <div className='edit-field genre'>
-        <div className='edit-field-name'>Genre: </div>
+        <label className="edit-field-name" htmlFor="genre">Genre: </label>
         <div className="edit-field-editor">
-          <select>
+          <select name="genre">
             <option value="sci-fi">sci-fi</option>
             <option value="action">action</option>
             <option value="drama">drama</option>
@@ -993,9 +993,9 @@ class MynEditor extends MynOpenablePane {
     /* KIND */
     let kind = (
       <div className='edit-field kind'>
-        <div className='edit-field-name'>Kind: </div>
+        <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor">
-          <select>
+          <select name="kind">
             <option value="movie">movie</option>
             <option value="show">show</option>
             <option value="stand-up">stand-up</option>
@@ -1008,7 +1008,7 @@ class MynEditor extends MynOpenablePane {
     /* DATEADDED */
     let dateadded = (
       <div className='edit-field dateadded'>
-        <div className='edit-field-name'>Date Added: </div>
+        <label className="edit-field-name" htmlFor="dateadded">Date Added: </label>
         <div className="edit-field-editor">
           [Some kind of date editor]
         </div>
@@ -1018,7 +1018,7 @@ class MynEditor extends MynOpenablePane {
     /* LASTSEEN */
     let lastseen = (
       <div className='edit-field lastseen'>
-        <div className='edit-field-name'>Last Seen: </div>
+        <label className="edit-field-name" htmlFor="lastseen">Last Seen: </label>
         <div className="edit-field-editor">
           [Some kind of date editor]
         </div>
@@ -1028,9 +1028,9 @@ class MynEditor extends MynOpenablePane {
     /* SEEN */
     let seen = (
       <div className='edit-field seen'>
-        <div className='edit-field-name'>Seen: </div>
+        <label className='edit-field-name' htmlFor="seen">Seen: </label>
         <div className="edit-field-editor">
-          <MynEditSeenWidget movie={video} />
+          <MynEditSeenWidget movie={this.state.data} />
         </div>
       </div>
     );
@@ -1038,9 +1038,9 @@ class MynEditor extends MynOpenablePane {
     /* POSITION */
     let position = (
       <div className='edit-field position'>
-        <div className='edit-field-name'>Position: </div>
+        <label className="edit-field-name" htmlFor="position">Position: </label>
         <div className="edit-field-editor">
-          <MynEditPositionWidget movie={video} />
+          <MynEditPositionWidget movie={this.state.data} />
         </div>
       </div>
     );
@@ -1048,9 +1048,9 @@ class MynEditor extends MynOpenablePane {
     /* RATING */
     let rating = (
       <div className='edit-field rating'>
-        <div className='edit-field-name'>Rating: </div>
+        <label className="edit-field-name" htmlFor="rating">Rating: </label>
         <div className="edit-field-editor">
-          <MynEditRatingWidget movie={video} />
+          <MynEditRatingWidget movie={this.state.data} />
         </div>
       </div>
     );
@@ -1058,7 +1058,7 @@ class MynEditor extends MynOpenablePane {
     /* COLLECTIONS */
     let collections = (
       <div className='edit-field collections'>
-        <div className='edit-field-name'>Collections: </div>
+        <label className="edit-field-name" htmlFor="collections">Collections: </label>
         <div className="edit-field-editor">
           [I really don't know yet...]
         </div>
@@ -1068,30 +1068,47 @@ class MynEditor extends MynOpenablePane {
           // JSX = (
           //   <div key={index} className={'edit-field ' + property}>
           //     <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
-          //     <input type="text" value={video[property]} placeholder={'[' + property + ']'} onChange={(e) => this.edit(e)} />
+          //     <input type="text" value={video[property]} placeholder={'[' + property + ']'} onChange={(e) => this.handleChange(e)} />
           //   </div>
 
     return (
-      <div>
-        {title}
-        {description}
-        {year}
-        {director}
-        {directorsort}
-        {cast}
-        {genre}
-        {tags}
-        {kind}
-        {rating}
-        {seen}
-        {lastseen}
-        {position}
-        {dateadded}
-        {artwork}
-        {collections}
+      <div id="edit-container">
+        <form onSubmit={this.handleSubmit}>
+          {title}
+          {description}
+          {year}
+          {director}
+          {directorsort}
+          {cast}
+          {genre}
+          {tags}
+          {kind}
+          {rating}
+          {seen}
+          {lastseen}
+          {position}
+          {dateadded}
+          {artwork}
+          {collections}
+          <input type="submit" value="Save" />
+        </form>
       </div>
     );
   }
+
+  handleChange(event,prop) {
+    console.log('Editing ' + prop);
+    let update = this.state.data;
+    update[prop] = event.target.value;
+    this.setState({data : update});
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    alert('Submitted: ' + JSON.stringify(this.state.data));
+    
+  }
+
 
   render() {
     return super.render(this.createContentJSX());
@@ -1114,6 +1131,8 @@ class MynEditWidget extends React.Component {
 
   // finds first element with targetClass, either the element itself,
   // or the nearest of its ancestors; this prevents bubbling problems
+  // by ensuring that we know which element we're operating on,
+  // instead of relying on event.target, which could be a child element
   findNearestOfClass(element, targetClass) {
     while (!element.classList.contains(targetClass) && (element = element.parentElement));
     return element;

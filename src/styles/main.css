@@ -32,7 +32,7 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-.collection h1, #movie-table th, #nav-playlists li, .edit-widget li, .movie-row {
+.collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row {
   cursor: pointer;
   user-select: none;
 }
@@ -443,11 +443,16 @@ th, tr, td {
   margin: var(--openable-closebtn-padding);
 }
 
+.openable-close-btn:hover {
+  box-shadow: var(--openable-closebtn-boxshadow-hover);
+  color: var(--openable-closebtn-text-hover);
+  background-color: var(--openable-closebtn-bg-color-hover);
+}
+
 
 /*************************************/
 /*########## SETTINGS PANE ##########*/
 /*************************************/
-
 
 #settings-pane {
 }
@@ -474,6 +479,14 @@ th, tr, td {
 /*************************************/
 /*########### EDITOR PANE ###########*/
 /*************************************/
+
+#editor-pane {
+  padding: var(--editorpane-padding);
+}
+
+.edit-field-name {
+  float:left;
+}
 
 /* edit widgets are little graphical editors, such as the rating stars and the checkmark
    that respond to mouseover and click events. These widgets are used in the editor pane
