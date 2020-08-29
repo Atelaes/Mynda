@@ -87,6 +87,7 @@
   --main-font: HKGrotesk, Helvetica, sans-serif;
   --main-font-size: 20pt;
   --main-font-weight: normal;
+  --textinput-font: var(--main-font);
   --big-title-font: Dorsa, Helvetica, sans-serif;
   --playlist-tab-font: var(--main-font);
   --playlist-tab-font-size: inherit;
@@ -147,6 +148,7 @@
   --details-bg: var(--pane-bg-1);
 
   --textinput-font-size: calc(var(--main-font-size));/* * 3 / 4);*/
+  --textinput-font-weight: 500;
   --textinput-height: calc(var(--textinput-font-size) * 7 / 5);
   --textinput-bg: var(--med-bg);
   --textinput-text: var(--dim-text);
@@ -322,7 +324,9 @@
 
   --editfield-margin: ;
 
+  --editor-textinput-width: 100%;
   --editor-textinput-font-size: inherit;
+  --editor-textinput-font-weight: 300;
   --editor-textinput-height: inherit;
   --editor-textinput-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,0)  100%);
   --editor-textinput-bg-color: initial;
@@ -336,6 +340,8 @@
   --editor-input-title-height: var(--detailtitle-font-size);
   --editor-input-title-color: var(--detailtitle-text);
   --editor-input-title-background: initial;
+  --editor-input-title-padding: 0em;
+  --editor-input-title-borderradius: 0em;
 
   --editor-textarea-borderradius: var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);
   --editor-textarea-height: 5em;
@@ -343,9 +349,46 @@
   --editor-textarea-margin: inherit; /*.5em 0em .5em 0em; */
   --editor-textarea-padding: .5em;
   --editor-textarea-font: var(--main-font);
-  --editor-textarea-font: .8em;
+  --editor-textarea-fontsize: .8em;
   --editor-textarea-fontstyle: italic;
   --editor-textarea-fontweight: 300;
+
+  --editfield-margin: initial; /*0em 0em .5em 0em;*/
+
+  --editfield-name-font: inherit;
+  --editfield-name-fontsize: .7em;
+  --editfield-name-fontstyle: initial;
+  --editfield-name-fontweight: 300;
+
+  --listwidget-item-bg: initial;
+  --listwidget-item-bg-color: rgba(54,59,69,.3); /*var(--light-bg);*/
+  --listwidget-item-text: inherit;
+  --listwidget-item-borderradius: 999px; /*calc(var(--playlisttab-borderradius-radius)/2);*/
+  --listwidget-item-height: initial; /*var(--listwidget-item-fontsize);*/
+  --listwidget-item-width: initial;
+  --listwidget-item-margin: 0em .2em .2em 0em; /*.5em 0em .5em 0em; */
+  --listwidget-item-padding: .2em 1em .2em .5em;
+  --listwidget-item-font: var(--main-font);
+  --listwidget-item-fontsize-size: .8;
+  --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1em);
+  --listwidget-item-fontstyle: initial;
+  --listwidget-item-fontweight: 300;
+
+  --listwidgetdel-item-fontsize: calc(var(--listwidget-item-fontsize-size) * .75rem);
+  --listwidgetdel-item-borderradius: 999px;
+  --listwidgetdel-item-bg-color: var(--darker-bg);
+  --listwidgetdel-item-lineheight: var(--listwidgetdel-item-fontsize);
+  --listwidgetdel-item-textalign: center;
+  --listwidgetdel-item-width: var(--listwidgetdel-item-fontsize);
+  --listwidgetdel-item-height: var(--listwidgetdel-item-fontsize);
+  --listwidgetdel-item-padding: .2rem;
+  --listwidgetdel-item-margin: initial;
+  --listwidgetdel-item-display: inline-block;
+  --listwidgetdel-item-position: absolute;
+  --listwidgetdel-item-left: initial;
+  --listwidgetdel-item-right: .2rem;
+  --listwidgetdel-item-top: calc((var(--listwidget-item-height) / 2) - (var(--listwidgetdel-item-height) / 2));
+  --listwidgetdel-item-bottom: initial;
 
   --positionwidget-border: .075em solid var(--lighter-bg);
   --positionwidget-bg: var(--dark-bg);
@@ -537,4 +580,15 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 .openable-pane {
   box-shadow: 0em 0em 1em -.2em var(--glow-dim);
+}
+
+.edit-field.cast .cast {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, 10em);
+  grid-auto-columns: minmax(7em, 10em);
+  grid-auto-flow: row;
+  white-space: nowrap;
+}
+
+.list-widget-item {
 }

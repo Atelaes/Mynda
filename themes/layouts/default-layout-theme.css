@@ -89,8 +89,9 @@
 
 #edit-container form {
   display:grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: 3fr 2fr;
   grid-template-rows: repeat(11, auto);
+  grid-gap: 0.5em;
 }
 
 #edit-container .edit-field {

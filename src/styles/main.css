@@ -4,6 +4,9 @@
 :root {
   overflow-x:hidden;
   scrollbar-width: none;
+  font-family: var(--main-font);
+  font-size: var(--main-font-size);
+  font-weight: var(--main-font-weight);
 }
 :root ::-webkit-scrollbar {
   display: none;
@@ -14,9 +17,6 @@ body {
   color: var(--main-text);
   padding:0px;
   margin:0px;
-  font-family: var(--main-font);
-  font-size: var(--main-font-size);
-  font-weight: var(--main-font-weight);
   overflow-x:hidden;
   overflow-y:hidden;
   scrollbar-width: none;
@@ -38,7 +38,9 @@ body ::-webkit-scrollbar {
 }
 
 input[type=text] {
+  font-family: var(--textinput-font);
   font-size: var(--textinput-font-size);
+  font-weight: var(--textinput-font-weight);
   height: var(--textinput-height);
   outline: none;
   background-color: var(--textinput-bg);
@@ -487,7 +489,9 @@ th, tr, td {
 #editor-pane input[type=text],
 #editor-pane textarea {
   outline: none;
+  width: var(--editor-textinput-width);
   font-size: var(--editor-textinput-font-size);
+  font-weight: var(--editor-textinput-font-weight);
   height: var(--editor-textinput-height);
   background: var(--editor-textinput-bg);
   background-color: var(--editor-textinput-bg-color);
@@ -504,13 +508,20 @@ th, tr, td {
   margin: var(--editor-textarea-margin);
   padding: var(--editor-textarea-padding);
   font-family: var(--editor-textarea-font);
-  font-size: var(--editor-textarea-font);
+  font-size: var(--editor-textarea-fontsize);
   font-style: var(--editor-textarea-fontstyle);
   font-weight: var(--editor-textarea-fontweight);
 }
 
+.edit-field {
+  margin: var(--editfield-margin);
+}
+
 .edit-field-name {
-  float:left;
+  font-family: var(--editfield-name-font);
+  font-size: var(--editfield-name-fontsize);
+  font-style: var(--editfield-name-fontstyle);
+  font-weight: var(--editfield-name-fontweight);
 }
 
 .edit-field.title .edit-field-name,
@@ -532,6 +543,8 @@ input[type=text]#edit-field-title {
   margin-right:0px; */
   color: var(--editor-input-title-color);
   background: var(--editor-input-title-background);
+  padding: var(--editor-input-title-padding);
+  border-radius: var(--editor-input-title-borderradius);
 }
 
 
@@ -563,4 +576,50 @@ input[type=text]#edit-field-title {
 .edit-widget .position-inner {
   height:100%;
   background-color: var(--positionwidgetinner-bg);
+}
+
+/* <ul> containing cast list items */
+.edit-field.cast .cast {
+  display:block;
+  margin:0em;
+  padding:0em;
+}
+
+/* e.g. individual cast and tags items (<li>) */
+.list-widget-item {
+  list-style-type: none;
+  user-select: none;
+  overflow:hidden;
+  background: var(--listwidget-item-bg);
+  background-color: var(--listwidget-item-bg-color);
+  color: var(--listwidget-item-text);
+  border-radius: var(--listwidget-item-borderradius);
+  height: var(--listwidget-item-height);
+  width: var(--listwidget-item-width);
+  margin: var(--listwidget-item-margin);
+  padding: var(--listwidget-item-padding);
+  font-family: var(--listwidget-item-font);
+  font-size: var(--listwidget-item-fontsize);
+  font-style: var(--listwidget-item-fontstyle);
+  font-weight: var(--listwidget-item-fontweight);
+}
+
+.list-widget-delete-item {
+  cursor:pointer;
+  vertical-align: middle;
+  display: var(--listwidgetdel-item-display);
+  position: var(--listwidgetdel-item-position);
+  left: var(--listwidgetdel-item-left);
+  right: var(--listwidgetdel-item-right);
+  top: var(--listwidgetdel-item-top);
+  bottom: var(--listwidgetdel-item-bottom);
+  font-size: var(--listwidgetdel-item-fontsize);
+  border-radius: var(--listwidgetdel-item-borderradius);
+  background-color: var(--listwidgetdel-item-bg-color);
+  line-height: var(--listwidgetdel-item-lineheight);
+  text-align: var(--listwidgetdel-item-textalign);
+  width: var(--listwidgetdel-item-width);
+  height: var(--listwidgetdel-item-height);
+  padding: var(--listwidgetdel-item-padding);
+  margin: var(--listwidgetdel-item-margin);
 }
