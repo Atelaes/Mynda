@@ -320,6 +320,33 @@
   /* editor pane */
   --editorpane-padding: 1em;
 
+  --editfield-margin: ;
+
+  --editor-textinput-font-size: inherit;
+  --editor-textinput-height: inherit;
+  --editor-textinput-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,0)  100%);
+  --editor-textinput-bg-color: initial;
+  --editor-textinput-text: inherit;
+  --editor-textinput-border: none;
+  --editor-textinput-borderradius: 999px 0px 0px 999px;
+  --editor-textinput-padding: var(--textinput-padding);
+
+  --editor-input-title-font: var(--big-title-font);
+  --editor-input-title-font-size: var(--detailtitle-font-size);
+  --editor-input-title-height: var(--detailtitle-font-size);
+  --editor-input-title-color: var(--detailtitle-text);
+  --editor-input-title-background: initial;
+
+  --editor-textarea-borderradius: var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);
+  --editor-textarea-height: 5em;
+  --editor-textarea-width: 100%;
+  --editor-textarea-margin: inherit; /*.5em 0em .5em 0em; */
+  --editor-textarea-padding: .5em;
+  --editor-textarea-font: var(--main-font);
+  --editor-textarea-font: .8em;
+  --editor-textarea-fontstyle: italic;
+  --editor-textarea-fontweight: 300;
+
   --positionwidget-border: .075em solid var(--lighter-bg);
   --positionwidget-bg: var(--dark-bg);
   --positionwidgetinner-bg: var(--lighter-bg);

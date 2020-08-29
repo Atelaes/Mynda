@@ -919,7 +919,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field title'>
         <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
-          <input type="text" name="text" value={this.state.data.title} placeholder={'[Title]'} onChange={(e) => this.handleChange(e.target.value,'title')} />
+          <input id="edit-field-title" type="text" name="text" value={this.state.data.title} placeholder={'[Title]'} onChange={(e) => this.handleChange(e.target.value,'title')} />
         </div>
       </div>
     );
@@ -929,7 +929,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field year'>
         <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
-          <input type="text" name="year" value={this.state.data.year} placeholder={'[Year]'} onChange={(e) => this.handleChange(e.target.value,'year')} />
+          <input id="edit-field-year" type="text" name="year" value={this.state.data.year} placeholder={'[Year]'} onChange={(e) => this.handleChange(e.target.value,'year')} />
         </div>
       </div>
     );
@@ -939,7 +939,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field director'>
         <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
-          <input type="text" name="director" value={this.state.data.director} placeholder={'[Director]'} onChange={(e) => this.handleChange(e.target.value,'director')} />
+          <input id="edit-field-director" type="text" name="director" value={this.state.data.director} placeholder={'[Director]'} onChange={(e) => this.handleChange(e.target.value,'director')} />
         </div>
       </div>
     );
@@ -949,7 +949,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field directorsort'>
         <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
-          <input type="text" name="directorsort" value={this.state.data.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.handleChange(e.target.value,'directorsort')} />
+          <input id="edit-field-directorsort" type="text" name="directorsort" value={this.state.data.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.handleChange(e.target.value,'directorsort')} />
         </div>
       </div>
     );
@@ -959,7 +959,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field description'>
         <label className="edit-field-name" htmlFor="description">Description: </label>
         <div className="edit-field-editor">
-          <textarea name="description" value={this.state.data.description} placeholder={'[Description]'} onChange={(e) => this.handleChange(e.target.value,'description')} />
+          <textarea id="edit-field-description" name="description" value={this.state.data.description} placeholder={'[Description]'} onChange={(e) => this.handleChange(e.target.value,'description')} />
         </div>
       </div>
     );
@@ -1007,7 +1007,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field genre'>
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
         <div className="edit-field-editor">
-          <select name="genre">
+          <select id="edit-field-genre" name="genre">
             <option value="sci-fi">sci-fi</option>
             <option value="action">action</option>
             <option value="drama">drama</option>
@@ -1021,7 +1021,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor">
-          <select name="kind">
+          <select id="edit-field-kind" name="kind">
             <option value="movie">movie</option>
             <option value="show">show</option>
             <option value="stand-up">stand-up</option>

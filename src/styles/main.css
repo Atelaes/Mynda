@@ -484,9 +484,56 @@ th, tr, td {
   padding: var(--editorpane-padding);
 }
 
+#editor-pane input[type=text],
+#editor-pane textarea {
+  outline: none;
+  font-size: var(--editor-textinput-font-size);
+  height: var(--editor-textinput-height);
+  background: var(--editor-textinput-bg);
+  background-color: var(--editor-textinput-bg-color);
+  color: var(--editor-textinput-text);
+  border: var(--editor-textinput-border);
+  border-radius: var(--editor-textinput-borderradius);
+  padding: var(--editor-textinput-padding);
+}
+
+#editor-pane textarea {
+  border-radius: var(--editor-textarea-borderradius);
+  height: var(--editor-textarea-height);
+  width: var(--editor-textarea-width);
+  margin: var(--editor-textarea-margin);
+  padding: var(--editor-textarea-padding);
+  font-family: var(--editor-textarea-font);
+  font-size: var(--editor-textarea-font);
+  font-style: var(--editor-textarea-fontstyle);
+  font-weight: var(--editor-textarea-fontweight);
+}
+
 .edit-field-name {
   float:left;
 }
+
+.edit-field.title .edit-field-name,
+.edit-field.description .edit-field-name,
+.edit-field.artwork .edit-field-name {
+  display:none;
+}
+
+input[type=text]#edit-field-title {
+  text-align:center;
+  font-family: var(--editor-input-title-font);
+  font-size: var(--editor-input-title-font-size);
+  height: var(--editor-input-title-height);
+  /* position: relative;
+  bottom: calc(var(--detailtitle-font-size) + var(--padding));
+  padding-top:var(--padding);
+  margin-bottom:calc(-1 * (var(--detailtitle-font-size) + var(--padding)));
+  margin-left:0px;
+  margin-right:0px; */
+  color: var(--editor-input-title-color);
+  background: var(--editor-input-title-background);
+}
+
 
 /* edit widgets are little graphical editors, such as the rating stars and the checkmark
    that respond to mouseover and click events. These widgets are used in the editor pane
