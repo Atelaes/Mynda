@@ -89,7 +89,7 @@
 
 #edit-container form {
   display:grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: repeat(11, auto);
   grid-gap: 0.5em;
 }
@@ -101,69 +101,67 @@
 /* column 1 */
 .edit-field.title {
   grid-row: 1;
-  grid-column: 1;
+  grid-column: 1 / span 2;
 }
 .edit-field.description {
   grid-row: 2;
-  grid-column: 1;
+  grid-column: 1 / span 2;
 }
 .edit-field.year {
   grid-row: 3;
-  grid-column: 1;
+  grid-column: 1 / span 2;
 }
 .edit-field.director {
   grid-row: 4;
   grid-column: 1;
 }
 .edit-field.directorsort {
-  grid-row: 5;
-  grid-column: 1;
+  grid-row: 4;
+  grid-column: 2;
 }
 .edit-field.cast {
-  grid-row: 6 / span 2;
-  grid-column: 1;
+  grid-row: 5 / span 2;
+  grid-column: 1 / span 2;
 }
 .edit-field.genre {
-  grid-row: 8;
+  grid-row: 7;
   grid-column: 1;
 }
 .edit-field.kind {
-  grid-row: 9;
-  grid-column: 1;
-}
-.edit-field.dateadded {
-  grid-row: 10;
-  grid-column: 1;
-}
-
-/* column 2 */
-.edit-field.artwork {
-  grid-row: 1 / span 4;
-  grid-column: 2;
-}
-.edit-field.position {
-  grid-row: 5;
-  grid-column: 2;
-}
-.edit-field.rating {
-  grid-row: 6;
-  grid-column: 2;
-}
-.edit-field.seen {
   grid-row: 7;
   grid-column: 2;
 }
 .edit-field.tags {
   grid-row: 8 / span 2;
-  grid-column: 2;
+  grid-column: 1 / span 2;
 }
-.edit-field.lastseen {
+.edit-field.collections {
   grid-row: 10;
-  grid-column: 2;
+  grid-column: 1 / span 2;
 }
 
-/* collections takes both columns */
-.edit-field.collections {
-  grid-row: 11;
-  grid-column: 1 / span 2;
+/* column 3 */
+.edit-field.artwork {
+  grid-row: 1 / span 4;
+  grid-column: 3;
+}
+.edit-field.position {
+  grid-row: 5;
+  grid-column: 3;
+}
+.edit-field.rating {
+  grid-row: 6;
+  grid-column: 3;
+}
+.edit-field.seen {
+  grid-row: 7;
+  grid-column: 3;
+}
+.edit-field.lastseen {
+  grid-row: 8;
+  grid-column: 3;
+}
+.edit-field.dateadded {
+  grid-row: 9;
+  grid-column: 3;
 }

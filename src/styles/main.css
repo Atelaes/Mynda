@@ -37,7 +37,7 @@ body ::-webkit-scrollbar {
   user-select: none;
 }
 
-input[type=text] {
+input[type=text], select {
   font-family: var(--textinput-font);
   font-size: var(--textinput-font-size);
   font-weight: var(--textinput-font-weight);
@@ -89,6 +89,30 @@ input + .input-clear-button {
 .input-container {
   display: inline-block;
   position: relative;
+}
+
+select, datalist {
+  /* hide the dropdown chrome so we can make our own */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.select-container::after {
+/* select::after { */
+  position:absolute;
+  display:block;
+  user-select: none;
+  cursor: pointer;
+  height: var(--select-arrow-height);
+  content: var(--select-arrow-content);
+  left: var(--select-arrow-left);
+  right: var(--select-arrow-right);
+  top: var(--select-arrow-top);
+  bottom: var(--select-arrow-bottom);
+  color: var(--select-arrow-text);
+  font-family: var(--select-arrow-font);
+  font-size: var(--select-arrow-fontsize);
+  font-weight: var(--select-arrow-fontweight);
 }
 
 /*************************************/
@@ -370,11 +394,21 @@ th, tr, td {
 #detail-artwork img {
   width:100%;
 }
+#detail-position .edit-widget.over {
+  /* override the general edit-widget opacity if desired */
+  opacity: var(--detailposition-opacity-hover);
+}
 #detail-position .position-outer {
   width:60%;
   height:.3em;
   margin-top:.2em;
   margin-bottom:.8em;
+  /* override the general position edit-widget border if desired */
+  border: var(--detailposition-outer-border);
+}
+#detail-position .position-inner {
+  /* override the general position edit-widget interior bg if desired */
+  background-color: var(--detailposition-inner-bgcolor);
 }
 #detail-tags {
   font-style: var(--detailtags-font-style);
@@ -487,6 +521,7 @@ th, tr, td {
 }
 
 #editor-pane input[type=text],
+#editor-pane select,
 #editor-pane textarea {
   outline: none;
   width: var(--editor-textinput-width);
@@ -507,10 +542,27 @@ th, tr, td {
   width: var(--editor-textarea-width);
   margin: var(--editor-textarea-margin);
   padding: var(--editor-textarea-padding);
+  background: var(--editor-textarea-bg);
+  background-color: var(--editor-textarea-bg-color);
+  color: var(--editor-textarea-text);
+  border: var(--editor-textarea-border);
   font-family: var(--editor-textarea-font);
   font-size: var(--editor-textarea-fontsize);
   font-style: var(--editor-textarea-fontstyle);
   font-weight: var(--editor-textarea-fontweight);
+}
+
+#editor-pane select {
+  width: var(--editor-select-width);
+  font-size: var(--editor-select-font-size);
+  font-weight: var(--editor-select-font-weight);
+  height: var(--editor-select-height);
+  background: var(--editor-select-bg);
+  background-color: var(--editor-select-bg-color);
+  color: var(--editor-select-text);
+  border: var(--editor-select-border);
+  border-radius: var(--editor-select-borderradius);
+  padding: var(--editor-select-padding);
 }
 
 .edit-field {
@@ -518,6 +570,7 @@ th, tr, td {
 }
 
 .edit-field-name {
+  margin: var(--editfield-name-margin);
   font-family: var(--editfield-name-font);
   font-size: var(--editfield-name-fontsize);
   font-style: var(--editfield-name-fontstyle);
@@ -530,11 +583,18 @@ th, tr, td {
   display:none;
 }
 
+.edit-field.genre input[type=text],
+.edit-field.kind select {
+  text-transform: capitalize;
+}
+
 input[type=text]#edit-field-title {
   text-align:center;
   font-family: var(--editor-input-title-font);
   font-size: var(--editor-input-title-font-size);
-  height: var(--editor-input-title-height);
+  /* height: var(--editor-input-title-height); */
+  line-height: var(--editor-input-title-lineheight);
+  margin: var(--editor-input-title-margin);
   /* position: relative;
   bottom: calc(var(--detailtitle-font-size) + var(--padding));
   padding-top:var(--padding);
@@ -590,6 +650,7 @@ input[type=text]#edit-field-title {
   list-style-type: none;
   user-select: none;
   overflow:hidden;
+  box-sizing: border-box;
   background: var(--listwidget-item-bg);
   background-color: var(--listwidget-item-bg-color);
   color: var(--listwidget-item-text);
@@ -604,9 +665,21 @@ input[type=text]#edit-field-title {
   font-weight: var(--listwidget-item-fontweight);
 }
 
+.list-widget-item::after {
+  content:"";
+  background: var(--listwidget-item-ellipsis-grad);
+  width: var(--listwidget-item-ellipsis-width);
+  height: 100%;
+  position: absolute;
+  right: -.1em;
+  top: 0em;
+  /* z-index:9999; */
+}
+
 .list-widget-delete-item {
   cursor:pointer;
   vertical-align: middle;
+  box-sizing: border-box;
   display: var(--listwidgetdel-item-display);
   position: var(--listwidgetdel-item-position);
   left: var(--listwidgetdel-item-left);
@@ -622,4 +695,75 @@ input[type=text]#edit-field-title {
   height: var(--listwidgetdel-item-height);
   padding: var(--listwidgetdel-item-padding);
   margin: var(--listwidgetdel-item-margin);
+}
+
+#editor-pane .list-widget-add.inline {
+  font-family: var(--listwidgetadd-inline-font);
+  font-size: var(--listwidgetadd-inline-fontsize);
+  font-style: var(--listwidgetadd-inline-fontstyle);
+  font-weight: var(--listwidgetadd-inline-fontweight);
+  background: var(--listwidgetadd-inline-bg);
+  background-color: var(--listwidgetadd-inline-bg-color);
+  color: var(--listwidgetadd-inline-text);
+  border: var(--listwidgetadd-inline-border);
+  border-radius: var(--listwidgetadd-inline-borderradius);
+  height: var(--listwidgetadd-inline-height);
+  width: var(--listwidgetadd-inline-width);
+  margin: var(--listwidgetadd-inline-margin);
+  padding: var(--listwidgetadd-inline-padding);
+}
+
+#editor-pane .list-widget-add.inline input.list-widget-add-input {
+  height: 100%;
+  width: 100%;
+  padding: var(--listwidget-item-padding);
+  /* font-family: var(--listwidgetadd-input-font);
+  font-size: var(--listwidgetadd-input-fontsize);
+  font-style: var(--listwidgetadd-input-fontstyle);
+  font-weight: var(--listwidgetadd-input-fontweight);
+  position: var(--listwidgetadd-input-position);
+  left: var(--listwidgetadd-input-left);
+  right: var(--listwidgetadd-input-right);
+  top: var(--listwidgetadd-input-top);
+  bottom: var(--listwidgetadd-input-bottom);
+  background: var(--listwidgetadd-input-bg);
+  background-color: var(--listwidgetadd-input-bg-color);
+  color: var(--listwidgetadd-input-text);
+  border: var(--listwidgetadd-input-border);
+  border-radius: var(--listwidgetadd-input-borderradius);
+  height: var(--listwidgetadd-input-height);
+  width: var(--listwidgetadd-input-width);
+  margin: var(--listwidgetadd-input-margin);
+  padding: var(--listwidgetadd-input-padding); */
+}
+
+.list-widget-add button {
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--listwidgetadd-button-font);
+  font-size: var(--listwidgetadd-button-fontsize);
+  font-style: var(--listwidgetadd-button-fontstyle);
+  font-weight: var(--listwidgetadd-button-fontweight);
+  line-height: var(--listwidgetadd-button-lineheight);
+  position: var(--listwidgetadd-button-position);
+  left: var(--listwidgetadd-button-left);
+  right: var(--listwidgetadd-button-right);
+  top: var(--listwidgetadd-button-top);
+  bottom: var(--listwidgetadd-button-bottom);
+  background: var(--listwidgetadd-button-bg);
+  background-color: var(--listwidgetadd-button-bg-color);
+  color: var(--listwidgetadd-button-text);
+  border: var(--listwidgetadd-button-border);
+  border-radius: var(--listwidgetadd-button-borderradius);
+  height: var(--listwidgetadd-button-height);
+  width: var(--listwidgetadd-button-width);
+  margin: var(--listwidgetadd-button-margin);
+  padding: var(--listwidgetadd-button-padding);
+}
+
+/* artwork image */
+.edit-field.artwork .edit-field-editor img {
+  width: var(--editartwork-img-width);
+  height: var(--editartwork-img-height);
 }

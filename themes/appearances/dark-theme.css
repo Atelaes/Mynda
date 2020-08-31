@@ -173,6 +173,18 @@
   --inputicon-background-empty: rgba(0,0,0,0) var(--inputicon-empty) no-repeat 0% 50%;
   --inputicon-background-filled: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
   --inputicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
+
+  --select-arrow-height: var(--textinput-height);
+  --select-arrow-content: '\30C';
+  --select-arrow-left: initial;
+  --select-arrow-right: .5rem;
+  --select-arrow-top: calc((var(--textinput-height) / 2) - (var(--select-arrow-height) / 2.6));
+  --select-arrow-bottom: initial;
+  --select-arrow-text: inherit;
+  --select-arrow-font: inherit;
+  --select-arrow-fontsize: 1.5em;
+  --select-arrow-fontweight: inherit;
+
 /* } */
 
 /* #nav-pane { */
@@ -272,6 +284,10 @@
 /* #details-pane { */
   --detailtitle-text: var(--bright-text);
   --detailtitle-bg: linear-gradient(0deg, var(--details-bg) 5%, rgba(0,0,0,.6) 60%, rgba(0,0,0,0) 100%);
+  --detailposition-outer-bordercolor: var(--lighter-bg);
+  --detailposition-outer-border: var(--positionwidget-borderwidth) solid var(--detailposition-outer-bordercolor);
+  --detailposition-inner-bgcolor: var(--detailposition-outer-bordercolor);
+  --detailposition-opacity-hover: .6;
 
   --editbutton-position: absolute;
   --editbutton-top: .3em;
@@ -332,19 +348,24 @@
   --editor-textinput-bg-color: initial;
   --editor-textinput-text: inherit;
   --editor-textinput-border: none;
-  --editor-textinput-borderradius: 999px 0px 0px 999px;
+  --editor-textinput-borderradius-radius: 999px;
+  --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);
   --editor-textinput-padding: var(--textinput-padding);
 
   --editor-input-title-font: var(--big-title-font);
   --editor-input-title-font-size: var(--detailtitle-font-size);
-  --editor-input-title-height: var(--detailtitle-font-size);
+  --editor-input-title-height: var(--editor-input-title-lineheight);
+  --editor-input-title-lineheight: calc(var(--detailtitle-font-size) * 1.3);
+  --editor-input-title-margin: -.5rem 0em -1rem 0em;
   --editor-input-title-color: var(--detailtitle-text);
   --editor-input-title-background: initial;
   --editor-input-title-padding: 0em;
   --editor-input-title-borderradius: 0em;
+  --editor-input-title-zindex: calc(var(--openablepane-zindex) + 10);
 
-  --editor-textarea-borderradius: var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);
-  --editor-textarea-height: 5em;
+
+  --editor-textarea-borderradius: 1em 0 0 1em; /*var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);*/
+  --editor-textarea-height: 6em;
   --editor-textarea-width: 100%;
   --editor-textarea-margin: inherit; /*.5em 0em .5em 0em; */
   --editor-textarea-padding: .5em;
@@ -352,49 +373,130 @@
   --editor-textarea-fontsize: .8em;
   --editor-textarea-fontstyle: italic;
   --editor-textarea-fontweight: 300;
+  --editor-textarea-bg: var(--editor-textinput-bg);
+  --editor-textarea-bg-color: var(--editor-textinput-bg-color);
+  --editor-textarea-text: inherit;
+  --editor-textarea-border: inherit;
+
+  --editor-select-width: var(--editor-textinput-width);
+  --editor-select-font-size: var(--editor-textinput-font-size);
+  --editor-select-font-weight: var(--editor-select-font-weight);
+  --editor-select-height: var(--editor-textinput-height);
+  --editor-select-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.15)  100%);;
+  --editor-select-bg-color: initial;
+  --editor-select-text: var(--editor-textinput-text);
+  --editor-select-border: var(--editor-textinput-border);
+  --editor-select-borderradius: var(--editor-textinput-borderradius-radius);
+  --editor-select-padding: var(--editor-textinput-padding);
 
   --editfield-margin: initial; /*0em 0em .5em 0em;*/
 
+  --editfield-name-margin: 0em 0em 0em .5rem;
   --editfield-name-font: inherit;
   --editfield-name-fontsize: .7em;
   --editfield-name-fontstyle: initial;
   --editfield-name-fontweight: 300;
 
   --listwidget-item-bg: initial;
-  --listwidget-item-bg-color: rgba(54,59,69,.3); /*var(--light-bg);*/
+  --listwidget-item-bg-color: rgba(37,39,43,1); /*rgba(54,59,69,.3);*/ /*var(--light-bg);*/
   --listwidget-item-text: inherit;
-  --listwidget-item-borderradius: 999px; /*calc(var(--playlisttab-borderradius-radius)/2);*/
-  --listwidget-item-height: initial; /*var(--listwidget-item-fontsize);*/
+  --listwidget-item-borderradius-radius: 999px;
+  --listwidget-item-borderradius: var(--listwidget-item-borderradius-radius); /*calc(var(--playlisttab-borderradius-radius)/2);*/
+  --listwidget-item-height: 1.3rem;
   --listwidget-item-width: initial;
   --listwidget-item-margin: 0em .2em .2em 0em; /*.5em 0em .5em 0em; */
-  --listwidget-item-padding: .2em 1em .2em .5em;
+  --listwidget-item-padding-top: .2em;
+  --listwidget-item-padding: var(--listwidget-item-padding-top) 1em var(--listwidget-item-padding-top) .5em;
   --listwidget-item-font: var(--main-font);
   --listwidget-item-fontsize-size: .8;
   --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1em);
   --listwidget-item-fontstyle: initial;
   --listwidget-item-fontweight: 300;
+  --listwidget-item-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--listwidget-item-bg-color) 30%);
+  --listwidget-item-ellipsis-width: 2rem;
 
-  --listwidgetdel-item-fontsize: calc(var(--listwidget-item-fontsize-size) * .75rem);
+  --listwidgetdel-item-fontsize-factor: .75;
+  --listwidgetdel-item-fontsize: calc(var(--listwidget-item-fontsize-size) * var(--listwidgetdel-item-fontsize-factor) * 1rem);
   --listwidgetdel-item-borderradius: 999px;
   --listwidgetdel-item-bg-color: var(--darker-bg);
   --listwidgetdel-item-lineheight: var(--listwidgetdel-item-fontsize);
   --listwidgetdel-item-textalign: center;
-  --listwidgetdel-item-width: var(--listwidgetdel-item-fontsize);
-  --listwidgetdel-item-height: var(--listwidgetdel-item-fontsize);
+  --listwidgetdel-item-width: calc(var(--listwidgetdel-item-fontsize) + 2 * var(--listwidgetdel-item-padding));
+  --listwidgetdel-item-height: var(--listwidgetdel-item-width);
   --listwidgetdel-item-padding: .2rem;
   --listwidgetdel-item-margin: initial;
   --listwidgetdel-item-display: inline-block;
   --listwidgetdel-item-position: absolute;
   --listwidgetdel-item-left: initial;
-  --listwidgetdel-item-right: .2rem;
-  --listwidgetdel-item-top: calc((var(--listwidget-item-height) / 2) - (var(--listwidgetdel-item-height) / 2));
+  --listwidgetdel-item-top: calc((var(--listwidget-item-height) / 2) - (var(--listwidgetdel-item-height) / 2));/* - (var(--listwidget-item-padding-top) / var(--listwidgetdel-item-fontsize-factor)));*/
+  --listwidgetdel-item-right: var(--listwidgetdel-item-top); /*.2rem;*/
   --listwidgetdel-item-bottom: initial;
 
-  --positionwidget-border: .075em solid var(--lighter-bg);
+  --listwidgetadd-inline-font: inherit;
+  --listwidgetadd-inline-fontsize: var(--listwidget-item-fontsize);
+  --listwidgetadd-inline-fontstyle: inherit;
+  --listwidgetadd-inline-fontweight: inherit;
+  --listwidgetadd-inline-bg: inherit;
+  --listwidgetadd-inline-bg-color: inherit;
+  --listwidgetadd-inline-text: inherit;
+  --listwidgetadd-inline-border: inherit;
+  --listwidgetadd-inline-borderradius: inherit;
+  --listwidgetadd-inline-height: var(--listwidget-item-height);
+  --listwidgetadd-inline-width: var(--listwidget-item-width);
+  --listwidgetadd-inline-margin: var(--listwidget-item-margin);
+  --listwidgetadd-inline-padding: 0em;
+
+  /* --listwidgetadd-input-font: inherit;
+  --listwidgetadd-input-fontsize: var(--listwidget-item-fontsize);
+  --listwidgetadd-input-fontstyle: inherit;
+  --listwidgetadd-input-fontweight: inherit;
+  --listwidgetadd-input-position: initial;
+  --listwidgetadd-input-left: initial;
+  --listwidgetadd-input-right: initial;
+  --listwidgetadd-input-top: initial;
+  --listwidgetadd-input-bottom: initial;
+  --listwidgetadd-input-bg: inherit;
+  --listwidgetadd-input-bg-color: inherit;
+  --listwidgetadd-input-text: inherit;
+  --listwidgetadd-input-border: inherit;
+  --listwidgetadd-input-borderradius: inherit;
+  --listwidgetadd-input-height: var(--listwidget-item-height);
+  --listwidgetadd-input-width: var(--listwidget-item-width);
+  --listwidgetadd-input-margin: var(--listwidget-item-margin);
+  --listwidgetadd-input-padding: var(--listwidget-item-padding); */
+
+  --listwidgetadd-button-font: inherit;
+  --listwidgetadd-button-fontsize: 1rem;
+  --listwidgetadd-button-fontstyle: inherit;
+  --listwidgetadd-button-fontweight: inherit;
+  --listwidgetadd-button-lineheight: calc(var(--listwidgetadd-inline-height) * var(--listwidgetadd-button-height));
+  --listwidgetadd-button-position: absolute;
+  --listwidgetadd-button-left: initial;
+  --listwidgetadd-button-right: 0em;
+  --listwidgetadd-button-top: 0em;
+  --listwidgetadd-button-bottom: initial;
+  --listwidgetadd-button-bg: initial;
+  --listwidgetadd-button-bg-color: var(--listwidget-item-bg-color);
+  --listwidgetadd-button-text: inherit;
+  --listwidgetadd-button-border: 0em solid rgba(0,0,0,0);
+  --listwidgetadd-button-borderradius: 0em var(--listwidget-item-borderradius-radius) var(--listwidget-item-borderradius-radius) 0em;
+  --listwidgetadd-button-height: 100%;
+  --listwidgetadd-button-width: initial;
+  --listwidgetadd-button-margin: initial;
+  --listwidgetadd-button-padding: 0em .13em 0em .09em;
+
+
+  --positionwidget-bordercolor: var(--main-text);
+  --positionwidget-borderwidth: .075em;
+  --positionwidget-border: var(--positionwidget-borderwidth) solid var(--positionwidget-bordercolor);
   --positionwidget-bg: var(--dark-bg);
-  --positionwidgetinner-bg: var(--lighter-bg);
+  --positionwidgetinner-bg: var(--positionwidget-bordercolor);
   --positionwidget-width: 8em;
   --positionwidget-height: .4em; /*.3em;*/
+
+  --editartwork-img-width: 100%;
+  --editartwork-img-height: auto;
+
 
 }
 
@@ -580,6 +682,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 .openable-pane {
   box-shadow: 0em 0em 1em -.2em var(--glow-dim);
+  /* overflow-y: scroll; */
 }
 
 .edit-field.cast .cast {
@@ -591,4 +694,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 .list-widget-item {
+}
+
+.list-widget-add {
+
 }
