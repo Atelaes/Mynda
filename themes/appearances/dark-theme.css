@@ -111,6 +111,7 @@
   --detaillabel-font-style: normal;
 
   /* background colors */
+  --transparent-black-bg: rgba(0,0,0,.25);
   --darker-bg: #181a1e;
   --dark-bg: #1e2126;
   --med-bg: #24272e;
@@ -148,12 +149,12 @@
   --details-bg: var(--pane-bg-1);
 
   --textinput-font-size: calc(var(--main-font-size));/* * 3 / 4);*/
-  --textinput-font-weight: 500;
+  --textinput-font-weight: 300;
   --textinput-height: calc(var(--textinput-font-size) * 7 / 5);
-  --textinput-bg: var(--med-bg);
+  --textinput-bg-color: var(--transparent-black-bg);
   --textinput-text: var(--dim-text);
-  --textinput-border-width: .12em;
-  --textinput-border-color: var(--light-bg);
+  --textinput-border-width: 0em;
+  --textinput-border-color: initial;
   --textinput-border: var(--textinput-border-width) solid var(--textinput-border-color);
   --textinput-borderradius: 999px;
   --textinput-padding: 0em 1.4em 0em .5em;
@@ -182,7 +183,7 @@
   --select-arrow-bottom: initial;
   --select-arrow-text: inherit;
   --select-arrow-font: inherit;
-  --select-arrow-fontsize: 1.5em;
+  --select-arrow-fontsize: 1.5rem;
   --select-arrow-fontweight: inherit;
 
 /* } */
@@ -190,6 +191,19 @@
 /* #nav-pane { */
   --navcontrols-height: var(--textinput-height);
   --navcontrolschildren-margin: 0em var(--navcontrols-top) 0em 0em;
+
+  --searchinput-font-size: var(--textinput-font-size);
+  --searchinput-font-weight: 500;
+  --searchinput-height: var(--textinput-height);
+  --searchinput-bg: var(--med-bg);
+  --searchinput-text: var(--dim-text);
+  --searchinput-border-width: .12em;
+  --searchinput-border-color: var(--light-bg);
+  --searchinput-border: var(--searchinput-border-width) solid var(--searchinput-border-color);
+  --searchinput-borderradius: var(--textinput-borderradius);
+  --searchinput-padding: var(--textinput-padding);
+  --searchinput-text-placeholder: var(--textinput-text-placeholder); /*var(--textinput-border-color);*/
+  --searchinput-text-placeholder-opacity: var(--textinput-text-placeholder-opacity);
 
   --searchfield-height: var(--navcontrols-height);
   --searchicon-empty: url('../../images/mag-icon_white.png');
@@ -340,18 +354,6 @@
 
   --editfield-margin: ;
 
-  --editor-textinput-width: 100%;
-  --editor-textinput-font-size: inherit;
-  --editor-textinput-font-weight: 300;
-  --editor-textinput-height: inherit;
-  --editor-textinput-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,0)  100%);
-  --editor-textinput-bg-color: initial;
-  --editor-textinput-text: inherit;
-  --editor-textinput-border: none;
-  --editor-textinput-borderradius-radius: 999px;
-  --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);
-  --editor-textinput-padding: var(--textinput-padding);
-
   --editor-input-title-font: var(--big-title-font);
   --editor-input-title-font-size: var(--detailtitle-font-size);
   --editor-input-title-height: var(--editor-input-title-lineheight);
@@ -363,6 +365,17 @@
   --editor-input-title-borderradius: 0em;
   --editor-input-title-zindex: calc(var(--openablepane-zindex) + 10);
 
+  --editor-textinput-width: 100%;
+  --editor-textinput-font-size: inherit;
+  --editor-textinput-font-weight: var(--textinput-font-weight);
+  --editor-textinput-height: inherit;
+  --editor-textinput-bg-color: var(--textinput-bg-color);
+  --editor-textinput-bg: linear-gradient(90deg, var(--textinput-bg-color) 0%, rgba(0,0,0,0)  100%);
+  --editor-textinput-text: inherit;
+  --editor-textinput-border: var(--textinput-border);
+  --editor-textinput-borderradius-radius: var(--textinput-borderradius);
+  --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);
+  --editor-textinput-padding: var(--textinput-padding);
 
   --editor-textarea-borderradius: 1em 0 0 1em; /*var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);*/
   --editor-textarea-height: 6em;
@@ -382,8 +395,8 @@
   --editor-select-font-size: var(--editor-textinput-font-size);
   --editor-select-font-weight: var(--editor-select-font-weight);
   --editor-select-height: var(--editor-textinput-height);
-  --editor-select-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.15)  100%);;
-  --editor-select-bg-color: initial;
+  --editor-select-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.15)  100%);
+  --editor-select-bg-color: rgba(0,0,0,.25);
   --editor-select-text: var(--editor-textinput-text);
   --editor-select-border: var(--editor-textinput-border);
   --editor-select-borderradius: var(--editor-textinput-borderradius-radius);
@@ -397,6 +410,7 @@
   --editfield-name-fontstyle: initial;
   --editfield-name-fontweight: 300;
 
+  --listwidget-item-maxwidth: 15em;
   --listwidget-item-bg: initial;
   --listwidget-item-bg-color: rgba(37,39,43,1); /*rgba(54,59,69,.3);*/ /*var(--light-bg);*/
   --listwidget-item-text: inherit;
@@ -445,6 +459,9 @@
   --listwidgetadd-inline-width: var(--listwidget-item-width);
   --listwidgetadd-inline-margin: var(--listwidget-item-margin);
   --listwidgetadd-inline-padding: 0em;
+
+  --listwidgetadd-input-maxwidth: 10em;
+
 
   /* --listwidgetadd-input-font: inherit;
   --listwidgetadd-input-fontsize: var(--listwidget-item-fontsize);
@@ -685,13 +702,29 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* overflow-y: scroll; */
 }
 
-.edit-field.cast .cast {
+.list-widget-list.cast {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, 10em);
   grid-auto-columns: minmax(7em, 10em);
   grid-auto-flow: row;
   white-space: nowrap;
 }
+#editor-pane .list-widget-list.cast .list-widget-add {
+  max-width: initial;
+}
+
+/* make the tags list inline, and make the ellipsis gradient */
+.list-widget-list.tags .list-widget-item {
+  display:inline-block;
+  padding-right: 1.7em;
+}
+.list-widget-list.tags .list-widget-item::after {
+  background: linear-gradient(90deg, rgba(37,39,43,0) 23%, var(--listwidget-item-bg-color) 40%);
+}
+.list-widget-list.tags .list-widget-add.inline {
+  display:inline-block;
+}
+
 
 .list-widget-item {
 }

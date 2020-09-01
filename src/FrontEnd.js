@@ -594,7 +594,7 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-description">{movie.description}</li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
           <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
-          <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags}</li>
+          <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags.map((tag) => <span key={tag}>{tag} </span>)}</li>
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.lastseenDisplayDate(movie.lastseen)}</li>
         </ul>
       );
@@ -965,16 +965,15 @@ class MynEditor extends MynOpenablePane {
     );
 
     /* TAGS */
+    // <MynEditListWidget movie={this.state.data} property="tags" update={this.handleChange} />
+    // <MynEditAddToList movie={this.state.data} property="tags" update={this.handleChange} validator={/^[a-zA-Z0-9_\-\.]+$/} options={["many","tags","happy","joy","existing","already-used"]} />
     let tags = (
       <div className='edit-field tags'>
         <label className="edit-field-name" htmlFor="tags">Tags: </label>
         <div className="edit-field-editor">
-          <span>tags list, </span>
-          <input type="text" name="tags" placeholder="+ btn brings this up" list="used-tags"  onChange={(e) => this.handleChange(e.target.value,'tags')} />
-          <datalist id="used-tags">
-            <option value="fun">fun</option>
-            <option value="90s">90s</option>
-          </datalist>
+          <div className="select-container">
+            <MynEditInlineAddListWidget movie={this.state.data} property="tags" update={this.handleChange} validator={/^[a-zA-Z0-9_\-\.]+$/} options={["many","tags","happy","joy","existing","already-used"]} />
+          </div>
         </div>
       </div>
     );
@@ -1009,7 +1008,7 @@ class MynEditor extends MynOpenablePane {
     let genre = (
       <div className='edit-field genre'>
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
-        <div className="edit-field-editor select-container">
+        <div className="edit-field-editor select-container select-hovericon">
           <input id="edit-field-genre" type="text" name="genre" value={this.state.data.genre} list="used-genres" onChange={(e) => this.handleChange(e.target.value,'genre')} />
           <datalist id="used-genres">
             <option value="sci-fi" />
@@ -1024,7 +1023,7 @@ class MynEditor extends MynOpenablePane {
     let kind = (
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
-        <div className="edit-field-editor select-container">
+        <div className="edit-field-editor select-container select-alwaysicon">
           <select id="edit-field-kind" name="kind">
             <option value="movie">movie</option>
             <option value="show">show</option>
@@ -1385,7 +1384,7 @@ class MynEditListWidget extends React.Component {
 
   render() {
     // return (<ul className={this.state.className} onMouseOut={(e) => this.mouseOut(e.target)}>{this.state.displayGraphic}</ul>);
-    return (<ul className={this.props.property}>{this.displayList()}</ul>);
+    return (<ul className={"list-widget-list " + this.props.property}>{this.displayList()}</ul>);
   }
 }
 
@@ -1427,10 +1426,22 @@ class MynEditAddToList extends MynEditListWidget {
   }
 
   render() {
+    let options = null;
+    let listName = null;
+    if (this.props.options) {
+      listName = "used-" + this.props.property;
+      options = (
+        <datalist id={listName}>
+          {this.props.options.map((option) => (<option key={option} value={option} />))}
+        </datalist>
+      );
+    }
+
     return (
-      <div id={this.state.id} className={"list-widget-add " + (this.props.inline || "")}>
-        <input type="text" id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." minLength="1" />
+      <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "")}>
+        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." minLength="1" />
         <button onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
+        {options}
       </div>
     );
   }
@@ -1445,7 +1456,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
   }
   render() {
     return (
-      <ul className={this.props.property}>
+      <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
         <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} validator={this.props.validator} options={this.props.options} inline="inline" />
       </ul>

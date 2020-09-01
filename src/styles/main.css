@@ -43,7 +43,7 @@ input[type=text], select {
   font-weight: var(--textinput-font-weight);
   height: var(--textinput-height);
   outline: none;
-  background-color: var(--textinput-bg);
+  background-color: var(--textinput-bg-color);
   color: var(--textinput-text);
   border: var(--textinput-border);
   border-radius: var(--textinput-borderradius);
@@ -57,13 +57,13 @@ input[type=text]::placeholder {
 
 /* when an input field is empty, optionally display an icon on the right side of it */
 /* in order to display an icon, override the 'background' property with an image */
-/* this is simply an empty div; we must populate it with an icon */
+/* this is simply an empty div; we must populate it with an icon using the background property */
 input.empty + .input-clear-button {
   background: var(--inputicon-background-empty);
 }
 
 /* when an input field has text, optionally display an icon on the right side of it */
-/* this is simply an empty div; we must populate it with an icon */
+/* this is simply an empty div; we must populate it with an icon using the background property */
 /* when clicked, this div should clear the search field */
 input.filled + .input-clear-button {
   background: var(--inputicon-background-filled);
@@ -91,14 +91,22 @@ input + .input-clear-button {
   position: relative;
 }
 
+/* remove arrow on a select dropdown */
+/* we replace it below with our own icon */
 select, datalist {
-  /* hide the dropdown chrome so we can make our own */
   appearance: none;
   -webkit-appearance: none;
 }
 
-.select-container::after {
-/* select::after { */
+/* this removes Chrome's added down arrow on a datalist dropdown */
+/* we replace it below with our own icon */
+input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+/* replace dropdown arrow icon with our own */
+.select-container.select-hovericon:hover::after,
+.select-container.select-alwaysicon::after {
   position:absolute;
   display:block;
   user-select: none;
@@ -196,6 +204,19 @@ select, datalist {
 #search-field input.empty + .input-clear-button {
   background: var(--searchicon-background-empty);
   /* background-size: var(--inputicon-bg-size); */
+}
+
+#search-input {
+  font-family: var(--searchinput-font);
+  font-size: var(--searchinput-font-size);
+  font-weight: var(--searchinput-font-weight);
+  height: var(--searchinput-height);
+  outline: none;
+  background-color: var(--searchinput-bg);
+  color: var(--searchinput-text);
+  border: var(--searchinput-border);
+  border-radius: var(--searchinput-borderradius);
+  padding: var(--searchinput-padding);
 }
 
 #settings-button {
@@ -528,8 +549,8 @@ th, tr, td {
   font-size: var(--editor-textinput-font-size);
   font-weight: var(--editor-textinput-font-weight);
   height: var(--editor-textinput-height);
-  background: var(--editor-textinput-bg);
   background-color: var(--editor-textinput-bg-color);
+  background: var(--editor-textinput-bg);
   color: var(--editor-textinput-text);
   border: var(--editor-textinput-border);
   border-radius: var(--editor-textinput-borderradius);
@@ -542,8 +563,8 @@ th, tr, td {
   width: var(--editor-textarea-width);
   margin: var(--editor-textarea-margin);
   padding: var(--editor-textarea-padding);
-  background: var(--editor-textarea-bg);
   background-color: var(--editor-textarea-bg-color);
+  background: var(--editor-textarea-bg);
   color: var(--editor-textarea-text);
   border: var(--editor-textarea-border);
   font-family: var(--editor-textarea-font);
@@ -552,13 +573,14 @@ th, tr, td {
   font-weight: var(--editor-textarea-fontweight);
 }
 
-#editor-pane select {
+#editor-pane select,
+#editor-pane .select-container input[type=text] {
   width: var(--editor-select-width);
   font-size: var(--editor-select-font-size);
   font-weight: var(--editor-select-font-weight);
   height: var(--editor-select-height);
-  background: var(--editor-select-bg);
   background-color: var(--editor-select-bg-color);
+  background: var(--editor-select-bg);
   color: var(--editor-select-text);
   border: var(--editor-select-border);
   border-radius: var(--editor-select-borderradius);
@@ -645,12 +667,18 @@ input[type=text]#edit-field-title {
   padding:0em;
 }
 
+.list-widget-list {
+  padding:0em;
+  margin:0em;
+}
+
 /* e.g. individual cast and tags items (<li>) */
 .list-widget-item {
   list-style-type: none;
   user-select: none;
-  overflow:hidden;
+  overflow: hidden;
   box-sizing: border-box;
+  max-width: var(--listwidget-item-maxwidth);
   background: var(--listwidget-item-bg);
   background-color: var(--listwidget-item-bg-color);
   color: var(--listwidget-item-text);
@@ -695,6 +723,10 @@ input[type=text]#edit-field-title {
   height: var(--listwidgetdel-item-height);
   padding: var(--listwidgetdel-item-padding);
   margin: var(--listwidgetdel-item-margin);
+}
+
+#editor-pane .list-widget-add {
+  max-width: var(--listwidgetadd-input-maxwidth);
 }
 
 #editor-pane .list-widget-add.inline {
@@ -760,6 +792,13 @@ input[type=text]#edit-field-title {
   width: var(--listwidgetadd-button-width);
   margin: var(--listwidgetadd-button-margin);
   padding: var(--listwidgetadd-button-padding);
+}
+
+/* dropdown icons that occurs in the same input as an add button
+   need to be moved over to the left out from behind the button */
+.list-widget-add.select-container.select-hovericon:hover::after,
+.list-widget-add.select-container.select-alwaysicon::after {
+  right: 1.5rem;
 }
 
 /* artwork image */
