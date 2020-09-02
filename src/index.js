@@ -1,75 +1,17 @@
 const electron = require('electron');
-const { ipcMain, dialog } = require('electron')
+const { ipcMain } = require('electron');
+const { dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
 //const ReadWrite = require("./ReadWrite.js");
 const Library = require("./Library.js");
-
+let library = new Library;
 const app = electron.app;
-/*let library = new Library;
-console.log(library.test);
-library.add(1, 0);
-console.log(library.test);*/
 
 const BrowserWindow = electron.BrowserWindow;
 
 app.whenReady().then(createWindow);
-
-function loadLibrary() {
-  /*
-  let defaultLibrary = {
-    "settings" : {
-      "watchfolders" : [],
-      "themes" : {
-        "appearances" : [
-          {
-            "name" : "Dark Theme",
-            "path" : "../themes/appearances/dark-theme.css",
-            "dependencies" : {
-              "fonts" : [],
-              "images" : []
-            }
-          }
-        ],
-        "layouts" : [
-          {
-            "name" : "Default Layout Theme",
-            "path" : "../themes/layouts/default-layout-theme.css",
-            "dependencies" : {}
-          }
-        ]
-      },
-      "kinds" : [
-        "movie",
-        "show"
-      ]
-    },
-    "playlists" : [
-      {
-        "id" : 0,
-        "name" : "Movies",
-        "filterFunction" : "video.kind === 'movie'",
-        "view" : "flat"
-      },
-      {
-        "id" : 1,
-        "name" : "Shows",
-        "filterFunction" : "video.kind === 'show'",
-        "view" : "hierarchical"
-      }
-    ],
-    "collections" : [],
-    "media" : []
-  };
-
-  let trialLibrary = new TrialLibraryClass();
-  console.log('Library trial: ' + trialLibrary.env);
-  // load library; if no library is found, create default library
-  library = new ReadWrite({configName: 'library', extension: 'json', defaults: defaultLibrary });
-  console.log(app.getPath('userData'));  //userData.set('working', 'Hell yeah!');
-  // library.set('settings',['hi','there']);*/
-}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -110,7 +52,6 @@ function findVideosFromFolder(folder, type) {
         let component = components[i];
         let compAddress = path.join(folder, component.name);
         if (component.isDirectory()) {
-          //console.log('Going through a DVD folder');
           findVideosFromFolder(compAddress, type);
         } else {
           let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
@@ -204,9 +145,4 @@ ipcMain.on('settings-watchfolder-select', (event) => {
 ipcMain.on('settings-watchfolder-add', (event, arg) => {
   //Add to library
   findVideosFromFolder(arg['address'], arg['type'].toLowerCase());
-})
-
-ipcMain.on('load-library', (event) => {
-  console.log(JSON.stringify(library.data));
-  event.returnValue = library.data;
 })

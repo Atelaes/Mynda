@@ -1,5 +1,5 @@
 //const React = require('React');
-const { ipcRenderer } = require('electron')
+const { ipcRenderer } = require('electron');
 const Library = require("./Library.js");
 
 class Mynda extends React.Component {
@@ -928,17 +928,5 @@ class MynSettingsThemes extends React.Component {
   }
 }
 
-ipcRenderer.on('lib-init-load', (event, message) => {
-      console.log('before');
-      let library = new Library;
-      console.log('after');
-      console.log(library.test);
-      library.add(1, 0);
-      console.log(library.test);
-      //ReactDOM.render(<Mynda library={message}/>, document.getElementById('root'));
-    })
-
     let library = new Library;
-    console.log(library.env);
-    library.add(1, 0);
-    console.log(library.media[0].filename);
+    ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));

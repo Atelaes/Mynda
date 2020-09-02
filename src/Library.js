@@ -2,17 +2,35 @@
 const electron = require('electron');
 const path = require('path');
 const fs = require('fs');
+const _ = require('lodash')
 
 class Library {
   constructor(opts) {
-    this.env = electron.app ? 'server' : 'browser';
+    this.env = (electron.app) ? 'server' : 'browser';
+    if (this.env === 'server') {
+      electron.ipcMain.on('lib-sync-op', (event, message) => {
+        message.origin = event.sender;
+        this.alter(message)
+      });
+      electron.ipcMain.on('lib-confirm', (event, message) => {
+        this.getConfirm(message)
+      });
+    } else {
+      ipcRenderer.on('lib-sync-op', (event, message) => {
+        this.alter(message)
+      })
+      ipcRenderer.on('lib-confirm', (event, message) => {
+        this.getConfirm(message)
+      })
+    }
+
     const dataPath = (electron.app || electron.remote.app).getPath('userData');
     this.path = path.join(dataPath, "library.json");
 
     const data = this.load();
     ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
 
-    this.toDoStack = [];
+    this.Queue = [];
     this.waitConfirm = null;
   }
 
@@ -21,12 +39,13 @@ class Library {
   //address: the location of the operation
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
-  alter(opType, address, entry=null, sync=false) {
+  alter({opType=null, address=null, entry=null, sync=false, origin=null} = {}) {
+    console.log(`alter(${opType}, ${address}, ${entry}, ${sync}, ${origin})`);
     try {
       //Start with some basic validation
-      if (!['add', 'replace', 'remove'].contains(opType)) {
+      if (!['add', 'replace', 'remove'].includes(opType)) {
         throw 'Unrecognized operation type.';
-      } else if (['add', 'replace'].contains(opType) && !entry) {
+      } else if (['add', 'replace'].includes(opType) && !entry) {
         throw 'Add or replace operations require entry';
       } else if (opType === 'remove' && entry) {
         throw 'Remove operations should not contain an entry';
@@ -46,7 +65,7 @@ class Library {
         if (addEnd === 'push') {
           switch(opType) {
             case 'add':
-              dest[addEnd].push(entry);
+              dest.push(entry);
               break;
             default:
               throw "Push can only be used with add.";
@@ -87,52 +106,85 @@ class Library {
       //If we haven't errored out yet, save to file, communicate with partner library
       if (sync) {
         //If this was requested by other library, let them know we did it
-        confirm(opType, address, entry)
+        this.confirm({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       } else {
         //If this was a local operation, request other library mirror it
-        sync(opType, address, entry)
+        this.sync({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       }
     } catch(e) {
-      console.log(`Error with library alter event.  op: ${opType}, add: ${address}, ent: ${entry} - ${e}`;
+      console.log(`Error with library alter event.  op: ${opType}, add: ${address}, ent: ${entry}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
   }
 
-  // Takes a string address in dot format, and replaces whatever is there with "replacement".
+  // Takes a string address in dot format, and adds "addition" to that location.
   add(address, addition) {
-    this.alter('replace', address, addition);
+    this.addToQueue({opType: 'add', address: address, entry: addition, sync: false, origin: null});
   }
 
   // Takes a string address in dot format, and replaces whatever is there with "replacement".
   replace(address, replacement) {
-    this.alter('replace', address, replacement);
+    this.addToQueue({opType: 'replace', address: address, entry: replacement, sync: false, origin: null});
   }
 
   // Takes a string address in dot format, and removes whatever is there.
   remove(address) {
-    this.alter('remove', address)
+    this.addToQueue({opType: 'remove', address: address, entry: null, sync: false, origin: null});
+  }
+
+  addToQueue(argObj) {
+    if (this.waitConfirm) {
+      this.Queue.push(argObj);
+    } else {
+      this.alter(argObj);
+    }
   }
 
   // Takes an operation type, a string address in dot format, and optionally an item.
-  // Communicates to counterpart library that a change has been made.
-  sync(operation, address, item = null) {
+  // Communicates to counterpart library that a change has been made that should be mirrored.
+  sync(argObj) {
     //Start by saving to file.
     this.save();
     //Next tell partner to replicate the action.
-    if (this.env === 'server') {
-      win.webContents.send('lib-sync-op', [operation, address, item]);
+    argObj.sync = true;
+    if (this.waitConfirm) {
+      console.log("Trying to create confirm, but something already at waitConfirm.");
     } else {
-      ipcRenderer.send('lib-sync-op', [operation, address, item]);
+      this.waitConfirm = argObj;
+    }
+    if (this.env === 'server') {
+      console.log('Sending a mirror request to browser');
+      win.webContents.send('lib-sync-op', argObj);
+    } else {
+      console.log('Sending a mirror request to server');
+      ipcRenderer.send('lib-sync-op', argObj);
     }
   }
 
   // Takes an operation type, a string address in dot format, and optionally an item.
   // Communicates to counterpart library that it has received and implemented the
   // requested change.
-  confirm(operation, address, item = null) {
+  confirm(argObj) {
     if (this.env === 'server') {
-      win.webContents.send('lib-confirm', [operation, address, item]);
+      let origin = argObj.origin;
+      argObj.origin = null;  //This is only added on syncOps received by server.
+      origin.send('lib-confirm', argObj);
     } else {
-      ipcRenderer.send('lib-confirm', [operation, address, item]);
+      ipcRenderer.send('lib-confirm', argObj);
+    }
+  }
+
+  getConfirm(argObj) {
+    if (_.isEqual(argObj, this.waitConfirm)) {
+      console.log("Got a valid confirmation back!")
+      this.waitConfirm = null;
+      if (this.Queue.length > 0) {
+        let nextOp = this.Queue.shift();
+        alter(nextOp);
+      }
+    } else {
+      console.log("Got a confirmation that didn't match what was expected.")
+      console.log(argObj);
+      console.log(this.waitConfirm);
     }
   }
 
@@ -163,9 +215,10 @@ class Library {
       }
 
 
-      return defaults;
+      return defaultLibrary;
     }
   }
+}
 
 let defaultLibrary = {
   "settings" : {
