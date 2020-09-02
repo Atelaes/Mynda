@@ -5,8 +5,9 @@ const fs = require('fs');
 const _ = require('lodash')
 
 class Library {
-  constructor(opts) {
+  constructor() {
     this.env = (electron.app) ? 'server' : 'browser';
+    this.browser = null;
     if (this.env === 'server') {
       electron.ipcMain.on('lib-sync-op', (event, message) => {
         message.origin = event.sender;
@@ -15,13 +16,17 @@ class Library {
       electron.ipcMain.on('lib-confirm', (event, message) => {
         this.getConfirm(message)
       });
+      electron.ipcMain.on('lib-beacon', (event, message) => {
+        this.browser = event.sender;
+      });
     } else {
       ipcRenderer.on('lib-sync-op', (event, message) => {
         this.alter(message)
-      })
+      });
       ipcRenderer.on('lib-confirm', (event, message) => {
         this.getConfirm(message)
-      })
+      });
+      ipcRenderer.send('lib-beacon');
     }
 
     const dataPath = (electron.app || electron.remote.app).getPath('userData');
@@ -153,7 +158,7 @@ class Library {
     }
     if (this.env === 'server') {
       console.log('Sending a mirror request to browser');
-      win.webContents.send('lib-sync-op', argObj);
+      this.browser.send('lib-sync-op', argObj);
     } else {
       console.log('Sending a mirror request to server');
       ipcRenderer.send('lib-sync-op', argObj);
@@ -179,7 +184,7 @@ class Library {
       this.waitConfirm = null;
       if (this.Queue.length > 0) {
         let nextOp = this.Queue.shift();
-        alter(nextOp);
+        this.alter(nextOp);
       }
     } else {
       console.log("Got a confirmation that didn't match what was expected.")

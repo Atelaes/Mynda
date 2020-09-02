@@ -94,6 +94,7 @@ function addDVDRip(folder, type) {
     addObj.title = path.basename(folder);
     addObj.kind = type;
     addObj.id = uuidv4();
+    addObj.dateadded = Math.floor(Date.now() / 1000);
     library.add('media.push', addObj);
     console.log('Added DVD rip: ' + addObj.title);
   }
@@ -110,6 +111,7 @@ function addVideoFile(file, type) {
     addObj.title = path.basename(file, fileExt);
     addObj.kind = type;
     addObj.id = uuidv4();
+    addObj.dateadded = Math.floor(Date.now() / 1000);
     library.add('media.push', addObj);
     console.log('Added Movie: ' + addObj.title);
 
