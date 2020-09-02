@@ -1039,7 +1039,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field dateadded'>
         <label className="edit-field-name" htmlFor="dateadded">Date Added: </label>
         <div className="edit-field-editor">
-          [Some kind of date editor]
+          <MynEditDateWidget movie={this.state.data} property="dateadded" update={this.handleChange} />
         </div>
       </div>
     );
@@ -1049,7 +1049,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field lastseen'>
         <label className="edit-field-name" htmlFor="lastseen">Last Seen: </label>
         <div className="edit-field-editor">
-          [Some kind of date editor]
+          <MynEditDateWidget movie={this.state.data} property="lastseen" update={this.handleChange} />
         </div>
       </div>
     );
@@ -1333,17 +1333,9 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   // }
 }
 
-// ######  ###### //
-class MynEditListWidget extends React.Component {
+class MynEditWidget extends React.Component {
   constructor(props) {
     super(props)
-
-    this.state = {
-      list: []
-    }
-
-    this.render = this.render.bind(this);
-    this.updateList = this.updateList.bind(this);
   }
 
   // finds first element with targetClass, either the element itself,
@@ -1353,6 +1345,28 @@ class MynEditListWidget extends React.Component {
   findNearestOfClass(element, targetClass) {
     while (!element.classList.contains(targetClass) && (element = element.parentElement));
     return element;
+  }
+
+  handleInvalidInput() {
+    console.log("INVALID INPUT!!");
+  }
+
+  render() {
+    return null;
+  }
+}
+
+// ######  ###### //
+class MynEditListWidget extends MynEditWidget {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      list: []
+    }
+
+    this.render = this.render.bind(this);
+    this.updateList = this.updateList.bind(this);
   }
 
   updateList(list) {
@@ -1419,7 +1433,8 @@ class MynEditAddToList extends MynEditListWidget {
       this.updateList(temp);
       input.value = '';
     } else {
-      console.log('validation error!');
+      this.handleInvalidInput();
+      // console.log('validation error!');
       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
     }
     event.preventDefault();
@@ -1460,6 +1475,76 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
         {this.displayList()}
         <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} validator={this.props.validator} options={this.props.options} inline="inline" />
       </ul>
+    );
+  }
+}
+
+// <MynEditDateWidget movie={this.state.data} property="cast" update={this.handleChange} />
+class MynEditDateWidget extends MynEditWidget {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      userFeedback : null,
+      valid : true
+    }
+  }
+
+  isValidDate(d) {
+    return d instanceof Date && !isNaN(d);
+  }
+
+  // we may want to use a library for this for more robustitudinality and such
+  cleanDateInput(input) {
+    try {
+      // get rid of ordinal suffixes
+      input = input.replace(/(\d+)(?:st|nd|rd|th)/gi, (match,$1) => $1);
+
+      // rough-and-tumble convert to military time, deleting "am" and "pm"
+      input = input.replace(/((\d{1,2})(:\d\d)?(:\d\d)?)(am?|pm?)/gi, (...groups) => {
+        groups = groups.filter(el => el !== undefined); // clean array of undefined matches
+        console.log(groups);
+        let ampm = groups.findIndex(el => el.match(/^am?$|^pm?$/i));
+        console.log("ampm index: " + ampm);
+        if (!isNaN(groups[2]) && groups[2] < 12 && groups[ampm].match(/p/i)) {
+          groups[2] = parseInt(groups[2]) + 12;
+        }
+        return groups.slice(2,ampm).join('');
+      });
+
+      // console.log("cleaned input: " + input);
+    } catch(error) {
+      console.log(error);
+    }
+    return input;
+  }
+
+  handleInput(event) {
+    let value = this.cleanDateInput(event.target.value);
+    try {
+      let date = new Date(value);
+      if (value === "") {
+        this.setState({userFeedback : "", valid : true });
+      } else if (this.isValidDate(date)) {
+        // console.log("Valid date! : " + value + " -- " + date.toString());
+        this.setState({userFeedback : date.toString(), valid : true});
+        let timestamp = Math.round(date.getTime() / 1000);
+        this.props.update(timestamp,this.props.property);
+      } else {
+        this.setState({userFeedback : "Invalid Date", valid : false});
+        this.handleInvalidInput();
+      }
+    } catch(error) {
+      console.log(error);
+    }
+  }
+
+  render() {
+    return (
+      <div>
+        <input type="text" placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
+        <div className={"date-editor-feedback " + this.state.valid ? 'valid' : 'invalid'}>{this.state.userFeedback}</div>
+      </div>
     );
   }
 }

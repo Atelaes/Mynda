@@ -713,16 +713,25 @@ in lieu of that, we will use a negative margin on the selected element instead (
   max-width: initial;
 }
 
-/* make the tags list inline, and make the ellipsis gradient */
+/* make the tags flex, and make the ellipsis gradient */
+.list-widget-list.tags {
+ display:flex;
+ flex-wrap: wrap;
+ justify-content: space-between;
+}
+.list-widget-list.tags > * {
+  flex-grow: 1;
+}
 .list-widget-list.tags .list-widget-item {
-  display:inline-block;
   padding-right: 1.7em;
 }
 .list-widget-list.tags .list-widget-item::after {
   background: linear-gradient(90deg, rgba(37,39,43,0) 23%, var(--listwidget-item-bg-color) 40%);
 }
 .list-widget-list.tags .list-widget-add.inline {
-  display:inline-block;
+  width: 2em;
+  flex-shrink: 1;
+  /* display:inline-block; */
 }
 
 

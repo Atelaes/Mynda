@@ -89,8 +89,9 @@
 
 #edit-container form {
   display:grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 10rem;
   grid-template-rows: repeat(11, auto);
+
   grid-gap: 0.5em;
 }
 
@@ -101,15 +102,23 @@
 /* column 1 */
 .edit-field.title {
   grid-row: 1;
-  grid-column: 1 / span 2;
+  grid-column: 1 / span 3;
 }
 .edit-field.description {
   grid-row: 2;
-  grid-column: 1 / span 2;
+  grid-column: 1 / span 3;
 }
 .edit-field.year {
   grid-row: 3;
-  grid-column: 1 / span 2;
+  grid-column: 1;
+}
+.edit-field.rating {
+  grid-row: 3;
+  grid-column: 2;
+}
+.edit-field.seen {
+  grid-row: 3;
+  grid-column: 3;
 }
 .edit-field.director {
   grid-row: 4;
@@ -117,51 +126,43 @@
 }
 .edit-field.directorsort {
   grid-row: 4;
-  grid-column: 2;
-}
-.edit-field.cast {
-  grid-row: 5 / span 2;
-  grid-column: 1 / span 2;
+  grid-column: 2 / span 2;
 }
 .edit-field.genre {
-  grid-row: 7;
+  grid-row: 5;
   grid-column: 1;
 }
 .edit-field.kind {
-  grid-row: 7;
-  grid-column: 2;
+  grid-row: 5;
+  grid-column: 2 / span 2;
+}
+.edit-field.cast {
+  grid-row: 6 / span 2;
+  grid-column: 1 / span 3;
 }
 .edit-field.tags {
   grid-row: 8 / span 2;
-  grid-column: 1 / span 2;
+  grid-column: 1 / span 3;
 }
 .edit-field.collections {
   grid-row: 10;
-  grid-column: 1 / span 2;
+  grid-column: 1 / span 3;
 }
 
-/* column 3 */
+/* column 4 */
 .edit-field.artwork {
   grid-row: 1 / span 4;
-  grid-column: 3;
+  grid-column: 4;
 }
 .edit-field.position {
   grid-row: 5;
-  grid-column: 3;
-}
-.edit-field.rating {
-  grid-row: 6;
-  grid-column: 3;
-}
-.edit-field.seen {
-  grid-row: 7;
-  grid-column: 3;
+  grid-column: 4;
 }
 .edit-field.lastseen {
-  grid-row: 8;
-  grid-column: 3;
+  grid-row: 6;
+  grid-column: 4;
 }
 .edit-field.dateadded {
-  grid-row: 9;
-  grid-column: 3;
+  grid-row: 7;
+  grid-column: 4;
 }

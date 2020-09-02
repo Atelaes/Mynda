@@ -726,7 +726,7 @@ input[type=text]#edit-field-title {
 }
 
 #editor-pane .list-widget-add {
-  max-width: var(--listwidgetadd-input-maxwidth);
+  /* max-width: var(--listwidgetadd-input-maxwidth); */
 }
 
 #editor-pane .list-widget-add.inline {
