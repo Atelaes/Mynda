@@ -1,7 +1,6 @@
 //const React = require('React');
 const { ipcRenderer } = require('electron')
-const cloneDeep = require('lodash.clonedeep');
-const { ipcRenderer } = require('electron');
+const _ = require('lodash');
 const Library = require("./Library.js");
 
 class Mynda extends React.Component {
@@ -881,7 +880,7 @@ class MynEditor extends MynOpenablePane {
 
     this.state = {
       paneID: 'editor-pane',
-      data: cloneDeep(props.video),
+      data: _.cloneDeep(props.video),
       valid: {}
     }
 
@@ -902,7 +901,7 @@ class MynEditor extends MynOpenablePane {
   revertChanges(event) {
     // console.log('reverting...');
     event.preventDefault();
-    this.setState({data : cloneDeep(this.props.video)});
+    this.setState({data : _.cloneDeep(this.props.video)});
   }
 
   saveChanges(event) {
