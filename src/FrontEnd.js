@@ -6,7 +6,6 @@ class Mynda extends React.Component {
   constructor(props) {
     super(props)
     let library = this.props.library;
-    console.log(library);
     this.state = {
       videos : library.media,
       playlists : library.playlists,

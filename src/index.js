@@ -1,14 +1,13 @@
 const electron = require('electron');
-const { ipcMain } = require('electron');
-const { dialog } = require('electron');
+const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-//const ReadWrite = require("./ReadWrite.js");
+const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
+
 let library = new Library;
 const app = electron.app;
-
 const BrowserWindow = electron.BrowserWindow;
 
 app.whenReady().then(createWindow);
@@ -23,11 +22,7 @@ function createWindow() {
   })
   win.webContents.openDevTools();
   //var child = cp.spawn('ffplay', ['E:\\DVD Movies\\Moana.mp4']);
-
   win.loadFile('src/index.html');
-  win.webContents.on('did-finish-load', () => {
-    //win.webContents.send('lib-init-load', library)
-  });
 
 }
 
@@ -98,8 +93,8 @@ function addDVDRip(folder, type) {
     addObj.filename = folder;
     addObj.title = path.basename(folder);
     addObj.kind = type;
-    library.data.media.push(addObj);
-    library.set('media', library.data.media)
+    addObj.id = uuidv4();
+    library.add('media.push', addObj);
     console.log('Added DVD rip: ' + addObj.title);
   }
 }
@@ -114,8 +109,8 @@ function addVideoFile(file, type) {
     let fileExt = path.extname(file)
     addObj.title = path.basename(file, fileExt);
     addObj.kind = type;
-    library.data.media.push(addObj);
-    library.set('media', library.data.media)
+    addObj.id = uuidv4();
+    library.add('media.push', addObj);
     console.log('Added Movie: ' + addObj.title);
 
   }
@@ -124,7 +119,7 @@ function addVideoFile(file, type) {
 //Takes a full address for a file/folder and checks to see if
 //we already have it in the library.
 function isAlreadyInLibrary(address) {
-  let allMedia = library.data.media;
+  let allMedia = library.media;
   for (let i=0; i<allMedia.length; i++) {
     let currentMedia = allMedia[i];
     if (currentMedia.filename === address) {
