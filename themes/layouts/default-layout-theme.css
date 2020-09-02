@@ -6,13 +6,13 @@
 
   --navcontrols-top: calc(var(--header-row-size) / 2 - (var(--navcontrols-height) / 2));
 
-  --settings-zindex: 999999;
-  --settings-width-factor: .7;
-  --settings-height-factor: .8;
-  --settings-width: calc(var(--settings-width-factor) * 100%);
-  --settings-height: calc(var(--settings-height-factor) * 100%);
-  --settings-left: calc((100% - var(--settings-width)) / 2);
-  --settings-top: calc((100% - var(--settings-height)) / 2);
+  --openablepane-zindex: 999999;
+  --openablepane-width-factor: .7;
+  --openablepane-height-factor: .8;
+  --openablepane-width: calc(var(--openablepane-width-factor) * 100%);
+  --openablepane-height: calc(var(--openablepane-height-factor) * 100%);
+  --openablepane-left: calc((100% - var(--openablepane-width)) / 2);
+  --openablepane-top: calc((100% - var(--openablepane-height)) / 2);
 }
 
 #grid-container {
@@ -47,34 +47,122 @@
   align-items: flex-end;
 }
 
-#settings-pane {
-  z-index: var(--settings-zindex);
+.openable-pane {
+  z-index: var(--openablepane-zindex);
   position: absolute;
-  width: var(--settings-width);
-  height: var(--settings-height);
-  top: var(--settings-top);
-  left: var(--settings-left);
+  width: var(--openablepane-width);
+  height: var(--openablepane-height);
+  top: var(--openablepane-top);
+  left: var(--openablepane-left);
   box-sizing: border-box;
 }
 
 /* so that everything appears above the ::before element which obscures the background */
-#settings-pane * {
+.openable-pane * {
   position: relative;
-  z-index: calc(var(--settings-zindex) + 1);
+  z-index: calc(var(--openablepane-zindex) + 1);
 }
 
-#close-settings-button {
-  z-index: calc(var(--settings-zindex) + 2);
+.openable-close-btn {
+  z-index: calc(var(--openablepane-zindex) + 2);
 }
 
 /* transparent element to obscure the other panes in the background */
-#settings-pane::before {
+.openable-pane::before {
   content: "";
-  z-index: calc(var(--settings-zindex) - 1);
+  z-index: calc(var(--openablepane-zindex) - 1);
   display: block;
   position: absolute;
-  left: calc(1 / var(--settings-width-factor) * var(--settings-left) * -1);
-  top: calc(1 / var(--settings-height-factor) * var(--settings-top) * -1);
+  left: calc(1 / var(--openablepane-width-factor) * var(--openablepane-left) * -1);
+  top: calc(1 / var(--openablepane-height-factor) * var(--openablepane-top) * -1);
   width: 100vw;
   height: 100vh;
+}
+
+#settings-tabs {
+  /* width:var(--lib-col-size); */
+  display:flex;
+  flex-flow: row nowrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+#edit-container form {
+  display:grid;
+  grid-template-columns: 4fr 2fr 2fr minmax(10rem,3fr);
+  grid-template-rows: repeat(11, auto);
+
+  grid-gap: 0.5em;
+}
+
+#edit-container .edit-field {
+
+}
+
+/* column 1 */
+.edit-field.title {
+  grid-row: 1;
+  grid-column: 1 / span 3;
+}
+.edit-field.description {
+  grid-row: 2;
+  grid-column: 1 / span 3;
+}
+.edit-field.year {
+  grid-row: 3;
+  grid-column: 1;
+}
+.edit-field.rating {
+  grid-row: 3;
+  grid-column: 2;
+}
+.edit-field.seen {
+  grid-row: 3;
+  grid-column: 3;
+}
+.edit-field.director {
+  grid-row: 4;
+  grid-column: 1;
+}
+.edit-field.directorsort {
+  grid-row: 4;
+  grid-column: 2 / span 2;
+}
+.edit-field.genre {
+  grid-row: 5;
+  grid-column: 1;
+}
+.edit-field.kind {
+  grid-row: 5;
+  grid-column: 2 / span 2;
+}
+.edit-field.cast {
+  grid-row: 6 / span 2;
+  grid-column: 1 / span 3;
+}
+.edit-field.tags {
+  grid-row: 8 / span 2;
+  grid-column: 1 / span 3;
+}
+.edit-field.collections {
+  grid-row: 10;
+  grid-column: 1 / span 3;
+}
+
+/* column 4 */
+.edit-field.artwork {
+  grid-row: 1 / span 4;
+  grid-column: 4;
+}
+.edit-field.position {
+  grid-row: 5;
+  grid-column: 4;
+}
+.edit-field.lastseen {
+  grid-row: 6;
+  grid-column: 4;
+}
+.edit-field.dateadded {
+  grid-row: 7;
+  grid-column: 4;
 }

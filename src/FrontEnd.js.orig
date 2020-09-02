@@ -1,8 +1,11 @@
 //const React = require('React');
-const { ipcRenderer } = require('electron')
-const cloneDeep = require('lodash.clonedeep');
+<<<<<<< HEAD
 const { ipcRenderer } = require('electron');
 const Library = require("./Library.js");
+=======
+const { ipcRenderer } = require('electron')
+const cloneDeep = require('lodash.clonedeep');
+>>>>>>> tagging
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -13,7 +16,10 @@ class Mynda extends React.Component {
       playlists : library.playlists,
       collections : library.collections,
       settings: library.settings,
+<<<<<<< HEAD
+=======
 
+>>>>>>> tagging
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
@@ -198,7 +204,11 @@ class Mynda extends React.Component {
 
   // set the initial playlist
   componentDidMount(props) {
+<<<<<<< HEAD
+    //this.loadLibrary();
+=======
     // this.loadLibrary();
+>>>>>>> tagging
     // let playlist = library.playlists[0];
     // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
     // this.setPlaylist(playlist.id, document.getElementById('nav-playlists').getElementsByTagName('li')[0]);
@@ -874,6 +884,10 @@ class MynSettingsThemes extends React.Component {
   }
 }
 
+<<<<<<< HEAD
+    let library = new Library;
+    ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));
+=======
 // ###### Editor: overlayed pane for editing video information (tagging) ###### //
 class MynEditor extends MynOpenablePane {
   constructor(props) {
@@ -1638,3 +1652,4 @@ class MynEditDateWidget extends MynEditWidget {
 }
 
 ReactDOM.render(<Mynda />, document.getElementById('root'));
+>>>>>>> tagging

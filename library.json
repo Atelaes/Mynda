@@ -134,7 +134,12 @@ library = {
       ],
       "description" : "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.",
       "genre" : "Sci-Fi",
-      "tags" : "sci-fi action cyber-punk 90s",
+      "tags" : [
+        "sci-fi",
+        "action",
+        "cyber-punk",
+        "90s"
+        ],
       "seen" : true,
       "position" : 1836,
       "duration" : 7200,
@@ -164,7 +169,13 @@ library = {
       ],
       "description" : "A man seeks answers about life, death, and the existence of God as he plays chess against the Grim Reaper during the Black Plague. A man seeks answers about life, death, and the existence of God as he plays chess against the Grim Reaper during the Black Plague. A man seeks answers about life, death, and the existence of God as he plays chess against the Grim Reaper during the Black Plague. This is a long description.",
       "genre" : "Drama",
-      "tags" : "drama existentialist philosophical 50s b&w",
+      "tags" : [
+        "drama",
+        "existentialist",
+        "philosophical",
+        "50s",
+        "b&w"
+      ],
       "seen" : false,
       "position" : 0,
       "duration" : 6900,
@@ -173,7 +184,8 @@ library = {
       "lastseen" : "1056692300",
       "kind" : "movie",
       "artwork" : "../artwork/MV5BM2I1ZWU4YjMtYzU0My00YmMzLWFmNTAtZDJhZGYwMmI3YWQ5XkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SY1000_CR0,0,666,1000_AL_.jpg",
-      "filename" : "~/Movies/seventhseal.mkv"
+      "filename" : "~/Movies/seventhseal.mkv",
+      "collections" : []
     },
     {
       "id" : 2,
@@ -188,7 +200,15 @@ library = {
       ],
       "description" : "Earth's mightiest heroes must come together and learn to fight as a team if they are going to stop the mischievous Loki and his alien army from enslaving humanity.",
       "genre" : "Action",
-      "tags" : "sci-fi action super-hero marvel ensemble fun 00s",
+      "tags" : [
+        "sci-fi",
+        "action",
+        "super-hero",
+        "marvel",
+        "ensemble",
+        "fun",
+        "00s"
+      ],
       "seen" : true,
       "position" : 3724,
       "duration" : 7200,
@@ -231,7 +251,7 @@ library = {
       ],
       "description" : "After being held captive in an Afghan cave, billionaire engineer Tony Stark creates a unique weaponized suit of armor to fight evil.",
       "genre" : "Action",
-      "tags" : "sci-fi action super-hero marvel fun 00s",
+      "tags" : ["sci-fi","action","super-hero","marvel","fun","00s"],
       "seen" : false,
       "position" : 3724,
       "duration" : 7200,
@@ -282,7 +302,7 @@ library = {
       ],
       "description" : "Lorem Ipsum bla bla bla bla, Lorem Ipsum bla bla bla bla. Lorem Ipsum bla bla bla bla.",
       "genre" : "Sci-Fi",
-      "tags" : "sci-fi drama space 90s",
+      "tags" : ["sci-fi","drama","space","90s"],
       "seen" : true,
       "position" : 423,
       "duration" : 2700,
@@ -317,7 +337,7 @@ library = {
       ],
       "description" : "Adventurer, brain surgeon, rock musician Buckaroo Banzai and his crime-fighting team, the Hong Kong Cavaliers, must stop evil alien invaders from the eighth dimension who are planning to conquer Earth.",
       "genre" : "Sci-Fi",
-      "tags" : "sci-fi aliens 80s B-movie",
+      "tags" : ["sci-fi","aliens","80s","B-movie"],
       "seen" : false,
       "position" : 0,
       "duration" : 2700,
@@ -327,6 +347,7 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/MV5BMmE1OWZjYjctYzZlNi00YmEyLTg4YWYtZDc4NTE2ODZlYzhhXkEyXkFqcGdeQXVyNzc5MjA3OA@@._V1_SY1000_CR0,0,651,1000_AL_.jpg",
       "filename" : "~/Movies/Buckaroo.mp4",
+      "collections" : []
     },
     {
       "id" : 6,
@@ -344,7 +365,7 @@ library = {
       ],
       "description" : "Captain Picard and his archaeological curiosity are called upon by scientists from Earth when they find evidence to support beliefs that aliens had visited Earth in the late 1800s.",
       "genre" : "Sci-Fi",
-      "tags" : "sci-fi drama space 90s",
+      "tags" : ["sci-fi","drama","space","90s"],
       "seen" : true,
       "position" : 2134,
       "duration" : 2700,
@@ -383,7 +404,7 @@ library = {
       ],
       "description" : "Captain Picard and crew follow Data back to the late 1800s to get him back, only to find the suspected alien visitors killing people of that time.",
       "genre" : "Sci-Fi",
-      "tags" : "sci-fi drama space 90s",
+      "tags" : ["sci-fi","drama","space","90s"],
       "seen" : false,
       "position" : 0,
       "duration" : 2700,

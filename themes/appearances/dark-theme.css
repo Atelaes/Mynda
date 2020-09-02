@@ -87,6 +87,7 @@
   --main-font: HKGrotesk, Helvetica, sans-serif;
   --main-font-size: 20pt;
   --main-font-weight: normal;
+  --textinput-font: var(--main-font);
   --big-title-font: Dorsa, Helvetica, sans-serif;
   --playlist-tab-font: var(--main-font);
   --playlist-tab-font-size: inherit;
@@ -110,12 +111,14 @@
   --detaillabel-font-style: normal;
 
   /* background colors */
+  --transparent-black-bg: rgba(0,0,0,.25);
   --darker-bg: #181a1e;
   --dark-bg: #1e2126;
   --med-bg: #24272e;
   --medlight-bg: #2d313a;
   --light-bg: #363b45;
   --lighter-bg: #464c59;
+  --lightest-bg: #656d80;
 
   --darker-bg-rgba0: rgba(24,26,30,0);
   --dark-bg-rgba0: rgba(30,33,38,0);
@@ -128,6 +131,12 @@
   --main-text: #b6b9bf; /*#a1a9b7;*/
   --bright-text: #d8dde5; /*#cfd4dc;*/
   --dim-text: #8b929e; /*#7e848f;*/
+  --dimmer-text: #4f5259;
+
+  /* other colors */
+  --glow-bright: rgba(220,225,255,.2);
+  --glow-dim: rgba(120,125,155,.15);
+
 /* } */
 
 /* body { */
@@ -140,12 +149,17 @@
   --details-bg: var(--pane-bg-1);
 
   --textinput-font-size: calc(var(--main-font-size));/* * 3 / 4);*/
+  --textinput-font-weight: 300;
   --textinput-height: calc(var(--textinput-font-size) * 7 / 5);
-  --textinput-bg: var(--med-bg);
+  --textinput-bg-color: var(--transparent-black-bg);
   --textinput-text: var(--dim-text);
-  --textinput-border: .12em solid var(--light-bg);
+  --textinput-border-width: 0em;
+  --textinput-border-color: initial;
+  --textinput-border: var(--textinput-border-width) solid var(--textinput-border-color);
   --textinput-borderradius: 999px;
   --textinput-padding: 0em 1.4em 0em .5em;
+  --textinput-text-placeholder: var(--dimmer-text); /*var(--textinput-border-color);*/
+  --textinput-text-placeholder-opacity: 1;
 
   --inputicon-opacity: .25;
   --inputicon-empty: none;
@@ -160,11 +174,59 @@
   --inputicon-background-empty: rgba(0,0,0,0) var(--inputicon-empty) no-repeat 0% 50%;
   --inputicon-background-filled: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
   --inputicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
+
+  --select-arrow-height: var(--textinput-height);
+  --select-arrow-content: '\30C';
+  --select-arrow-left: initial;
+  --select-arrow-right: .5rem;
+  --select-arrow-top: calc((var(--textinput-height) / 2) - (var(--select-arrow-height) / 2.6));
+  --select-arrow-bottom: initial;
+  --select-arrow-text: inherit;
+  --select-arrow-font: inherit;
+  --select-arrow-fontsize: 1.5rem;
+  --select-arrow-fontweight: inherit;
+
+  --input-invalid-text: inherit;
+  --input-invalid-bgcolor: inherit;
+  --input-invalid-bg: inherit;
+  --input-invalid-border: inherit;
+  --input-invalid-boxshadow: inset 0em 0em .5em 0em rgba(255,0,0,.5);
+
+  /* --button-text: black; */
+  --button-font: inherit;
+  --button-fontsize: .8rem;
+  --button-fontweight: inherit;
+  --button-fontstyle: inherit;
+  /* --button-bgcolor: var(--lighter-bg);
+  --button-bg: inherit;
+  --button-border: .075em solid black; */
+  --button-bgcolor: var(--light-bg);
+  --button-text: black;
+  --button-margin: initial;
+  --button-padding: .1em .3em .1em .3em;
+  --button-border: .075em solid black;
+  --button-borderradius: var(--playlisttab-borderradius-radius);
+
+
+
 /* } */
 
 /* #nav-pane { */
   --navcontrols-height: var(--textinput-height);
   --navcontrolschildren-margin: 0em var(--navcontrols-top) 0em 0em;
+
+  --searchinput-font-size: var(--textinput-font-size);
+  --searchinput-font-weight: 500;
+  --searchinput-height: var(--textinput-height);
+  --searchinput-bg: var(--med-bg);
+  --searchinput-text: var(--dim-text);
+  --searchinput-border-width: .12em;
+  --searchinput-border-color: var(--light-bg);
+  --searchinput-border: var(--searchinput-border-width) solid var(--searchinput-border-color);
+  --searchinput-borderradius: var(--textinput-borderradius);
+  --searchinput-padding: var(--textinput-padding);
+  --searchinput-text-placeholder: var(--textinput-text-placeholder); /*var(--textinput-border-color);*/
+  --searchinput-text-placeholder-opacity: var(--textinput-text-placeholder-opacity);
 
   --searchfield-height: var(--navcontrols-height);
   --searchicon-empty: url('../../images/mag-icon_white.png');
@@ -181,6 +243,14 @@
   --settingsicon-margin: inherit;
   --settingsicon-border: initial;
 
+  --settingstabs-container-padding: 0em;
+  --settingstabs-container-margin: 0em;
+  --settingstabs-bgcolor-selected: #444444;
+  --settingstabs-padding: .1em .5em .1em .5em;
+  --settingstabs-margin: initial;
+  --settingstabs-border: 1px solid gray;
+
+  --settingscontent-padding: 1em;
 
   --playlisttab-bg: var(--pane-bg-0);
   --playlisttab-bg-hover: var(--medlight-bg);
@@ -200,6 +270,7 @@
   --playlisttab-bordercolor-hover: var(--playlisttab-bordercolor);
   --playlisttab-bordercolor-selected-color: var(--lighter-bg);
   --playlisttab-bordercolor-selected: var(--playlisttab-bordercolor-selected-color) var(--playlisttab-bordercolor-selected-color) var(--playlisttab-bg) var(--playlisttab-bordercolor-selected-color);
+  --playlisttab-borderradius-radius: .5em;
   --playlisttab-boxshadow: .2em -.2em .15em .05em rgba(24,26,30,.2);
   --playlisttab-boxshadow-selected: var(--playlisttab-boxshadow), -.2em -.2em .15em .05em rgba(24,26,30,.2);
   --playlisttab-padding: .2em .7em .2em .7em;
@@ -250,10 +321,227 @@
 /* #details-pane { */
   --detailtitle-text: var(--bright-text);
   --detailtitle-bg: linear-gradient(0deg, var(--details-bg) 5%, rgba(0,0,0,.6) 60%, rgba(0,0,0,0) 100%);
+  --detailposition-outer-bordercolor: var(--lighter-bg);
+  --detailposition-outer-border: var(--positionwidget-borderwidth) solid var(--detailposition-outer-bordercolor);
+  --detailposition-inner-bgcolor: var(--detailposition-outer-bordercolor);
+  --detailposition-opacity-hover: .6;
 
-  --detailposition-border: .075em solid var(--lighter-bg);
-  --detailposition-bg: var(--dark-bg);
-  --detailpositioninner-bg: var(--lighter-bg);
+  --editbutton-position: absolute;
+  --editbutton-top: .3em;
+  --editbutton-bottom: initial;
+  --editbutton-left: initial;
+  --editbutton-right: .3em;
+  --editbutton-bg: initial;
+  --editbutton-bgcolor: var(--dark-bg);
+  --editbutton-text: var(--main-text);
+  --editbutton-margin: initial;
+  --editbutton-padding: var(--button-padding);/*.1em .3em .1em .3em;*/
+  --editbutton-border: var(--textinput-border-width) solid var(--lightest-bg);
+  --editbutton-borderradius: var(--button-borderradius);
+  --editbutton-font-size: var(--button-fontsize);
+  --editbutton-font-weight: var(--button-fontweight);
+  --editbutton-font: var(--button-font);
+  --editbutton-font-style: var(--button-fontstyle);
+  --editbutton-boxshadow: 0em 0em .3em .1em var(--glow-bright);
+
+  --editbutton-bg-hover: initial;
+  --editbutton-bgcolor-hover: var(--light-bg);
+  --editbutton-text-hover: var(--bright-text);
+  --editbutton-border-hover: var(--textinput-border-width) solid var(--dim-text);
+
+/* openable panes */
+  --openable-bgcolor: rgba(30,30,30,.9);
+
+  --openable-closebtn-position: absolute;
+  --openable-closebtn-top: -.6em;
+  --openable-closebtn-bottom: initial;
+  --openable-closebtn-left: initial;
+  --openable-closebtn-right: -.6em;
+  --openable-closebtn-bg-color: var(--darker-bg);
+  --openable-closebtn-bg: initial;
+  --openable-closebtn-border: initial;
+  --openable-closebtn-borderradius: 999px;
+  --openable-closebtn-lineheight: 1em;
+  --openable-closebtn-textalign: center;
+  --openable-closebtn-width: 1em;
+  --openable-closebtn-height: 1em;
+  --openable-closebtn-padding: .2em;
+  --openable-closebtn-margin: initial;
+  --openable-closebtn-boxshadow-hover: 0em 0em .3em .1em var(--glow-bright);
+  --openable-closebtn-text-hover: var(--bright-text);
+  --openable-closebtn-bg-color-hover: var(--medlight-bg);
+
+
+  /* editor pane */
+  --editorpane-padding: 1em;
+
+  --editfield-margin: ;
+
+  --editor-input-title-font: var(--big-title-font);
+  --editor-input-title-font-size: var(--detailtitle-font-size);
+  --editor-input-title-height: var(--editor-input-title-lineheight);
+  --editor-input-title-lineheight: calc(var(--detailtitle-font-size) * 1.3);
+  --editor-input-title-margin: -.5rem 0em -1rem 0em;
+  --editor-input-title-color: var(--detailtitle-text);
+  --editor-input-title-background: initial;
+  --editor-input-title-padding: 0em;
+  --editor-input-title-borderradius: 0em;
+  --editor-input-title-zindex: calc(var(--openablepane-zindex) + 10);
+
+  --editor-textinput-width: 100%;
+  --editor-textinput-font-size: inherit;
+  --editor-textinput-font-weight: var(--textinput-font-weight);
+  --editor-textinput-height: inherit;
+  --editor-textinput-bg-color: var(--textinput-bg-color);
+  --editor-textinput-bg: linear-gradient(90deg, var(--textinput-bg-color) 0%, rgba(0,0,0,0)  100%);
+  --editor-textinput-text: inherit;
+  --editor-textinput-border: var(--textinput-border);
+  --editor-textinput-borderradius-radius: var(--textinput-borderradius);
+  --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius); /*var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);*/
+  --editor-textinput-padding: var(--textinput-padding);
+
+  --editor-textarea-borderradius: 1em 0 0 1em; /*var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);*/
+  --editor-textarea-height: 6em;
+  --editor-textarea-width: 100%;
+  --editor-textarea-margin: inherit; /*.5em 0em .5em 0em; */
+  --editor-textarea-padding: .5em;
+  --editor-textarea-font: var(--main-font);
+  --editor-textarea-fontsize: .8em;
+  --editor-textarea-fontstyle: italic;
+  --editor-textarea-fontweight: 300;
+  --editor-textarea-bg: var(--editor-textinput-bg);
+  --editor-textarea-bg-color: var(--editor-textinput-bg-color);
+  --editor-textarea-text: inherit;
+  --editor-textarea-border: inherit;
+
+  --editor-select-width: var(--editor-textinput-width);
+  --editor-select-font-size: var(--editor-textinput-font-size);
+  --editor-select-font-weight: var(--editor-select-font-weight);
+  --editor-select-height: var(--editor-textinput-height);
+  --editor-select-bg: linear-gradient(90deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.15)  100%);
+  --editor-select-bg-color: rgba(0,0,0,.25);
+  --editor-select-text: var(--editor-textinput-text);
+  --editor-select-border: var(--editor-textinput-border);
+  --editor-select-borderradius: var(--editor-textinput-borderradius-radius);
+  --editor-select-padding: var(--editor-textinput-padding);
+
+  --editfield-margin: initial; /*0em 0em .5em 0em;*/
+
+  --editfield-name-margin: 0em 0em 0em .5rem;
+  --editfield-name-font: inherit;
+  --editfield-name-fontsize: .7em;
+  --editfield-name-fontstyle: initial;
+  --editfield-name-fontweight: 300;
+
+  --listwidget-item-maxwidth: 15em;
+  --listwidget-item-bg: initial;
+  --listwidget-item-bg-color: rgba(37,39,43,1); /*rgba(54,59,69,.3);*/ /*var(--light-bg);*/
+  --listwidget-item-text: inherit;
+  --listwidget-item-borderradius-radius: 999px;
+  --listwidget-item-borderradius: var(--listwidget-item-borderradius-radius); /*calc(var(--playlisttab-borderradius-radius)/2);*/
+  --listwidget-item-height: 1.3rem;
+  --listwidget-item-width: initial;
+  --listwidget-item-margin: 0em .2em .2em 0em; /*.5em 0em .5em 0em; */
+  --listwidget-item-padding-top: .2em;
+  --listwidget-item-padding: var(--listwidget-item-padding-top) 1em var(--listwidget-item-padding-top) .5em;
+  --listwidget-item-font: var(--main-font);
+  --listwidget-item-fontsize-size: .8;
+  --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1em);
+  --listwidget-item-fontstyle: initial;
+  --listwidget-item-fontweight: 300;
+  --listwidget-item-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--listwidget-item-bg-color) 30%);
+  --listwidget-item-ellipsis-width: 2rem;
+
+  --listwidgetdel-item-fontsize-factor: .75;
+  --listwidgetdel-item-fontsize: calc(var(--listwidget-item-fontsize-size) * var(--listwidgetdel-item-fontsize-factor) * 1rem);
+  --listwidgetdel-item-borderradius: 999px;
+  --listwidgetdel-item-bg-color: var(--darker-bg);
+  --listwidgetdel-item-lineheight: var(--listwidgetdel-item-fontsize);
+  --listwidgetdel-item-textalign: center;
+  --listwidgetdel-item-width: calc(var(--listwidgetdel-item-fontsize) + 2 * var(--listwidgetdel-item-padding));
+  --listwidgetdel-item-height: var(--listwidgetdel-item-width);
+  --listwidgetdel-item-padding: .2rem;
+  --listwidgetdel-item-margin: initial;
+  --listwidgetdel-item-display: inline-block;
+  --listwidgetdel-item-position: absolute;
+  --listwidgetdel-item-left: initial;
+  --listwidgetdel-item-top: calc((var(--listwidget-item-height) / 2) - (var(--listwidgetdel-item-height) / 2));/* - (var(--listwidget-item-padding-top) / var(--listwidgetdel-item-fontsize-factor)));*/
+  --listwidgetdel-item-right: var(--listwidgetdel-item-top); /*.2rem;*/
+  --listwidgetdel-item-bottom: initial;
+
+  --listwidgetadd-inline-font: inherit;
+  --listwidgetadd-inline-fontsize: var(--listwidget-item-fontsize);
+  --listwidgetadd-inline-fontstyle: inherit;
+  --listwidgetadd-inline-fontweight: inherit;
+  --listwidgetadd-inline-bg: inherit;
+  --listwidgetadd-inline-bg-color: inherit;
+  --listwidgetadd-inline-text: inherit;
+  --listwidgetadd-inline-border: inherit;
+  --listwidgetadd-inline-borderradius: inherit;
+  --listwidgetadd-inline-height: var(--listwidget-item-height);
+  --listwidgetadd-inline-width: var(--listwidget-item-width);
+  --listwidgetadd-inline-margin: var(--listwidget-item-margin);
+  --listwidgetadd-inline-padding: 0em;
+
+  --listwidgetadd-input-maxwidth: 10em;
+
+
+  /* --listwidgetadd-input-font: inherit;
+  --listwidgetadd-input-fontsize: var(--listwidget-item-fontsize);
+  --listwidgetadd-input-fontstyle: inherit;
+  --listwidgetadd-input-fontweight: inherit;
+  --listwidgetadd-input-position: initial;
+  --listwidgetadd-input-left: initial;
+  --listwidgetadd-input-right: initial;
+  --listwidgetadd-input-top: initial;
+  --listwidgetadd-input-bottom: initial;
+  --listwidgetadd-input-bg: inherit;
+  --listwidgetadd-input-bg-color: inherit;
+  --listwidgetadd-input-text: inherit;
+  --listwidgetadd-input-border: inherit;
+  --listwidgetadd-input-borderradius: inherit;
+  --listwidgetadd-input-height: var(--listwidget-item-height);
+  --listwidgetadd-input-width: var(--listwidget-item-width);
+  --listwidgetadd-input-margin: var(--listwidget-item-margin);
+  --listwidgetadd-input-padding: var(--listwidget-item-padding); */
+
+  --listwidgetadd-button-font: inherit;
+  --listwidgetadd-button-fontsize: 1rem;
+  --listwidgetadd-button-fontstyle: inherit;
+  --listwidgetadd-button-fontweight: inherit;
+  --listwidgetadd-button-lineheight: calc(var(--listwidgetadd-inline-height) * var(--listwidgetadd-button-height));
+  --listwidgetadd-button-position: absolute;
+  --listwidgetadd-button-left: initial;
+  --listwidgetadd-button-right: 0em;
+  --listwidgetadd-button-top: 0em;
+  --listwidgetadd-button-bottom: initial;
+  --listwidgetadd-button-bg: initial;
+  --listwidgetadd-button-bg-color: var(--listwidget-item-bg-color);
+  --listwidgetadd-button-text: inherit;
+  --listwidgetadd-button-border: 0em solid rgba(0,0,0,0);
+  --listwidgetadd-button-borderradius: 0em var(--listwidget-item-borderradius-radius) var(--listwidget-item-borderradius-radius) 0em;
+  --listwidgetadd-button-height: 100%;
+  --listwidgetadd-button-width: initial;
+  --listwidgetadd-button-margin: initial;
+  --listwidgetadd-button-padding: 0em .13em 0em .09em;
+
+
+  --positionwidget-bordercolor: var(--main-text);
+  --positionwidget-borderwidth: .075em;
+  --positionwidget-border: var(--positionwidget-borderwidth) solid var(--positionwidget-bordercolor);
+  --positionwidget-bg: var(--dark-bg);
+  --positionwidgetinner-bg: var(--positionwidget-bordercolor);
+  --positionwidget-width: 8em;
+  --positionwidget-height: .4em; /*.3em;*/
+
+  --editartwork-img-width: 100%;
+  --editartwork-img-height: auto;
+
+  --editartwork-browse-position: absolute;
+  --editartwork-browse-top: initial;
+  --editartwork-browse-bottom: .3em;
+  --editartwork-browse-left: initial;
+  --editartwork-browse-right: .3em;
 
 }
 
@@ -261,14 +549,14 @@
 
 /* extend the playlist tabs to the left so they slip behind the tab to their left, creating an overlap effect */
 #nav-playlists li {
-  border-radius: 0em .5em 0em 0em;
+  border-radius: 0em var(--playlisttab-borderradius-radius) 0em 0em;
   padding-left: 1.4em !important;
   margin-left: -.7em;
 }
 
 /* undo overlap effect for selected tab */
 #nav-playlists li.selected {
-  border-radius: .5em .5em 0em 0em;
+  border-radius: var(--playlisttab-borderradius-radius) var(--playlisttab-borderradius-radius) 0em 0em;
   padding-left: .7em !important;
   margin-left: calc(-1 * var(--playlisttab-borderwidth-selected));
   z-index:10000 !important;
@@ -411,4 +699,73 @@ in lieu of that, we will use a negative margin on the selected element instead (
    blur the other panes behind it) */
 .pane.blurred {
   filter: blur(.15em);
+}
+
+#edit-button {
+  visibility: hidden;
+}
+
+#details-pane:hover #edit-button {
+  visibility: visible;
+
+  animation: editbutton-popin .25s ease 1;
+  animation-delay: 0s;
+  /* animation-fill-mode: both; */
+}
+
+@keyframes editbutton-popin {
+  0% {
+    transform: scale(0);
+  }
+  70% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.openable-pane {
+  box-shadow: 0em 0em 1em -.2em var(--glow-dim);
+  /* overflow-y: scroll; */
+}
+
+.list-widget-list.cast {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, 10em);
+  grid-auto-columns: minmax(7em, 10em);
+  grid-auto-flow: row;
+  white-space: nowrap;
+}
+#editor-pane .list-widget-list.cast .list-widget-add {
+  max-width: initial;
+}
+
+/* make the tags flex, and make the ellipsis gradient */
+.list-widget-list.tags {
+ display:flex;
+ flex-wrap: wrap;
+ justify-content: space-between;
+}
+.list-widget-list.tags > * {
+  flex-grow: 1;
+}
+.list-widget-list.tags .list-widget-item {
+  padding-right: 1.7em;
+}
+.list-widget-list.tags .list-widget-item::after {
+  background: linear-gradient(90deg, rgba(37,39,43,0) 23%, var(--listwidget-item-bg-color) 40%);
+}
+.list-widget-list.tags .list-widget-add.inline {
+  width: 2em;
+  flex-shrink: 1;
+  /* display:inline-block; */
+}
+
+
+.list-widget-item {
+}
+
+.list-widget-add {
+
 }

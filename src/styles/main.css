@@ -4,6 +4,9 @@
 :root {
   overflow-x:hidden;
   scrollbar-width: none;
+  font-family: var(--main-font);
+  font-size: var(--main-font-size);
+  font-weight: var(--main-font-weight);
 }
 :root ::-webkit-scrollbar {
   display: none;
@@ -14,9 +17,6 @@ body {
   color: var(--main-text);
   padding:0px;
   margin:0px;
-  font-family: var(--main-font);
-  font-size: var(--main-font-size);
-  font-weight: var(--main-font-weight);
   overflow-x:hidden;
   overflow-y:hidden;
   scrollbar-width: none;
@@ -32,31 +32,38 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-.collection h1, #movie-table th, #nav-playlists li, .edit-widget li, .movie-row {
+.collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row {
   cursor: pointer;
   user-select: none;
 }
 
-input[type=text] {
+input[type=text], select {
+  font-family: var(--textinput-font);
   font-size: var(--textinput-font-size);
+  font-weight: var(--textinput-font-weight);
   height: var(--textinput-height);
   outline: none;
-  background-color: var(--textinput-bg);
+  background-color: var(--textinput-bg-color);
   color: var(--textinput-text);
   border: var(--textinput-border);
   border-radius: var(--textinput-borderradius);
   padding: var(--textinput-padding);
 }
 
+input[type=text]::placeholder {
+  color:var(--textinput-text-placeholder);
+  /* opacity: var(--textinput-text-placeholder-opacity); */
+}
+
 /* when an input field is empty, optionally display an icon on the right side of it */
 /* in order to display an icon, override the 'background' property with an image */
-/* this is simply an empty div; we must populate it with an icon */
+/* this is simply an empty div; we must populate it with an icon using the background property */
 input.empty + .input-clear-button {
   background: var(--inputicon-background-empty);
 }
 
 /* when an input field has text, optionally display an icon on the right side of it */
-/* this is simply an empty div; we must populate it with an icon */
+/* this is simply an empty div; we must populate it with an icon using the background property */
 /* when clicked, this div should clear the search field */
 input.filled + .input-clear-button {
   background: var(--inputicon-background-filled);
@@ -82,6 +89,61 @@ input + .input-clear-button {
 .input-container {
   display: inline-block;
   position: relative;
+}
+
+/* remove arrow on a select dropdown */
+/* we replace it below with our own icon */
+select, datalist {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* this removes Chrome's added down arrow on a datalist dropdown */
+/* we replace it below with our own icon */
+input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+/* replace dropdown arrow icon with our own */
+.select-container.select-hovericon:hover::after,
+.select-container.select-alwaysicon::after {
+  position:absolute;
+  display:block;
+  user-select: none;
+  cursor: pointer;
+  height: var(--select-arrow-height);
+  content: var(--select-arrow-content);
+  left: var(--select-arrow-left);
+  right: var(--select-arrow-right);
+  top: var(--select-arrow-top);
+  bottom: var(--select-arrow-bottom);
+  color: var(--select-arrow-text);
+  font-family: var(--select-arrow-font);
+  font-size: var(--select-arrow-fontsize);
+  font-weight: var(--select-arrow-fontweight);
+}
+
+input.invalid {
+  color: var(--input-invalid-text);
+  background-color: var(--input-invalid-bgcolor);
+  background: var(--input-invalid-bg);
+  border: var(--input-invalid-border);
+  box-shadow: var(--input-invalid-boxshadow);
+}
+
+button, input[type=submit] {
+  outline: none;
+  cursor:pointer;
+  color: var(--button-text);
+  font-family: var(--button-font);
+  font-size: var(--button-fontsize);
+  font-weight: var(--button-fontweight);
+  font-style: var(--button-fontstyle);
+  background-color: var(--button-bgcolor);
+  margin: var(--button-margin);
+  padding: var(--button-padding);
+  border: var(--button-border);
+  border-radius: var(--button-borderradius);
 }
 
 /*************************************/
@@ -165,6 +227,19 @@ input + .input-clear-button {
 #search-field input.empty + .input-clear-button {
   background: var(--searchicon-background-empty);
   /* background-size: var(--inputicon-bg-size); */
+}
+
+#search-input {
+  font-family: var(--searchinput-font);
+  font-size: var(--searchinput-font-size);
+  font-weight: var(--searchinput-font-weight);
+  height: var(--searchinput-height);
+  outline: none;
+  background-color: var(--searchinput-bg);
+  color: var(--searchinput-text);
+  border: var(--searchinput-border);
+  border-radius: var(--searchinput-borderradius);
+  padding: var(--searchinput-padding);
 }
 
 #settings-button {
@@ -282,20 +357,6 @@ th, tr, td {
   text-align: center;
 }
 
-/* edit widgets are little graphical editors, such as the rating stars and the checkmark in the table rows that respond to mouseover and click events */
-.edit-widget {
-  list-style: none;
-  padding: 0px;
-  margin: 0px;
-}
-.edit-widget.over {
-  color: var(--editwidget-text-hover);
-  opacity: var(--editwidget-opacity-hover);
-}
-.edit-widget li {
-  display: inline;
-}
-
 #collections-container {
   margin-left: calc(-1 * var(--collection-marginleft));
 }
@@ -377,20 +438,21 @@ th, tr, td {
 #detail-artwork img {
   width:100%;
 }
+#detail-position .edit-widget.over {
+  /* override the general edit-widget opacity if desired */
+  opacity: var(--detailposition-opacity-hover);
+}
 #detail-position .position-outer {
   width:60%;
   height:.3em;
-  border: var(--detailposition-border);
-  background-color: var(--detailposition-bg);
-  border-radius:999px;
-  overflow:hidden;
-  margin: auto;
   margin-top:.2em;
   margin-bottom:.8em;
+  /* override the general position edit-widget border if desired */
+  border: var(--detailposition-outer-border);
 }
 #detail-position .position-inner {
-  height:100%;
-  background-color: var(--detailpositioninner-bg);
+  /* override the general position edit-widget interior bg if desired */
+  background-color: var(--detailposition-inner-bgcolor);
 }
 #detail-tags {
   font-style: var(--detailtags-font-style);
@@ -399,48 +461,380 @@ th, tr, td {
   font-size: var(--detaildescrip-font-size);
 }
 
+#edit-button {
+  display: inline-block;
+  cursor:pointer;
+  user-select: none;
+  position: var(--editbutton-position);
+  top: var(--editbutton-top);
+  bottom: var(--editbutton-bottom);
+  left: var(--editbutton-left);
+  right: var(--editbutton-right);
+  background: var(--editbutton-bg);
+  background-color: var(--editbutton-bgcolor);
+  color: var(--editbutton-text);
+  margin: var(--editbutton-margin);
+  padding: var(--editbutton-padding);
+  border: var(--editbutton-border);
+  border-radius: var(--editbutton-borderradius);
+  box-shadow: var(--editbutton-boxshadow);
+  font-size: var(--editbutton-font-size);
+  font-weight: var(--editbutton-font-weight);
+  font-family: var(--editbutton-font);
+  font-style: var(--editbutton-font-style);
+}
+
+#edit-button:hover {
+  background: var(--editbutton-bg-hover);
+  background-color: var(--editbutton-bgcolor-hover);
+  color: var(--editbutton-text-hover);
+  border: var(--editbutton-border-hover);
+}
+
+/*************************************/
+/*######### OPENABLE PANES ##########*/
+/*************************************/
+/* Openable panes are a class of panes
+   that don't appear until a button is
+   clicked. E.g. the settings pane and
+   the editor pane */
+
+.openable-pane {
+  background-color: var(--openable-bgcolor);
+}
+
+.openable-close-btn {
+  cursor:pointer;
+  user-select: none;
+  position: var(--openable-closebtn-position);
+  top: var(--openable-closebtn-top);
+  bottom: var(--openable-closebtn-bottom);
+  left: var(--openable-closebtn-left);
+  right: var(--openable-closebtn-right);
+  background: var(--openable-closebtn-bg);
+  background-color: var(--openable-closebtn-bg-color);
+  border: var(--openable-closebtn-border);
+  border-radius: var(--openable-closebtn-borderradius);
+  line-height: var(--openable-closebtn-lineheight);
+  text-align: var(--openable-closebtn-textalign);
+  width: var(--openable-closebtn-width);
+  height: var(--openable-closebtn-height);
+  padding: var(--openable-closebtn-padding);
+  margin: var(--openable-closebtn-padding);
+}
+
+.openable-close-btn:hover {
+  box-shadow: var(--openable-closebtn-boxshadow-hover);
+  color: var(--openable-closebtn-text-hover);
+  background-color: var(--openable-closebtn-bg-color-hover);
+}
+
+
 /*************************************/
 /*########## SETTINGS PANE ##########*/
 /*************************************/
 
-
 #settings-pane {
-  background-color:rgba(30,30,30,.9);
 }
 
-#close-settings-button {
-  cursor:pointer;
-  user-select: none;
-  position:absolute;
-  top: -.6em;
-  right: -.6em;
-  background-color:#222;
-  border-radius: 999px;
-  line-height:1em;
-  text-align: center;
-  width:1em;
-  height:1em;
-  padding:.2em;
-}
 #settings-tabs {
-  padding:0px;
-  margin:0px;
-  /* width:var(--lib-col-size); */
-  display:flex;
-  flex-flow: row nowrap;
-  justify-content: flex-start;
-  align-items: flex-start;
+  padding: var(--settingstabs-container-padding);
+  margin: var(--settingstabs-container-margin);
 }
 #settings-tabs li {
   list-style-type: none;
-  padding:.1em .5em .1em .5em;
-  border:1px solid gray;
   cursor:pointer;
-
+  user-select: none;
+  padding: var(--settingstabs-padding);
+  margin: var(--settingstabs-margin);
+  border: var(--settingstabs-border);
 }
 #settings-tabs .selected {
-  background-color:#444444;
+  background-color: var(--settingstabs-bgcolor-selected);
 }
 #settings-content {
-  padding: 1em;
+  padding: var(--settingscontent-padding);
+}
+
+/*************************************/
+/*########### EDITOR PANE ###########*/
+/*************************************/
+
+#editor-pane {
+  padding: var(--editorpane-padding);
+  height: auto;
+}
+
+#editor-pane input[type=text],
+#editor-pane select,
+#editor-pane textarea {
+  outline: none;
+  width: var(--editor-textinput-width);
+  font-size: var(--editor-textinput-font-size);
+  font-weight: var(--editor-textinput-font-weight);
+  height: var(--editor-textinput-height);
+  background-color: var(--editor-textinput-bg-color);
+  background: var(--editor-textinput-bg);
+  color: var(--editor-textinput-text);
+  border: var(--editor-textinput-border);
+  border-radius: var(--editor-textinput-borderradius);
+  padding: var(--editor-textinput-padding);
+}
+
+#editor-pane textarea {
+  border-radius: var(--editor-textarea-borderradius);
+  height: var(--editor-textarea-height);
+  width: var(--editor-textarea-width);
+  margin: var(--editor-textarea-margin);
+  padding: var(--editor-textarea-padding);
+  background-color: var(--editor-textarea-bg-color);
+  background: var(--editor-textarea-bg);
+  color: var(--editor-textarea-text);
+  border: var(--editor-textarea-border);
+  font-family: var(--editor-textarea-font);
+  font-size: var(--editor-textarea-fontsize);
+  font-style: var(--editor-textarea-fontstyle);
+  font-weight: var(--editor-textarea-fontweight);
+}
+
+#editor-pane select,
+#editor-pane .select-container input[type=text] {
+  width: var(--editor-select-width);
+  font-size: var(--editor-select-font-size);
+  font-weight: var(--editor-select-font-weight);
+  height: var(--editor-select-height);
+  background-color: var(--editor-select-bg-color);
+  background: var(--editor-select-bg);
+  color: var(--editor-select-text);
+  border: var(--editor-select-border);
+  border-radius: var(--editor-select-borderradius);
+  padding: var(--editor-select-padding);
+}
+
+.edit-field {
+  margin: var(--editfield-margin);
+}
+
+.edit-field-name {
+  margin: var(--editfield-name-margin);
+  font-family: var(--editfield-name-font);
+  font-size: var(--editfield-name-fontsize);
+  font-style: var(--editfield-name-fontstyle);
+  font-weight: var(--editfield-name-fontweight);
+}
+
+.edit-field.title .edit-field-name,
+.edit-field.description .edit-field-name,
+.edit-field.artwork .edit-field-name {
+  display:none;
+}
+
+.edit-field.genre input[type=text],
+.edit-field.kind select {
+  text-transform: capitalize;
+}
+
+input[type=text]#edit-field-title {
+  text-align:center;
+  font-family: var(--editor-input-title-font);
+  font-size: var(--editor-input-title-font-size);
+  /* height: var(--editor-input-title-height); */
+  line-height: var(--editor-input-title-lineheight);
+  margin: var(--editor-input-title-margin);
+  /* position: relative;
+  bottom: calc(var(--detailtitle-font-size) + var(--padding));
+  padding-top:var(--padding);
+  margin-bottom:calc(-1 * (var(--detailtitle-font-size) + var(--padding)));
+  margin-left:0px;
+  margin-right:0px; */
+  color: var(--editor-input-title-color);
+  background: var(--editor-input-title-background);
+  padding: var(--editor-input-title-padding);
+  border-radius: var(--editor-input-title-borderradius);
+}
+
+
+/* edit widgets are little graphical editors, such as the rating stars and the checkmark
+   that respond to mouseover and click events. These widgets are used in the editor pane
+   but also in the movie table rows */
+.edit-widget {
+  list-style: none;
+  padding: 0px;
+  margin: 0px;
+}
+.edit-widget.over {
+  color: var(--editwidget-text-hover);
+  opacity: var(--editwidget-opacity-hover);
+}
+.edit-widget li {
+  display: inline;
+}
+
+.edit-widget .position-outer {
+  width: var(--positionwidget-width);
+  height: var(--positionwidget-height);
+  border: var(--positionwidget-border);
+  background-color: var(--positionwidget-bg);
+  border-radius:999px;
+  overflow:hidden;
+  margin: auto;
+}
+.edit-widget .position-inner {
+  height:100%;
+  background-color: var(--positionwidgetinner-bg);
+}
+
+/* <ul> containing cast list items */
+.edit-field.cast .cast {
+  display:block;
+  margin:0em;
+  padding:0em;
+}
+
+.list-widget-list {
+  padding:0em;
+  margin:0em;
+}
+
+/* e.g. individual cast and tags items (<li>) */
+.list-widget-item {
+  list-style-type: none;
+  user-select: none;
+  overflow: hidden;
+  box-sizing: border-box;
+  max-width: var(--listwidget-item-maxwidth);
+  background: var(--listwidget-item-bg);
+  background-color: var(--listwidget-item-bg-color);
+  color: var(--listwidget-item-text);
+  border-radius: var(--listwidget-item-borderradius);
+  height: var(--listwidget-item-height);
+  width: var(--listwidget-item-width);
+  margin: var(--listwidget-item-margin);
+  padding: var(--listwidget-item-padding);
+  font-family: var(--listwidget-item-font);
+  font-size: var(--listwidget-item-fontsize);
+  font-style: var(--listwidget-item-fontstyle);
+  font-weight: var(--listwidget-item-fontweight);
+}
+
+.list-widget-item::after {
+  content:"";
+  background: var(--listwidget-item-ellipsis-grad);
+  width: var(--listwidget-item-ellipsis-width);
+  height: 100%;
+  position: absolute;
+  right: -.1em;
+  top: 0em;
+  /* z-index:9999; */
+}
+
+.list-widget-delete-item {
+  cursor:pointer;
+  vertical-align: middle;
+  box-sizing: border-box;
+  display: var(--listwidgetdel-item-display);
+  position: var(--listwidgetdel-item-position);
+  left: var(--listwidgetdel-item-left);
+  right: var(--listwidgetdel-item-right);
+  top: var(--listwidgetdel-item-top);
+  bottom: var(--listwidgetdel-item-bottom);
+  font-size: var(--listwidgetdel-item-fontsize);
+  border-radius: var(--listwidgetdel-item-borderradius);
+  background-color: var(--listwidgetdel-item-bg-color);
+  line-height: var(--listwidgetdel-item-lineheight);
+  text-align: var(--listwidgetdel-item-textalign);
+  width: var(--listwidgetdel-item-width);
+  height: var(--listwidgetdel-item-height);
+  padding: var(--listwidgetdel-item-padding);
+  margin: var(--listwidgetdel-item-margin);
+}
+
+#editor-pane .list-widget-add {
+  /* max-width: var(--listwidgetadd-input-maxwidth); */
+}
+
+#editor-pane .list-widget-add.inline {
+  font-family: var(--listwidgetadd-inline-font);
+  font-size: var(--listwidgetadd-inline-fontsize);
+  font-style: var(--listwidgetadd-inline-fontstyle);
+  font-weight: var(--listwidgetadd-inline-fontweight);
+  background: var(--listwidgetadd-inline-bg);
+  background-color: var(--listwidgetadd-inline-bg-color);
+  color: var(--listwidgetadd-inline-text);
+  border: var(--listwidgetadd-inline-border);
+  border-radius: var(--listwidgetadd-inline-borderradius);
+  height: var(--listwidgetadd-inline-height);
+  width: var(--listwidgetadd-inline-width);
+  margin: var(--listwidgetadd-inline-margin);
+  padding: var(--listwidgetadd-inline-padding);
+}
+
+#editor-pane .list-widget-add.inline input.list-widget-add-input {
+  height: 100%;
+  width: 100%;
+  padding: var(--listwidget-item-padding);
+  /* font-family: var(--listwidgetadd-input-font);
+  font-size: var(--listwidgetadd-input-fontsize);
+  font-style: var(--listwidgetadd-input-fontstyle);
+  font-weight: var(--listwidgetadd-input-fontweight);
+  position: var(--listwidgetadd-input-position);
+  left: var(--listwidgetadd-input-left);
+  right: var(--listwidgetadd-input-right);
+  top: var(--listwidgetadd-input-top);
+  bottom: var(--listwidgetadd-input-bottom);
+  background: var(--listwidgetadd-input-bg);
+  background-color: var(--listwidgetadd-input-bg-color);
+  color: var(--listwidgetadd-input-text);
+  border: var(--listwidgetadd-input-border);
+  border-radius: var(--listwidgetadd-input-borderradius);
+  height: var(--listwidgetadd-input-height);
+  width: var(--listwidgetadd-input-width);
+  margin: var(--listwidgetadd-input-margin);
+  padding: var(--listwidgetadd-input-padding); */
+}
+
+.list-widget-add button {
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--listwidgetadd-button-font);
+  font-size: var(--listwidgetadd-button-fontsize);
+  font-style: var(--listwidgetadd-button-fontstyle);
+  font-weight: var(--listwidgetadd-button-fontweight);
+  line-height: var(--listwidgetadd-button-lineheight);
+  position: var(--listwidgetadd-button-position);
+  left: var(--listwidgetadd-button-left);
+  right: var(--listwidgetadd-button-right);
+  top: var(--listwidgetadd-button-top);
+  bottom: var(--listwidgetadd-button-bottom);
+  background: var(--listwidgetadd-button-bg);
+  background-color: var(--listwidgetadd-button-bg-color);
+  color: var(--listwidgetadd-button-text);
+  border: var(--listwidgetadd-button-border);
+  border-radius: var(--listwidgetadd-button-borderradius);
+  height: var(--listwidgetadd-button-height);
+  width: var(--listwidgetadd-button-width);
+  margin: var(--listwidgetadd-button-margin);
+  padding: var(--listwidgetadd-button-padding);
+}
+
+/* dropdown icons that occurs in the same input as an add button
+   need to be moved over to the left out from behind the button */
+.list-widget-add.select-container.select-hovericon:hover::after,
+.list-widget-add.select-container.select-alwaysicon::after {
+  right: 1.5rem;
+}
+
+/* artwork image */
+.edit-field.artwork .edit-field-editor img {
+  width: var(--editartwork-img-width);
+  height: var(--editartwork-img-height);
+}
+
+.edit-field.artwork .edit-field-editor button {
+  position: var(--editartwork-browse-position);
+  top: var(--editartwork-browse-top);
+  bottom: var(--editartwork-browse-bottom);
+  left: var(--editartwork-browse-left);
+  right: var(--editartwork-browse-right);
 }
