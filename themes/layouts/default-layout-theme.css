@@ -89,7 +89,7 @@
 
 #edit-container form {
   display:grid;
-  grid-template-columns: 2fr 1fr 1fr 10rem;
+  grid-template-columns: 4fr 2fr 2fr minmax(10rem,3fr);
   grid-template-rows: repeat(11, auto);
 
   grid-gap: 0.5em;

@@ -123,6 +123,29 @@ input::-webkit-calendar-picker-indicator {
   font-weight: var(--select-arrow-fontweight);
 }
 
+input.invalid {
+  color: var(--input-invalid-text);
+  background-color: var(--input-invalid-bgcolor);
+  background: var(--input-invalid-bg);
+  border: var(--input-invalid-border);
+  box-shadow: var(--input-invalid-boxshadow);
+}
+
+button, input[type=submit] {
+  outline: none;
+  cursor:pointer;
+  color: var(--button-text);
+  font-family: var(--button-font);
+  font-size: var(--button-fontsize);
+  font-weight: var(--button-fontweight);
+  font-style: var(--button-fontstyle);
+  background-color: var(--button-bgcolor);
+  margin: var(--button-margin);
+  padding: var(--button-padding);
+  border: var(--button-border);
+  border-radius: var(--button-borderradius);
+}
+
 /*************************************/
 /*######## MAIN GRID LAYOUT #########*/
 /*************************************/
@@ -539,6 +562,7 @@ th, tr, td {
 
 #editor-pane {
   padding: var(--editorpane-padding);
+  height: auto;
 }
 
 #editor-pane input[type=text],
@@ -805,4 +829,12 @@ input[type=text]#edit-field-title {
 .edit-field.artwork .edit-field-editor img {
   width: var(--editartwork-img-width);
   height: var(--editartwork-img-height);
+}
+
+.edit-field.artwork .edit-field-editor button {
+  position: var(--editartwork-browse-position);
+  top: var(--editartwork-browse-top);
+  bottom: var(--editartwork-browse-bottom);
+  left: var(--editartwork-browse-left);
+  right: var(--editartwork-browse-right);
 }

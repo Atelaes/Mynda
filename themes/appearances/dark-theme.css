@@ -186,6 +186,29 @@
   --select-arrow-fontsize: 1.5rem;
   --select-arrow-fontweight: inherit;
 
+  --input-invalid-text: inherit;
+  --input-invalid-bgcolor: inherit;
+  --input-invalid-bg: inherit;
+  --input-invalid-border: inherit;
+  --input-invalid-boxshadow: inset 0em 0em .5em 0em rgba(255,0,0,.5);
+
+  /* --button-text: black; */
+  --button-font: inherit;
+  --button-fontsize: .8rem;
+  --button-fontweight: inherit;
+  --button-fontstyle: inherit;
+  /* --button-bgcolor: var(--lighter-bg);
+  --button-bg: inherit;
+  --button-border: .075em solid black; */
+  --button-bgcolor: var(--light-bg);
+  --button-text: black;
+  --button-margin: initial;
+  --button-padding: .1em .3em .1em .3em;
+  --button-border: .075em solid black;
+  --button-borderradius: var(--playlisttab-borderradius-radius);
+
+
+
 /* } */
 
 /* #nav-pane { */
@@ -312,13 +335,13 @@
   --editbutton-bgcolor: var(--dark-bg);
   --editbutton-text: var(--main-text);
   --editbutton-margin: initial;
-  --editbutton-padding: .1em .3em .1em .3em;
+  --editbutton-padding: var(--button-padding);/*.1em .3em .1em .3em;*/
   --editbutton-border: var(--textinput-border-width) solid var(--lightest-bg);
-  --editbutton-borderradius: var(--playlisttab-borderradius-radius);
-  --editbutton-font-size: inherit;
-  --editbutton-font-weight: inherit;
-  --editbutton-font: inherit;
-  --editbutton-font-style: inherit;
+  --editbutton-borderradius: var(--button-borderradius);
+  --editbutton-font-size: var(--button-fontsize);
+  --editbutton-font-weight: var(--button-fontweight);
+  --editbutton-font: var(--button-font);
+  --editbutton-font-style: var(--button-fontstyle);
   --editbutton-boxshadow: 0em 0em .3em .1em var(--glow-bright);
 
   --editbutton-bg-hover: initial;
@@ -374,7 +397,7 @@
   --editor-textinput-text: inherit;
   --editor-textinput-border: var(--textinput-border);
   --editor-textinput-borderradius-radius: var(--textinput-borderradius);
-  --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);
+  --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius); /*var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);*/
   --editor-textinput-padding: var(--textinput-padding);
 
   --editor-textarea-borderradius: 1em 0 0 1em; /*var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);*/
@@ -514,6 +537,11 @@
   --editartwork-img-width: 100%;
   --editartwork-img-height: auto;
 
+  --editartwork-browse-position: absolute;
+  --editartwork-browse-top: initial;
+  --editartwork-browse-bottom: .3em;
+  --editartwork-browse-left: initial;
+  --editartwork-browse-right: .3em;
 
 }
 

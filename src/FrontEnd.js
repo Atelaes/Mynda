@@ -879,13 +879,15 @@ class MynEditor extends MynOpenablePane {
 
     this.state = {
       paneID: 'editor-pane',
-      data: cloneDeep(props.video)
+      data: cloneDeep(props.video),
+      valid: {}
     }
 
     this.render = this.render.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.revertChanges = this.revertChanges.bind(this);
     this.saveChanges = this.saveChanges.bind(this);
+    this.handleValidity = this.handleValidity.bind(this);
   }
 
   handleChange(value,prop) {
@@ -902,14 +904,48 @@ class MynEditor extends MynOpenablePane {
   }
 
   saveChanges(event) {
-    // console.log('saving...');
     event.preventDefault();
-    alert('Submitted: ' + JSON.stringify(this.state.data));
 
+    /* make sure all the fields are valid before submitting */
+    console.log(JSON.stringify(this.state.valid));
+    for (var i=0, keys=Object.keys(this.state.valid); i<keys.length; i++) {
+      if (this.state.valid[keys[i]] == false) {
+        alert("Invalid Input in " + keys[i] + " field");
+        return;
+      }
+    }
+
+    /* Submit */
+    // console.log('saving...');
+    // alert('Submitted: ' + JSON.stringify(this.state.data));
     Object.keys(this.state.data).forEach((property) => {
       // update values in library here
     });
   }
+
+  handleValidity(valid, property, element, tip) {
+    if (valid) {
+      this.state.valid[property] = true;
+      element.classList.remove("invalid");
+    } else {
+      this.state.valid[property] = false;
+      element.classList.add("invalid");
+    }
+
+    // show validator tip on the element, if we were given one
+    let tipper = document.getElementById(property + "-tip");
+    if (tipper) {
+      tipper.parentNode.removeChild(tipper);
+    }
+    if (tip) {
+      console.log(tip);
+      tipper = document.createElement('div')
+      tipper.id = property + "-tip";
+      tipper.innerHTML = tip;
+      element.parentNode.appendChild(tipper);
+    }
+  }
+
 
   createContentJSX() {
     const video = this.props.video;
@@ -972,7 +1008,7 @@ class MynEditor extends MynOpenablePane {
         <label className="edit-field-name" htmlFor="tags">Tags: </label>
         <div className="edit-field-editor">
           <div className="select-container">
-            <MynEditInlineAddListWidget movie={this.state.data} property="tags" update={this.handleChange} validator={/^[a-zA-Z0-9_\-\.]+$/} options={["many","tags","happy","joy","existing","already-used"]} />
+            <MynEditInlineAddListWidget movie={this.state.data} property="tags" update={this.handleChange} options={["many","tags","happy","joy","existing","already-used"]} validator={/^[a-zA-Z0-9_\-\.]+$/} validatorTip="Allowed: Letters, Numbers, Underscores, Dashes, Periods" handleValidity={this.handleValidity} />
           </div>
         </div>
       </div>
@@ -983,9 +1019,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field artwork'>
         <label className="edit-field-name" htmlFor="artwork">Artwork: </label>
         <div className="edit-field-editor">
-          <img src={this.state.data.artwork} width="100" />
-          <button name="artwork">[browse]</button>
-
+          <MynEditArtwork movie={this.state.data} />
         </div>
       </div>
     );
@@ -999,7 +1033,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field cast'>
         <label className="edit-field-name" htmlFor="cast">Cast: </label>
         <div className="edit-field-editor">
-          <MynEditInlineAddListWidget movie={this.state.data} property="cast" update={this.handleChange} validator={/^[a-zA-Z0-9_\s\-\.']+$/} options={null} />
+          <MynEditInlineAddListWidget movie={this.state.data} property="cast" update={this.handleChange} options={null} validator={/^[a-zA-Z0-9_\s\-\.']+$/} validatorTip="Allowed: Letters, Numbers, Spaces, Underscores, Dashes, Periods, Apostrophes" handleValidity={this.handleValidity} />
         </div>
       </div>
     );
@@ -1039,7 +1073,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field dateadded'>
         <label className="edit-field-name" htmlFor="dateadded">Date Added: </label>
         <div className="edit-field-editor">
-          <MynEditDateWidget movie={this.state.data} property="dateadded" update={this.handleChange} />
+          <MynEditDateWidget movie={this.state.data} property="dateadded" update={this.handleChange} handleValidity={this.handleValidity} />
         </div>
       </div>
     );
@@ -1049,7 +1083,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field lastseen'>
         <label className="edit-field-name" htmlFor="lastseen">Last Seen: </label>
         <div className="edit-field-editor">
-          <MynEditDateWidget movie={this.state.data} property="lastseen" update={this.handleChange} />
+          <MynEditDateWidget movie={this.state.data} property="lastseen" update={this.handleChange} handleValidity={this.handleValidity} />
         </div>
       </div>
     );
@@ -1128,6 +1162,29 @@ class MynEditor extends MynOpenablePane {
 
   render() {
     return super.render(this.createContentJSX());
+  }
+}
+
+class MynEditArtwork extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      artwork : props.movie.artwork
+    }
+
+    ipcRenderer.on('editor-artwork-selected', (event, args) => {
+      // this.changeTargetFolder(args);
+    })
+  }
+
+  render() {
+    return (
+      <div>
+        <img src={this.state.artwork} width="100" />
+        <button name="artwork" onClick={() => ipcRenderer.send('editor-artwork-select')}>Browse</button>
+      </div>
+    );
   }
 }
 
@@ -1347,9 +1404,14 @@ class MynEditWidget extends React.Component {
     return element;
   }
 
-  handleInvalidInput() {
-    console.log("INVALID INPUT!!");
-  }
+  // handleInputValidity(valid, event) {
+  //   if (valid) {
+  //     event.target.classList.remove("invalid");
+  //   } else {
+  //     event.target.classList.add("invalid");
+  //     console.log("INVALID INPUT!!");
+  //   }
+  // }
 
   render() {
     return null;
@@ -1420,10 +1482,27 @@ class MynEditAddToList extends MynEditListWidget {
     this.render = this.render.bind(this);
   }
 
+  /* test for valid input */
+  handleInput(event) {
+    const input = document.getElementById(this.state.id + "-input");
+    const item = input.value;
+    if (item === "") {
+      this.props.handleValidity(true,this.props.property,input);
+    } else if (this.props.validator.test(item)) {
+      this.props.handleValidity(true,this.props.property,input);
+    } else {
+      this.props.handleValidity(false,this.props.property,input,this.props.validatorTip);
+      // console.log('validation error!');
+      // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
+    }
+  }
+
   addItem(event) {
     const input = document.getElementById(this.state.id + "-input");
     const item = input.value;
-    if (this.props.validator.test(item)) {
+    if (item === "") {
+      // do nothing
+    } else if (this.props.validator.test(item)) {
       let temp = this.state.list;
       try {
         temp.push(item);
@@ -1433,11 +1512,12 @@ class MynEditAddToList extends MynEditListWidget {
       this.updateList(temp);
       input.value = '';
     } else {
-      this.handleInvalidInput();
+      // do nothing
       // console.log('validation error!');
       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
     }
     event.preventDefault();
+    // event.stopPropagation();
   }
 
   render() {
@@ -1454,7 +1534,7 @@ class MynEditAddToList extends MynEditListWidget {
 
     return (
       <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "")}>
-        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." minLength="1" />
+        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." minLength="1" onChange={(e) => this.handleInput(e)} />
         <button onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
         {options}
       </div>
@@ -1473,7 +1553,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
     return (
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
-        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} validator={this.props.validator} options={this.props.options} inline="inline" />
+        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} options={this.props.options} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} handleValidity={this.props.handleValidity} />
       </ul>
     );
   }
@@ -1488,6 +1568,8 @@ class MynEditDateWidget extends MynEditWidget {
       userFeedback : null,
       valid : true
     }
+
+    this.input = React.createRef();
   }
 
   isValidDate(d) {
@@ -1519,20 +1601,24 @@ class MynEditDateWidget extends MynEditWidget {
     return input;
   }
 
+  handleValidity(valid, tip) {
+    let element = this.input.current;
+    this.props.handleValidity(valid,this.props.property,element,tip);
+  }
+
   handleInput(event) {
     let value = this.cleanDateInput(event.target.value);
     try {
       let date = new Date(value);
       if (value === "") {
-        this.setState({userFeedback : "", valid : true });
+        this.handleValidity(true);
       } else if (this.isValidDate(date)) {
         // console.log("Valid date! : " + value + " -- " + date.toString());
-        this.setState({userFeedback : date.toString(), valid : true});
+        this.handleValidity(true, date.toString());
         let timestamp = Math.round(date.getTime() / 1000);
         this.props.update(timestamp,this.props.property);
       } else {
-        this.setState({userFeedback : "Invalid Date", valid : false});
-        this.handleInvalidInput();
+        this.handleValidity(false, "Invalid Date");
       }
     } catch(error) {
       console.log(error);
@@ -1540,10 +1626,10 @@ class MynEditDateWidget extends MynEditWidget {
   }
 
   render() {
+    //        <div className={"date-editor-feedback " + this.state.valid ? 'valid' : 'invalid'}>{this.state.userFeedback}</div>
     return (
-      <div>
-        <input type="text" placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
-        <div className={"date-editor-feedback " + this.state.valid ? 'valid' : 'invalid'}>{this.state.userFeedback}</div>
+      <div className={"date-widget " + this.props.property}>
+        <input ref={this.input} type="text" placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
       </div>
     );
   }
