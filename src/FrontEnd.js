@@ -1636,4 +1636,5 @@ class MynEditDateWidget extends MynEditWidget {
   }
 }
 
-ReactDOM.render(<Mynda />, document.getElementById('root'));
+const library = new Library;
+ReactDOM.render(<Mynda library={library} />, document.getElementById('root'));
