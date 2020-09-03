@@ -143,3 +143,14 @@ ipcMain.on('settings-watchfolder-add', (event, arg) => {
   //Add to library
   findVideosFromFolder(arg['address'], arg['type'].toLowerCase());
 })
+
+ipcMain.on('editor-artwork-select', (event) => {
+  let options = {
+    filters: [{name: 'Images', extensions: ['jpg', 'png', 'gif']}],
+    properties: ['openFile']
+  };
+  dialog.showOpenDialog(null, options).then(result => {
+  event.sender.send('editor-artwork-selected', result.filePaths[0]);
+}).catch(err => {
+  console.log(err)
+})})

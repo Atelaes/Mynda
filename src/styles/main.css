@@ -146,6 +146,13 @@ button, input[type=submit] {
   border-radius: var(--button-borderradius);
 }
 
+button:hover, input[type=submit]:hover {
+  background: var(--button-bg-hover);
+  background-color: var(--button-bgcolor-hover);
+  color: var(--button-text-hover);
+  border: var(--button-border-hover);
+}
+
 /*************************************/
 /*######## MAIN GRID LAYOUT #########*/
 /*************************************/
@@ -837,4 +844,10 @@ input[type=text]#edit-field-title {
   bottom: var(--editartwork-browse-bottom);
   left: var(--editartwork-browse-left);
   right: var(--editartwork-browse-right);
+}
+
+#editor-pane .tip {
+  font-size: .5rem;
+  opacity:.7;
+  margin: var(--editfield-name-margin);
 }

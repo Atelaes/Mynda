@@ -1,6 +1,7 @@
 //const React = require('React');
 const { ipcRenderer } = require('electron')
 const _ = require('lodash');
+const DateJS = require('datejs');
 const Library = require("./Library.js");
 
 class Mynda extends React.Component {
@@ -584,7 +585,8 @@ class MynDetails extends React.Component {
 
   render() {
     let details;
-    let editBtn;
+    let editBtn = (<div id="edit-button" onClick={() => this.props.showEditor()}>Edit</div>);
+
     try {
       const movie = this.props.movie
       details = (
@@ -599,11 +601,15 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.lastseenDisplayDate(movie.lastseen)}</li>
         </ul>
       );
-
-      editBtn = (<div id="edit-button" onClick={() => this.props.showEditor()}>Edit</div>);
     } catch (error) {
+      // eventually we'll put some kind of better placeholder here
       details = <div>No Details</div>
       // console.log(error.toString());
+
+      if (!isValidVideo(this.props.movie)) {
+        details = null;
+        editBtn = null;
+      }
     }
 
     return  (
@@ -881,7 +887,25 @@ class MynEditor extends MynOpenablePane {
     this.state = {
       paneID: 'editor-pane',
       data: _.cloneDeep(props.video),
-      valid: {}
+      valid: {},
+      validators: {
+        people: {
+          regex: /^[a-zA-Z0-9_\s\-\.',]+$/,
+          tip: "Allowed: Letters, Numbers, Spaces, Underscores, Dashes, Periods, Apostrophes"
+        },
+        descriptors: {
+          regex: /^[a-zA-Z0-9_\-\.]+$/,
+          tip: "Allowed: Letters, Numbers, Underscores, Dashes, Periods"
+        },
+        year: {
+          regex: /^\d{4}$/,
+          tip: "YYYY"
+        },
+        everything: {
+          regex: /.*/,
+          tip: ""
+        }
+      }
     }
 
     this.render = this.render.bind(this);
@@ -909,19 +933,23 @@ class MynEditor extends MynOpenablePane {
 
     /* make sure all the fields are valid before submitting */
     console.log(JSON.stringify(this.state.valid));
+    let valid = true;
+    let invalidFields = [];
     for (var i=0, keys=Object.keys(this.state.valid); i<keys.length; i++) {
       if (this.state.valid[keys[i]] == false) {
-        alert("Invalid Input in " + keys[i] + " field");
-        return;
+        valid = false;
+        invalidFields.push(keys[i]);
       }
+    }
+    if (!valid) {
+      alert("Invalid Input in " + invalidFields);
+      return;
     }
 
     /* Submit */
     // console.log('saving...');
-    // alert('Submitted: ' + JSON.stringify(this.state.data));
-    Object.keys(this.state.data).forEach((property) => {
-      // update values in library here
-    });
+    let index = library.media.findIndex((video) => video.id === this.props.video.id);
+    library.replace("media." + index, this.state.data);
   }
 
   handleValidity(valid, property, element, tip) {
@@ -942,6 +970,7 @@ class MynEditor extends MynOpenablePane {
       console.log(tip);
       tipper = document.createElement('div')
       tipper.id = property + "-tip";
+      tipper.className = "tip";
       tipper.innerHTML = tip;
       element.parentNode.appendChild(tipper);
     }
@@ -950,13 +979,27 @@ class MynEditor extends MynOpenablePane {
 
   createContentJSX() {
     const video = this.props.video;
+    if (!isValidVideo(video)) {
+      console.log("Invalid video passed to editor");
+      return (
+        <div className="error-message">Error: Invalid video object</div>
+      );
+    }
 
     /* TITLE */
     let title = (
       <div className='edit-field title'>
         <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
-          <input id="edit-field-title" type="text" name="text" value={this.state.data.title} placeholder={'[Title]'} onChange={(e) => this.handleChange(e.target.value,'title')} />
+          <MynEditText
+            movie={this.state.data}
+            property="title"
+            update={this.handleChange}
+            options={null}
+            validator={this.state.validators.everything.regex}
+            validatorTip={this.state.validators.everything.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -966,7 +1009,15 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field year'>
         <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
-          <input id="edit-field-year" type="text" name="year" value={this.state.data.year} placeholder={'[Year]'} onChange={(e) => this.handleChange(e.target.value,'year')} />
+          <MynEditText
+            movie={this.state.data}
+            property="year"
+            update={this.handleChange}
+            options={null}
+            validator={this.state.validators.year.regex}
+            validatorTip={this.state.validators.year.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -976,7 +1027,15 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field director'>
         <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
-          <input id="edit-field-director" type="text" name="director" value={this.state.data.director} placeholder={'[Director]'} onChange={(e) => this.handleChange(e.target.value,'director')} />
+          <MynEditText
+            movie={this.state.data}
+            property="director"
+            update={this.handleChange}
+            options={null}
+            validator={this.state.validators.people.regex}
+            validatorTip={this.state.validators.people.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -986,7 +1045,15 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field directorsort'>
         <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
-          <input id="edit-field-directorsort" type="text" name="directorsort" value={this.state.data.directorsort} placeholder={'[Director Sort]'} onChange={(e) => this.handleChange(e.target.value,'directorsort')} />
+          <MynEditText
+            movie={this.state.data}
+            property="directorsort"
+            update={this.handleChange}
+            options={null}
+            validator={this.state.validators.people.regex}
+            validatorTip={this.state.validators.people.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -1009,7 +1076,15 @@ class MynEditor extends MynOpenablePane {
         <label className="edit-field-name" htmlFor="tags">Tags: </label>
         <div className="edit-field-editor">
           <div className="select-container">
-            <MynEditInlineAddListWidget movie={this.state.data} property="tags" update={this.handleChange} options={["many","tags","happy","joy","existing","already-used"]} validator={/^[a-zA-Z0-9_\-\.]+$/} validatorTip="Allowed: Letters, Numbers, Underscores, Dashes, Periods" handleValidity={this.handleValidity} />
+            <MynEditInlineAddListWidget
+              movie={this.state.data}
+              property="tags"
+              update={this.handleChange}
+              options={["many","tags","happy","joy","existing","already-used"]}
+              validator={this.state.validators.descriptors.regex}
+              validatorTip={this.state.validators.descriptors.tip}
+              handleValidity={this.handleValidity}
+            />
           </div>
         </div>
       </div>
@@ -1020,36 +1095,53 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field artwork'>
         <label className="edit-field-name" htmlFor="artwork">Artwork: </label>
         <div className="edit-field-editor">
-          <MynEditArtwork movie={this.state.data} />
+          <MynEditArtwork
+            movie={this.state.data}
+            update={this.handleChange}
+          />
         </div>
       </div>
     );
 
     /* CAST */
-    // <MynEditInlineAddListWidget movie={this.state.data} property="cast" update={this.handleChange} validator={/^[a-zA-Z0-9_\s\-\.']+$/} options={null} />
-    //
-    // <MynEditListWidget movie={this.state.data} property="cast" update={this.handleChange} />
-    // <MynEditAddToList movie={this.state.data} property="cast" update={this.handleChange} validator={/^[a-zA-Z0-9_\s\-\.']+$/} options={null} />
     let cast = (
       <div className='edit-field cast'>
         <label className="edit-field-name" htmlFor="cast">Cast: </label>
         <div className="edit-field-editor">
-          <MynEditInlineAddListWidget movie={this.state.data} property="cast" update={this.handleChange} options={null} validator={/^[a-zA-Z0-9_\s\-\.']+$/} validatorTip="Allowed: Letters, Numbers, Spaces, Underscores, Dashes, Periods, Apostrophes" handleValidity={this.handleValidity} />
+          <MynEditInlineAddListWidget
+            movie={this.state.data}
+            property="cast"
+            update={this.handleChange}
+            options={null}
+            validator={this.state.validators.people.regex}
+            validatorTip={this.state.validators.people.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
 
     /* GENRE */
+    // <input id="edit-field-genre" type="text" name="genre" value={this.state.data.genre} list="used-genres" onChange={(e) => this.handleChange(e.target.value,'genre')} />
+    // <datalist id="used-genres">
+    //   <option value="sci-fi" />
+    //   <option value="action" />
+    //   <option value="drama" />
+    // </datalist>
+
     let genre = (
       <div className='edit-field genre'>
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
         <div className="edit-field-editor select-container select-hovericon">
-          <input id="edit-field-genre" type="text" name="genre" value={this.state.data.genre} list="used-genres" onChange={(e) => this.handleChange(e.target.value,'genre')} />
-          <datalist id="used-genres">
-            <option value="sci-fi" />
-            <option value="action" />
-            <option value="drama" />
-          </datalist>
+          <MynEditText
+            movie={this.state.data}
+            property="genre"
+            update={this.handleChange}
+            options={["sci-fi","action","drama","comedy"]}
+            validator={this.state.validators.descriptors.regex}
+            validatorTip={this.state.validators.descriptors.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -1059,7 +1151,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
-          <select id="edit-field-kind" name="kind">
+          <select id="edit-field-kind" name="kind" value={this.state.data.kind} onChange={(e) => this.handleChange(e.target.value,'kind')}>
             <option value="movie">movie</option>
             <option value="show">show</option>
             <option value="stand-up">stand-up</option>
@@ -1074,7 +1166,12 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field dateadded'>
         <label className="edit-field-name" htmlFor="dateadded">Date Added: </label>
         <div className="edit-field-editor">
-          <MynEditDateWidget movie={this.state.data} property="dateadded" update={this.handleChange} handleValidity={this.handleValidity} />
+          <MynEditDateWidget
+            movie={this.state.data}
+            property="dateadded"
+            update={this.handleChange}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -1084,7 +1181,12 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field lastseen'>
         <label className="edit-field-name" htmlFor="lastseen">Last Seen: </label>
         <div className="edit-field-editor">
-          <MynEditDateWidget movie={this.state.data} property="lastseen" update={this.handleChange} handleValidity={this.handleValidity} />
+          <MynEditDateWidget
+            movie={this.state.data}
+            property="lastseen"
+            update={this.handleChange}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -1124,7 +1226,7 @@ class MynEditor extends MynOpenablePane {
       <div className='edit-field collections'>
         <label className="edit-field-name" htmlFor="collections">Collections: </label>
         <div className="edit-field-editor">
-          [I really don't know yet...]
+          [Coming Soon to a Mynda Near You!!!]
         </div>
       </div>
     );
@@ -1154,7 +1256,7 @@ class MynEditor extends MynOpenablePane {
           {dateadded}
           {artwork}
           {collections}
-          <button onClick={(e) => this.revertChanges(e)}>Revert to current values</button>
+          <button onClick={(e) => this.revertChanges(e)}>Revert to Saved</button>
           <input type="submit" value="Save" />
         </form>
       </div>
@@ -1166,23 +1268,79 @@ class MynEditor extends MynOpenablePane {
   }
 }
 
+class MynEditText extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.input = React.createRef();
+  }
+
+  handleInput() {
+    let target = this.input.current;
+    let value = target.value;
+    if (value === "") {
+      this.props.handleValidity(true,this.props.property,target);
+    } else if (this.props.validator.test(value)) {
+      this.props.handleValidity(true,this.props.property,target);
+    } else {
+      this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
+      // console.log('validation error!');
+      // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
+    }
+    this.props.update(value,this.props.property);
+  }
+
+  componentDidUpdate(oldProps) {
+    if (oldProps.movie[this.props.property] !== this.props.movie[this.props.property]) {
+      this.handleInput();
+    }
+  }
+
+  render() {
+    let options = null;
+    let listName = null;
+    if (this.props.options) {
+      listName = "used-" + this.props.property;
+      options = (
+        <datalist id={listName}>
+          {this.props.options.map((option) => (<option key={option} value={option} />))}
+        </datalist>
+      );
+    }
+
+    return (
+      <div>
+        <input
+          ref={this.input}
+          id={"edit-field-" + this.props.property}
+          list={listName}
+          type="text"
+          name="text"
+          value={this.props.movie[this.props.property]}
+          placeholder={'[' + this.props.property + ']'}
+          onChange={(e) => this.handleInput(e)}
+        />
+        {options}
+      </div>
+    );
+  }
+}
+
 class MynEditArtwork extends React.Component {
   constructor(props) {
     super(props)
 
-    this.state = {
-      artwork : props.movie.artwork
-    }
-
-    ipcRenderer.on('editor-artwork-selected', (event, args) => {
-      // this.changeTargetFolder(args);
+    ipcRenderer.on('editor-artwork-selected', (event, image) => {
+      if (image) {
+        this.props.update(image, "artwork");
+      }
     })
   }
 
   render() {
     return (
       <div>
-        <img src={this.state.artwork} width="100" />
+        <img src={this.props.movie.artwork} width="100" />
         <button name="artwork" onClick={() => ipcRenderer.send('editor-artwork-select')}>Browse</button>
       </div>
     );
@@ -1566,6 +1724,8 @@ class MynEditDateWidget extends MynEditWidget {
     super(props)
 
     this.state = {
+      inputValue : "",
+      inputValueTimestamp : null,
       userFeedback : null,
       valid : true
     }
@@ -1578,29 +1738,29 @@ class MynEditDateWidget extends MynEditWidget {
   }
 
   // we may want to use a library for this for more robustitudinality and such
-  cleanDateInput(input) {
-    try {
-      // get rid of ordinal suffixes
-      input = input.replace(/(\d+)(?:st|nd|rd|th)/gi, (match,$1) => $1);
-
-      // rough-and-tumble convert to military time, deleting "am" and "pm"
-      input = input.replace(/((\d{1,2})(:\d\d)?(:\d\d)?)(am?|pm?)/gi, (...groups) => {
-        groups = groups.filter(el => el !== undefined); // clean array of undefined matches
-        console.log(groups);
-        let ampm = groups.findIndex(el => el.match(/^am?$|^pm?$/i));
-        console.log("ampm index: " + ampm);
-        if (!isNaN(groups[2]) && groups[2] < 12 && groups[ampm].match(/p/i)) {
-          groups[2] = parseInt(groups[2]) + 12;
-        }
-        return groups.slice(2,ampm).join('');
-      });
-
-      // console.log("cleaned input: " + input);
-    } catch(error) {
-      console.log(error);
-    }
-    return input;
-  }
+  // cleanDateInput(input) {
+  //   try {
+  //     // get rid of ordinal suffixes
+  //     input = input.replace(/(\d+)(?:st|nd|rd|th)/gi, (match,$1) => $1);
+  //
+  //     // rough-and-tumble convert to military time, deleting "am" and "pm"
+  //     input = input.replace(/((\d{1,2})(:\d\d)?(:\d\d)?)(am?|pm?)/gi, (...groups) => {
+  //       groups = groups.filter(el => el !== undefined); // clean array of undefined matches
+  //       console.log(groups);
+  //       let ampm = groups.findIndex(el => el.match(/^am?$|^pm?$/i));
+  //       console.log("ampm index: " + ampm);
+  //       if (!isNaN(groups[2]) && groups[2] < 12 && groups[ampm].match(/p/i)) {
+  //         groups[2] = parseInt(groups[2]) + 12;
+  //       }
+  //       return groups.slice(2,ampm).join('');
+  //     });
+  //
+  //     // console.log("cleaned input: " + input);
+  //   } catch(error) {
+  //     console.log(error);
+  //   }
+  //   return input;
+  // }
 
   handleValidity(valid, tip) {
     let element = this.input.current;
@@ -1608,32 +1768,87 @@ class MynEditDateWidget extends MynEditWidget {
   }
 
   handleInput(event) {
-    let value = this.cleanDateInput(event.target.value);
+    // update the state variable so that the form input reflects what is typed
+    this.setState({inputValue: event.target.value});
+
+    // now figure out if it's a valid date
+    // and if so, update the parent object
+    let value = event.target.value;//this.cleanDateInput(event.target.value);
     try {
-      let date = new Date(value);
+      let date = Date.parse(value);
+
+      // if field is empty, reset to valid, pass null to parent
       if (value === "") {
         this.handleValidity(true);
+        this.props.update(null,this.props.property);
+
+      // if field is a valid date, reset to valid, pass timestamp of date to parent
       } else if (this.isValidDate(date)) {
-        // console.log("Valid date! : " + value + " -- " + date.toString());
-        this.handleValidity(true, date.toString());
         let timestamp = Math.round(date.getTime() / 1000);
+        this.handleValidity(true, date.toString("M/d/yyyy, hh:mm:ss tt"));//date.toString().replace(/\sGMT.*$/,''));
         this.props.update(timestamp,this.props.property);
+
+      // if we're here, whatever's in the field is invalid; reset to invalid,
+      // pass null to parent;
       } else {
         this.handleValidity(false, "Invalid Date");
+        this.props.update(null,this.props.property);
       }
     } catch(error) {
       console.log(error);
     }
   }
 
+  setStateValuesFromProps() {
+    let timestamp = this.props.movie[this.props.property];
+    if (timestamp) {
+      let value = timestamp;
+      let date = new Date(timestamp * 1000);
+      if (this.isValidDate(date)) {
+        value = date.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+      }
+      this.setState({
+        inputValue : value,
+        inputValueTimestamp: timestamp
+      });
+    }
+  }
+
+  componentDidMount(props) {
+    // set initial value
+    this.setStateValuesFromProps();
+  }
+
+  componentDidUpdate(oldProps) {
+    // console.log("PROPSCHANGE\nold: " + oldProps.movie[this.props.property] + "\nnew: " + this.props.movie[this.props.property] + '\nste: ' + this.state.inputValueTimestamp);
+    if (oldProps.movie[this.props.property] != this.props.movie[this.props.property]) {// && this.props.movie[this.props.property] != this.state.inputValueTimestamp) {
+      this.setStateValuesFromProps();
+      this.handleValidity(true);
+    }
+  }
+
   render() {
-    //        <div className={"date-editor-feedback " + this.state.valid ? 'valid' : 'invalid'}>{this.state.userFeedback}</div>
     return (
       <div className={"date-widget " + this.props.property}>
-        <input ref={this.input} type="text" placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
+        <input ref={this.input} type="text" value={this.state.inputValue} placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
       </div>
     );
   }
+}
+
+// helper function to test whether a video object is a valid video
+// all it does right now is check for top-level properties
+// eventually it should do more than that
+function isValidVideo(video) {
+  const properties = ['id', 'title', 'year', 'director', 'directorsort', 'cast', 'description', 'genre', 'tags', 'seen', 'position', 'duration', 'rating', 'dateadded', 'lastseen', 'kind', 'filename', 'artwork', 'collections'];
+  for(const property of properties){
+    if (Object.keys(video).includes(property)) {
+       continue;
+    } else {
+       return false;
+    }
+  }
+  return true;
 }
 
 const library = new Library;

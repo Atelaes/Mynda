@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "datejs": "^1.0.0-rc3",
     "lodash": "^4.17.20",
     "uuid": "^8.3.0"
   },

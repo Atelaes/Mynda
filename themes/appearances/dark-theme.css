@@ -200,14 +200,18 @@
   /* --button-bgcolor: var(--lighter-bg);
   --button-bg: inherit;
   --button-border: .075em solid black; */
-  --button-bgcolor: var(--light-bg);
-  --button-text: black;
+  --button-bgcolor: var(--dark-bg);
+  --button-text: var(--main-text);
   --button-margin: initial;
   --button-padding: .1em .3em .1em .3em;
-  --button-border: .075em solid black;
+  --button-border-width: .05em;
+  --button-border: var(--button-border-width) solid var(--lightest-bg);
   --button-borderradius: var(--playlisttab-borderradius-radius);
 
-
+  --button-bg-hover: initial;
+  --button-bgcolor-hover: var(--light-bg);
+  --button-text-hover: var(--bright-text);
+  --button-border-hover: var(--button-border-width) solid var(--dim-text);
 
 /* } */
 
@@ -332,11 +336,11 @@
   --editbutton-left: initial;
   --editbutton-right: .3em;
   --editbutton-bg: initial;
-  --editbutton-bgcolor: var(--dark-bg);
-  --editbutton-text: var(--main-text);
-  --editbutton-margin: initial;
+  --editbutton-bgcolor: var(--button-bgcolor);
+  --editbutton-text: var(--button-text);
+  --editbutton-margin: var(--button-margin);
   --editbutton-padding: var(--button-padding);/*.1em .3em .1em .3em;*/
-  --editbutton-border: var(--textinput-border-width) solid var(--lightest-bg);
+  --editbutton-border: var(--button-border);
   --editbutton-borderradius: var(--button-borderradius);
   --editbutton-font-size: var(--button-fontsize);
   --editbutton-font-weight: var(--button-fontweight);
@@ -344,10 +348,10 @@
   --editbutton-font-style: var(--button-fontstyle);
   --editbutton-boxshadow: 0em 0em .3em .1em var(--glow-bright);
 
-  --editbutton-bg-hover: initial;
-  --editbutton-bgcolor-hover: var(--light-bg);
-  --editbutton-text-hover: var(--bright-text);
-  --editbutton-border-hover: var(--textinput-border-width) solid var(--dim-text);
+  --editbutton-bg-hover: var(--button-bg-hover);
+  --editbutton-bgcolor-hover: var(--button-bgcolor-hover);
+  --editbutton-text-hover: var(--button-text-hover);
+  --editbutton-border-hover: var(--button-border-hover);
 
 /* openable panes */
   --openable-bgcolor: rgba(30,30,30,.9);
