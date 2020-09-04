@@ -845,8 +845,43 @@ input[type=text]#edit-field-title {
   right: var(--editartwork-browse-right);
 }
 
+/* revert link that appears in the artwork field when the image is moused over */
+/* it's empty, so we have to fill it with a background */
+#editor-pane .edit-field-revert {
+  cursor:pointer;
+  user-select: none;
+  position: var(--editartwork-revert-position);
+  top: var(--editartwork-revert-top);
+  bottom: var(--editartwork-revert-bottom);
+  left: var(--editartwork-revert-left);
+  right: var(--editartwork-revert-right);
+  /* width:1em; */
+  height:1em;
+  font-size: 1.5em;
+  font-weight: 800;
+  color: var(--editartwork-revert-text);
+  text-shadow: var(--editartwork-revert-textshadow);
+}
+#editor-pane .edit-field-revert::after {
+  content:"\21BA";
+}
+#editor-pane .edit-field-revert:hover {
+  color: var(--editartwork-revert-text-hover);
+  text-shadow: var(--editartwork-revert-textshadow-hover);
+}
+
+
+
 #editor-pane .tip {
   font-size: .5rem;
   opacity:.7;
   margin: var(--editfield-name-margin);
+}
+
+#edit-field-artwork-dl-msg {
+  position: absolute;
+  left: 0em;
+  top: 0em;
+  width: 100%;
+  text-align: center;
 }

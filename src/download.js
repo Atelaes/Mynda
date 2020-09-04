@@ -34,12 +34,17 @@ const {v4: uuidv4} = require('uuid');
       console.log(typeof dest);
       console.log(JSON.stringify(dest));
       const file = fs.createWriteStream(dest);
-      const sendReq = request.get(url);
+      let sendReq;
+      try {
+        sendReq = request.get(url);
+      } catch(err) {
+        return callback(err.message);
+      }
 
       // verify response code
       sendReq.on('response', (response) => {
           if (response.statusCode !== 200) {
-              return callback('Response status was ' + response.statusCode);
+              return callback({status:response.statusCode});
           }
 
           sendReq.pipe(file);

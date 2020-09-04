@@ -547,6 +547,17 @@
   --editartwork-browse-left: initial;
   --editartwork-browse-right: .3em;
 
+  --editartwork-revert-position: absolute;
+  --editartwork-revert-top: var(--editartwork-browse-top);
+  --editartwork-revert-bottom: var(--editartwork-browse-bottom);
+  --editartwork-revert-left: var(--editartwork-browse-right);
+  --editartwork-revert-right: var(--editartwork-browse-left);
+  --editartwork-revert-text: var(--darker-bg);
+  --editartwork-revert-textshadow: 0em 0em .1em rgba(220,225,255,1), 0em 0em .05em rgba(220,225,255,.6);
+  --editartwork-revert-text-hover: var(--med-text);
+  --editartwork-revert-textshadow-hover: 0em 0em .05em black, 0em 0em .15em black;
+
+
 }
 
 /******************************************/
@@ -728,6 +739,46 @@ in lieu of that, we will use a negative margin on the selected element instead (
     transform: scale(1);
   }
 }
+
+#edit-field-artwork-dl-msg {
+  animation: dl-msg-fade 1s ease infinite;
+  animation-delay: 0s;
+  animation-direction: alternate;
+}
+
+@keyframes dl-msg-fade {
+  0% {
+    opacity: 0;
+    transform: scale(.9);
+  }
+  50% {
+    transform: scale(1);
+  }
+  100% {
+    opacity: .5;
+  }
+}
+
+/* actual image of artwork */
+#edit-artwork-image {
+  opacity:.7;
+}
+
+#edit-field-artwork-dl-msg:after {
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: bottom;
+  animation: ellipsis steps(4,end) 2s infinite;
+  content: "\2026"; /* ascii code for the ellipsis character */
+  width: 0px;
+}
+
+@keyframes ellipsis {
+  to {
+    width: 1em;
+  }
+}
+
 
 .openable-pane {
   box-shadow: 0em 0em 1em -.2em var(--glow-dim);

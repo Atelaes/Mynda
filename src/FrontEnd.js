@@ -894,11 +894,11 @@ class MynEditor extends MynOpenablePane {
       validators: {
         people: {
           regex: /^[a-zA-Z0-9_\s\-\.',]+$/,
-          tip: "Allowed: Letters, Numbers, Spaces, Underscores, Dashes, Periods, Apostrophes"
+          tip: "Allowed: a-z A-Z 0-9 _ - . ' [space]"
         },
         descriptors: {
           regex: /^[a-zA-Z0-9_\-\.]+$/,
-          tip: "Allowed: Letters, Numbers, Underscores, Dashes, Periods"
+          tip: "Allowed: a-z A-Z 0-9 _ - ."
         },
         year: {
           regex: /^\d{4}$/,
@@ -948,6 +948,12 @@ class MynEditor extends MynOpenablePane {
       alert("Invalid Input in " + invalidFields);
       return;
     }
+
+    // Before saving, we need to move the artwork image to the appropriate
+    // folder in the user data. In the case of a new image, it may either be
+    // in its original location on the user's local drive (in the case that
+    // the user browsed to it or entered its path manually), or it may be
+    // saved in a temp folder (in the case that it was downloaded from a URL)
 
     /* Submit */
     // console.log('saving...');
@@ -1335,12 +1341,18 @@ class MynEditArtwork extends React.Component {
 
     this.state = {
       value: "",
-      placeholderImage: "../images/qmark.png"
+      placeholderImage: "../images/qmark.png",
+      message: "",
+      revertLink: null,
+      original: props.movie.artwork
     }
+
+    this.revert = React.createRef();
+    this.container = React.createRef();
 
     ipcRenderer.on('editor-artwork-selected', (event, image) => {
       if (image) {
-        this.props.update(image, "artwork");
+        this.update(image);
       } else {
         console.log("Unable to select file");
       }
@@ -1357,51 +1369,97 @@ class MynEditArtwork extends React.Component {
   }
 
   handleInput(event) {
+    let messageEl = document.getElementById('edit-field-artwork-dl-msg');
+    let element = event.target;
+
+    // update value as it's entered
     let value = event.target.value;
     this.setState({value:value});
+
     let extReg = /\.(jpg|jpeg|png|gif)$/i;
     if (isValidURL(value) && extReg.test(value)) {
       console.log("Valid URL? " + value);
       // then this is a valid url with an image extension at the end
       // try to download it
+
+      // hide the input element and display message while downloading
+      element.style.visibility = 'hidden'
+      this.setState({message: "downloading"});
+      messageEl.style.display = 'block';
       dl.download(value, null, (args) => {
         console.log("CALLBACK!!!");
-        if (args) {
-          console.log(args);
-        }
         try {
-          this.props.update(args.path, "artwork");
+          // if successful, we'll receive an object with the path at "path"
+          if (args.hasOwnProperty('path')) {
+            this.update(args.path);
+            console.log("Updated image!");
+          } else {
+            console.log(args);
+            if (args.status != 200) {
+              this.update(this.state.placeholderImage);
+            }
+          }
         } catch(error) {
           console.log(error);
         }
+
+        // on finishing, whether successful or not,
+        // hide message and show input field again
+        element.style.visibility = 'visible';
+        this.setState({message: ""});
+        messageEl.style.display = 'none';
       });
 
     } else if (extReg.test(value)) {
       console.log("Possible local path? " + value);
       // then this MIGHT be a valid local path,
       // we'll see if we can find it
-      fs.readFile(value, (err, data) => {
-        if (err) {
-          this.props.update(this.state.placeholderImage,'artwork');
-          return console.error(err);
-        }
-        this.props.update(value, "artwork");
-        console.log("Asynchronous read successful");
-      });
-
+      this.handleLocalFile(value);
     } else {
       // do nothing?
     }
 
   }
 
-  downloaded(args) {
-    console.log(`Downloaded! ${args}`);
+  handleLocalFile(path) {
+    fs.readFile(path, (err, data) => {
+      if (err) {
+        this.update(this.state.placeholderImage);
+        return console.error(err);
+      }
+      this.update(path);
+      console.log("Asynchronous read successful");
+    });
+  }
+
+  update(path) {
+    this.setState({value:''});
+
+    this.props.update(path,'artwork');
   }
 
   handleBrowse(event) {
     ipcRenderer.send('editor-artwork-select');
     event.preventDefault();
+  }
+
+  handleRevert() {
+    console.log("reverting! " + this.state.original);
+    this.update(this.state.original);
+  }
+
+  imageOver(event) {
+    // this.revert.current.style.visibility = "visible";
+  }
+
+  imageOut(event) {
+    // // //this is the original element the event handler was assigned to
+    // // var e = event.toElement || event.relatedTarget;
+    // // if (e.parentNode == this || e == this) {
+    // //    return;
+    // // }
+    //
+    // this.revert.current.style.visibility = "hidden";
   }
 
   componentDidUpdate(oldProps) {
@@ -1412,12 +1470,69 @@ class MynEditArtwork extends React.Component {
     // }
   }
 
+  componentDidMount(props) {
+    // const container = this.container.current;
+    document.addEventListener('drop', (event) => {
+        event.preventDefault();
+        // event.stopPropagation();
+
+        console.log(JSON.stringify(event.dataTransfer));
+
+        for (const f of event.dataTransfer.files) {
+          // Using the path attribute to get absolute file path
+          console.log('Oh you touched me! ', f.path)
+        }
+
+        try {
+          const files = event.dataTransfer.files;
+          if (files.length === 1) {
+            if (/image/.test(files[0].type)) {
+              this.handleLocalFile(files[0].path);
+            } else {
+              console.log("Wrong file type: images only");
+            }
+          } else if (files.length === 0) {
+            console.log("No files found");
+          } else {
+            console.log("Only 1 file at a time");
+          }
+        } catch(err) {
+          console.error(err);
+        }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    document.addEventListener('dragenter', (event) => {
+      // console.log('File is in the Drop Space');
+    });
+
+    document.addEventListener('dragleave', (event) => {
+      // console.log('File has left the Drop Space');
+    });
+  }
+
   render() {
     return (
-      <div>
-        <img src={this.props.movie.artwork} width="100" />
-        <input type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder="Paste path/URL" onChange={(e) => this.handleInput(e)} />
-        <button onClick={(e) => this.handleBrowse(e)}>Browse</button>
+      <div ref={this.container}>
+        <img
+          id="edit-artwork-image"
+          src={this.props.movie.artwork}
+          width="100"
+          onMouseOver={(e) => this.imageOver(e)}
+          onMouseLeave={(e) => this.imageOut(e)}
+        />
+        <div>
+          <input type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder="Paste path/URL" onChange={(e) => this.handleInput(e)} />
+          <div id="edit-field-artwork-dl-msg" style={{display:"none"}}>{this.state.message}</div>
+        </div>
+        <div id="edit-field-artwork-buttons">
+          <div ref={this.revert} onClick={() => this.handleRevert()} className="edit-field-revert"></div>
+          <button onClick={(e) => this.handleBrowse(e)}>Browse</button>
+        </div>
       </div>
     );
   }
