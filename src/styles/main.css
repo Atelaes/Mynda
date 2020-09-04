@@ -645,7 +645,7 @@ input[type=text]#edit-field-title {
   text-align:center;
   font-family: var(--editor-input-title-font);
   font-size: var(--editor-input-title-font-size);
-  /* height: var(--editor-input-title-height); */
+  height: var(--editor-input-title-height);
   line-height: var(--editor-input-title-lineheight);
   margin: var(--editor-input-title-margin);
   /* position: relative;
@@ -659,7 +659,6 @@ input[type=text]#edit-field-title {
   padding: var(--editor-input-title-padding);
   border-radius: var(--editor-input-title-borderradius);
 }
-
 
 /* edit widgets are little graphical editors, such as the rating stars and the checkmark
    that respond to mouseover and click events. These widgets are used in the editor pane

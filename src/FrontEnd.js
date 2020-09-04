@@ -2,7 +2,10 @@
 const { ipcRenderer } = require('electron')
 const _ = require('lodash');
 const DateJS = require('datejs');
+const URL = require("url").URL;
+const fs = require('fs');
 const Library = require("./Library.js");
+const dl = require('./download');
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -1330,18 +1333,91 @@ class MynEditArtwork extends React.Component {
   constructor(props) {
     super(props)
 
+    this.state = {
+      value: "",
+      placeholderImage: "../images/qmark.png"
+    }
+
     ipcRenderer.on('editor-artwork-selected', (event, image) => {
       if (image) {
         this.props.update(image, "artwork");
+      } else {
+        console.log("Unable to select file");
       }
-    })
+    });
+
+    // ipcRenderer.on('editor-artwork-downloaded', (event, image) => {
+    //   if (image) {
+    //     this.props.update(image, "artwork");
+    //   } else {
+    //     console.log("Unable to download file");
+    //   }
+    // });
+
+  }
+
+  handleInput(event) {
+    let value = event.target.value;
+    this.setState({value:value});
+    let extReg = /\.(jpg|jpeg|png|gif)$/i;
+    if (isValidURL(value) && extReg.test(value)) {
+      console.log("Valid URL? " + value);
+      // then this is a valid url with an image extension at the end
+      // try to download it
+      dl.download(value, null, (args) => {
+        console.log("CALLBACK!!!");
+        if (args) {
+          console.log(args);
+        }
+        try {
+          this.props.update(args.path, "artwork");
+        } catch(error) {
+          console.log(error);
+        }
+      });
+
+    } else if (extReg.test(value)) {
+      console.log("Possible local path? " + value);
+      // then this MIGHT be a valid local path,
+      // we'll see if we can find it
+      fs.readFile(value, (err, data) => {
+        if (err) {
+          this.props.update(this.state.placeholderImage,'artwork');
+          return console.error(err);
+        }
+        this.props.update(value, "artwork");
+        console.log("Asynchronous read successful");
+      });
+
+    } else {
+      // do nothing?
+    }
+
+  }
+
+  downloaded(args) {
+    console.log(`Downloaded! ${args}`);
+  }
+
+  handleBrowse(event) {
+    ipcRenderer.send('editor-artwork-select');
+    event.preventDefault();
+  }
+
+  componentDidUpdate(oldProps) {
+    // console.log("component updated");
+    // if (oldProps.movie.artwork !== this.props.movie.artwork) {
+    //   console.log("updating state");
+    //   this.setState({value:this.props.movie.artwork});
+    // }
   }
 
   render() {
     return (
       <div>
         <img src={this.props.movie.artwork} width="100" />
-        <button name="artwork" onClick={() => ipcRenderer.send('editor-artwork-select')}>Browse</button>
+        <input type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder="Paste path/URL" onChange={(e) => this.handleInput(e)} />
+        <button onClick={(e) => this.handleBrowse(e)}>Browse</button>
       </div>
     );
   }
@@ -1849,6 +1925,16 @@ function isValidVideo(video) {
     }
   }
   return true;
+}
+
+// helper function to determine if a string is a valid URL
+function isValidURL(s) {
+  try {
+    new URL(s);
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 const library = new Library;

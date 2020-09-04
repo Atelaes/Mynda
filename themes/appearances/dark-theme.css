@@ -156,7 +156,7 @@
   --textinput-border-width: 0em;
   --textinput-border-color: initial;
   --textinput-border: var(--textinput-border-width) solid var(--textinput-border-color);
-  --textinput-borderradius: 999px;
+  --textinput-borderradius: calc(var(--textinput-height) / 2);/*999px;*/
   --textinput-padding: 0em 1.4em 0em .5em;
   --textinput-text-placeholder: var(--dimmer-text); /*var(--textinput-border-color);*/
   --textinput-text-placeholder-opacity: 1;
@@ -395,7 +395,7 @@
   --editor-textinput-width: 100%;
   --editor-textinput-font-size: inherit;
   --editor-textinput-font-weight: var(--textinput-font-weight);
-  --editor-textinput-height: inherit;
+  --editor-textinput-height: var(--textinput-height);
   --editor-textinput-bg-color: var(--textinput-bg-color);
   --editor-textinput-bg: linear-gradient(90deg, var(--textinput-bg-color) 0%, rgba(0,0,0,0)  100%);
   --editor-textinput-text: inherit;
@@ -543,7 +543,7 @@
 
   --editartwork-browse-position: absolute;
   --editartwork-browse-top: initial;
-  --editartwork-browse-bottom: .3em;
+  --editartwork-browse-bottom: calc(.3em + var(--editor-textinput-height));
   --editartwork-browse-left: initial;
   --editartwork-browse-right: .3em;
 
@@ -732,6 +732,12 @@ in lieu of that, we will use a negative margin on the selected element instead (
 .openable-pane {
   box-shadow: 0em 0em 1em -.2em var(--glow-dim);
   /* overflow-y: scroll; */
+}
+
+/*  */
+#editor-pane input[type=text]#edit-field-artwork {
+  font-size: var(--listwidget-item-fontsize);
+  border-radius: 0em 0em var(--editor-textinput-borderradius-radius) var(--editor-textinput-borderradius-radius);
 }
 
 .list-widget-list.cast {
