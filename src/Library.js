@@ -29,8 +29,8 @@ class Library {
       ipcRenderer.send('lib-beacon');
     }
 
-    const dataPath = (electron.app || electron.remote.app).getPath('userData');
-    this.path = path.join(dataPath, "library.json");
+    this.dataPath = (electron.app || electron.remote.app).getPath('userData');
+    this.path = path.join(this.dataPath, "Library", "library.json");
 
     const data = this.load();
     ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
@@ -214,6 +214,12 @@ class Library {
       // if there was some kind of error, return the passed in defaults instead.
       console.log("No file found, creating default file");
       try {
+        let libDir = path.join(this.dataPath, "Library");
+        let artDir = path.join(libDir, "Artwork");
+        if (!fs.existsSync(libDir)) {
+          fs.mkdirSync(libDir);
+          fs.mkdirSync(artDir);
+        }
         fs.writeFileSync(this.path, JSON.stringify(defaultLibrary));
       } catch(e) {
         console.log("Error writing to file: " + e.toString());

@@ -1,9 +1,12 @@
 //const React = require('React');
-const { ipcRenderer } = require('electron')
+const electron = require('electron');
+const { ipcRenderer } = require('electron');
 const _ = require('lodash');
 const DateJS = require('datejs');
 const URL = require("url").URL;
 const fs = require('fs');
+const path = require('path');
+const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const dl = require('./download');
 
@@ -954,6 +957,17 @@ class MynEditor extends MynOpenablePane {
     // in its original location on the user's local drive (in the case that
     // the user browsed to it or entered its path manually), or it may be
     // saved in a temp folder (in the case that it was downloaded from a URL)
+    const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
+    const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.data.artwork.match(/.\w{3,4}$/)[0]);
+    fs.copyFile(this.state.data.artwork, newArtworkPath, (err) => {
+      if (err) {
+        console.error(err);
+      } else {
+        console.log('artwork was copied successfully: ' + newArtworkPath);
+      }
+    });
+    this.handleChange(newArtworkPath,'artwork');
+    console.log("updated state var: " + this.state.data.artwork);
 
     /* Submit */
     // console.log('saving...');
