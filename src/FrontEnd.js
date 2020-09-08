@@ -890,6 +890,8 @@ class MynEditor extends MynOpenablePane {
   constructor(props) {
     super(props)
 
+    this._isMounted = false;
+
     this.state = {
       paneID: 'editor-pane',
       data: _.cloneDeep(props.video),
@@ -925,13 +927,13 @@ class MynEditor extends MynOpenablePane {
     // console.log('Editing ' + prop);
     let update = this.state.data;
     update[prop] = value;
-    this.setState({data : update});
+    this._isMounted && this.setState({data : update});
   }
 
   revertChanges(event) {
     // console.log('reverting...');
     event.preventDefault();
-    this.setState({data : _.cloneDeep(this.props.video)});
+    this._isMounted && this.setState({data : _.cloneDeep(this.props.video)});
   }
 
   saveChanges(event) {
@@ -957,17 +959,19 @@ class MynEditor extends MynOpenablePane {
     // in its original location on the user's local drive (in the case that
     // the user browsed to it or entered its path manually), or it may be
     // saved in a temp folder (in the case that it was downloaded from a URL)
-    const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
-    const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.data.artwork.match(/.\w{3,4}$/)[0]);
-    fs.copyFile(this.state.data.artwork, newArtworkPath, (err) => {
-      if (err) {
-        console.error(err);
-      } else {
-        console.log('artwork was copied successfully: ' + newArtworkPath);
-      }
-    });
-    this.handleChange(newArtworkPath,'artwork');
-    console.log("updated state var: " + this.state.data.artwork);
+    if (this._isMounted) {
+      const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
+      const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.data.artwork.match(/.\w{3,4}$/)[0]);
+      fs.copyFile(this.state.data.artwork, newArtworkPath, (err) => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log('artwork was copied successfully: ' + newArtworkPath);
+        }
+      });
+      this.handleChange(newArtworkPath,'artwork');
+      console.log("updated state var: " + this.state.data.artwork);
+    }
 
     /* Submit */
     // console.log('saving...');
@@ -999,6 +1003,13 @@ class MynEditor extends MynOpenablePane {
     }
   }
 
+  componentDidMount() {
+    this._isMounted = true;
+  }
+
+  componentWillUnmount() {
+    this._isMounted = false;
+  }
 
   createContentJSX() {
     const video = this.props.video;
@@ -1353,6 +1364,8 @@ class MynEditArtwork extends React.Component {
   constructor(props) {
     super(props)
 
+    this._isMounted = false;
+
     this.state = {
       value: "",
       placeholderImage: "../images/qmark.png",
@@ -1388,7 +1401,7 @@ class MynEditArtwork extends React.Component {
 
     // update value as it's entered
     let value = event.target.value;
-    this.setState({value:value});
+    this._isMounted && this.setState({value:value});
 
     let extReg = /\.(jpg|jpeg|png|gif)$/i;
     if (isValidURL(value) && extReg.test(value)) {
@@ -1398,9 +1411,9 @@ class MynEditArtwork extends React.Component {
 
       // hide the input element and display message while downloading
       element.style.visibility = 'hidden'
-      this.setState({message: "downloading"});
+      this._isMounted && this.setState({message: "downloading"});
       messageEl.style.display = 'block';
-      dl.download(value, null, (args) => {
+      this._isMounted && dl.download(value, null, (args) => {
         console.log("CALLBACK!!!");
         try {
           // if successful, we'll receive an object with the path at "path"
@@ -1420,7 +1433,7 @@ class MynEditArtwork extends React.Component {
         // on finishing, whether successful or not,
         // hide message and show input field again
         element.style.visibility = 'visible';
-        this.setState({message: ""});
+        this._isMounted && this.setState({message: ""});
         messageEl.style.display = 'none';
       });
 
@@ -1436,7 +1449,7 @@ class MynEditArtwork extends React.Component {
   }
 
   handleLocalFile(path) {
-    fs.readFile(path, (err, data) => {
+    this._isMounted && fs.readFile(path, (err, data) => {
       if (err) {
         this.update(this.state.placeholderImage);
         return console.error(err);
@@ -1447,7 +1460,7 @@ class MynEditArtwork extends React.Component {
   }
 
   update(path) {
-    this.setState({value:''});
+    this._isMounted && this.setState({value:''});
 
     this.props.update(path,'artwork');
   }
@@ -1485,7 +1498,10 @@ class MynEditArtwork extends React.Component {
   }
 
   componentDidMount(props) {
+    this._isMounted = true;
     // const container = this.container.current;
+
+    // set listener for drag and drop functionality
     document.addEventListener('drop', (event) => {
         event.preventDefault();
         // event.stopPropagation();
@@ -1527,6 +1543,10 @@ class MynEditArtwork extends React.Component {
     document.addEventListener('dragleave', (event) => {
       // console.log('File has left the Drop Space');
     });
+  }
+
+  componentWillUnmount() {
+    this._isMounted = false;
   }
 
   render() {
