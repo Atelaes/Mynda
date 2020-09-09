@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
+const dl = require('./download');
 
 let library = new Library;
 const app = electron.app;
@@ -154,3 +155,28 @@ ipcMain.on('editor-artwork-select', (event) => {
 }).catch(err => {
   console.log(err)
 })})
+
+ipcMain.on('download', (event, url, destination) => {
+  let response = {success:false, message:''};
+  // event.sender.send('cancel-download', dl.canceller, "hi");
+  dl.download(url,destination, (args) => {
+    console.log("CALLBACK!!!");
+    try {
+      // if successful, we'll receive an object with the path at "path"
+      if (args.hasOwnProperty('path')) {
+        response.success = true;
+        response.message = args.path;
+        // console.log("successfully downloaded file");
+      } else {
+        // console.log(JSON.stringify(args));
+        response.success = false;
+        response.message = args;
+      }
+    } catch(error) {
+      response.success = false;
+      response.message = error;
+      // console.log(error);
+    }
+    event.sender.send('downloaded', response);
+  });
+})

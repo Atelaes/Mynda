@@ -1372,6 +1372,7 @@ class MynEditArtwork extends React.Component {
       message: "",
       revertLink: null,
       original: props.movie.artwork
+      // cancelDownload: () => { console.log('default cancel function') }
     }
 
     this.revert = React.createRef();
@@ -1385,14 +1386,28 @@ class MynEditArtwork extends React.Component {
       }
     });
 
-    // ipcRenderer.on('editor-artwork-downloaded', (event, image) => {
-    //   if (image) {
-    //     this.props.update(image, "artwork");
-    //   } else {
-    //     console.log("Unable to download file");
-    //   }
-    // });
+    ipcRenderer.on('downloaded', (event, response) => {
+      if (response.success) {
+        this.props.update(response.message, "artwork");
+      } else {
+        console.log("Unable to download file: " + response.message);
+        this.update(this.state.placeholderImage);
+      }
 
+      // on finishing, whether successful or not,
+      // hide message and show input field again
+      let messageEl = document.getElementById('edit-field-artwork-dl-msg');
+      let inputEl = document.getElementById('edit-field-artwork');
+      inputEl.style.visibility = 'visible';
+      this._isMounted && this.setState({message: ""});
+      messageEl.style.display = 'none';
+
+    });
+
+    // ipcRenderer.on('cancel-download', (event, cancelFunc, string) => {
+    //   this.setState({cancelDownload: cancelFunc});
+    //   console.log(string);
+    // });
   }
 
   handleInput(event) {
@@ -1413,29 +1428,7 @@ class MynEditArtwork extends React.Component {
       element.style.visibility = 'hidden'
       this._isMounted && this.setState({message: "downloading"});
       messageEl.style.display = 'block';
-      this._isMounted && dl.download(value, null, (args) => {
-        console.log("CALLBACK!!!");
-        try {
-          // if successful, we'll receive an object with the path at "path"
-          if (args.hasOwnProperty('path')) {
-            this.update(args.path);
-            console.log("Updated image!");
-          } else {
-            console.log(args);
-            if (args.status != 200) {
-              this.update(this.state.placeholderImage);
-            }
-          }
-        } catch(error) {
-          console.log(error);
-        }
-
-        // on finishing, whether successful or not,
-        // hide message and show input field again
-        element.style.visibility = 'visible';
-        this._isMounted && this.setState({message: ""});
-        messageEl.style.display = 'none';
-      });
+      this._isMounted && ipcRenderer.send('download', value);
 
     } else if (extReg.test(value)) {
       console.log("Possible local path? " + value);
@@ -1472,6 +1465,7 @@ class MynEditArtwork extends React.Component {
 
   handleRevert() {
     console.log("reverting! " + this.state.original);
+    // this.state.cancelDownload(); // in case there's a download in progress, cancel it
     this.update(this.state.original);
   }
 
