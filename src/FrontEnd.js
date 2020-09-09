@@ -9,6 +9,8 @@ const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const dl = require('./download');
+const omdb = require('../omdb');
+
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -890,10 +892,44 @@ class MynEditor extends MynOpenablePane {
   constructor(props) {
     super(props)
 
+    this.state = {
+      paneID: 'editor-pane',
+      // data: _.cloneDeep(props.video)
+    }
+  }
+
+  createContentJSX() {
+    return (<MynEditorEdit video={this.props.video} />);
+  }
+
+  render() {
+    return super.render(this.createContentJSX());
+  }
+
+}
+
+class MynEditorLookup extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+    }
+  }
+
+
+  render() {
+    return null;
+  }
+}
+
+// edit fields for video object in MynEditor
+class MynEditorEdit extends React.Component {
+  constructor(props) {
+    super(props)
+
     this._isMounted = false;
 
     this.state = {
-      paneID: 'editor-pane',
       data: _.cloneDeep(props.video),
       valid: {},
       validators: {
@@ -1011,7 +1047,7 @@ class MynEditor extends MynOpenablePane {
     this._isMounted = false;
   }
 
-  createContentJSX() {
+  render() {
     const video = this.props.video;
     if (!isValidVideo(video)) {
       console.log("Invalid video passed to editor");
@@ -1295,10 +1331,6 @@ class MynEditor extends MynOpenablePane {
         </form>
       </div>
     );
-  }
-
-  render() {
-    return super.render(this.createContentJSX());
   }
 }
 
