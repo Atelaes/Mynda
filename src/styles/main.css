@@ -885,3 +885,23 @@ input[type=text]#edit-field-title {
   width: 100%;
   text-align: center;
 }
+
+#edit-search {
+  width:100%;
+  display:flex;
+  flex-direction: column;
+}
+
+#edit-search-button {
+  align-self: flex-start;
+}
+
+/* list of search results */
+#edit-search-results {
+  align-self: center;
+}
+
+#edit-search-results tr {
+  cursor:pointer;
+  user-select:none;
+}

@@ -10,6 +10,7 @@ const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const dl = require('./download');
 const omdb = require('../omdb');
+const axios = require('axios');
 
 
 class Mynda extends React.Component {
@@ -892,71 +893,26 @@ class MynEditor extends MynOpenablePane {
   constructor(props) {
     super(props)
 
-    this.state = {
-      paneID: 'editor-pane',
-      // data: _.cloneDeep(props.video)
-    }
-  }
-
-  createContentJSX() {
-    return (<MynEditorEdit video={this.props.video} />);
-  }
-
-  render() {
-    return super.render(this.createContentJSX());
-  }
-
-}
-
-class MynEditorLookup extends React.Component {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-    }
-  }
-
-
-  render() {
-    return null;
-  }
-}
-
-// edit fields for video object in MynEditor
-class MynEditorEdit extends React.Component {
-  constructor(props) {
-    super(props)
-
     this._isMounted = false;
 
     this.state = {
+      paneID: 'editor-pane',
       data: _.cloneDeep(props.video),
-      valid: {},
-      validators: {
-        people: {
-          regex: /^[a-zA-Z0-9_\s\-\.',]+$/,
-          tip: "Allowed: a-z A-Z 0-9 _ - . ' [space]"
-        },
-        descriptors: {
-          regex: /^[a-zA-Z0-9_\-\.]+$/,
-          tip: "Allowed: a-z A-Z 0-9 _ - ."
-        },
-        year: {
-          regex: /^\d{4}$/,
-          tip: "YYYY"
-        },
-        everything: {
-          regex: /.*/,
-          tip: ""
-        }
-      }
+      placeholderImage: "../images/qmark.png",
+      valid: {}
     }
 
     this.render = this.render.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.revertChanges = this.revertChanges.bind(this);
     this.saveChanges = this.saveChanges.bind(this);
-    this.handleValidity = this.handleValidity.bind(this);
+    this.reportValid = this.reportValid.bind(this);
+  }
+
+  reportValid(property,value) {
+    if (typeof value === 'boolean') {
+      this.state.valid[property] = value;
+    }
   }
 
   handleChange(value,prop) {
@@ -1015,12 +971,198 @@ class MynEditorEdit extends React.Component {
     library.replace("media." + index, this.state.data);
   }
 
+  componentDidMount() {
+    this._isMounted = true;
+  }
+
+  componentWillUnmount() {
+    this._isMounted = false;
+  }
+
+  createContentJSX() {
+    // <MynEditorLookup
+    //   video={this.state.data}
+    // />
+
+    return (
+      <div>
+        <MynEditorSearch
+          video={this.state.data}
+          placeholderImage={this.state.placeholderImage}
+        />
+
+        <MynEditorEdit
+          video={this.state.data}
+          handleChange={this.handleChange}
+          revertChanges={this.revertChanges}
+          saveChanges={this.saveChanges}
+          placeholderImage={this.state.placeholderImage}
+          reportValid={this.reportValid}
+        />
+      </div>
+    );
+  }
+
+  render() {
+    return super.render(this.createContentJSX());
+  }
+
+}
+
+class MynEditorSearch extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      results: null
+    }
+
+    this.handleSearch = this.handleSearch.bind(this);
+    this.render = this.render.bind(this);
+  }
+
+  // search online movie database to auto-fill fields
+  handleSearch(event) {
+    event.preventDefault();
+
+    // we want to query the database using the existing field values
+    // of the movie object, if present;
+    // if the title field is empty, we will substitute the file name
+    const filename = this.props.video.filename.match(/[^/]+(?=\.\w{2,4}$)/)[0]; // get just the filename from the path
+    console.log('filename: ' + filename);
+    const titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
+    const yearQuery = this.props.video.year !== '' ? this.props.video.year : null
+    const typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
+
+    // compose query url
+    let urlParts = [`http://www.omdbapi.com/?apikey=${omdb.key}`];
+    urlParts.push(`s=${titleQuery}`);
+    if (yearQuery) urlParts.push(`y=${yearQuery}`);
+    if (typeQuery) urlParts.push(`type=${typeQuery}`);
+
+    // execute query
+    this.executeSearchQuery(urlParts);
+  }
+
+  executeSearchQuery(urlParts) {
+    axios({
+      method: 'get',
+      url: urlParts.join('&'),
+      timeout: 20000,
+    })
+      .then((response) => {
+        console.log(urlParts.join('&'));
+
+        if (response.status !== 200) {
+          return console.log(response.status + ': ' + response.statusText);
+        }
+
+        // if we didn't get any results, try again with fewer search parameters
+        if (response.data.Response == "False" && urlParts.length > 2) {
+          console.log('nothing found, trying again with less');
+          this.executeSearchQuery(urlParts.slice(0, -1));
+          return;
+        }
+
+        this.handleSearchResults(response.data);
+      })
+      .catch((error) => {
+        this.handleSearchResults({Error:error});
+        return;
+      })
+      .then(() => {
+        // always executed
+      });
+  }
+
+  handleSearchResults(results) {
+    if (!results.hasOwnProperty('Response')) {
+      // then there was an error getting the search results;
+      // during testing, just use an alert to tell the user
+      this.setState({results:null});
+      alert('Error getting search results: ' + results.Error);
+    } else if (results.Response === 'False' || !results.hasOwnProperty('Search')) {
+      // then there were no results found
+      // during testing, just use an alert to tell the user
+      this.setState({results:null});
+      alert('No results found! Try editing the title and searching again.');
+    } else {
+      console.log(results);
+      // display search results
+      let movies = results.Search.map((movie) => {
+        if (!isValidURL(movie.Poster)) {
+          movie.Poster = this.props.placeholderImage;
+        }
+
+        return (
+          <tr key={movie.imdbID} onClick={() => (this.chooseResult(movie))}>
+            <td><img src={movie.Poster} width="50" /></td>
+            <td className='title'>{movie.Title}</td>
+            <td className='year'>{movie.Year}</td>
+            <td><a href={`https://www.imdb.com/title/${movie.imdbID}`} target='_blank' onClick={(e) => {e.stopPropagation()}}>IMDb</a></td>
+          </tr>
+        );
+      });
+
+      this.setState({results:movies});
+    }
+  }
+
+  chooseResult(movie) {
+    alert('chose ' + movie.imdbID + '!!');
+  }
+
+  render() {
+    return (
+        <div id='edit-search'>
+          <button id='edit-search-button' onClick={this.handleSearch}>Search</button>
+          <table id='edit-search-results'>
+            <tbody>{this.state.results}</tbody>
+          </table>
+        </div>
+    );
+  }
+}
+
+// edit fields for video object in MynEditor
+class MynEditorEdit extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this._isMounted = false;
+
+    this.state = {
+      // data: _.cloneDeep(props.video),
+      validators: {
+        people: {
+          regex: /^[a-zA-Z0-9_\s\-\.',]+$/,
+          tip: "Allowed: a-z A-Z 0-9 _ - . ' [space]"
+        },
+        descriptors: {
+          regex: /^[a-zA-Z0-9_\-\.]+$/,
+          tip: "Allowed: a-z A-Z 0-9 _ - ."
+        },
+        year: {
+          regex: /^\d{4}$/,
+          tip: "YYYY"
+        },
+        everything: {
+          regex: /.*/,
+          tip: ""
+        }
+      }
+    }
+
+    this.render = this.render.bind(this);
+    this.handleValidity = this.handleValidity.bind(this);
+  }
+
   handleValidity(valid, property, element, tip) {
     if (valid) {
-      this.state.valid[property] = true;
+      this.props.reportValid(property,true);
       element.classList.remove("invalid");
     } else {
-      this.state.valid[property] = false;
+      this.props.reportValid(property,false);
       element.classList.add("invalid");
     }
 
@@ -1062,9 +1204,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.state.data}
+            movie={this.props.video}
             property="title"
-            update={this.handleChange}
+            update={this.props.handleChange}
             options={null}
             validator={this.state.validators.everything.regex}
             validatorTip={this.state.validators.everything.tip}
@@ -1080,9 +1222,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.state.data}
+            movie={this.props.video}
             property="year"
-            update={this.handleChange}
+            update={this.props.handleChange}
             options={null}
             validator={this.state.validators.year.regex}
             validatorTip={this.state.validators.year.tip}
@@ -1098,9 +1240,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.state.data}
+            movie={this.props.video}
             property="director"
-            update={this.handleChange}
+            update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.regex}
             validatorTip={this.state.validators.people.tip}
@@ -1116,9 +1258,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.state.data}
+            movie={this.props.video}
             property="directorsort"
-            update={this.handleChange}
+            update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.regex}
             validatorTip={this.state.validators.people.tip}
@@ -1133,7 +1275,13 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field description'>
         <label className="edit-field-name" htmlFor="description">Description: </label>
         <div className="edit-field-editor">
-          <textarea id="edit-field-description" name="description" value={this.state.data.description} placeholder={'[Description]'} onChange={(e) => this.handleChange(e.target.value,'description')} />
+          <textarea
+            id="edit-field-description"
+            name="description"
+            value={this.props.video.description}
+            placeholder={'[Description]'}
+            onChange={(e) => this.props.handleChange(e.target.value,'description')}
+          />
         </div>
       </div>
     );
@@ -1147,9 +1295,9 @@ class MynEditorEdit extends React.Component {
         <div className="edit-field-editor">
           <div className="select-container">
             <MynEditInlineAddListWidget
-              movie={this.state.data}
+              movie={this.props.video}
               property="tags"
-              update={this.handleChange}
+              update={this.props.handleChange}
               options={["many","tags","happy","joy","existing","already-used"]}
               validator={this.state.validators.descriptors.regex}
               validatorTip={this.state.validators.descriptors.tip}
@@ -1166,8 +1314,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="artwork">Artwork: </label>
         <div className="edit-field-editor">
           <MynEditArtwork
-            movie={this.state.data}
-            update={this.handleChange}
+            movie={this.props.video}
+            update={this.props.handleChange}
+            placeholderImage={this.props.placeholderImage}
           />
         </div>
       </div>
@@ -1179,9 +1328,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="cast">Cast: </label>
         <div className="edit-field-editor">
           <MynEditInlineAddListWidget
-            movie={this.state.data}
+            movie={this.props.video}
             property="cast"
-            update={this.handleChange}
+            update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.regex}
             validatorTip={this.state.validators.people.tip}
@@ -1204,9 +1353,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
         <div className="edit-field-editor select-container select-hovericon">
           <MynEditText
-            movie={this.state.data}
+            movie={this.props.video}
             property="genre"
-            update={this.handleChange}
+            update={this.props.handleChange}
             options={["sci-fi","action","drama","comedy"]}
             validator={this.state.validators.descriptors.regex}
             validatorTip={this.state.validators.descriptors.tip}
@@ -1221,7 +1370,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
-          <select id="edit-field-kind" name="kind" value={this.state.data.kind} onChange={(e) => this.handleChange(e.target.value,'kind')}>
+          <select id="edit-field-kind" name="kind" value={this.props.video.kind} onChange={(e) => this.props.handleChange(e.target.value,'kind')}>
             <option value="movie">movie</option>
             <option value="show">show</option>
             <option value="stand-up">stand-up</option>
@@ -1237,9 +1386,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="dateadded">Date Added: </label>
         <div className="edit-field-editor">
           <MynEditDateWidget
-            movie={this.state.data}
+            movie={this.props.video}
             property="dateadded"
-            update={this.handleChange}
+            update={this.props.handleChange}
             handleValidity={this.handleValidity}
           />
         </div>
@@ -1252,9 +1401,9 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="lastseen">Last Seen: </label>
         <div className="edit-field-editor">
           <MynEditDateWidget
-            movie={this.state.data}
+            movie={this.props.video}
             property="lastseen"
-            update={this.handleChange}
+            update={this.props.handleChange}
             handleValidity={this.handleValidity}
           />
         </div>
@@ -1266,7 +1415,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field seen'>
         <label className='edit-field-name' htmlFor="seen">Seen: </label>
         <div className="edit-field-editor">
-          <MynEditSeenWidget movie={this.state.data} />
+          <MynEditSeenWidget movie={this.props.video} />
         </div>
       </div>
     );
@@ -1276,7 +1425,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field position'>
         <label className="edit-field-name" htmlFor="position">Position: </label>
         <div className="edit-field-editor">
-          <MynEditPositionWidget movie={this.state.data} />
+          <MynEditPositionWidget movie={this.props.video} />
         </div>
       </div>
     );
@@ -1286,7 +1435,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field rating'>
         <label className="edit-field-name" htmlFor="rating">Rating: </label>
         <div className="edit-field-editor">
-          <MynEditRatingWidget movie={this.state.data} />
+          <MynEditRatingWidget movie={this.props.video} />
         </div>
       </div>
     );
@@ -1309,7 +1458,7 @@ class MynEditorEdit extends React.Component {
 
     return (
       <div id="edit-container">
-        <form onSubmit={this.saveChanges}>
+        <form onSubmit={this.props.saveChanges}>
           {title}
           {description}
           {year}
@@ -1326,7 +1475,7 @@ class MynEditorEdit extends React.Component {
           {dateadded}
           {artwork}
           {collections}
-          <button onClick={(e) => this.revertChanges(e)}>Revert to Saved</button>
+          <button onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
           <input type="submit" value="Save" />
         </form>
       </div>
@@ -1400,7 +1549,6 @@ class MynEditArtwork extends React.Component {
 
     this.state = {
       value: "",
-      placeholderImage: "../images/qmark.png",
       message: "",
       revertLink: null,
       original: props.movie.artwork
@@ -1423,7 +1571,7 @@ class MynEditArtwork extends React.Component {
         this.props.update(response.message, "artwork");
       } else {
         console.log("Unable to download file: " + response.message);
-        this.update(this.state.placeholderImage);
+        this.update(this.props.placeholderImage);
       }
 
       // on finishing, whether successful or not,
