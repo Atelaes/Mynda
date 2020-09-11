@@ -891,6 +891,7 @@ input[type=text]#edit-field-title {
   width:100%;
   display:flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #edit-search-button {
@@ -921,8 +922,12 @@ input[type=text]#edit-field-title {
 }
 
 #edit-search-results td {
-  white-space: nowrap;
+  white-space:normal;
   padding: var(--tablecell-padding);
+}
+
+#edit-search-results td.title {
+  overflow:hidden;
 }
 
 #edit-search-results tbody tr:hover {
@@ -957,4 +962,9 @@ input[type=text]#edit-field-title {
 #edit-search-results td.artwork img {
   width:3em;
   height: 4.5em;
+}
+
+.loading-icon {
+  width:1.2rem;
+  height:1.2rem;
 }

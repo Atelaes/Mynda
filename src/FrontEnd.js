@@ -1035,7 +1035,8 @@ class MynEditorSearch extends React.Component {
 
     this.state = {
       results: null,
-      searchBaseURL: `http://www.omdbapi.com/?apikey=${omdb.key}`
+      searchBaseURL: `http://www.omdbapi.com/?apikey=${omdb.key}`,
+      searching: false
     }
 
     this.handleSearch = this.handleSearch.bind(this);
@@ -1067,6 +1068,7 @@ class MynEditorSearch extends React.Component {
   }
 
   executeSearchQuery(urlParts) {
+    this.setState({searching:true});
     axios({
       method: 'get',
       url: urlParts.join('&'),
@@ -1098,6 +1100,7 @@ class MynEditorSearch extends React.Component {
   }
 
   handleSearchResults(results) {
+    this.setState({searching:false});
     if (!results.hasOwnProperty('Response')) {
       // then there was an error getting the search results;
       // during testing, just use an alert to tell the user
@@ -1113,6 +1116,8 @@ class MynEditorSearch extends React.Component {
       console.log(results);
       // display search results
       let movies = results.Search.map((movie) => {
+        if (movie.Type === 'series') return; // don't want to display series results
+
         if (!isValidURL(movie.Poster)) {
           movie.Poster = this.props.placeholderImage;
         }
@@ -1190,10 +1195,10 @@ class MynEditorSearch extends React.Component {
 
   render() {
     let clearBtn = this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
-
+    let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>);
     return (
         <div id='edit-search'>
-          <button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>
+          {searchBtn}
           <table id='edit-search-results'>
             <thead>
               <tr>
