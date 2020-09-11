@@ -557,7 +557,25 @@
   --editartwork-revert-text-hover: var(--med-text);
   --editartwork-revert-textshadow-hover: 0em 0em .05em black, 0em 0em .15em black;
 
+  --editsearch-clearbtn-text-hover: var(--bright-text);
+  --editsearch-clearbtn-textshadow-hover: 0em 0em .1em rgba(220,225,255,.5);
 
+  --editsearch-resultsrow-fontsize: 1rem;
+  --editsearch-resultsrow-bgcolor-hover: initial; /*var(--light-bg);*/
+  --editsearch-resultsrow-bg-hover: linear-gradient(90deg, var(--med-bg) 0%, var(--med-bg-rgba0) 100%);;
+  --editsearch-resultsrow-text-hover: var(--bright-text);
+
+  --editsearch-resultsrow-link-fontsize: .6em;
+  --editsearch-resultsrow-link-text: var(--button-text);
+  --editsearch-resultsrow-link-bgcolor: var(--button-bgcolor);
+  --editsearch-resultsrow-link-bg: ;
+  --editsearch-resultsrow-link-border: var(--button-border);
+  --editsearch-resultsrow-link-borderradius: var(--button-borderradius);
+  --editsearch-resultsrow-link-padding: var(--button-padding);
+  --editsearch-resultsrow-link-text-hover: var(--button-text-hover);
+  --editsearch-resultsrow-link-bgcolor-hover: var(--button-bgcolor-hover);
+  --editsearch-resultsrow-link-bg-hover: var(--button-bg-hover);
+  --editsearch-resultsrow-link-border-hover: var(--button-border-hover);
 }
 
 /******************************************/
@@ -830,3 +848,11 @@ in lieu of that, we will use a negative margin on the selected element instead (
 .list-widget-add {
 
 }
+
+/* #edit-search-results::after {
+  content:'';
+  display:block;
+  margin: 1.5em;
+  width:100%;
+  border-bottom: .3em dotted var(--lighter-bg);
+} */

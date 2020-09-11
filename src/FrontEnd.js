@@ -80,8 +80,13 @@ class Mynda extends React.Component {
         playlist = { "filterFunction" : "false" } // just display nothing
       }
     }
-
-    return this.state.videos.filter(video => eval(playlist.filterFunction))
+    let filteredVids = [];
+    try {
+      filteredVids = this.state.videos.filter(video => eval(playlist.filterFunction))
+    } catch(err) {
+      console.error(`Unable to execute playlist filter: ${err}`);
+    }
+    return filteredVids;
   }
 
   // called from the nav component to change the current playlist
@@ -915,10 +920,24 @@ class MynEditor extends MynOpenablePane {
     }
   }
 
-  handleChange(value,prop) {
-    // console.log('Editing ' + prop);
-    let update = this.state.data;
-    update[prop] = value;
+  // handleChange(value,prop) {
+  //   // console.log('Editing ' + prop);
+  //   let update = this.state.data;
+  //   update[prop] = value;
+  //   this._isMounted && this.setState({data : update});
+  // }
+
+  handleChange(...args) {
+    let update;
+    if (args.length == 2 && typeof args[0] === "string") {
+      update = this.state.data;
+      update[args[0]] = args[1];
+    } else if (args.length == 1 && typeof args[0] === "object") {
+      update = { ...this.state.data, ...args[0] };
+    } else {
+      throw 'Incorrect parameters passed to handleChange in MynEditor';
+    }
+
     this._isMounted && this.setState({data : update});
   }
 
@@ -961,7 +980,7 @@ class MynEditor extends MynOpenablePane {
           console.log('artwork was copied successfully: ' + newArtworkPath);
         }
       });
-      this.handleChange(newArtworkPath,'artwork');
+      this.handleChange({'artwork':newArtworkPath});
       console.log("updated state var: " + this.state.data.artwork);
     }
 
@@ -989,6 +1008,7 @@ class MynEditor extends MynOpenablePane {
         <MynEditorSearch
           video={this.state.data}
           placeholderImage={this.state.placeholderImage}
+          handleChange={this.handleChange}
         />
 
         <MynEditorEdit
@@ -1014,10 +1034,12 @@ class MynEditorSearch extends React.Component {
     super(props)
 
     this.state = {
-      results: null
+      results: null,
+      searchBaseURL: `http://www.omdbapi.com/?apikey=${omdb.key}`
     }
 
     this.handleSearch = this.handleSearch.bind(this);
+    this.clearSearch = this.clearSearch.bind(this);
     this.render = this.render.bind(this);
   }
 
@@ -1035,7 +1057,7 @@ class MynEditorSearch extends React.Component {
     const typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
 
     // compose query url
-    let urlParts = [`http://www.omdbapi.com/?apikey=${omdb.key}`];
+    let urlParts = [this.state.searchBaseURL];
     urlParts.push(`s=${titleQuery}`);
     if (yearQuery) urlParts.push(`y=${yearQuery}`);
     if (typeQuery) urlParts.push(`type=${typeQuery}`);
@@ -1079,7 +1101,8 @@ class MynEditorSearch extends React.Component {
     if (!results.hasOwnProperty('Response')) {
       // then there was an error getting the search results;
       // during testing, just use an alert to tell the user
-      this.setState({results:null});
+      // and clear the previous results
+      this.clearSearch();
       alert('Error getting search results: ' + results.Error);
     } else if (results.Response === 'False' || !results.hasOwnProperty('Search')) {
       // then there were no results found
@@ -1096,28 +1119,93 @@ class MynEditorSearch extends React.Component {
 
         return (
           <tr key={movie.imdbID} onClick={() => (this.chooseResult(movie))}>
-            <td><img src={movie.Poster} width="50" /></td>
+            <td className='artwork'><img src={movie.Poster} width='50' /></td>
             <td className='title'>{movie.Title}</td>
             <td className='year'>{movie.Year}</td>
             <td><a href={`https://www.imdb.com/title/${movie.imdbID}`} target='_blank' onClick={(e) => {e.stopPropagation()}}>IMDb</a></td>
           </tr>
         );
       });
-
       this.setState({results:movies});
     }
   }
 
+  clearSearch() {
+    this.setState({results:null});
+  }
+
   chooseResult(movie) {
+    // first we ask the user to confirm, because this will overwrite any metadata
+    // the movie currently has (although the revert button will still work until
+    // the user saves the changes)
+    // for the moment, we're just sending a browser alert; later we'll make this an electron confirmation dialog
     alert('chose ' + movie.imdbID + '!!');
+    this.clearSearch();
+
+    // next, we have to get the actual movie object from the database
+    axios({
+      method: 'get',
+      url: this.state.searchBaseURL + '&i=' + movie.imdbID,
+      timeout: 20000,
+    })
+      .then((response) => {
+        if (response.status !== 200) {
+          return console.log(response.status + ': ' + response.statusText);
+        }
+
+        console.log(response.data);
+        if (response.data.Response === 'False') {
+          return console.log('Error: no result found: ' + response.data);
+        } else {
+          // if we're here, we have the movie, so all we have to do is overwrite
+          // the existing values with the new ones;
+          const newData = {
+            title: response.data.Title,
+            description: response.data.Plot,
+            artwork: response.data.Poster, // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
+            year: response.data.Year,
+            director: response.data.Director,
+            directorsort: /^\w+\s\w+$/.test(response.data.Director) ? response.data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : response.data.Director, // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
+            genre: response.data.Genre.split(', ')[0], // just pick the first genre for genre, since we only allow one
+            tags: Array.from(new Set(response.data.Genre.split(', ').map((item) => item.toLowerCase()).concat(this.props.video.tags))), // add new tags to existing tags, removing duplicates
+            kind: response.data.Type === 'episode' ? 'show' : response.data.Type,
+            cast: response.data.Actors.split(', '),
+            duration: parseInt(response.data.Runtime) * 60,
+            country: response.data.Country,
+            language: response.data.Language.split(', '),
+            mpaa: response.data.Rated,
+            boxoffice: parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+          };
+          console.log(newData);
+          this.props.handleChange(newData);
+        }
+      })
+      .catch((error) => {
+        return console.log(error);
+      })
+      .then(() => {
+        // always executed
+      });
   }
 
   render() {
+    let clearBtn = this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
+
     return (
         <div id='edit-search'>
-          <button id='edit-search-button' onClick={this.handleSearch}>Search</button>
+          <button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>
           <table id='edit-search-results'>
-            <tbody>{this.state.results}</tbody>
+            <thead>
+              <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>{clearBtn}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {this.state.results}
+            </tbody>
           </table>
         </div>
     );
@@ -1280,7 +1368,7 @@ class MynEditorEdit extends React.Component {
             name="description"
             value={this.props.video.description}
             placeholder={'[Description]'}
-            onChange={(e) => this.props.handleChange(e.target.value,'description')}
+            onChange={(e) => this.props.handleChange({'description':e.target.value})}
           />
         </div>
       </div>
@@ -1341,7 +1429,7 @@ class MynEditorEdit extends React.Component {
     );
 
     /* GENRE */
-    // <input id="edit-field-genre" type="text" name="genre" value={this.state.data.genre} list="used-genres" onChange={(e) => this.handleChange(e.target.value,'genre')} />
+    // <input id="edit-field-genre" type="text" name="genre" value={this.state.data.genre} list="used-genres" onChange={(e) => this.handleChange({'genre':e.target.value})} />
     // <datalist id="used-genres">
     //   <option value="sci-fi" />
     //   <option value="action" />
@@ -1370,7 +1458,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
-          <select id="edit-field-kind" name="kind" value={this.props.video.kind} onChange={(e) => this.props.handleChange(e.target.value,'kind')}>
+          <select id="edit-field-kind" name="kind" value={this.props.video.kind} onChange={(e) => this.props.handleChange({'kind':e.target.value})}>
             <option value="movie">movie</option>
             <option value="show">show</option>
             <option value="stand-up">stand-up</option>
@@ -1502,7 +1590,7 @@ class MynEditText extends React.Component {
       // console.log('validation error!');
       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
     }
-    this.props.update(value,this.props.property);
+    this.props.update(this.props.property,value);
   }
 
   componentDidUpdate(oldProps) {
@@ -1556,6 +1644,8 @@ class MynEditArtwork extends React.Component {
     }
 
     this.revert = React.createRef();
+    this.input = React.createRef();
+    this.dlMsg = React.createRef();
     this.container = React.createRef();
 
     ipcRenderer.on('editor-artwork-selected', (event, image) => {
@@ -1568,7 +1658,7 @@ class MynEditArtwork extends React.Component {
 
     ipcRenderer.on('downloaded', (event, response) => {
       if (response.success) {
-        this.props.update(response.message, "artwork");
+        this.props.update({'artwork':response.message});
       } else {
         console.log("Unable to download file: " + response.message);
         this.update(this.props.placeholderImage);
@@ -1576,11 +1666,9 @@ class MynEditArtwork extends React.Component {
 
       // on finishing, whether successful or not,
       // hide message and show input field again
-      let messageEl = document.getElementById('edit-field-artwork-dl-msg');
-      let inputEl = document.getElementById('edit-field-artwork');
-      inputEl.style.visibility = 'visible';
+      this.input.current.style.visibility = 'visible';
       this._isMounted && this.setState({message: ""});
-      messageEl.style.display = 'none';
+      this.dlMsg.current.style.display = 'none';
 
     });
 
@@ -1591,9 +1679,6 @@ class MynEditArtwork extends React.Component {
   }
 
   handleInput(event) {
-    let messageEl = document.getElementById('edit-field-artwork-dl-msg');
-    let element = event.target;
-
     // update value as it's entered
     let value = event.target.value;
     this._isMounted && this.setState({value:value});
@@ -1603,12 +1688,7 @@ class MynEditArtwork extends React.Component {
       console.log("Valid URL? " + value);
       // then this is a valid url with an image extension at the end
       // try to download it
-
-      // hide the input element and display message while downloading
-      element.style.visibility = 'hidden'
-      this._isMounted && this.setState({message: "downloading"});
-      messageEl.style.display = 'block';
-      this._isMounted && ipcRenderer.send('download', value);
+      this.download(value);
 
     } else if (extReg.test(value)) {
       console.log("Possible local path? " + value);
@@ -1619,6 +1699,16 @@ class MynEditArtwork extends React.Component {
       // do nothing?
     }
 
+  }
+
+  download(url) {
+    // hide the input element and display message while downloading
+    this.input.current.style.visibility = 'hidden'
+    this._isMounted && this.setState({message: "downloading"});
+    this.dlMsg.current.style.display = 'block';
+
+    // download
+    this._isMounted && ipcRenderer.send('download', url);
   }
 
   handleLocalFile(path) {
@@ -1635,7 +1725,7 @@ class MynEditArtwork extends React.Component {
   update(path) {
     this._isMounted && this.setState({value:''});
 
-    this.props.update(path,'artwork');
+    this.props.update({'artwork':path});
   }
 
   handleBrowse(event) {
@@ -1664,11 +1754,14 @@ class MynEditArtwork extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    // console.log("component updated");
-    // if (oldProps.movie.artwork !== this.props.movie.artwork) {
-    //   console.log("updating state");
-    //   this.setState({value:this.props.movie.artwork});
-    // }
+    console.log("component updated");
+
+    // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
+    // then we want to download it, and point the movie metadata to the downloaded local file instead
+    if (oldProps.movie.artwork !== this.props.movie.artwork && isValidURL(this.props.movie.artwork)) {
+      console.log("artwork changed from outside?!");
+      this.download(this.props.movie.artwork);
+    }
   }
 
   componentDidMount(props) {
@@ -1734,8 +1827,8 @@ class MynEditArtwork extends React.Component {
           onMouseLeave={(e) => this.imageOut(e)}
         />
         <div>
-          <input type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder="Paste path/URL" onChange={(e) => this.handleInput(e)} />
-          <div id="edit-field-artwork-dl-msg" style={{display:"none"}}>{this.state.message}</div>
+          <input ref={this.input} type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder="Paste path/URL" onChange={(e) => this.handleInput(e)} />
+          <div ref={this.dlMsg} id="edit-field-artwork-dl-msg" style={{display:"none"}}>{this.state.message}</div>
         </div>
         <div id="edit-field-artwork-buttons">
           <div ref={this.revert} onClick={() => this.handleRevert()} className="edit-field-revert"></div>
@@ -1837,7 +1930,7 @@ class MynEditWidgetCheckmark extends MynEditGraphicalWidget {
   // }
 }
 
-// ######  ###### //
+// ###### Graphical editor for the 'seen' checkmark ###### //
 class MynEditSeenWidget extends MynEditWidgetCheckmark {
   constructor(props) {
     super(props)
@@ -1850,7 +1943,7 @@ class MynEditSeenWidget extends MynEditWidgetCheckmark {
   }
 }
 
-// ######  ###### //
+// ###### Graphical editor for the 5-star user rating ###### //
 class MynEditRatingWidget extends MynEditGraphicalWidget {
   constructor(props) {
     super(props)
@@ -1885,7 +1978,7 @@ class MynEditRatingWidget extends MynEditGraphicalWidget {
   // }
 }
 
-// ######  ###### //
+// ###### Graphical editor for the 'position' attribute ###### //
 class MynEditPositionWidget extends MynEditGraphicalWidget {
   constructor(props) {
     super(props)
@@ -1991,7 +2084,7 @@ class MynEditListWidget extends MynEditWidget {
 
   updateList(list) {
     this.setState({ list : list });
-    this.props.update(list,this.props.property);
+    this.props.update(this.props.property,list);
   }
 
   deleteItem(index) {
@@ -2179,19 +2272,19 @@ class MynEditDateWidget extends MynEditWidget {
       // if field is empty, reset to valid, pass null to parent
       if (value === "") {
         this.handleValidity(true);
-        this.props.update(null,this.props.property);
+        this.props.update(this.props.property,null);
 
       // if field is a valid date, reset to valid, pass timestamp of date to parent
       } else if (this.isValidDate(date)) {
         let timestamp = Math.round(date.getTime() / 1000);
         this.handleValidity(true, date.toString("M/d/yyyy, hh:mm:ss tt"));//date.toString().replace(/\sGMT.*$/,''));
-        this.props.update(timestamp,this.props.property);
+        this.props.update(this.props.property,timestamp);
 
       // if we're here, whatever's in the field is invalid; reset to invalid,
       // pass null to parent;
       } else {
         this.handleValidity(false, "Invalid Date");
-        this.props.update(null,this.props.property);
+        this.props.update(this.props.property,null);
       }
     } catch(error) {
       console.log(error);

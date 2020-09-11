@@ -32,7 +32,7 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-.collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row {
+.collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row, .clickable {
   cursor: pointer;
   user-select: none;
 }
@@ -472,6 +472,7 @@ th, tr, td {
   display: inline-block;
   cursor:pointer;
   user-select: none;
+  z-index: 9999;
   position: var(--editbutton-position);
   top: var(--editbutton-top);
   bottom: var(--editbutton-bottom);
@@ -896,12 +897,64 @@ input[type=text]#edit-field-title {
   align-self: flex-start;
 }
 
-/* list of search results */
-#edit-search-results {
-  align-self: center;
+#edit-search-clear-button {
+  /* align-self: flex-end; */
+  font-size: 1rem;
 }
 
-#edit-search-results tr {
+#edit-search-clear-button:hover {
+  color: var(--editsearch-clearbtn-text-hover);
+  text-shadow: var(--editsearch-clearbtn-textshadow-hover);
+}
+
+/* list of search results */
+/* table element */
+#edit-search-results {
+  align-self: center;
+  border-collapse: collapse;
+}
+
+#edit-search-results tbody tr {
   cursor:pointer;
   user-select:none;
+  font-size: var(--editsearch-resultsrow-fontsize);
+}
+
+#edit-search-results td {
+  white-space: nowrap;
+  padding: var(--tablecell-padding);
+}
+
+#edit-search-results tbody tr:hover {
+  background: var(--editsearch-resultsrow-bg-hover);
+  background-color: var(--editsearch-resultsrow-bgcolor-hover);
+  color: var(--editsearch-resultsrow-text-hover);
+}
+
+#edit-search-results td a {
+  display: block;
+  text-decoration: none;
+  font-size: var(--editsearch-resultsrow-link-fontsize);
+  color: var(--editsearch-resultsrow-link-color);
+  background: var(--editsearch-resultsrow-link-bg);
+  background-color: var(--editsearch-resultsrow-link-bgcolor);
+  border: var(--editsearch-resultsrow-link-border);
+  border-radius: var(--editsearch-resultsrow-link-borderradius);
+  padding: var(--editsearch-resultsrow-link-padding);
+}
+
+#edit-search-results td a:hover {
+  color: var(--editsearch-resultsrow-link-color-hover);
+  background: var(--editsearch-resultsrow-link-bg-hover);
+  background-color: var(--editsearch-resultsrow-link-bgcolor-hover);
+  border: var(--editsearch-resultsrow-link-border-hover);
+}
+
+#edit-search-results td.artwork {
+  padding-left:0em;
+}
+
+#edit-search-results td.artwork img {
+  width:3em;
+  height: 4.5em;
 }
