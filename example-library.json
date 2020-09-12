@@ -62,18 +62,22 @@ library = {
   ],
   "collections" : [
     {
+      "id" : "0",
       "name" : "Marvel Cinematic Universe",
       "collections" : [
         {
+          "id" : "0-0",
           "name" : "Avengers Movies",
           "videos" : [
             { "id":2, "order":1 }
           ]
         },
         {
+          "id" : "0-1",
           "name" : "Phases",
           "collections" : [
             {
+              "id" : "0-1-0",
               "name" : "Phase 1",
               "videos" : [
                 { "id":2, "order":6 },
@@ -83,9 +87,11 @@ library = {
           ]
         },
         {
+          "id" : "0-2",
           "name" : "Characters",
           "collections" : [
             {
+              "id" : "0-2-0",
               "name" : "Iron Man",
               "videos" : [
                 { "id":3, "order":1 }
@@ -96,9 +102,11 @@ library = {
       ]
     },
     {
+      "id" : "1",
       "name" : "Star Trek: The Next Generation",
       "collections" : [
         {
+          "id" : "1-0",
           "name" : "Season 5",
           "videos" : [
             { "id" : 4, "order" : 25},
@@ -106,6 +114,7 @@ library = {
           ]
         },
         {
+          "id" : "1-1",
           "name" : "Season 6",
           "videos" : [
             { "id" : 7, "order" : 1}
@@ -114,6 +123,7 @@ library = {
       ]
     },
     {
+      "id" : "2",
       "name" : "Matrix Movies",
       "videos" : [
         { "id" : 0, "order" : 1}
@@ -151,6 +161,7 @@ library = {
       "filename" : "~/Movies/thematrix.mp4",
       "collections" : [
         {
+          "id" : 2,
           "name" : "Matrix Movies",
           "order" : 1
         }
@@ -220,16 +231,20 @@ library = {
       "artwork" : "../artwork/The_Avengers.jpg",
       "collections" : [
         {
+          "id" : "0",
           "name" : "Marvel Cinematic Universe",
           "collections" : [
             {
+              "id" : "0-0",
               "name" : "Avengers Movies",
               "order" : 1
             },
             {
+              "id" : "0-1",
               "name" : "Phases",
               "collections" : [
                 {
+                  "id" : "0-1-0",
                   "name" : "Phase 1",
                   "order" : 6
                 }
@@ -263,21 +278,26 @@ library = {
       "filename" : "~/Movies/Iron Man.mp4",
       "collections" : [
         {
+          "id" : "0",
           "name" : "Marvel Cinematic Universe",
           "collections" : [
             {
+              "id" : "0-2",
               "name" : "Characters",
               "collections" : [
                 {
+                  "id" : "0-2-0",
                   "name" : "Iron Man",
                   "order" : 1
                 }
               ]
             },
             {
+              "id" : "0-1",
               "name" : "Phases",
               "collections" : [
                 {
+                  "id" : "0-1-0",
                   "name" : "Phase 1",
                   "order" : 1
                 }
@@ -314,9 +334,11 @@ library = {
       "filename" : "~/TV Shows/Star Trek TNG/Season 5/25 - The Inner Light.mpeg",
       "collections" : [
         {
+          "id" : "1",
           "name" : "Star Trek: The Next Generation",
           "collections" : [
             {
+              "id" : "1-0",
               "name" : "Season 5",
               "order" : 25
             }
@@ -377,9 +399,11 @@ library = {
       "filename" : "~/TV Shows/Star Trek TNG/Season 5/26 - Times Arrow Part 1.mpeg",
       "collections" : [
         {
+          "id" : "1",
           "name" : "Star Trek: The Next Generation",
           "collections" : [
             {
+              "id" : "1-0",
               "name" : "Season 5",
               "order" : 26
             }
@@ -416,9 +440,11 @@ library = {
       "filename" : "~/TV Shows/Star Trek TNG/Season 6/01 - Times Arrow Part 2.mpeg",
       "collections" : [
         {
+          "id" : "1",
           "name" : "Star Trek: The Next Generation",
           "collections" : [
             {
+              "id" : "1-1",
               "name" : "Season 6",
               "order" : 1
             }

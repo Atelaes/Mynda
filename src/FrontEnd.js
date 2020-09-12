@@ -973,7 +973,8 @@ class MynEditor extends MynOpenablePane {
     if (this._isMounted) {
       const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
       const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.data.artwork.match(/.\w{3,4}$/)[0]);
-      fs.copyFile(this.state.data.artwork, newArtworkPath, (err) => {
+      const oldArtworkPath = path.resolve(__dirname, this.state.data.artwork); // create the correct absolute path, in case it was a relative one
+      fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
         if (err) {
           console.error(err);
         } else {
@@ -1538,7 +1539,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field collections'>
         <label className="edit-field-name" htmlFor="collections">Collections: </label>
         <div className="edit-field-editor">
-          [Coming Soon to a Mynda Near You!!!]
+          <MynEditCollections video={this.props.video} update={this.props.handleChange} />
         </div>
       </div>
     );
@@ -1571,6 +1572,158 @@ class MynEditorEdit extends React.Component {
           <button onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
           <input type="submit" value="Save" />
         </form>
+      </div>
+    );
+  }
+}
+
+class MynEditCollections extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+    }
+
+    this.render = this.render.bind(this);
+    this.addCollection = this.addCollection.bind(this);
+
+  }
+
+  createAddCollectionBtn(parentID) {
+    return (
+      <div
+        className="collection-add clickable"
+        onClick={this.showAddField}
+        title="Add a sub-collection to this collection"
+      >
+        {"\uFE62"}
+      </div>
+    )
+  }
+
+  showAddField(event) {
+    event.target.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
+  }
+
+  addCollection(event, name, parentID) {
+    event.preventDefault();
+
+    // make a deep copy of the whole collections object for this video,
+    // we will alter the copy, and then update the video object with the copy
+    let copy = _.cloneDeep(this.props.video.collections);
+
+    // find the parent collection object by traversing the parentID
+    let parent = copy;
+    // console.log(parent);
+    let map = parentID.split('-');
+    map.map((nodeIndex, index) => {
+      console.log(parent);
+      if (index < map.length - 1) {
+        parent = parent[nodeIndex].collections;
+      } else {
+        parent = parent[nodeIndex];
+      }
+    });
+
+    // if parent.order then this is a terminal node.
+    // since non-terminal nodes cannot contain videos, and adding a child to this collection
+    // will make it no longer terminal, we must warn the user;
+    // in particular because there may be other videos occupying this node as well,
+    // and adding a child will erase them from this collection
+    let order;
+    if (parent.order) {
+      // later we'll make this into a proper confirmation dialog
+      alert('Warning! AAAHHHH what are you doing!?!!!');
+
+      order = parent.order;
+      delete parent.order;
+      parent.collections = [];
+    }
+
+    event.target.parentNode.querySelector('input').value = "";
+    event.target.parentNode.style.display = "none";
+
+    // create new collection to be added
+    let newCollection = {
+      id : parentID + '-' + parent.collections.length,
+      name : name,
+      order : 0
+    };
+
+    // if the parent was a terminal node, we'll take the order property for this video
+    // from that node and make it the order property for this video of this node instead
+    // otherwise we'll just default to an order of 0 and let the user edit it after the update
+    if (order) {
+      newCollection.order = order;
+    }
+    parent.collections.push(newCollection);
+
+    // console.log(copy);
+
+    // do the update
+    this.props.update({'collections':copy});
+  }
+
+  // addToCollection(collectionID, video, order) {
+  //
+  // }
+
+  deleteFromCollection(collection) {
+    alert('deleting from collection ' + collection.name);
+  }
+
+  createCollectionNode(collection, index) {
+    let contents;
+    // if this collection has child collections
+    if (collection.collections) {
+      try {
+        // recurse on those children
+        contents = collection.collections.map((child, index) => this.createCollectionNode(child, index));
+      } catch(err) {
+        contents = "[Error: sub-collections found, but unable to display]";
+        console.error(contents + ': ' + err);
+      }
+    } else {
+      // this collection does not have child collections
+      // which means it's a terminal node, so display the movie order and the delete button
+      try {
+        contents = (
+          <div className="collection-terminal-node">
+            <div className="collection-order">order: {collection.order}</div>
+            <div className="delete-btn clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
+          </div>
+        );
+      } catch(err) {
+        contents = "[Error: unable to find terminal node]";
+        console.error(contents + ': ' + err);
+      }
+    }
+
+    return (
+      <div className="collection" key={index}>
+        <div className="collection-name">{collection.name}</div>
+        {this.createAddCollectionBtn(collection.id)}
+        <div className="add-collection-form" style={{display:"none"}}>
+          <input type="text" name="name" placeholder="Collection Name" />
+          <button onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('input').value,collection.id)}>Add</button>
+        </div>
+        {contents}
+      </div>
+    );
+  }
+
+  render() {
+    let collections;
+    if (this.props.video.collections && this.props.video.collections.length > 0) {
+      collections = this.props.video.collections.map((child, index) => this.createCollectionNode(child, index));
+    } else {
+      collections = (<div>[No Collections]</div>);
+    }
+
+    return (
+      <div className="top-level">
+      {this.state.addCollectionBtn}
+      {collections}
       </div>
     );
   }
