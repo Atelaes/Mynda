@@ -349,7 +349,7 @@ class MynLibrary extends React.Component {
           // add the 'order' property to each movie for this collection
           // (making a deep copy of each movie object)
           movies = movies.map(movie => {
-            const movieCopy = JSON.parse(JSON.stringify(movie));
+            const movieCopy = _.cloneDeep(movie); //JSON.parse(JSON.stringify(movie));
             movieCopy.order = videos.filter(collectionVideo => (collectionVideo.id === movieCopy.id))[0].order;
             // console.log(JSON.stringify(movieCopy));
             return movieCopy;
