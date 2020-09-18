@@ -193,7 +193,7 @@ class Mynda extends React.Component {
         stateObj[name] = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={() => {this.hideOpenablePane(name)}}/>
         break;
       case "editorPane":
-        stateObj[name] = <MynEditor video={this.state.detailMovie} hideFunction={() => {this.hideOpenablePane(name)}}/>
+        stateObj[name] = <MynEditor video={this.state.detailMovie} collections={this.state.collections} hideFunction={() => {this.hideOpenablePane(name)}}/>
         break;
     };
     this.setState(stateObj);
@@ -326,14 +326,14 @@ class MynLibrary extends React.Component {
       }
     } else {
       // we're at a bottom-level collection
-      let flag = false;
+      let vidsWereFound = false;
       let videos = []
       try {
         // if this collection has a video in our playlist
         for (let i=0; i<object.videos.length; i++) {
           if (this.props.movies.filter(movie => (object.videos[i].id === movie.id)).length > 0) {
             videos.push(object.videos[i]);
-            flag = true;
+            vidsWereFound = true;
           }
         }
       } catch(e) {
@@ -341,7 +341,7 @@ class MynLibrary extends React.Component {
       }
       // if the flag is true, that means there were videos from our playlist
       // in this collection, so wrap them in JSX and return them upward
-      if (flag) {
+      if (vidsWereFound) {
         // find only the movie objects (from the playlist) that match the videos found in this collection
         let movies = this.props.movies.filter(movie => (videos.filter(collectionVideo => (collectionVideo.id === movie.id)).length > 0))
         // console.log('movies: ' + JSON.stringify(movies) + '\nVideos from collection: ' + JSON.stringify(videos));
@@ -1014,6 +1014,7 @@ class MynEditor extends MynOpenablePane {
 
         <MynEditorEdit
           video={this.state.data}
+          collections={this.props.collections}
           handleChange={this.handleChange}
           revertChanges={this.revertChanges}
           saveChanges={this.saveChanges}
@@ -1539,7 +1540,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field collections'>
         <label className="edit-field-name" htmlFor="collections">Collections: </label>
         <div className="edit-field-editor">
-          <MynEditCollections video={this.props.video} update={this.props.handleChange} />
+          <MynEditCollections video={this.props.video} collections={this.props.collections} update={this.props.handleChange} />
         </div>
       </div>
     );
@@ -1585,7 +1586,7 @@ class MynEditCollections extends React.Component {
     }
 
     this.render = this.render.bind(this);
-    this.addCollection = this.addCollection.bind(this);
+    // this.addCollection = this.addCollection.bind(this);
 
   }
 
@@ -1605,64 +1606,100 @@ class MynEditCollections extends React.Component {
     event.target.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
   }
 
-  addCollection(event, name, parentID) {
+  addCollection(event, name, parent) {
     event.preventDefault();
 
-    // make a deep copy of the whole collections object for this video,
-    // we will alter the copy, and then update the video object with the copy
-    let copy = _.cloneDeep(this.props.video.collections);
+    // get the parent collection of the one we're going to add
+    // let parent = this.getCollectionObject(parentID)
 
-    // find the parent collection object by traversing the parentID
-    let parent = copy;
-    // console.log(parent);
-    let map = parentID.split('-');
-    map.map((nodeIndex, index) => {
-      console.log(parent);
-      if (index < map.length - 1) {
-        parent = parent[nodeIndex].collections;
-      } else {
-        parent = parent[nodeIndex];
-      }
-    });
+    // get the collection object the user wants to add
+    let collection = parent.collections.filter(collection => collection.name === name)[0];
 
-    // if parent.order then this is a terminal node.
-    // since non-terminal nodes cannot contain videos, and adding a child to this collection
-    // will make it no longer terminal, we must warn the user;
-    // in particular because there may be other videos occupying this node as well,
-    // and adding a child will erase them from this collection
-    let order;
-    if (parent.order) {
-      // later we'll make this into a proper confirmation dialog
-      alert('Warning! AAAHHHH what are you doing!?!!!');
+    // if this is not a terminal node,
+    if (collection.collections) {
 
-      order = parent.order;
-      delete parent.order;
-      parent.collections = [];
+      // reveal the jsx for that collection
+      document.getElementById("collection-" + collection.id).style.display = 'block';
+
+      // add a dropdown form for the children
+      // let names = collection.collections.map(child => child.name);
+      // event.target.parentNode.parentNode.appendChild(this.createAddNodeForm(names));
+
+      // if this is a terminal node
+      // all we have to do is add this video to this node and trigger a re-render
+    } else if (collection.videos) {
+      console.log('adding this video to ' + collection.name + '!!!');
+      // actually we'll have to ask the user what order they want at some point
+      let order = 9000;
+
+      let updated = this.props.video.collections;
+      updated[collection.id] = order;
+      this.props.update({ collections : updated});
+
+      // and then we have to remember to update the settings collections map to match
+      // collection.videos.push({ "id":this.props.video.id, "order":order });
+      console.error('WARNING! video object was updated, but master collections object in settings was not. Thus, the change will not be reflected in the edit view, among other problems.');
     }
-
-    event.target.parentNode.querySelector('input').value = "";
-    event.target.parentNode.style.display = "none";
-
-    // create new collection to be added
-    let newCollection = {
-      id : parentID + '-' + parent.collections.length,
-      name : name,
-      order : 0
-    };
-
-    // if the parent was a terminal node, we'll take the order property for this video
-    // from that node and make it the order property for this video of this node instead
-    // otherwise we'll just default to an order of 0 and let the user edit it after the update
-    if (order) {
-      newCollection.order = order;
-    }
-    parent.collections.push(newCollection);
-
-    // console.log(copy);
-
-    // do the update
-    this.props.update({'collections':copy});
   }
+
+  // addCollection(event, name, parentID) {
+  //   event.preventDefault();
+  //
+  //   // make a deep copy of the whole collections object for this video,
+  //   // we will alter the copy, and then update the video object with the copy
+  //   let copy = _.cloneDeep(this.props.video.collections);
+  //
+  //   // find the parent collection object by traversing the parentID
+  //   let parent = copy;
+  //   // console.log(parent);
+  //   let map = parentID.split('-');
+  //   map.map((nodeIndex, index) => {
+  //     console.log(parent);
+  //     if (index < map.length - 1) {
+  //       parent = parent[nodeIndex].collections;
+  //     } else {
+  //       parent = parent[nodeIndex];
+  //     }
+  //   });
+  //
+  //   // if parent.order then this is a terminal node.
+  //   // since non-terminal nodes cannot contain videos, and adding a child to this collection
+  //   // will make it no longer terminal, we must warn the user;
+  //   // in particular because there may be other videos occupying this node as well,
+  //   // and adding a child will erase them from this collection
+  //   let order;
+  //   if (parent.order) {
+  //     // later we'll make this into a proper confirmation dialog
+  //     alert('Warning! AAAHHHH what are you doing!?!!!');
+  //
+  //     order = parent.order;
+  //     delete parent.order;
+  //     parent.collections = [];
+  //   }
+  //
+  //   event.target.parentNode.querySelector('input').value = "";
+  //   event.target.parentNode.style.display = "none";
+  //
+  //   // create new collection to be added
+  //   let newCollection = {
+  //     id : parentID + '-' + parent.collections.length,
+  //     name : name,
+  //     order : 0
+  //   };
+  //
+  //   // if the parent was a terminal node, we'll take the order property for this video
+  //   // from that node and make it the order property for this video of this node instead
+  //   // otherwise we'll just default to an order of 0 and let the user edit it after the update
+  //   if (order) {
+  //     newCollection.order = order;
+  //   }
+  //   parent.collections.push(newCollection);
+  //
+  //   // console.log(copy);
+  //
+  //   // do the update
+  //   this.props.update({'collections':copy});
+  // }
 
   // addToCollection(collectionID, video, order) {
   //
@@ -1672,57 +1709,224 @@ class MynEditCollections extends React.Component {
     alert('deleting from collection ' + collection.name);
   }
 
-  createCollectionNode(collection, index) {
-    let contents;
-    // if this collection has child collections
-    if (collection.collections) {
-      try {
-        // recurse on those children
-        contents = collection.collections.map((child, index) => this.createCollectionNode(child, index));
-      } catch(err) {
-        contents = "[Error: sub-collections found, but unable to display]";
-        console.error(contents + ': ' + err);
+  getCollectionObject(id) {
+    // initially set collection to the root of the master collection object
+    // (well, it's an array, so we wrap it in an object)
+    // then we'll walk down the tree using the id, which is descriptive of the tree structure
+    let collection = {collections : this.props.collections};
+
+    // find the collection object by traversing the id
+    let map = id.split('-');
+    map.map((nodeIndex, index) => {
+      console.log(collection);
+      if (index < map.length - 1) {
+        collection = collection[nodeIndex].collections;
+      } else {
+        collection = collection[nodeIndex];
       }
-    } else {
-      // this collection does not have child collections
-      // which means it's a terminal node, so display the movie order and the delete button
-      try {
-        contents = (
-          <div className="collection-terminal-node">
-            <div className="collection-order">order: {collection.order}</div>
-            <div className="delete-btn clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
-          </div>
-        );
-      } catch(err) {
-        contents = "[Error: unable to find terminal node]";
-        console.error(contents + ': ' + err);
-      }
-    }
+    });
+
+    // return the collection
+    return collection;
+  }
+
+  createAddNodeForm(options,collection) {
+    options = options.map(option => (<option key={option}>{option}</option>));
 
     return (
-      <div className="collection" key={index}>
-        <div className="collection-name">{collection.name}</div>
-        {this.createAddCollectionBtn(collection.id)}
-        <div className="add-collection-form" style={{display:"none"}}>
-          <input type="text" name="name" placeholder="Collection Name" />
-          <button onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('input').value,collection.id)}>Add</button>
-        </div>
-        {contents}
+      <div className="add-collection-form" style={{display:"none"}}>
+        <select name="name">{options}</select>
+        <button onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('select').value,collection)}>Add</button>
       </div>
     );
   }
 
+  // createCollectionNode(collection, index) {
+  //   let contents;
+  //   // if this collection has child collections
+  //   if (collection.collections) {
+  //     try {
+  //       // recurse on those children
+  //       contents = collection.collections.map((child, index) => this.createCollectionNode(child, index));
+  //     } catch(err) {
+  //       contents = "[Error: sub-collections found, but unable to display]";
+  //       console.error(contents + ': ' + err);
+  //     }
+  //   } else {
+  //     // this collection does not have child collections
+  //     // which means it's a terminal node, so display the movie order and the delete button
+  //     try {
+  //       contents = (
+  //         <div className="collection-terminal-node">
+  //           <div className="collection-order">order: {collection.order}</div>
+  //           <div className="delete-btn clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
+  //         </div>
+  //       );
+  //     } catch(err) {
+  //       contents = "[Error: unable to find terminal node]";
+  //       console.error(contents + ': ' + err);
+  //     }
+  //   }
+  //
+  //   return (
+  //     <div className="collection" key={index}>
+  //       <div className="collection-name">{collection.name}</div>
+  //       {this.createAddCollectionBtn(collection.id)}
+  //       <div className="add-collection-form" style={{display:"none"}}>
+  //         <input type="text" name="name" placeholder="Collection Name" />
+  //         <button onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('input').value,collection.id)}>Add</button>
+  //       </div>
+  //       {contents}
+  //     </div>
+  //   );
+  // }
+
+  // create display of tree of collections in which this movie participates
+  createCollectionsMap() {
+    console.log("Creating new collections map");
+    return this.props.collections.map(collection => (this.findCollections(collection))).map(result => result.jsx);
+  }
+
+  // recursive function that walks down the collections and returns each branch
+  // as JSX if and only if it contains this video
+  findCollections(collection) {
+    let results = []
+    let childrenOpts = []
+    let show = false;
+
+    // if this object contains sub-collections, then it's a non-terminal node,
+    // so we recurse on its children
+    if (collection.collections) {
+      // loop through the subcollections and call ourselves recursively on each one
+      for (let i=0; i<collection.collections.length; i++) {
+        let child = this.findCollections(collection.collections[i]);
+        // add child to results array
+        results.push(child);
+
+        // if this child isn't being shown (i.e. our video isn't in its branch)
+        // add it to the list of options to display to the user for adding the video to its branch
+        if (child.show === false) {
+          childrenOpts.push(collection.collections[i].name);
+        }
+      }
+      // if there are no sub-collections within this collection
+      // there should be videos (if not, something went wrong)
+      // if there are videos, test whether one of them is this video
+      // and if it is, add the video JSX to the results array
+    } else if (collection.videos) {
+      // we're at a bottom-level collection
+      try {
+        let collectionVid = collection.videos.filter((video) => (video.id == this.props.video.id))[0];
+        let order;
+        if (collectionVid) {
+          order = collectionVid.order;
+          show = true; // if our video was in this collection, show the node, otherwise hide it
+        } else {
+          show = false;
+        }
+
+        let contents;
+        try {
+          // create JSX for the terminal node. If our video is not in this collection,
+          // the order will be null, but nothing will be displayed anyway
+          contents = (
+            <div key={'terminal-' + collection.id} className="collection-terminal-node">
+              <div className="collection-order">order: {order}</div>
+              <div className="delete-btn clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
+            </div>
+          );
+        } catch(err) {
+          contents = "[Error: unable to display terminal node]";
+          console.error(contents + ': ' + err);
+        }
+        results.push({jsx: contents});
+      } catch(err) {
+        console.error("Error, no videos found in this terminal collection node. That should not happen (malformed collections object in library settings?): " + e.toString());
+      }
+    }
+
+    // if there were any collections returned from the level below,
+    // or any videos found at this level, they will be in the results array;
+    // place them within this collection and return them upward to the next level;
+    // if our video was in this branch,
+    if (results.length > 0) {
+      // if any results have their 'show' as positive
+      // set show here to true
+      for (const result of results) {
+        if (result.show === true) {
+          show = true;
+          break;
+        }
+      }
+
+      return {
+        show: show,
+        jsx: (
+          <div key={collection.id} className="collection" id={"collection-" + collection.id} style={{display: show ? 'block' : 'none'}}>
+            <div className="collection-name">{collection.name}</div>
+            {this.createAddCollectionBtn(collection.id)}
+            {this.createAddNodeForm(childrenOpts,collection)}
+            {results.map(result => result.jsx)}
+          </div>
+      )};
+      // return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden">{results}</div></div>);
+    } else {
+      // if there were no sub-collections found, or in the case of a terminal node,
+      // if there none of the videos was this video, return null
+      return null;
+    }
+    // let vidsWereFound = false;
+    // let videos = []
+    // try {
+    //   // if this collection contains our video
+    //   for (let i=0; i<collection.videos.length; i++) {
+    //     if (this.props.movies.filter(movie => (collection.videos[i].id === movie.id)).length > 0) {
+    //       videos.push(object.videos[i]);
+    //       vidsWereFound = true;
+    //     }
+    //   }
+    // } catch(e) {
+    //   console.log("Error, no videos found in this collection: " + e.toString());
+    // }
+    // // if the flag is true, that means there were videos from our playlist
+    // // in this collection, so wrap them in JSX and return them upward
+    // if (vidsWereFound) {
+    //   // find only the movie objects (from the playlist) that match the videos found in this collection
+    //   let movies = this.props.movies.filter(movie => (videos.filter(collectionVideo => (collectionVideo.id === movie.id)).length > 0))
+    //   // console.log('movies: ' + JSON.stringify(movies) + '\nVideos from collection: ' + JSON.stringify(videos));
+    //   try {
+    //     // add the 'order' property to each movie for this collection
+    //     // (making a deep copy of each movie object)
+    //     movies = movies.map(movie => {
+    //       const movieCopy = _.cloneDeep(movie); //JSON.parse(JSON.stringify(movie));
+    //       movieCopy.order = videos.filter(collectionVideo => (collectionVideo.id === movieCopy.id))[0].order;
+    //       // console.log(JSON.stringify(movieCopy));
+    //       return movieCopy;
+    //     });
+    //     // console.log(JSON.stringify(movies))
+    //   } catch(e) {
+    //     console.log('Error assigning order to videos in collection ' + object.name + ': ' + e.toString());
+    //   }
+    //   // console.log(JSON.stringify(movies));
+    //   // wrap the movies in the last collection div,
+    //   // then hand them off to MynLibTable with an initial sort by 'order'
+    //   return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
+    // } else {
+    //   return null;
+    // }
+  }
+
   render() {
     let collections;
-    if (this.props.video.collections && this.props.video.collections.length > 0) {
-      collections = this.props.video.collections.map((child, index) => this.createCollectionNode(child, index));
+    if (this.props.video.collections && Object.keys(this.props.video.collections).length > 0) {
+      collections = this.createCollectionsMap();
     } else {
       collections = (<div>[No Collections]</div>);
     }
 
     return (
       <div className="top-level">
-      {this.state.addCollectionBtn}
+      {this.createAddCollectionBtn(null)}
       {collections}
       </div>
     );
@@ -1912,7 +2116,7 @@ class MynEditArtwork extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    console.log("component updated");
+    console.log("artwork component updated");
 
     // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
     // then we want to download it, and point the movie metadata to the downloaded local file instead

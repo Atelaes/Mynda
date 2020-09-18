@@ -56,7 +56,7 @@ library = {
     {
       "id" : 2,
       "name" : "Sci-Fi",
-      "filterFunction" : "video.tags.match(/(?:^| )sci-fi(?: |$)/i)",
+      "filterFunction" : "video.tags.includes('sci-fi')",
       "view" : "flat"
     }
   ],
@@ -159,13 +159,9 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/thematrix.jpg",
       "filename" : "~/Movies/thematrix.mp4",
-      "collections" : [
-        {
-          "id" : 2,
-          "name" : "Matrix Movies",
-          "order" : 1
-        }
-      ]
+      "collections" : {
+        "2" : 1
+      }
     },
     {
       "id" : 1,
@@ -196,7 +192,7 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/MV5BM2I1ZWU4YjMtYzU0My00YmMzLWFmNTAtZDJhZGYwMmI3YWQ5XkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SY1000_CR0,0,666,1000_AL_.jpg",
       "filename" : "~/Movies/seventhseal.mkv",
-      "collections" : []
+      "collections" : {}
     },
     {
       "id" : 2,
@@ -229,30 +225,10 @@ library = {
       "kind" : "movie",
       "filename" : "~/Movies/TheAvengers.divx",
       "artwork" : "../artwork/The_Avengers.jpg",
-      "collections" : [
-        {
-          "id" : "0",
-          "name" : "Marvel Cinematic Universe",
-          "collections" : [
-            {
-              "id" : "0-0",
-              "name" : "Avengers Movies",
-              "order" : 1
-            },
-            {
-              "id" : "0-1",
-              "name" : "Phases",
-              "collections" : [
-                {
-                  "id" : "0-1-0",
-                  "name" : "Phase 1",
-                  "order" : 6
-                }
-              ]
-            }
-          ]
-        }
-      ]
+      "collections" : {
+        "0-0" : 1,
+        "0-1-0" : 6
+      }
     },
     {
       "id" : 3,
@@ -276,36 +252,10 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/Iron_Man.jpg",
       "filename" : "~/Movies/Iron Man.mp4",
-      "collections" : [
-        {
-          "id" : "0",
-          "name" : "Marvel Cinematic Universe",
-          "collections" : [
-            {
-              "id" : "0-2",
-              "name" : "Characters",
-              "collections" : [
-                {
-                  "id" : "0-2-0",
-                  "name" : "Iron Man",
-                  "order" : 1
-                }
-              ]
-            },
-            {
-              "id" : "0-1",
-              "name" : "Phases",
-              "collections" : [
-                {
-                  "id" : "0-1-0",
-                  "name" : "Phase 1",
-                  "order" : 1
-                }
-              ]
-            }
-          ]
-        }
-      ]
+      "collections" : {
+        "0-2-0" : 1,
+        "0-1-0" : 1
+      }
     },
     {
       "id" : 4,
@@ -332,19 +282,9 @@ library = {
       "kind" : "show",
       "artwork" : "../artwork/theinnerlight.jpg",
       "filename" : "~/TV Shows/Star Trek TNG/Season 5/25 - The Inner Light.mpeg",
-      "collections" : [
-        {
-          "id" : "1",
-          "name" : "Star Trek: The Next Generation",
-          "collections" : [
-            {
-              "id" : "1-0",
-              "name" : "Season 5",
-              "order" : 25
-            }
-          ]
-        }
-      ]
+      "collections" : {
+        "1-0" : 25
+      }
     },
     {
       "id" : 5,
@@ -369,7 +309,7 @@ library = {
       "kind" : "movie",
       "artwork" : "../artwork/MV5BMmE1OWZjYjctYzZlNi00YmEyLTg4YWYtZDc4NTE2ODZlYzhhXkEyXkFqcGdeQXVyNzc5MjA3OA@@._V1_SY1000_CR0,0,651,1000_AL_.jpg",
       "filename" : "~/Movies/Buckaroo.mp4",
-      "collections" : []
+      "collections" : {}
     },
     {
       "id" : 6,
@@ -397,19 +337,9 @@ library = {
       "kind" : "show",
       "artwork" : "../artwork/MV5BNjU1N2VjNGEtYWQ1Yi00ZjYxLTlhMjMtZDM3OGNhMjI1ZjljXkEyXkFqcGdeQXVyMjQ3MjU3NTU@._V1_SY1000_CR0,0,1329,1000_AL_.jpg",
       "filename" : "~/TV Shows/Star Trek TNG/Season 5/26 - Times Arrow Part 1.mpeg",
-      "collections" : [
-        {
-          "id" : "1",
-          "name" : "Star Trek: The Next Generation",
-          "collections" : [
-            {
-              "id" : "1-0",
-              "name" : "Season 5",
-              "order" : 26
-            }
-          ]
-        }
-      ]
+      "collections" : {
+        "1-0" : 26
+      }
     },
     {
       "id" : 7,
@@ -438,19 +368,9 @@ library = {
       "kind" : "show",
       "artwork" : "../artwork/MV5BNDY0OTY1YjAtYzQxOS00YjFhLTliNjctOTYzNWU4YmRhZjhmXkEyXkFqcGdeQXVyMjQ3MjU3NTU@._V1_UY268_CR87,0,182,268_AL_.jpg",
       "filename" : "~/TV Shows/Star Trek TNG/Season 6/01 - Times Arrow Part 2.mpeg",
-      "collections" : [
-        {
-          "id" : "1",
-          "name" : "Star Trek: The Next Generation",
-          "collections" : [
-            {
-              "id" : "1-1",
-              "name" : "Season 6",
-              "order" : 1
-            }
-          ]
-        }
-      ]
+      "collections" : {
+        "1-1" : 1
+      }
     }
   ]
 }
