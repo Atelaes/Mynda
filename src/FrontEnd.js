@@ -902,7 +902,8 @@ class MynEditor extends MynOpenablePane {
 
     this.state = {
       paneID: 'editor-pane',
-      data: _.cloneDeep(props.video),
+      video: _.cloneDeep(props.video),
+      collections: _.cloneDeep(props.collections),
       placeholderImage: "../images/qmark.png",
       valid: {}
     }
@@ -922,29 +923,77 @@ class MynEditor extends MynOpenablePane {
 
   // handleChange(value,prop) {
   //   // console.log('Editing ' + prop);
-  //   let update = this.state.data;
+  //   let update = this.state.video;
   //   update[prop] = value;
   //   this._isMounted && this.setState({data : update});
   // }
 
   handleChange(...args) {
+    console.log("UPDATING");
+
     let update;
     if (args.length == 2 && typeof args[0] === "string") {
-      update = this.state.data;
+      update = this.state.video;
       update[args[0]] = args[1];
     } else if (args.length == 1 && typeof args[0] === "object") {
-      update = { ...this.state.data, ...args[0] };
+      update = { ...this.state.video, ...args[0] };
     } else {
       throw 'Incorrect parameters passed to handleChange in MynEditor';
     }
 
-    this._isMounted && this.setState({data : update});
+    this._isMounted && this.setState({video : update});
+
+    // in addition to updating the video object, in the special case that the collections were changed,
+    // we need to update the master collections object in library.settings
+    if (args[0] == "collections" || args[0].collections) { // collections was updated
+      // console.log("args[0] == " + JSON.stringify(args[0]));
+      const collectionUpdate = args[1] || args[0].collections;
+      // console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
+      // console.log("original collections == " + JSON.stringify(this.state.video.collections));
+
+      let collectionsCopy = _.cloneDeep(this.state.collections);
+
+      // add video to any new collections
+      const addedIDs = Object.keys(collectionUpdate).filter((key) => !Object.keys(this.state.video.collections).includes(key));
+      // console.log(`addedIDs == ${addedIDs}`);
+      for (const id of addedIDs) {
+        let collection = getCollectionObject(id, collectionsCopy, false);
+        if (collection) {
+          collection.videos.push({
+            id: this.state.video.id,
+            order: collectionUpdate[id]
+          });
+        } else {
+          console.error(`Unable to add ${this.state.video.title} to collection ${id}. Unable to retrieve collection object from that id.`);
+        }
+      }
+
+      // delete video from any deleted collections
+      Object.keys(this.state.video.collections).forEach((id) => {
+        if (!Object.keys(collectionUpdate).includes(id)) {
+          let collection = getCollectionObject(id, collectionsCopy, false);
+          if (collection) {
+            collection.videos = collection.videos.filter(video => video.id !== this.state.video.id);
+          } else {
+            console.error(`Unable to remove ${this.state.video.title} from collection ${id}. Unable to retrieve collection object from that id.`);
+          }
+        }
+      });
+
+      // console.log("collections after change: " + JSON.stringify(collectionsCopy));
+      this._isMounted && this.setState({collections : collectionsCopy});
+    }
   }
 
   revertChanges(event) {
     // console.log('reverting...');
     event.preventDefault();
-    this._isMounted && this.setState({data : _.cloneDeep(this.props.video)});
+    this._isMounted && this.setState(
+      {
+        video : _.cloneDeep(this.props.video),
+        collections : _.cloneDeep(this.props.collections)
+      }
+    );
   }
 
   saveChanges(event) {
@@ -972,8 +1021,8 @@ class MynEditor extends MynOpenablePane {
     // saved in a temp folder (in the case that it was downloaded from a URL)
     if (this._isMounted) {
       const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
-      const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.data.artwork.match(/.\w{3,4}$/)[0]);
-      const oldArtworkPath = path.resolve(__dirname, this.state.data.artwork); // create the correct absolute path, in case it was a relative one
+      const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.video.artwork.match(/.\w{3,4}$/)[0]);
+      const oldArtworkPath = path.resolve(__dirname, this.state.video.artwork); // create the correct absolute path, in case it was a relative one
       fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
         if (err) {
           console.error(err);
@@ -982,13 +1031,20 @@ class MynEditor extends MynOpenablePane {
         }
       });
       this.handleChange({'artwork':newArtworkPath});
-      console.log("updated state var: " + this.state.data.artwork);
+      console.log("updated state var: " + this.state.video.artwork);
     }
 
     /* Submit */
     // console.log('saving...');
+
+    // first, save the video object
     let index = library.media.findIndex((video) => video.id === this.props.video.id);
-    library.replace("media." + index, this.state.data);
+    library.replace("media." + index, this.state.video);
+
+    // then, if any collections were changed, save the collections object
+    if (!_.isEqual(this.props.collections,this.state.collections)) {
+      library.replace("collections", this.state.collections);
+    }
   }
 
   componentDidMount() {
@@ -1001,20 +1057,20 @@ class MynEditor extends MynOpenablePane {
 
   createContentJSX() {
     // <MynEditorLookup
-    //   video={this.state.data}
+    //   video={this.state.video}
     // />
 
     return (
       <div>
         <MynEditorSearch
-          video={this.state.data}
+          video={this.state.video}
           placeholderImage={this.state.placeholderImage}
           handleChange={this.handleChange}
         />
 
         <MynEditorEdit
-          video={this.state.data}
-          collections={this.props.collections}
+          video={this.state.video}
+          collections={this.state.collections}
           handleChange={this.handleChange}
           revertChanges={this.revertChanges}
           saveChanges={this.saveChanges}
@@ -1382,8 +1438,8 @@ class MynEditorEdit extends React.Component {
     );
 
     /* TAGS */
-    // <MynEditListWidget movie={this.state.data} property="tags" update={this.handleChange} />
-    // <MynEditAddToList movie={this.state.data} property="tags" update={this.handleChange} validator={/^[a-zA-Z0-9_\-\.]+$/} options={["many","tags","happy","joy","existing","already-used"]} />
+    // <MynEditListWidget movie={this.state.video} property="tags" update={this.handleChange} />
+    // <MynEditAddToList movie={this.state.video} property="tags" update={this.handleChange} validator={/^[a-zA-Z0-9_\-\.]+$/} options={["many","tags","happy","joy","existing","already-used"]} />
     let tags = (
       <div className='edit-field tags'>
         <label className="edit-field-name" htmlFor="tags">Tags: </label>
@@ -1436,7 +1492,7 @@ class MynEditorEdit extends React.Component {
     );
 
     /* GENRE */
-    // <input id="edit-field-genre" type="text" name="genre" value={this.state.data.genre} list="used-genres" onChange={(e) => this.handleChange({'genre':e.target.value})} />
+    // <input id="edit-field-genre" type="text" name="genre" value={this.state.video.genre} list="used-genres" onChange={(e) => this.handleChange({'genre':e.target.value})} />
     // <datalist id="used-genres">
     //   <option value="sci-fi" />
     //   <option value="action" />
@@ -1603,7 +1659,7 @@ class MynEditCollections extends React.Component {
   }
 
   showAddField(event) {
-    event.target.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
+    event.target.parentNode.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
   }
 
   addCollection(event, name, parent) {
@@ -1632,13 +1688,10 @@ class MynEditCollections extends React.Component {
       // actually we'll have to ask the user what order they want at some point
       let order = 9000;
 
-      let updated = this.props.video.collections;
+      let updated = _.cloneDeep(this.props.video.collections);
       updated[collection.id] = order;
-      this.props.update({ collections : updated});
-
-      // and then we have to remember to update the settings collections map to match
-      // collection.videos.push({ "id":this.props.video.id, "order":order });
-      console.error('WARNING! video object was updated, but master collections object in settings was not. Thus, the change will not be reflected in the edit view, among other problems.');
+      this.props.update({ collections : updated });
+      // the update function will take care of updating the library.collections object to correspond to our edit
     }
   }
 
@@ -1709,27 +1762,6 @@ class MynEditCollections extends React.Component {
     alert('deleting from collection ' + collection.name);
   }
 
-  getCollectionObject(id) {
-    // initially set collection to the root of the master collection object
-    // (well, it's an array, so we wrap it in an object)
-    // then we'll walk down the tree using the id, which is descriptive of the tree structure
-    let collection = {collections : this.props.collections};
-
-    // find the collection object by traversing the id
-    let map = id.split('-');
-    map.map((nodeIndex, index) => {
-      console.log(collection);
-      if (index < map.length - 1) {
-        collection = collection[nodeIndex].collections;
-      } else {
-        collection = collection[nodeIndex];
-      }
-    });
-
-    // return the collection
-    return collection;
-  }
-
   createAddNodeForm(options,collection) {
     options = options.map(option => (<option key={option}>{option}</option>));
 
@@ -1787,8 +1819,8 @@ class MynEditCollections extends React.Component {
     return this.props.collections.map(collection => (this.findCollections(collection))).map(result => result.jsx);
   }
 
-  // recursive function that walks down the collections and returns each branch
-  // as JSX if and only if it contains this video
+  // recursive function that walks down the collections and returns each branch as JSX
+  // if it contains this video, display it to the user, otherwise hide it
   findCollections(collection) {
     let results = []
     let childrenOpts = []
@@ -1811,8 +1843,9 @@ class MynEditCollections extends React.Component {
       }
       // if there are no sub-collections within this collection
       // there should be videos (if not, something went wrong)
-      // if there are videos, test whether one of them is this video
-      // and if it is, add the video JSX to the results array
+      // if there are videos, add the terminal node JSX to the results array
+      // test whether one of the videos is this video
+      // and if it is, show the terminal node; otherwise, hide it
     } else if (collection.videos) {
       // we're at a bottom-level collection
       try {
@@ -1863,10 +1896,14 @@ class MynEditCollections extends React.Component {
         show: show,
         jsx: (
           <div key={collection.id} className="collection" id={"collection-" + collection.id} style={{display: show ? 'block' : 'none'}}>
-            <div className="collection-name">{collection.name}</div>
-            {this.createAddCollectionBtn(collection.id)}
+            <div className="collection-header">
+              <div className="collection-name">{collection.name}</div>
+              {this.createAddCollectionBtn(collection.id)}
+            </div>
             {this.createAddNodeForm(childrenOpts,collection)}
-            {results.map(result => result.jsx)}
+            <div className="children">
+              {results.map(result => result.jsx)}
+            </div>
           </div>
       )};
       // return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden">{results}</div></div>);
@@ -2215,27 +2252,18 @@ class MynEditGraphicalWidget extends React.Component {
     this.render = this.render.bind(this);
   }
 
-  // finds first element with targetClass, either the element itself,
-  // or the nearest of its ancestors; this prevents bubbling problems
-  // by ensuring that we know which element we're operating on,
-  // instead of relying on event.target, which could be a child element
-  findNearestOfClass(element, targetClass) {
-    while (!element.classList.contains(targetClass) && (element = element.parentElement));
-    return element;
-  }
-
   updateValue(value, event) {
     console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
     event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     this.props.movie[this.state.property] = value;
     // event.target.parentNode.classList.remove('over');
-    this.findNearestOfClass(event.target,"edit-widget").classList.remove('over');
+    findNearestOfClass(event.target,"edit-widget").classList.remove('over');
   }
 
   mouseOver(value,event) {
     this.updateGraphic(value);
     // event.target.parentNode.classList.add('over');
-    this.findNearestOfClass(event.target,"edit-widget").classList.add('over');
+    findNearestOfClass(event.target,"edit-widget").classList.add('over');
   }
 
   mouseOut(target,event) {
@@ -2353,15 +2381,8 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
     this.render = this.render.bind(this);
   }
 
-  // finds first element with targetClass, either the element itself,
-  // or the nearest of its ancestors; this prevents bubbling problems
-  findNearestOfClass(element, targetClass) {
-    while (!element.classList.contains(targetClass) && (element = element.parentElement));
-    return element;
-  }
-
   getPositionFromMouse(event) {
-    let target = this.findNearestOfClass(event.target,'position-outer');
+    let target = findNearestOfClass(event.target,'position-outer');
     let widgetX = window.scrollX + target.getBoundingClientRect().left;
     let widgetWidth = target.clientWidth;
     let mouseX = event.clientX;
@@ -2388,7 +2409,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
     let graphic = (
       <div className="position-outer"
         onMouseMove={(e) => this.updatePosition(e)}
-        onMouseLeave={(e) => this.mouseOut(this.findNearestOfClass(event.target,'position-outer').parentElement,e)}
+        onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
         onClick={(e) => this.updateValue(position,e)} >
           <div className="position-inner" style={{width:(position / this.props.movie.duration * 100) + "%"}} />
       </div>
@@ -2406,15 +2427,6 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
 class MynEditWidget extends React.Component {
   constructor(props) {
     super(props)
-  }
-
-  // finds first element with targetClass, either the element itself,
-  // or the nearest of its ancestors; this prevents bubbling problems
-  // by ensuring that we know which element we're operating on,
-  // instead of relying on event.target, which could be a child element
-  findNearestOfClass(element, targetClass) {
-    while (!element.classList.contains(targetClass) && (element = element.parentElement));
-    return element;
   }
 
   // handleInputValidity(valid, event) {
@@ -2480,7 +2492,7 @@ class MynEditListWidget extends MynEditWidget {
 // ######  ###### //
 
 //<MynEditAddToList
-//movie={this.state.data}
+//movie={this.state.video}
 //property="cast"
 //validator={/.*/g}
 //options={null} />
@@ -2572,7 +2584,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
   }
 }
 
-// <MynEditDateWidget movie={this.state.data} property="cast" update={this.handleChange} />
+// <MynEditDateWidget movie={this.state.video} property="cast" update={this.handleChange} />
 class MynEditDateWidget extends MynEditWidget {
   constructor(props) {
     super(props)
@@ -2714,6 +2726,50 @@ function isValidURL(s) {
     return false;
   }
 }
+
+// finds first element with targetClass, either the element itself,
+// or the nearest of its ancestors; this prevents bubbling problems
+// by ensuring that we know which element we're operating on,
+// instead of relying on event.target, which could be a child element
+function findNearestOfClass(element, targetClass) {
+  while (!element.classList.contains(targetClass) && (element = element.parentElement));
+  return element;
+}
+
+// finds and returns a collection object in <collectionsRoot> from its id (<id>);
+// if <copy> (a boolean) is true, return a copy instead of the original;
+// <collectionsRoot> should be (optionally a copy of) the entire library.collections array;
+function getCollectionObject(id, collectionsRoot, copy) {
+  // initially set collections to the root of the master collections array
+  // then we'll walk down the tree using the id, which is descriptive of the tree structure
+  let collections = collectionsRoot;
+
+  // split the id into an array that we can loop over
+  const map = id.split('-');
+
+  // find the collection object by traversing the id
+  let result;
+  try {
+    map.map((nodeIndex, index) => {
+      try {
+        result = collections[nodeIndex];
+        if (collections[nodeIndex].collections) {
+          collections = collections[nodeIndex].collections;
+        }
+      } catch (err) {
+        throw `Could not find collection object: failed at element ${index} of ${map}. ${err}`;
+      }
+    });
+  } catch(err) {
+    console.error(err);
+    // in case of error, return nothing
+    return;
+  }
+
+  // return the collection
+  return copy ? _.cloneDeep(result) : result;
+}
+
 
 const library = new Library;
 ReactDOM.render(<Mynda library={library} />, document.getElementById('root'));

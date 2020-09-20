@@ -67,6 +67,11 @@
   z-index: calc(var(--openablepane-zindex) + 2);
 }
 
+#edit-search {
+  position:relative;
+  z-index: calc(var(--openablepane-zindex) + 3);
+}
+
 /* transparent element to obscure the other panes in the background */
 .openable-pane::before {
   content: "";

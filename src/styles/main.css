@@ -962,9 +962,18 @@ input[type=text]#edit-field-title {
 #edit-search-results td.artwork img {
   width:3em;
   height: 4.5em;
+  opacity: .7;
+}
+
+#edit-search-results tbody tr:hover td.artwork img {
+  opacity: 1;
 }
 
 .loading-icon {
   width:1.2rem;
   height:1.2rem;
+}
+
+#editor-pane .collection-header * {
+  display: inline-block;
 }

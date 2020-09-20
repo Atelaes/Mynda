@@ -780,6 +780,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 /* actual image of artwork */
 #edit-artwork-image {
   opacity:.7;
+  border-radius: var(--editor-textinput-borderradius-radius) var(--editor-textinput-borderradius-radius) 0em 0em;
 }
 
 #edit-field-artwork-dl-msg:after {
