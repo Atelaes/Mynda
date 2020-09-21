@@ -1659,7 +1659,12 @@ class MynEditCollections extends React.Component {
   }
 
   showAddField(event) {
-    event.target.parentNode.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
+    try {
+      findNearestOfClass(event.target,'collection').getElementsByClassName("add-collection-form")[0].style.display = "block";
+      // event.target.parentNode.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
+    } catch(err) {
+      console.error('There are no subcollections to add to');
+    }
   }
 
   addCollection(event, name, parent) {
@@ -1676,29 +1681,39 @@ class MynEditCollections extends React.Component {
       // if no parent was passed, we take it from the top level
       parentList = this.props.collections;
     }
-    let collection = parentList.filter(collection => collection.name === name)[0]
 
-    // if this is not a terminal node,
-    if (collection.collections) {
+    let collection;
+    try {
+      collection = parentList.filter(collection => collection.name === name)[0];
+    } catch(err) {
+      console.error('This collection has no subcollections');
+    }
 
-      // reveal the jsx for that collection
-      document.getElementById("collection-" + collection.id).style.display = 'block';
+    try {
+      // if this is not a terminal node,
+      if (collection.collections) {
 
-      // add a dropdown form for the children
-      // let names = collection.collections.map(child => child.name);
-      // event.target.parentNode.parentNode.appendChild(this.createAddNodeForm(names));
+        // reveal the jsx for that collection
+        document.getElementById("collection-" + collection.id).style.display = 'block';
 
-      // if this is a terminal node
-      // all we have to do is add this video to this node and trigger a re-render
-    } else if (collection.videos) {
-      console.log('adding this video to ' + collection.name + '!!!');
-      // actually we'll have to ask the user what order they want at some point
-      let order = 9000;
+        // add a dropdown form for the children
+        // let names = collection.collections.map(child => child.name);
+        // event.target.parentNode.parentNode.appendChild(this.createAddNodeForm(names));
 
-      let updated = _.cloneDeep(this.props.video.collections);
-      updated[collection.id] = order;
-      this.props.update({ collections : updated });
-      // the update function will take care of updating the library.collections object to correspond to our edit
+        // if this is a terminal node
+        // all we have to do is add this video to this node and trigger a re-render
+      } else if (collection.videos) {
+        console.log('adding this video to ' + collection.name + '!!!');
+        // actually we'll have to ask the user what order they want at some point
+        let order = 9000;
+
+        let updated = _.cloneDeep(this.props.video.collections);
+        updated[collection.id] = order;
+        this.update({ collections : updated });
+        // the update function will take care of updating the library.collections object to correspond to our edit
+      }
+    } catch(err) {
+      console.error('Unable to add collection: ' + err);
     }
   }
 
@@ -1770,18 +1785,22 @@ class MynEditCollections extends React.Component {
 
     let collectionUpdate = _.cloneDeep(this.props.video.collections);
     delete collectionUpdate[collection.id];
-    this.props.update({ collections : collectionUpdate });
+    this.update({ collections : collectionUpdate });
   }
 
   createAddNodeForm(options,collection) {
     options = options.map(option => (<option key={option}>{option}</option>));
 
-    return (
-      <div className="add-collection-form" style={{display:"none"}}>
-        <select name="name">{options}</select>
-        <button onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('select').value,collection)}>Add</button>
-      </div>
-    );
+    if (options.length > 0) {
+      return (
+        <div className="add-collection-form" style={{display:"none"}}>
+          <select name="name">{options}</select>
+          <button className="editor-inline-button" onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('select').value,collection)}>{"\uFE62"}</button>
+        </div>
+      );
+    } else {
+      return null;
+    }
   }
 
   // createCollectionNode(collection, index) {
@@ -1909,9 +1928,9 @@ class MynEditCollections extends React.Component {
           <div key={collection.id} className="collection" id={"collection-" + collection.id} style={{display: show ? 'block' : 'none'}}>
             <div className="collection-header">
               <div className="collection-name">{collection.name}</div>
-              {this.createAddCollectionBtn(collection.id)}
+              {childrenOpts.length > 0 ? this.createAddCollectionBtn(collection.id) : null}
             </div>
-            {this.createAddNodeForm(childrenOpts,collection)}
+            {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,collection) : null}
             <div className="children">
               {results.map(result => result.jsx)}
             </div>
@@ -1964,6 +1983,13 @@ class MynEditCollections extends React.Component {
     // }
   }
 
+  update(prop) {
+    // hide the add forms
+    Array.from(document.getElementById('editor-pane').getElementsByClassName('add-collection-form')).forEach(form => {form.style.display = 'none'});
+
+    this.props.update(prop);
+  }
+
   render() {
     let collections;
     if (this.props.video.collections && Object.keys(this.props.video.collections).length > 0) {
@@ -1978,8 +2004,8 @@ class MynEditCollections extends React.Component {
 
     return (
       <div className="top-level collection">
-      {this.createAddCollectionBtn(null)}
-      {this.createAddNodeForm(childrenOpts,null)}
+      {childrenOpts.length > 0 ? this.createAddCollectionBtn(null) : null}
+      {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,null) : null}
       <div className="children">
         {collections}
       </div>
@@ -2578,7 +2604,7 @@ class MynEditAddToList extends MynEditListWidget {
     return (
       <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "")}>
         <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." minLength="1" onChange={(e) => this.handleInput(e)} />
-        <button onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
+        <button className="editor-inline-button" onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
         {options}
       </div>
     );

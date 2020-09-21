@@ -800,7 +800,8 @@ input[type=text]#edit-field-title {
   padding: var(--listwidgetadd-input-padding); */
 }
 
-.list-widget-add button {
+/* .list-widget-add button { */
+.editor-inline-button {
   outline: none;
   cursor: pointer;
   user-select: none;
@@ -823,6 +824,10 @@ input[type=text]#edit-field-title {
   width: var(--listwidgetadd-button-width);
   margin: var(--listwidgetadd-button-margin);
   padding: var(--listwidgetadd-button-padding);
+}
+
+.editor-inline-button:hover {
+  border: var(--listwidgetadd-button-border);
 }
 
 /* dropdown icons that occurs in the same input as an add button
