@@ -1669,7 +1669,14 @@ class MynEditCollections extends React.Component {
     // let parent = this.getCollectionObject(parentID)
 
     // get the collection object the user wants to add
-    let collection = parent.collections.filter(collection => collection.name === name)[0];
+    let parentList;
+    if (parent) {
+      parentList = parent.collections;
+    } else {
+      // if no parent was passed, we take it from the top level
+      parentList = this.props.collections;
+    }
+    let collection = parentList.filter(collection => collection.name === name)[0]
 
     // if this is not a terminal node,
     if (collection.collections) {
@@ -1759,7 +1766,11 @@ class MynEditCollections extends React.Component {
   // }
 
   deleteFromCollection(collection) {
-    alert('deleting from collection ' + collection.name);
+    // alert('deleting from collection ' + collection.name);
+
+    let collectionUpdate = _.cloneDeep(this.props.video.collections);
+    delete collectionUpdate[collection.id];
+    this.props.update({ collections : collectionUpdate });
   }
 
   createAddNodeForm(options,collection) {
@@ -1961,10 +1972,17 @@ class MynEditCollections extends React.Component {
       collections = (<div>[No Collections]</div>);
     }
 
+    // get list of top-level collections that this video does not belong within,
+    // in order to display as dropdown options when the user clicks the top level + button
+    let childrenOpts = this.props.collections.filter(collection => Object.keys(this.props.video.collections).filter(key => key.split('-')[0] === collection.id).length == 0).map(collection => collection.name);
+
     return (
-      <div className="top-level">
+      <div className="top-level collection">
       {this.createAddCollectionBtn(null)}
-      {collections}
+      {this.createAddNodeForm(childrenOpts,null)}
+      <div className="children">
+        {collections}
+      </div>
       </div>
     );
   }
