@@ -1297,6 +1297,10 @@ class MynEditorEdit extends React.Component {
           regex: /^\d{4}$/,
           tip: "YYYY"
         },
+        posint: {
+          regex: { test: v => Number.isInteger(Number(v)) && v>0 },
+          tip: "Positive integer"
+        },
         everything: {
           regex: /.*/,
           tip: ""
@@ -1596,7 +1600,14 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field collections'>
         <label className="edit-field-name" htmlFor="collections">Collections: </label>
         <div className="edit-field-editor">
-          <MynEditCollections video={this.props.video} collections={this.props.collections} update={this.props.handleChange} />
+          <MynEditCollections
+            video={this.props.video}
+            collections={this.props.collections}
+            update={this.props.handleChange}
+            validator={this.state.validators.posint.regex}
+            validatorTip={this.state.validators.posint.tip}
+            handleValidity={this.handleValidity}
+          />
         </div>
       </div>
     );
@@ -1704,8 +1715,15 @@ class MynEditCollections extends React.Component {
         // all we have to do is add this video to this node and trigger a re-render
       } else if (collection.videos) {
         console.log('adding this video to ' + collection.name + '!!!');
-        // actually we'll have to ask the user what order they want at some point
-        let order = 9000;
+
+        // initially, set the order to the smallest unused order number in this collection;
+        // the user can edit it to whatever they want afterwards
+        let order = 0;
+        let used = true;
+        while (used) {
+          order++;
+          used = collection.videos.filter(vid => vid.order == order).length > 0;
+        }
 
         let updated = _.cloneDeep(this.props.video.collections);
         updated[collection.id] = order;
@@ -1879,10 +1897,8 @@ class MynEditCollections extends React.Component {
     } else if (collection.videos) {
       // we're at a bottom-level collection
       try {
-        let collectionVid = collection.videos.filter((video) => (video.id == this.props.video.id))[0];
-        let order;
-        if (collectionVid) {
-          order = collectionVid.order;
+        let index = collection.videos.findIndex(video => video.id == this.props.video.id);
+        if (index !== -1) {
           show = true; // if our video was in this collection, show the node, otherwise hide it
         } else {
           show = false;
@@ -1891,11 +1907,11 @@ class MynEditCollections extends React.Component {
         let contents;
         try {
           // create JSX for the terminal node. If our video is not in this collection,
-          // the order will be null, but nothing will be displayed anyway
+          // the order will be undefined (we display an empty string), but nothing will be shown anyway
           contents = (
             <div key={'terminal-' + collection.id} className="collection-terminal-node">
-              <div className="collection-order">order: {order}</div>
-              <div className="delete-btn clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
+              <div className="collection-order">Order: <input type="text" className="filled" value={this.props.video.collections[collection.id] || ''} onChange={(e) => this.updateOrder(e.target.value, e.target, collection)} /><div className="input-clear-button" onClick={(e) => this.clearOrder(e, collection)}></div></div>
+              <div className="inline-delete-button clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
             </div>
           );
         } catch(err) {
@@ -1981,6 +1997,32 @@ class MynEditCollections extends React.Component {
     // } else {
     //   return null;
     // }
+  }
+
+  clearOrder(event, collection) {
+    this.updateOrder('',findNearestOfClass(event.target,'collection-order').getElementsByTagName("input")[0],collection);
+  }
+
+  updateOrder(order, target, collection) {
+    // let target = event.target;
+    // let order = event.target.value;
+    order = !isNaN(Number(order)) && Number(order) !== 0 ? Number(order) : !isNaN(parseInt(order)) ? parseInt(order) : '';
+    console.log(order);
+    let updated = _.cloneDeep(this.props.video.collections);
+    updated[collection.id] = order;
+    this.update({collections: updated});
+
+    if (this.props.validator.test(order)) {
+      this.props.handleValidity(true,this.props.property,target);
+    } else {
+      this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
+    }
+
+    if (order !== '') {
+      target.classList.add('filled');
+    } else {
+      target.classList.remove('filled');
+    }
   }
 
   update(prop) {
@@ -2513,7 +2555,7 @@ class MynEditListWidget extends MynEditWidget {
 
   displayList() {
     return this.state.list.map((item, index) => (
-      <li key={index} className="list-widget-item">{item}<div className="list-widget-delete-item" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>
+      <li key={index} className="list-widget-item">{item}<div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>
     ));
   }
 

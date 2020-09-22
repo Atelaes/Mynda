@@ -397,7 +397,7 @@
   --editor-textinput-font-weight: var(--textinput-font-weight);
   --editor-textinput-height: var(--textinput-height);
   --editor-textinput-bg-color: var(--textinput-bg-color);
-  --editor-textinput-bg: linear-gradient(90deg, var(--textinput-bg-color) 0%, rgba(0,0,0,0)  100%);
+  --editor-textinput-bg: linear-gradient(90deg, var(--editor-textinput-bg-color) 0%, rgba(0,0,0,0)  100%);
   --editor-textinput-text: inherit;
   --editor-textinput-border: var(--textinput-border);
   --editor-textinput-borderradius-radius: var(--textinput-borderradius);
@@ -527,7 +527,11 @@
   --listwidgetadd-button-height: 100%;
   --listwidgetadd-button-width: initial;
   --listwidgetadd-button-margin: initial;
-  --listwidgetadd-button-padding: 0em .13em 0em .09em;
+  --listwidgetadd-button-padding-top: 0em;
+  --listwidgetadd-button-padding-right: .13em;
+  --listwidgetadd-button-padding-bottom: 0em;
+  --listwidgetadd-button-padding-left: .09em;
+  --listwidgetadd-button-padding: var(--listwidgetadd-button-padding-top) var(--listwidgetadd-button-padding-right) var(--listwidgetadd-button-padding-bottom) var(--listwidgetadd-button-padding-left) /*0em .13em 0em .09em;*/
 
 
   --positionwidget-bordercolor: var(--main-text);
@@ -556,6 +560,24 @@
   --editartwork-revert-textshadow: 0em 0em .1em rgba(220,225,255,1), 0em 0em .05em rgba(220,225,255,.6);
   --editartwork-revert-text-hover: var(--med-text);
   --editartwork-revert-textshadow-hover: 0em 0em .05em black, 0em 0em .15em black;
+
+  --coltermnode-bg: initial;
+  --coltermnode-bg-color: var(--listwidget-item-bg-color); /*rgba(37,39,43,1);*/
+  --coltermnode-text: inherit;
+  --coltermnode-borderradius-radius: var(--listwidget-item-borderradius-radius);
+  --coltermnode-borderradius: var(--coltermnode-borderradius-radius);
+  --coltermnode-height: var(--listwidget-item-height);
+  --coltermnode-width: initial;
+  --coltermnode-margin: 0em 0em 0em var(--collection-marginleft);
+  --coltermnode-padding-top: 0em; /*var(--listwidget-item-padding-top); /*.2em;*/
+  --coltermnode-padding: var(--coltermnode-padding-top) 0em var(--coltermnode-padding-top) 1.7em; /*.5em;*/
+  --coltermnode-font: var(--main-font);
+  --coltermnode-fontsize-size: .8;
+  --coltermnode-fontsize: calc(var(--coltermnode-fontsize-size) * 1em);
+  --coltermnode-fontstyle: initial;
+  --coltermnode-fontweight: 300;
+  --coltermnode-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--coltermnode-bg-color) 30%);
+  --coltermnode-ellipsis-width: 2rem;
 
   --editsearch-clearbtn-text-hover: var(--bright-text);
   --editsearch-clearbtn-textshadow-hover: 0em 0em .1em rgba(220,225,255,.5);
@@ -758,6 +780,36 @@ in lieu of that, we will use a negative margin on the selected element instead (
   }
 }
 
+#editor-pane input.filled + .input-clear-button {
+  /* position: var(--inputicon-position);
+  top: var(--inputicon-top);
+  bottom: var(--inputicon-bottom);
+  left: var(--inputicon-left);
+  right: var(--inputicon-right);
+  height: var(--inputicon-height);
+  width: var(--inputicon-width);
+  background-size: var(--inputicon-bg-size) !important;
+  opacity:var(--inputicon-opacity); */
+  background-size: .6em .6em !important;
+  background: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 40% 50%;
+  height:100%;
+}
+
+/* --inputicon-opacity: .25;
+--inputicon-empty: none;
+--inputicon-filled: url('../../images/x-icon_white.png');
+--inputicon-position: absolute;
+--inputicon-top: 0em;
+--inputicon-bottom: inherit;
+--inputicon-left: inherit;
+--inputicon-right: calc(var(--textinput-height) * -.1);
+--inputicon-height: var(--textinput-height);
+--inputicon-width: var(--textinput-height);
+--inputicon-background-empty: rgba(0,0,0,0) var(--inputicon-empty) no-repeat 0% 50%;
+--inputicon-background-filled: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
+--inputicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6); */
+
+
 #edit-field-artwork-dl-msg {
   animation: dl-msg-fade 1s ease infinite;
   animation-delay: 0s;
@@ -857,3 +909,39 @@ in lieu of that, we will use a negative margin on the selected element instead (
   width:100%;
   border-bottom: .3em dotted var(--lighter-bg);
 } */
+
+.collection-terminal-node .inline-delete-button {
+  /* reverse left-right padding and positioning */
+  right: var(--listwidgetdel-item-left);
+  left: var(--listwidgetdel-item-right);
+}
+
+/* input field for the order of video in a collection in the editor pane */
+#editor-pane .collection-terminal-node input[type=text] {
+  background: linear-gradient(90deg, var(--textinput-bg-color) 0%, rgba(0,0,0,.15)  100%);
+}
+
+/* validator tip for order input */
+.collection-order .tip {
+  position: absolute;
+  right: 0em;
+}
+
+#editor-pane .collection-name {
+  /* --border-grad: linear-gradient(90deg, var(--light-bg) 0%, var(--light-bg-rgba0) 100%); */
+  border-bottom-width: .05px;
+  border-left-width: .1em;
+  border-bottom-style: solid;
+  border-left-style: solid;
+  border-color: var(--light-bg);
+  /* border: .3em solid grey; */
+  /* border-image: var(--border-grad);
+  border-image-slice: 1; */
+  /* border-radius: 0em 0em 0em .5em; */
+  border-bottom-left-radius: .5em;
+  padding-left: .5em;
+
+  /* background: var(--border-grad);
+  -webkit-mask-image: radial-gradient(transparent 0 65px, #000 65.5px);
+          mask-image: radial-gradient(transparent 0 65px, #000 65.5px); */
+}
