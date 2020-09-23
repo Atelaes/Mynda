@@ -2046,7 +2046,9 @@ class MynEditCollections extends React.Component {
 
     return (
       <div className="top-level collection">
-      {childrenOpts.length > 0 ? this.createAddCollectionBtn(null) : null}
+      <div className="collection-header">
+        {childrenOpts.length > 0 ? this.createAddCollectionBtn(null) : null}
+      </div>
       {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,null) : null}
       <div className="children">
         {collections}

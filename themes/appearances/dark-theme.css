@@ -561,16 +561,19 @@
   --editartwork-revert-text-hover: var(--med-text);
   --editartwork-revert-textshadow-hover: 0em 0em .05em black, 0em 0em .15em black;
 
+  --collections-fontsize-factor: .8;
+  --collections-fontsize: calc(var(--collections-fontsize-factor) * 1em);
+
   --coltermnode-bg: initial;
   --coltermnode-bg-color: var(--listwidget-item-bg-color); /*rgba(37,39,43,1);*/
   --coltermnode-text: inherit;
   --coltermnode-borderradius-radius: var(--listwidget-item-borderradius-radius);
-  --coltermnode-borderradius: var(--coltermnode-borderradius-radius);
+  --coltermnode-borderradius: 0em var(--coltermnode-borderradius-radius) var(--coltermnode-borderradius-radius) var(--coltermnode-borderradius-radius);
   --coltermnode-height: var(--listwidget-item-height);
   --coltermnode-width: initial;
-  --coltermnode-margin: 0em 0em 0em var(--collection-marginleft);
+  --coltermnode-margin: 0em 0em 1em var(--collection-marginleft);
   --coltermnode-padding-top: 0em; /*var(--listwidget-item-padding-top); /*.2em;*/
-  --coltermnode-padding: var(--coltermnode-padding-top) 0em var(--coltermnode-padding-top) 1.7em; /*.5em;*/
+  --coltermnode-padding: var(--coltermnode-padding-top) 0em var(--coltermnode-padding-top) calc(1.7em * (1 / var(--collections-fontsize-factor))); /*.5em;*/
   --coltermnode-font: var(--main-font);
   --coltermnode-fontsize-size: .8;
   --coltermnode-fontsize: calc(var(--coltermnode-fontsize-size) * 1em);
@@ -791,8 +794,10 @@ in lieu of that, we will use a negative margin on the selected element instead (
   background-size: var(--inputicon-bg-size) !important;
   opacity:var(--inputicon-opacity); */
   background-size: .6em .6em !important;
-  background: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 40% 50%;
+  background: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
   height:100%;
+  width: 1.2em;
+  right:0em;
 }
 
 /* --inputicon-opacity: .25;
@@ -927,13 +932,15 @@ in lieu of that, we will use a negative margin on the selected element instead (
   right: 0em;
 }
 
-#editor-pane .collection-name {
+#editor-pane .collection-header,
+#editor-pane .add-collection-form select {
   /* --border-grad: linear-gradient(90deg, var(--light-bg) 0%, var(--light-bg-rgba0) 100%); */
-  border-bottom-width: .05px;
-  border-left-width: .1em;
+  border-bottom-width: .12em;
+  border-left-width: .17em;
   border-bottom-style: solid;
   border-left-style: solid;
-  border-color: var(--light-bg);
+  border-left-color: var(--med-bg);
+  border-bottom-color: var(--med-bg);
   /* border: .3em solid grey; */
   /* border-image: var(--border-grad);
   border-image-slice: 1; */
@@ -944,4 +951,34 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* background: var(--border-grad);
   -webkit-mask-image: radial-gradient(transparent 0 65px, #000 65.5px);
           mask-image: radial-gradient(transparent 0 65px, #000 65.5px); */
+}
+
+#editor-pane .collection::after {
+  content:'';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0em;
+  left: 0;
+  --border-grad: linear-gradient(0deg, var(--med-bg) 0%, var(--med-bg-rgba0) 90%);
+  /* border-left-width: .15rem; */
+  border-left-style: solid;
+  box-sizing: border-box;
+  border-image: var(--border-grad);
+  border-image-slice: 1;
+  border-image-width: 0em 0em 0em .17em;
+}
+
+#editor-pane .collection-header {
+  width:100%;
+}
+
+#editor-pane .add-collection-form {
+  margin-left: var(--collection-marginleft);
+  border-top-left-radius: 0em;
+}
+
+#editor-pane .add-collection-form select {
+  border-top-left-radius: 0em;
+  /* border-bottom-left-radius: 0em; */
 }
