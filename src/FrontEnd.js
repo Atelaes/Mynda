@@ -1240,9 +1240,9 @@ class MynEditorSearch extends React.Component {
             boxoffice: parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
             ratings: {
               user: this.props.video.ratings.user,
-              imdb: Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)) / 10,
-              rt: Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)) / 100,
-              metacritic: Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)) / 100
+              imdb: Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)), // / 10,
+              rt: Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)), // / 100,
+              metacritic: Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)) // / 100
             }
           };
           console.log(newData);
@@ -1704,6 +1704,9 @@ class MynEditRatings extends React.Component {
     let min = this.state.source[source].min;
     let max = this.state.source[source].max;
 
+    console.log("Value: " + value);
+    console.log("typeof: " + typeof value);
+
     // let target = event.target;
     // let value = target.value;
     if (value === "") {
@@ -1717,7 +1720,8 @@ class MynEditRatings extends React.Component {
     }
 
     let update = _.cloneDeep(this.props.video[this.props.property]);
-    update[source] = !isNaN(Number(value)) && value !== '' ? value / this.state.source[source].max : value;
+    // update[source] = !isNaN(Number(value)) && value !== '' ? value / this.state.source[source].max : value;
+    update[source] = value;
     // console.log('HMMM... ' + update[source]);
     this.props.update(this.props.property,update);
   }
@@ -1735,11 +1739,14 @@ class MynEditRatings extends React.Component {
         let value = this.props.video[this.props.property][source];
         // if the value does not exist in the video object, we have to supply our own empty string;
         // if it does, we have to multiply it to produce the appropriate display value
-        if (!isNaN(Number(value))) {
-          value *= this.state.source[source].max;
-        } else {
-          value = ''
+        if (value === undefined) {
+          value = '';
         }
+        // if (!isNaN(Number(value))) {
+        //   value *= this.state.source[source].max;
+        // } else {
+        //   value = ''
+        // }
         // now we can call handleInput to update the input values
         this.handleInput(input, value, source);
       });
@@ -1747,13 +1754,14 @@ class MynEditRatings extends React.Component {
   }
 
   render() {
+    // value={!isNaN(Number(this.props.video[this.props.property][source])) && this.props.video[this.props.property][source] !== '' ? Math.round(Number(this.props.video[this.props.property][source]) * this.state.source[source].max * 10) / 10 : this.props.video[this.props.property][source]}
     return (
       <table ref={this.table}><tbody>
         {Object.keys(this.state.source).map((source) => {
           return (
             <tr key={source}>
               <td className="ratings-icon">
-                <img src={`../images/logos/${source}-logo` + (source=='rt' && this.props.video[this.props.property][source]<.6 ? '-splat' : '') + '.png'} />
+                <img src={`../images/logos/${source}-logo` + (source=='rt' && this.props.video[this.props.property][source]<60 && this.props.video[this.props.property][source] !== '' ? '-splat' : '') + '.png'} />
               </td>
               <td className="ratings-input">
                 <input
@@ -1761,7 +1769,7 @@ class MynEditRatings extends React.Component {
                  id={`edit-field-${this.props.property}-${source}`}
                  type="text"
                  name={source}
-                 value={!isNaN(Number(this.props.video[this.props.property][source])) && this.props.video[this.props.property][source] !== '' ? Number(this.props.video[this.props.property][source]) * this.state.source[source].max : this.props.video[this.props.property][source]}
+                 value={this.props.video[this.props.property][source] || ''}
                  placeholder={'#'}
                  onChange={(e) => this.handleInput(e.target, e.target.value, source)}
                 />
@@ -2168,11 +2176,11 @@ class MynEditCollections extends React.Component {
 
   render() {
     let collections;
-    if (this.props.video.collections && Object.keys(this.props.video.collections).length > 0) {
+    // if (this.props.video.collections && Object.keys(this.props.video.collections).length > 0) {
       collections = this.createCollectionsMap();
-    } else {
-      collections = (<div>[No Collections]</div>);
-    }
+    // } else {
+    //   collections = (<div>[No Collections]</div>);
+    // }
 
     // get list of top-level collections that this video does not belong within,
     // in order to display as dropdown options when the user clicks the top level + button
@@ -2280,6 +2288,7 @@ class MynEditArtwork extends React.Component {
     ipcRenderer.on('downloaded', (event, response) => {
       if (response.success) {
         this.props.update({'artwork':response.message});
+        console.log('Successfully downloaded artwork');
       } else {
         console.log("Unable to download file: " + response.message);
         this.update(this.props.placeholderImage);
@@ -2287,11 +2296,7 @@ class MynEditArtwork extends React.Component {
 
       // on finishing, whether successful or not,
       // hide message and show input field again
-      try {
-        this.input.current.style.visibility = 'visible';
-      } catch(err) {
-        console.error(err);
-      }
+      this.input.current.style.visibility = 'visible';
       this._isMounted && this.setState({message: ""});
       this.dlMsg.current.style.display = 'none';
 

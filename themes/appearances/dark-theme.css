@@ -1003,9 +1003,13 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* border-bottom-left-radius: 0em; */
 }
 
-.edit-field.ratings .edit-field-editor {
+.edit-field.ratings .edit-field-editor table {
   border-radius: var(--textinput-borderradius);
-  padding-left:.5em;
+  padding-left:.5rem;
   /* background-color: var(--textinput-bg-color); */
   background: var(--editor-textinput-bg);
+}
+
+.edit-field.ratings .edit-field-editor table td {
+  user-select: none;
 }
