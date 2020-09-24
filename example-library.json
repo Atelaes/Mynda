@@ -1,4 +1,4 @@
-library = {
+{
   "settings" : {
     "watchfolders" : [
       {
@@ -153,7 +153,13 @@ library = {
       "seen" : true,
       "position" : 1836,
       "duration" : 7200,
-      "rating" : 3,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "R",
+      "ratings" : {
+        "user": 3
+      },
       "dateadded" : "946684800",
       "lastseen" : "946692300",
       "kind" : "movie",
@@ -186,7 +192,13 @@ library = {
       "seen" : false,
       "position" : 0,
       "duration" : 6900,
-      "rating" : 5,
+      "country" : "Sweden",
+      "language" : "Swedish",
+      "boxoffice" : 0,
+      "mpaa" : "n/a",
+      "ratings" : {
+        "user" : 5
+      },
       "dateadded" : "1053388800",
       "lastseen" : "1056692300",
       "kind" : "movie",
@@ -219,7 +231,13 @@ library = {
       "seen" : true,
       "position" : 3724,
       "duration" : 7200,
-      "rating" : 4,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "PG-13",
+      "ratings" : {
+        "user" : 4
+      },
       "dateadded" : "1383523200",
       "lastseen" : "1456692300",
       "kind" : "movie",
@@ -246,7 +264,13 @@ library = {
       "seen" : false,
       "position" : 3724,
       "duration" : 7200,
-      "rating" : 1,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "PG-13",
+      "ratings" : {
+        "user" : 1
+      },
       "dateadded" : "1283523200",
       "lastseen" : null,
       "kind" : "movie",
@@ -276,7 +300,13 @@ library = {
       "seen" : true,
       "position" : 423,
       "duration" : 2700,
-      "rating" : 5,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "n/a",
+      "ratings" : {
+        "user" : 5
+      },
       "dateadded" : "1313525600",
       "lastseen" : "856692300",
       "kind" : "show",
@@ -303,7 +333,13 @@ library = {
       "seen" : false,
       "position" : 0,
       "duration" : 2700,
-      "rating" : 2,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "PG",
+      "ratings" : {
+        "user" : 2
+      },
       "dateadded" : "1303525600",
       "lastseen" : "756092300",
       "kind" : "movie",
@@ -331,7 +367,13 @@ library = {
       "seen" : true,
       "position" : 2134,
       "duration" : 2700,
-      "rating" : 4,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "n/a",
+      "ratings" : {
+        "user": 4
+      },
       "dateadded" : "1323525600",
       "lastseen" : "956692300",
       "kind" : "show",
@@ -362,7 +404,13 @@ library = {
       "seen" : false,
       "position" : 0,
       "duration" : 2700,
-      "rating" : 4,
+      "country" : "United States",
+      "language" : "English",
+      "boxoffice" : 0,
+      "mpaa" : "n/a",
+      "ratings" : {
+        "user" : 4
+      },
       "dateadded" : "1323525600",
       "lastseen" : null,
       "kind" : "show",

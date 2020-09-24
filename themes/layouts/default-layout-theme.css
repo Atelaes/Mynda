@@ -171,3 +171,8 @@
   grid-row: 7;
   grid-column: 4;
 }
+
+.edit-field.ratings {
+  grid-row: 8;
+  grid-column: 4;
+}

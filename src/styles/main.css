@@ -32,7 +32,7 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-.collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row, .clickable {
+select, .collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row, .clickable {
   cursor: pointer;
   user-select: none;
 }
@@ -121,6 +121,13 @@ input::-webkit-calendar-picker-indicator {
   font-family: var(--select-arrow-font);
   font-size: var(--select-arrow-fontsize);
   font-weight: var(--select-arrow-fontweight);
+}
+
+/* dropdown icons that occurs in the same input as an add button
+   need to be moved over to the left out from behind the button */
+.select-container.inline.select-hovericon:hover::after,
+.select-container.inline.select-alwaysicon::after {
+  right: 1.5rem;
 }
 
 input.invalid {
@@ -631,6 +638,14 @@ th, tr, td {
   font-weight: var(--editfield-name-fontweight);
 }
 
+.edit-field-description {
+  color: var(--editfield-descrip-text);
+  font-family: var(--editfield-descrip-font);
+  font-size: var(--editfield-descrip-fontsize);
+  font-style: var(--editfield-descrip-fontstyle);
+  font-weight: var(--editfield-descrip-fontweight);
+}
+
 .edit-field.title .edit-field-name,
 .edit-field.description .edit-field-name,
 .edit-field.artwork .edit-field-name {
@@ -831,13 +846,6 @@ input[type=text]#edit-field-title {
   border: var(--listwidgetadd-button-border);
 }
 
-/* dropdown icons that occurs in the same input as an add button
-   need to be moved over to the left out from behind the button */
-.list-widget-add.select-container.select-hovericon:hover::after,
-.list-widget-add.select-container.select-alwaysicon::after {
-  right: 1.5rem;
-}
-
 /* artwork image */
 .edit-field.artwork .edit-field-editor img {
   width: var(--editartwork-img-width);
@@ -877,10 +885,54 @@ input[type=text]#edit-field-title {
   text-shadow: var(--editartwork-revert-textshadow-hover);
 }
 
+.edit-field.collections .edit-field-editor {
+  font-size: var(--collections-fontsize);
+}
 
+.edit-field.ratings table {
+  /* list-style-type: none;
+  margin: 0em;
+  padding: 0em; */
+  vertical-align: middle;
+}
+
+.edit-field.ratings tr {
+  /* display: flex;
+  flex-wrap: nowrap; */
+  font-size: var(--editratings-fontsize);
+}
+
+.edit-field.ratings td {
+  padding-bottom: var(--tip-fontsize);
+}
+
+.edit-field.ratings td.ratings-input {
+  text-align: right;
+}
+
+.edit-field.ratings .ratings-icon img {
+  width:1.5em;
+  height:1.5em;
+  opacity: var(--editratingsicon-opacity);
+}
+
+#editor-pane .edit-field.ratings .ratings-input input[type=text] {
+  line-height: var(--editratings-fontsize);
+  text-align: right;
+  width:2.5em;
+  height: initial;
+  border-radius:var(--editratings-borderradius);
+  padding: 0em 0em 0em .5em;
+  background: none;
+}
+
+#editor-pane .edit-field.ratings .tip {
+  position: absolute;
+  bottom: 0em; /*calc(-1 * var(--tip-fontsize));*/
+}
 
 #editor-pane .tip {
-  font-size: .5rem;
+  font-size: var(--tip-fontsize);
   opacity:.7;
   margin: var(--editfield-name-margin);
 }
@@ -891,10 +943,6 @@ input[type=text]#edit-field-title {
   top: 0em;
   width: 100%;
   text-align: center;
-}
-
-.edit-field.collections .edit-field-editor {
-  font-size: var(--collections-fontsize);
 }
 
 #edit-search {
@@ -986,6 +1034,15 @@ input[type=text]#edit-field-title {
 
 #editor-pane .collection-header * {
   display: inline-block;
+}
+
+#editor-pane .collection-name {
+  color: var(--colname-text);
+  font-family: var(--colname-font);
+  font-size: var(--colname-fontsize);
+  font-style: var(--colname-fontstyle);
+  font-weight: var(--colname-fontweight);
+  text-transform: var(--colname-texttransform);
 }
 
 #editor-pane .collection-terminal-node {

@@ -464,7 +464,7 @@ class MynLibTable extends React.Component {
      director: (a, b) => a.directorsort > b.directorsort,
      genre: (a, b) => a.genre > b.genre,
      seen: (a, b) => a.seen > b.seen,
-     rating: (a, b) => a.rating > b.rating,
+     rating: (a, b) => a.ratings.user > b.ratings.user,
      dateadded: (a, b) => parseInt(a.dateadded) > parseInt(b.dateadded),
      order: (a, b) => a.order > b.order
     }
@@ -1237,7 +1237,13 @@ class MynEditorSearch extends React.Component {
             country: response.data.Country,
             language: response.data.Language.split(', '),
             mpaa: response.data.Rated,
-            boxoffice: parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+            boxoffice: parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+            ratings: {
+              user: this.props.video.ratings.user,
+              imdb: Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)) / 10,
+              rt: Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)) / 100,
+              metacritic: Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)) / 100
+            }
           };
           console.log(newData);
           this.props.handleChange(newData);
@@ -1286,23 +1292,27 @@ class MynEditorEdit extends React.Component {
       // data: _.cloneDeep(props.video),
       validators: {
         people: {
-          regex: /^[a-zA-Z0-9_\s\-\.',]+$/,
+          exp: /^[a-zA-Z0-9_\s\-\.',]+$/,
           tip: "Allowed: a-z A-Z 0-9 _ - . ' [space]"
         },
         descriptors: {
-          regex: /^[a-zA-Z0-9_\-\.]+$/,
+          exp: /^[a-zA-Z0-9_\-\.]+$/,
           tip: "Allowed: a-z A-Z 0-9 _ - ."
         },
         year: {
-          regex: /^\d{4}$/,
+          exp: /^\d{4}$/,
           tip: "YYYY"
         },
         posint: {
-          regex: { test: v => Number.isInteger(Number(v)) && v>0 },
+          exp: { test: value => Number.isInteger(Number(value)) && Number(value)>0 },
           tip: "Positive integer"
         },
+        numrange: {
+          exp: { test: (value,min,max) => !isNaN(Number(value)) && Number(value)>=min && Number(value)<=max },
+          tip: (min,max) => `${min}-${max}`
+        },
         everything: {
-          regex: /.*/,
+          exp: /.*/,
           tip: ""
         }
       }
@@ -1363,7 +1373,7 @@ class MynEditorEdit extends React.Component {
             property="title"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.everything.regex}
+            validator={this.state.validators.everything.exp}
             validatorTip={this.state.validators.everything.tip}
             handleValidity={this.handleValidity}
           />
@@ -1381,7 +1391,7 @@ class MynEditorEdit extends React.Component {
             property="year"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.year.regex}
+            validator={this.state.validators.year.exp}
             validatorTip={this.state.validators.year.tip}
             handleValidity={this.handleValidity}
           />
@@ -1399,7 +1409,7 @@ class MynEditorEdit extends React.Component {
             property="director"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.people.regex}
+            validator={this.state.validators.people.exp}
             validatorTip={this.state.validators.people.tip}
             handleValidity={this.handleValidity}
           />
@@ -1417,7 +1427,7 @@ class MynEditorEdit extends React.Component {
             property="directorsort"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.people.regex}
+            validator={this.state.validators.people.exp}
             validatorTip={this.state.validators.people.tip}
             handleValidity={this.handleValidity}
           />
@@ -1454,7 +1464,7 @@ class MynEditorEdit extends React.Component {
               property="tags"
               update={this.props.handleChange}
               options={["many","tags","happy","joy","existing","already-used"]}
-              validator={this.state.validators.descriptors.regex}
+              validator={this.state.validators.descriptors.exp}
               validatorTip={this.state.validators.descriptors.tip}
               handleValidity={this.handleValidity}
             />
@@ -1487,7 +1497,7 @@ class MynEditorEdit extends React.Component {
             property="cast"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.people.regex}
+            validator={this.state.validators.people.exp}
             validatorTip={this.state.validators.people.tip}
             handleValidity={this.handleValidity}
           />
@@ -1496,13 +1506,6 @@ class MynEditorEdit extends React.Component {
     );
 
     /* GENRE */
-    // <input id="edit-field-genre" type="text" name="genre" value={this.state.video.genre} list="used-genres" onChange={(e) => this.handleChange({'genre':e.target.value})} />
-    // <datalist id="used-genres">
-    //   <option value="sci-fi" />
-    //   <option value="action" />
-    //   <option value="drama" />
-    // </datalist>
-
     let genre = (
       <div className='edit-field genre'>
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
@@ -1512,7 +1515,7 @@ class MynEditorEdit extends React.Component {
             property="genre"
             update={this.props.handleChange}
             options={["sci-fi","action","drama","comedy"]}
-            validator={this.state.validators.descriptors.regex}
+            validator={this.state.validators.descriptors.exp}
             validatorTip={this.state.validators.descriptors.tip}
             handleValidity={this.handleValidity}
           />
@@ -1599,13 +1602,32 @@ class MynEditorEdit extends React.Component {
     let collections = (
       <div className='edit-field collections'>
         <label className="edit-field-name" htmlFor="collections">Collections: </label>
+        <div className="edit-field-description">Add and subtract the video to and from existing collections. In order to create new collections or edit the existing structure, go to the settings pane.</div>
         <div className="edit-field-editor">
           <MynEditCollections
             video={this.props.video}
             collections={this.props.collections}
             update={this.props.handleChange}
-            validator={this.state.validators.posint.regex}
+            validator={this.state.validators.posint.exp}
             validatorTip={this.state.validators.posint.tip}
+            handleValidity={this.handleValidity}
+          />
+        </div>
+      </div>
+    );
+
+    /* RATINGS */
+    // (not including the user rating, which is separate)
+    let ratings = (
+      <div className='edit-field ratings'>
+        <label className="edit-field-name" htmlFor="ratings">Ratings: </label>
+        <div className="edit-field-editor">
+          <MynEditRatings
+            property="ratings"
+            video={this.props.video}
+            update={this.props.handleChange}
+            validator={this.state.validators.numrange.exp}
+            validatorTip={this.state.validators.numrange.tip}
             handleValidity={this.handleValidity}
           />
         </div>
@@ -1637,10 +1659,120 @@ class MynEditorEdit extends React.Component {
           {dateadded}
           {artwork}
           {collections}
+          {ratings}
           <button onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
           <input type="submit" value="Save" />
         </form>
       </div>
+    );
+  }
+}
+
+class MynEditRatings extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      source : {
+        "imdb" : {
+          min: 0,
+          max: 10,
+          display: "IMDb",
+          units: "/\u202F10"
+        },
+        "rt" : {
+          min: 0,
+          max: 100,
+          display: "Rotten Tomatoes",
+          units: "%"
+        },
+        "metacritic" : {
+          min: 0,
+          max: 100,
+          display: "Metacritic",
+          units: "/\u202F100"
+        }
+      }
+    }
+
+    this.table = React.createRef();
+    // this.render = this.render.bind(this);
+    // this.handleInput = this.handleInput.bind(this);
+  }
+
+  handleInput(target, value, source) {
+    let min = this.state.source[source].min;
+    let max = this.state.source[source].max;
+
+    // let target = event.target;
+    // let value = target.value;
+    if (value === "") {
+      this.props.handleValidity(true,this.props.property,target);
+    } else if (this.props.validator.test(value,min,max)) {
+      this.props.handleValidity(true,this.props.property,target);
+    } else {
+      this.props.handleValidity(false,this.props.property,target,this.props.validatorTip(min,max));
+      // console.log('validation error!');
+      // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
+    }
+
+    let update = _.cloneDeep(this.props.video[this.props.property]);
+    update[source] = !isNaN(Number(value)) && value !== '' ? value / this.state.source[source].max : value;
+    // console.log('HMMM... ' + update[source]);
+    this.props.update(this.props.property,update);
+  }
+
+  componentDidUpdate(oldProps) {
+    // this will trigger when we hit the 'revert to saved' button
+    if (!_.isEqual(oldProps.video[this.props.property],this.props.video[this.props.property])) {
+      // we have to reset each field back, which is actually a little convoluted since there are 3 of them
+
+       // get array of each input and loop over them
+      let inputs = Array.from(this.table.current.getElementsByClassName('ratings-input-input'));
+      inputs.map(input => {
+        // get the source for this input by comparing the classList to the state object, picking the one that matches one of the state object's keys (convoluted, right?)
+        let source = Array.from(input.classList).find(theClass => Object.keys(this.state.source).includes(theClass));
+        let value = this.props.video[this.props.property][source];
+        // if the value does not exist in the video object, we have to supply our own empty string;
+        // if it does, we have to multiply it to produce the appropriate display value
+        if (!isNaN(Number(value))) {
+          value *= this.state.source[source].max;
+        } else {
+          value = ''
+        }
+        // now we can call handleInput to update the input values
+        this.handleInput(input, value, source);
+      });
+    }
+  }
+
+  render() {
+    return (
+      <table ref={this.table}><tbody>
+        {Object.keys(this.state.source).map((source) => {
+          return (
+            <tr key={source}>
+              <td className="ratings-icon">
+                <img src={`../images/logos/${source}-logo` + (source=='rt' && this.props.video[this.props.property][source]<.6 ? '-splat' : '') + '.png'} />
+              </td>
+              <td className="ratings-input">
+                <input
+                 className={"ratings-input-input " + source}
+                 id={`edit-field-${this.props.property}-${source}`}
+                 type="text"
+                 name={source}
+                 value={!isNaN(Number(this.props.video[this.props.property][source])) && this.props.video[this.props.property][source] !== '' ? Number(this.props.video[this.props.property][source]) * this.state.source[source].max : this.props.video[this.props.property][source]}
+                 placeholder={'#'}
+                 onChange={(e) => this.handleInput(e.target, e.target.value, source)}
+                />
+              </td>
+              <td className="ratings-unit">
+                {this.state.source[source].units}
+              </td>
+           </tr>
+          );
+        })}
+      </tbody></table>
     );
   }
 }
@@ -1671,8 +1803,10 @@ class MynEditCollections extends React.Component {
 
   showAddField(event) {
     try {
-      findNearestOfClass(event.target,'collection').getElementsByClassName("add-collection-form")[0].style.display = "block";
+      let field = findNearestOfClass(event.target,'collection').getElementsByClassName("add-collection-form")[0];
       // event.target.parentNode.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
+
+      field.style.display = field.style.display == "block" ? "none" : "block";
     } catch(err) {
       console.error('There are no subcollections to add to');
     }
@@ -1681,8 +1815,8 @@ class MynEditCollections extends React.Component {
   addCollection(event, name, parent) {
     event.preventDefault();
 
-    // get the parent collection of the one we're going to add
-    // let parent = this.getCollectionObject(parentID)
+    // hide the add node form
+    findNearestOfClass(event.target,'add-collection-form').style.display = "none";
 
     // get the collection object the user wants to add
     let parentList;
@@ -1811,7 +1945,7 @@ class MynEditCollections extends React.Component {
 
     if (options.length > 0) {
       return (
-        <div className="add-collection-form" style={{display:"none"}}>
+        <div className="add-collection-form select-container inline select-alwaysicon" style={{display:"none"}}>
           <select name="name">{options}</select>
           <button className="editor-inline-button" onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('select').value,collection)}>{"\uFE62"}</button>
         </div>
@@ -2153,7 +2287,11 @@ class MynEditArtwork extends React.Component {
 
       // on finishing, whether successful or not,
       // hide message and show input field again
-      this.input.current.style.visibility = 'visible';
+      try {
+        this.input.current.style.visibility = 'visible';
+      } catch(err) {
+        console.error(err);
+      }
       this._isMounted && this.setState({message: ""});
       this.dlMsg.current.style.display = 'none';
 
@@ -2341,7 +2479,7 @@ class MynEditGraphicalWidget extends React.Component {
   }
 
   updateValue(value, event) {
-    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value + "! ...but not really. JSON library has not been updated!");
+    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value.user + "! ...but not really. JSON library has not been updated!");
     event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     this.props.movie[this.state.property] = value;
     // event.target.parentNode.classList.remove('over');
@@ -2371,7 +2509,7 @@ class MynEditGraphicalWidget extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    if (oldProps.movie[this.state.property] !== this.props.movie[this.state.property]) {
+    if (!_.isEqual(oldProps.movie[this.state.property],this.props.movie[this.state.property])) {//(oldProps.movie[this.state.property] !== this.props.movie[this.state.property]) {
       this.updateGraphic(this.props.movie[this.state.property]);
     }
   }
@@ -2427,14 +2565,22 @@ class MynEditRatingWidget extends MynEditGraphicalWidget {
     super(props)
 
     this.state = {
-      property : "rating",
+      property : "ratings",
       className : "stars"
     }
 
     this.render = this.render.bind(this);
+    this.updateGraphic = this.updateGraphic.bind(this);
   }
 
   updateGraphic(rating) {
+    // sometimes the actual rating value will be passed to us here,
+    // but other times, the whole ratings object will be passed,
+    // in which case we want the value of the 'user' property
+    if (rating.hasOwnProperty("user")) {
+      rating = rating.user
+    }
+
     let stars = [];
     let char = "";
     for (let i=1; i<=5; i++) {
@@ -2446,7 +2592,9 @@ class MynEditRatingWidget extends MynEditGraphicalWidget {
         char="\u2606";
         starClass += "empty";
       }
-      stars.push(<li className={starClass} key={i} onMouseOver={(e) => this.mouseOver(i,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(i,e)}>{char}</li>);
+      let update = _.cloneDeep(this.props.movie[this.state.property]);
+      update["user"] = i;
+      stars.push(<li className={starClass} key={i} onMouseOver={(e) => this.mouseOver(i,e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(update,e)}>{char}</li>);
     }
     this.setState({displayGraphic : stars});
   }
@@ -2794,7 +2942,32 @@ class MynEditDateWidget extends MynEditWidget {
 // all it does right now is check for top-level properties
 // eventually it should do more than that
 function isValidVideo(video) {
-  const properties = ['id', 'title', 'year', 'director', 'directorsort', 'cast', 'description', 'genre', 'tags', 'seen', 'position', 'duration', 'rating', 'dateadded', 'lastseen', 'kind', 'filename', 'artwork', 'collections'];
+  const properties = [
+    'id',
+    'title',
+    'year',
+    'director',
+    'directorsort',
+    'cast',
+    'description',
+    'genre',
+    'tags',
+    'seen',
+    'position',
+    'duration',
+    'ratings',
+    'dateadded',
+    'lastseen',
+    'kind',
+    'filename',
+    'artwork',
+    'collections',
+    'boxoffice',
+    'mpaa',
+    'language',
+    'country'
+  ];
+
   for(const property of properties){
     if (Object.keys(video).includes(property)) {
        continue;

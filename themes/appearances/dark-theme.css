@@ -377,6 +377,8 @@
 
 
   /* editor pane */
+  --tip-fontsize: .5rem;
+
   --editorpane-padding: 1em;
 
   --editfield-margin: ;
@@ -436,6 +438,12 @@
   --editfield-name-fontsize: .7em;
   --editfield-name-fontstyle: initial;
   --editfield-name-fontweight: 300;
+
+  --editfield-descrip-text: var(--dim-text);
+  --editfield-descrip-font: inherit;
+  --editfield-descrip-fontsize: calc(var(--editfield-name-fontsize) * .8);
+  --editfield-descrip-fontstyle: italic;
+  --editfield-descrip-fontweight: 300;
 
   --listwidget-item-maxwidth: 15em;
   --listwidget-item-bg: initial;
@@ -531,7 +539,7 @@
   --listwidgetadd-button-padding-right: .13em;
   --listwidgetadd-button-padding-bottom: 0em;
   --listwidgetadd-button-padding-left: .09em;
-  --listwidgetadd-button-padding: var(--listwidgetadd-button-padding-top) var(--listwidgetadd-button-padding-right) var(--listwidgetadd-button-padding-bottom) var(--listwidgetadd-button-padding-left) /*0em .13em 0em .09em;*/
+  --listwidgetadd-button-padding: var(--listwidgetadd-button-padding-top) var(--listwidgetadd-button-padding-right) var(--listwidgetadd-button-padding-bottom) var(--listwidgetadd-button-padding-left); /*0em .13em 0em .09em;*/
 
 
   --positionwidget-bordercolor: var(--main-text);
@@ -564,6 +572,13 @@
   --collections-fontsize-factor: .8;
   --collections-fontsize: calc(var(--collections-fontsize-factor) * 1em);
 
+  --colname-text: inherit;
+  --colname-font: inherit;
+  --colname-fontsize: inherit;
+  --colname-fontstyle: normal;
+  --colname-fontweight: 200;
+  --colname-texttransform: none;
+
   --coltermnode-bg: initial;
   --coltermnode-bg-color: var(--listwidget-item-bg-color); /*rgba(37,39,43,1);*/
   --coltermnode-text: inherit;
@@ -581,6 +596,11 @@
   --coltermnode-fontweight: 300;
   --coltermnode-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--coltermnode-bg-color) 30%);
   --coltermnode-ellipsis-width: 2rem;
+
+  --editratings-fontsize: .8rem;
+  --editratings-borderradius-radius: var(--textinput-borderradius);
+  --editratings-borderradius: var(--editratings-borderradius-radius) 0em 0em var(--editratings-borderradius-radius);
+  --editratingsicon-opacity: .5;
 
   --editsearch-clearbtn-text-hover: var(--bright-text);
   --editsearch-clearbtn-textshadow-hover: 0em 0em .1em rgba(220,225,255,.5);
@@ -981,4 +1001,11 @@ in lieu of that, we will use a negative margin on the selected element instead (
 #editor-pane .add-collection-form select {
   border-top-left-radius: 0em;
   /* border-bottom-left-radius: 0em; */
+}
+
+.edit-field.ratings .edit-field-editor {
+  border-radius: var(--textinput-borderradius);
+  padding-left:.5em;
+  /* background-color: var(--textinput-bg-color); */
+  background: var(--editor-textinput-bg);
 }
