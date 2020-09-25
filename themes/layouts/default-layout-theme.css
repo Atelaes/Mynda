@@ -146,11 +146,11 @@
   grid-column: 1 / span 3;
 }
 .edit-field.tags {
-  grid-row: 8 / span 2;
+  grid-row: 8;
   grid-column: 1 / span 3;
 }
 .edit-field.collections {
-  grid-row: 10;
+  grid-row: 9 / span 5;
   grid-column: 1 / span 3;
 }
 
@@ -174,5 +174,10 @@
 
 .edit-field.ratings {
   grid-row: 8;
+  grid-column: 4;
+}
+
+.edit-field.boxoffice {
+  grid-row: 9;
   grid-column: 4;
 }

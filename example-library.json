@@ -156,7 +156,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "R",
+      "rated" : "R",
       "ratings" : {
         "user": 3
       },
@@ -195,7 +195,7 @@
       "country" : "Sweden",
       "language" : "Swedish",
       "boxoffice" : 0,
-      "mpaa" : "n/a",
+      "rated" : "n/a",
       "ratings" : {
         "user" : 5
       },
@@ -234,7 +234,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "PG-13",
+      "rated" : "PG-13",
       "ratings" : {
         "user" : 4
       },
@@ -267,7 +267,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "PG-13",
+      "rated" : "PG-13",
       "ratings" : {
         "user" : 1
       },
@@ -303,7 +303,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "n/a",
+      "rated" : "n/a",
       "ratings" : {
         "user" : 5
       },
@@ -336,7 +336,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "PG",
+      "rated" : "PG",
       "ratings" : {
         "user" : 2
       },
@@ -370,7 +370,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "n/a",
+      "rated" : "n/a",
       "ratings" : {
         "user": 4
       },
@@ -407,7 +407,7 @@
       "country" : "United States",
       "language" : "English",
       "boxoffice" : 0,
-      "mpaa" : "n/a",
+      "rated" : "n/a",
       "ratings" : {
         "user" : 4
       },

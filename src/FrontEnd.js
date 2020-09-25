@@ -11,7 +11,7 @@ const Library = require("./Library.js");
 const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
-
+const accounting = require('accounting');
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -262,7 +262,7 @@ class MynNav extends React.Component {
           ))}
         </ul>
         <div id="nav-controls">
-          <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button" onClick={(e) => this.clearSearch(e)}></div></div>
+          <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
         </div>
       </div>)
@@ -831,7 +831,7 @@ class MynSettingsFolders extends React.Component {
       <div id="folder-settings-choose">
         <div className="input-container">
           <input type="text" id="folder-settings-choose-path" className="empty" value={this.state.folderToAdd || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
-          <div className="input-clear-button" onClick={() => this.changeTargetFolder('')}></div>
+          <div className="input-clear-button hover" onClick={() => this.changeTargetFolder('')}></div>
         </div>
         <button onClick={() => ipcRenderer.send('settings-watchfolder-select')}>Browse</button>
         <label htmlFor="folder-settings-choose-watched">Watchfolder?</label><input type="checkbox" id="folder-settings-choose-watched" />
@@ -1236,8 +1236,8 @@ class MynEditorSearch extends React.Component {
             duration: parseInt(response.data.Runtime) * 60,
             country: response.data.Country,
             language: response.data.Language.split(', '),
-            mpaa: response.data.Rated,
-            boxoffice: parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+            rated: response.data.Rated,
+            boxoffice: accounting.parse(response.data.BoxOffice) || 0,//parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
             ratings: {
               user: this.props.video.ratings.user,
               imdb: Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)), // / 10,
@@ -1293,7 +1293,7 @@ class MynEditorEdit extends React.Component {
       validators: {
         people: {
           exp: /^[a-zA-Z0-9_\s\-\.',]+$/,
-          tip: "Allowed: a-z A-Z 0-9 _ - . ' [space]"
+          tip: "Allowed: a-z A-Z 0-9 _ - . , ' [space]"
         },
         descriptors: {
           exp: /^[a-zA-Z0-9_\-\.]+$/,
@@ -1310,6 +1310,10 @@ class MynEditorEdit extends React.Component {
         numrange: {
           exp: { test: (value,min,max) => !isNaN(Number(value)) && Number(value)>=min && Number(value)<=max },
           tip: (min,max) => `${min}-${max}`
+        },
+        money: {
+          exp: { test: value => !isNaN(accounting.unformat(value)) && accounting.unformat(value) >= 0 },
+          tip: "Non-negative monetary value"
         },
         everything: {
           exp: /.*/,
@@ -1369,7 +1373,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.props.video}
+            video={this.props.video}
             property="title"
             update={this.props.handleChange}
             options={null}
@@ -1387,7 +1391,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.props.video}
+            video={this.props.video}
             property="year"
             update={this.props.handleChange}
             options={null}
@@ -1405,7 +1409,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.props.video}
+            video={this.props.video}
             property="director"
             update={this.props.handleChange}
             options={null}
@@ -1423,7 +1427,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
           <MynEditText
-            movie={this.props.video}
+            video={this.props.video}
             property="directorsort"
             update={this.props.handleChange}
             options={null}
@@ -1511,7 +1515,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
         <div className="edit-field-editor select-container select-hovericon">
           <MynEditText
-            movie={this.props.video}
+            video={this.props.video}
             property="genre"
             update={this.props.handleChange}
             options={["sci-fi","action","drama","comedy"]}
@@ -1634,6 +1638,26 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    /* BOXOFFICE */
+    let boxoffice = (
+      <div className='edit-field boxoffice'>
+        <label className="edit-field-name" htmlFor="boxoffice">Box Office: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            video={this.props.video}
+            property="boxoffice"
+            update={this.props.handleChange}
+            options={null}
+            storeTransform={value => Math.round(accounting.unformat(value))}
+            displayTransform={value => accounting.formatMoney(value,'$',0)}
+            validator={this.state.validators.money.exp}
+            validatorTip={this.state.validators.money.tip}
+            handleValidity={this.handleValidity}
+          />
+        </div>
+      </div>
+    );
+
           // JSX = (
           //   <div key={index} className={'edit-field ' + property}>
           //     <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
@@ -1660,6 +1684,7 @@ class MynEditorEdit extends React.Component {
           {artwork}
           {collections}
           {ratings}
+          {boxoffice}
           <button onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
           <input type="submit" value="Save" />
         </form>
@@ -2052,7 +2077,7 @@ class MynEditCollections extends React.Component {
           // the order will be undefined (we display an empty string), but nothing will be shown anyway
           contents = (
             <div key={'terminal-' + collection.id} className="collection-terminal-node">
-              <div className="collection-order">Order: <input type="text" className="filled" value={this.props.video.collections[collection.id] || ''} onChange={(e) => this.updateOrder(e.target.value, e.target, collection)} /><div className="input-clear-button" onClick={(e) => this.clearOrder(e, collection)}></div></div>
+              <div className="collection-order">Order: <input type="text" className="filled" value={this.props.video.collections[collection.id] || ''} onChange={(e) => this.updateOrder(e.target.value, e.target, collection)} /><div className="input-clear-button always" onClick={(e) => this.clearOrder(e, collection)}></div></div>
               <div className="inline-delete-button clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
             </div>
           );
@@ -2090,7 +2115,14 @@ class MynEditCollections extends React.Component {
             </div>
             {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,collection) : null}
             <div className="children">
-              {results.map(result => result.jsx)}
+              {results.map((result,i) => {
+                if (i < results.length - 1 && results[i+1].show == true) {
+                  // then we're an older sister, and we want to display a vertical gradient border
+                  // below ourselves, for which we have to add class 'niece' to the 'children' div
+                  // within result.jsx ...somehow
+                }
+                return result.jsx;
+              })}
             </div>
           </div>
       )};
@@ -2204,33 +2236,84 @@ class MynEditText extends React.Component {
   constructor(props) {
     super(props)
 
+    this.state = {
+      value: ''
+    }
+
     this.input = React.createRef();
+    this.clearInput = this.clearInput.bind(this);
   }
 
-  handleInput() {
+  handleInput(value) {
     let target = this.input.current;
-    let value = target.value;
+    if (value === undefined) {
+      value = target.value;
+    }
+
+    console.log("value: " + value);
+
+    // keep the input field updated with what the user is typing
+    this.setStateValue(value);
+
+    // handle validation
     if (value === "") {
       this.props.handleValidity(true,this.props.property,target);
     } else if (this.props.validator.test(value)) {
       this.props.handleValidity(true,this.props.property,target);
     } else {
       this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
-      // console.log('validation error!');
-      // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
+    }
+
+    // if we're given a transform function (i.e. we want the saved value to be different
+    // in some way than the value of the input form), transform the value here before updating it
+    if (this.props.storeTransform) {
+      value = this.props.storeTransform(value);
     }
     this.props.update(this.props.property,value);
   }
 
-  componentDidUpdate(oldProps) {
-    if (oldProps.movie[this.props.property] !== this.props.movie[this.props.property]) {
-      this.handleInput();
+  clearInput() {
+    this.handleInput('');
+  }
+
+  setStateValuesFromProps() {
+    this.setStateValue(this.props.video[this.props.property]);
+  }
+
+  // set state form value with optional transform
+  setStateValue(value) {
+    try {
+      value = this.props.displayTransform(value);
+    } catch(err) {
+
     }
+    this.setState({value:value});
+
+    // if there is anything in the input field, add a class to display the clear button
+    let pseudoEmpty = this.props.displayTransform ? this.props.displayTransform('') : '';
+    console.log('display transform of empty string: ' + pseudoEmpty);
+    if (value !== pseudoEmpty) {
+      this.input.current.classList.add('filled');
+    } else {
+      this.input.current.classList.remove('filled');
+    }
+  }
+
+  componentDidUpdate(oldProps) {
+    if (oldProps.video[this.props.property] !== this.props.video[this.props.property]) {
+      this.setStateValuesFromProps();
+      // this.handleInput();
+    }
+  }
+
+  componentDidMount() {
+    this.setStateValuesFromProps();
   }
 
   render() {
     let options = null;
     let listName = null;
+    let clearBtn = null;
     if (this.props.options) {
       listName = "used-" + this.props.property;
       options = (
@@ -2238,6 +2321,9 @@ class MynEditText extends React.Component {
           {this.props.options.map((option) => (<option key={option} value={option} />))}
         </datalist>
       );
+    } else {
+      // only create a clear button if there's no dropdown
+      clearBtn = (<div className="input-clear-button hover" onClick={this.clearInput}></div>);
     }
 
     return (
@@ -2248,15 +2334,75 @@ class MynEditText extends React.Component {
           list={listName}
           type="text"
           name="text"
-          value={this.props.movie[this.props.property]}
+          value={this.state.value}
           placeholder={'[' + this.props.property + ']'}
-          onChange={(e) => this.handleInput(e)}
+          onChange={() => this.handleInput()}
         />
         {options}
+        {clearBtn}
       </div>
     );
   }
 }
+
+
+// class MynEditTextOld extends React.Component {
+//   constructor(props) {
+//     super(props)
+//
+//     this.input = React.createRef();
+//   }
+//
+//   handleInput() {
+//     let target = this.input.current;
+//     let value = target.value;
+//     if (value === "") {
+//       this.props.handleValidity(true,this.props.property,target);
+//     } else if (this.props.validator.test(value)) {
+//       this.props.handleValidity(true,this.props.property,target);
+//     } else {
+//       this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
+//       // console.log('validation error!');
+//       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
+//     }
+//     this.props.update(this.props.property,value);
+//   }
+//
+//   componentDidUpdate(oldProps) {
+//     if (oldProps.movie[this.props.property] !== this.props.movie[this.props.property]) {
+//       this.handleInput();
+//     }
+//   }
+//
+//   render() {
+//     let options = null;
+//     let listName = null;
+//     if (this.props.options) {
+//       listName = "used-" + this.props.property;
+//       options = (
+//         <datalist id={listName}>
+//           {this.props.options.map((option) => (<option key={option} value={option} />))}
+//         </datalist>
+//       );
+//     }
+//
+//     return (
+//       <div>
+//         <input
+//           ref={this.input}
+//           id={"edit-field-" + this.props.property}
+//           list={listName}
+//           type="text"
+//           name="text"
+//           value={this.props.movie[this.props.property]}
+//           placeholder={'[' + this.props.property + ']'}
+//           onChange={(e) => this.handleInput(e)}
+//         />
+//         {options}
+//       </div>
+//     );
+//   }
+// }
 
 class MynEditArtwork extends React.Component {
   constructor(props) {
@@ -2968,7 +3114,7 @@ function isValidVideo(video) {
     'artwork',
     'collections',
     'boxoffice',
-    'mpaa',
+    'rated',
     'language',
     'country'
   ];

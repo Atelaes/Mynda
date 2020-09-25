@@ -399,7 +399,7 @@
   --editor-textinput-font-weight: var(--textinput-font-weight);
   --editor-textinput-height: var(--textinput-height);
   --editor-textinput-bg-color: var(--textinput-bg-color);
-  --editor-textinput-bg: linear-gradient(90deg, var(--editor-textinput-bg-color) 0%, rgba(0,0,0,0)  100%);
+  --editor-textinput-bg: linear-gradient(90deg, var(--editor-textinput-bg-color) 0%, rgba(0,0,0,.15)  100%);
   --editor-textinput-text: inherit;
   --editor-textinput-border: var(--textinput-border);
   --editor-textinput-borderradius-radius: var(--textinput-borderradius);
@@ -814,7 +814,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
   background-size: var(--inputicon-bg-size) !important;
   opacity:var(--inputicon-opacity); */
   background-size: .6em .6em !important;
-  background: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
+  /* background: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%; */
   height:100%;
   width: 1.2em;
   right:0em;
@@ -973,7 +973,10 @@ in lieu of that, we will use a negative margin on the selected element instead (
           mask-image: radial-gradient(transparent 0 65px, #000 65.5px); */
 }
 
-#editor-pane .collection::after {
+/* Create vertical gradient border to show hierarchical level,
+   but only when there's another collection below your parent, i.e. an aunt */
+/* #editor-pane .collection .children.nieces::after { */
+#editor-pane .collection .children::after {
   content:'';
   position: absolute;
   top: 0;
@@ -1003,7 +1006,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* border-bottom-left-radius: 0em; */
 }
 
-.edit-field.ratings .edit-field-editor table {
+.edit-field.ratings .edit-field-editor {
   border-radius: var(--textinput-borderradius);
   padding-left:.5rem;
   /* background-color: var(--textinput-bg-color); */

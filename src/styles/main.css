@@ -65,7 +65,9 @@ input.empty + .input-clear-button {
 /* when an input field has text, optionally display an icon on the right side of it */
 /* this is simply an empty div; we must populate it with an icon using the background property */
 /* when clicked, this div should clear the search field */
-input.filled + .input-clear-button {
+input.filled + .input-clear-button.always,
+input.filled:hover + .input-clear-button.hover,
+input.filled + .input-clear-button.hover:hover {
   background: var(--inputicon-background-filled);
   cursor:pointer;
 }
@@ -932,6 +934,7 @@ input[type=text]#edit-field-title {
 }
 
 #editor-pane .tip {
+  position:absolute;
   font-size: var(--tip-fontsize);
   opacity:.7;
   margin: var(--editfield-name-margin);
