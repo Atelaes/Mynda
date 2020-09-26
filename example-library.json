@@ -154,7 +154,7 @@
       "position" : 1836,
       "duration" : 7200,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "R",
       "ratings" : {
@@ -193,7 +193,7 @@
       "position" : 0,
       "duration" : 6900,
       "country" : "Sweden",
-      "language" : "Swedish",
+      "languages" : ["Swedish"],
       "boxoffice" : 0,
       "rated" : "n/a",
       "ratings" : {
@@ -232,7 +232,7 @@
       "position" : 3724,
       "duration" : 7200,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "PG-13",
       "ratings" : {
@@ -265,7 +265,7 @@
       "position" : 3724,
       "duration" : 7200,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "PG-13",
       "ratings" : {
@@ -301,7 +301,7 @@
       "position" : 423,
       "duration" : 2700,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "n/a",
       "ratings" : {
@@ -334,7 +334,7 @@
       "position" : 0,
       "duration" : 2700,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "PG",
       "ratings" : {
@@ -368,7 +368,7 @@
       "position" : 2134,
       "duration" : 2700,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "n/a",
       "ratings" : {
@@ -405,7 +405,7 @@
       "position" : 0,
       "duration" : 2700,
       "country" : "United States",
-      "language" : "English",
+      "languages" : ["English"],
       "boxoffice" : 0,
       "rated" : "n/a",
       "ratings" : {

@@ -193,7 +193,7 @@ class Mynda extends React.Component {
         stateObj[name] = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={() => {this.hideOpenablePane(name)}}/>
         break;
       case "editorPane":
-        stateObj[name] = <MynEditor video={this.state.detailMovie} collections={this.state.collections} hideFunction={() => {this.hideOpenablePane(name)}}/>
+        stateObj[name] = <MynEditor video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
         break;
     };
     this.setState(stateObj);
@@ -1071,6 +1071,7 @@ class MynEditor extends MynOpenablePane {
         <MynEditorEdit
           video={this.state.video}
           collections={this.state.collections}
+          settings={this.props.settings}
           handleChange={this.handleChange}
           revertChanges={this.revertChanges}
           saveChanges={this.saveChanges}
@@ -1228,29 +1229,46 @@ class MynEditorSearch extends React.Component {
             artwork: response.data.Poster, // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
             year: response.data.Year,
             director: response.data.Director,
-            directorsort: /^\w+\s\w+$/.test(response.data.Director) ? response.data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : response.data.Director, // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
-            genre: response.data.Genre.split(', ')[0], // just pick the first genre for genre, since we only allow one
-            tags: Array.from(new Set(response.data.Genre.split(', ').map((item) => item.toLowerCase()).concat(this.props.video.tags))), // add new tags to existing tags, removing duplicates
             kind: response.data.Type === 'episode' ? 'show' : response.data.Type,
-            cast: response.data.Actors.split(', '),
-            duration: parseInt(response.data.Runtime) * 60,
             country: response.data.Country,
-            language: response.data.Language.split(', '),
             rated: response.data.Rated,
-            boxoffice: accounting.parse(response.data.BoxOffice) || 0,//parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
-            ratings: {
-              user: this.props.video.ratings.user,
-              imdb: Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)), // / 10,
-              rt: Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)), // / 100,
-              metacritic: Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)) // / 100
-            }
           };
+          try {
+            newData.boxoffice = accounting.parse(response.data.BoxOffice) || 0; //parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            newData.directorsort = /^\w+\s\w+$/.test(response.data.Director) ? response.data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : response.data.Director; // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            newData.cast = response.data.Actors.split(', ');
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            newData.genre = response.data.Genre.split(', ')[0]; // just pick the first genre for genre, since we only allow one
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            newData.languages = response.data.Language.split(', ');
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            newData.tags = Array.from(new Set(response.data.Genre.split(', ').map((item) => item.toLowerCase()).concat(this.props.video.tags))); // add new tags to existing tags, removing duplicates
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          let ratings = _.cloneDeep(this.props.video.ratings);
+          try {
+            ratings.imdb = Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)); // / 10;
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            ratings.rt = Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)); // / 100;
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          try {
+            ratings.metacritic = Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
+          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          newData.ratings = ratings;
+
           console.log(newData);
           this.props.handleChange(newData);
         }
       })
       .catch((error) => {
-        return console.log(error);
+        return console.error(error);
       })
       .then(() => {
         // always executed
@@ -1295,9 +1313,13 @@ class MynEditorEdit extends React.Component {
           exp: /^[a-zA-Z0-9_\s\-\.',]+$/,
           tip: "Allowed: a-z A-Z 0-9 _ - . , ' [space]"
         },
-        descriptors: {
+        tags: {
           exp: /^[a-zA-Z0-9_\-\.]+$/,
           tip: "Allowed: a-z A-Z 0-9 _ - ."
+        },
+        generous: {
+          exp: /^[^=;{}]+$/,
+          tip: "Not allowed: = ; { }"
         },
         year: {
           exp: /^\d{4}$/,
@@ -1468,8 +1490,8 @@ class MynEditorEdit extends React.Component {
               property="tags"
               update={this.props.handleChange}
               options={["many","tags","happy","joy","existing","already-used"]}
-              validator={this.state.validators.descriptors.exp}
-              validatorTip={this.state.validators.descriptors.tip}
+              validator={this.state.validators.tags.exp}
+              validatorTip={this.state.validators.tags.tip}
               handleValidity={this.handleValidity}
             />
           </div>
@@ -1519,8 +1541,8 @@ class MynEditorEdit extends React.Component {
             property="genre"
             update={this.props.handleChange}
             options={["sci-fi","action","drama","comedy"]}
-            validator={this.state.validators.descriptors.exp}
-            validatorTip={this.state.validators.descriptors.tip}
+            validator={this.state.validators.tags.exp}
+            validatorTip={this.state.validators.tags.tip}
             handleValidity={this.handleValidity}
           />
         </div>
@@ -1658,6 +1680,76 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    /* RATED */
+    // create dropdown options for the different ratings systems
+    // let options = {};
+    // // populate movie and show with MPA and TV ratings, respectively;
+    // // in the future we should expand to allow other content rating systems, perhaps by locale
+    // // or else simply allow text entry instead of preset options
+    // options.movie = ['Not Rated','G','PG','PG-13','R','NC-17','X'];
+    // options.show = ['Not Rated','TV-G','TV-Y','TV-Y7','TV-PG','TV-14','TV-MA'];
+    // // create JSX
+    // try {
+    //   options = options[this.props.video.kind].map(option => (<option key={option} value={option}>{option}</option>));
+    // } catch(err) {
+    //   options = (<option key='N/A' value='N/A'>N/A</option>);
+    // }
+    let options = ['N/A','','G','PG','PG-13','R','NC-17','X','','TV-G','TV-Y','TV-Y7','TV-PG','TV-14','TV-MA','','Not Rated'];
+    options = options.map((option,i) => {
+      if (option !== '') {
+        return (<option key={i} value={option}>{option}</option>);
+      } else {
+        // create separator
+        return (<option key={i} disabled>{'\u2501'}{'\u2501'}{'\u2501'}{'\u2501'}</option>)
+      }
+    });
+    let rated = (
+      <div className='edit-field rated'>
+        <label className="edit-field-name" htmlFor="rated">Rated: </label>
+        <div className="edit-field-editor select-container select-alwaysicon">
+          <select id="edit-field-kind" name="rated" value={this.props.video.rated} onChange={(e) => this.props.handleChange({'rated':e.target.value})}>
+            {options}
+          </select>
+        </div>
+      </div>
+    );
+
+    /* LANGUAGES */
+    let languages = (
+      <div className='edit-field languages'>
+        <label className="edit-field-name" htmlFor="languages">Languages: </label>
+        <div className="edit-field-editor">
+          <MynEditInlineAddListWidget
+            movie={this.props.video}
+            property="languages"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.generous.exp}
+            validatorTip={this.state.validators.generous.tip}
+            handleValidity={this.handleValidity}
+          />
+        </div>
+      </div>
+    );
+
+    /* COUNTRY */
+    let country = (
+      <div className='edit-field country'>
+        <label className="edit-field-name" htmlFor="country">Country: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            video={this.props.video}
+            property="country"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.generous.exp}
+            validatorTip={this.state.validators.generous.tip}
+            handleValidity={this.handleValidity}
+          />
+        </div>
+      </div>
+    );
+
           // JSX = (
           //   <div key={index} className={'edit-field ' + property}>
           //     <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
@@ -1685,8 +1777,11 @@ class MynEditorEdit extends React.Component {
           {collections}
           {ratings}
           {boxoffice}
-          <button onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
-          <input type="submit" value="Save" />
+          {rated}
+          {country}
+          {languages}
+          <button className="edit-field revert-btn" onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
+          <input className="edit-field save-btn" type="submit" value="Save" />
         </form>
       </div>
     );
@@ -1728,9 +1823,6 @@ class MynEditRatings extends React.Component {
   handleInput(target, value, source) {
     let min = this.state.source[source].min;
     let max = this.state.source[source].max;
-
-    console.log("Value: " + value);
-    console.log("typeof: " + typeof value);
 
     // let target = event.target;
     // let value = target.value;
@@ -2530,7 +2622,7 @@ class MynEditArtwork extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    console.log("artwork component updated");
+    // console.log("artwork component updated");
 
     // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
     // then we want to download it, and point the movie metadata to the downloaded local file instead
@@ -3115,7 +3207,7 @@ function isValidVideo(video) {
     'collections',
     'boxoffice',
     'rated',
-    'language',
+    'languages',
     'country'
   ];
 

@@ -150,7 +150,7 @@
   grid-column: 1 / span 3;
 }
 .edit-field.collections {
-  grid-row: 9 / span 5;
+  grid-row: 9 / span 100;
   grid-column: 1 / span 3;
 }
 
@@ -179,5 +179,30 @@
 
 .edit-field.boxoffice {
   grid-row: 9;
+  grid-column: 4;
+}
+
+.edit-field.rated {
+  grid-row: 10;
+  grid-column: 4;
+}
+
+.edit-field.country {
+  grid-row: 11;
+  grid-column: 4;
+}
+
+.edit-field.languages {
+  grid-row: 12;
+  grid-column: 4;
+}
+
+.edit-field.revert-btn {
+  grid-row: 13;
+  grid-column: 4;
+}
+
+.edit-field.save-btn {
+  grid-row: 14;
   grid-column: 4;
 }
