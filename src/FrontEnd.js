@@ -415,6 +415,17 @@ class MynLibTable extends React.Component {
     this.render = this.render.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentDidUpdate = this.componentDidUpdate.bind(this);
+
+    ipcRenderer.on('save-video-confirm', (event, response, changes, originalVid) => {
+      if (response === 0) { // yes
+        // save video to library
+        let updated = { ...originalVid, ...changes };
+        let index = library.media.findIndex((video) => video.id === updated.id);
+        library.replace("media." + index, updated);
+      } else {
+        console.log('Edit cancelled by user')
+      }
+    });
   }
 
   rowHovered(id, e) {
@@ -492,8 +503,8 @@ class MynLibTable extends React.Component {
         <td className="year centered mono">{movie.year}</td>
         <td className="director">{movie.director}</td>
         <td className="genre">{movie.genre}</td>
-        <td className="seen centered"><MynEditSeenWidget movie={movie} /></td>
-        <td className="rating centered"><MynEditRatingWidget movie={movie} /></td>
+        <td className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
+        <td className="rating centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
         <td className="dateadded centered mono">{displaydate}</td>
       </tr>
     )})
@@ -527,6 +538,23 @@ class MynLibTable extends React.Component {
 
   removeArticle(string) {
     return string.replace(/^(?:a\s|the\s)/i,"")
+  }
+
+  saveEdited(originalVid, ...args) {
+    console.log('save-edited!!!');
+    let changes = {};
+    if (args.length == 2 && typeof args[0] === "string") {
+      changes[args[0]] = args[1];
+    } else if (args.length == 1 && typeof args[0] === "object") {
+      changes = args[0];
+    } else {
+      throw 'Incorrect parameters passed to saveEdited in MynLibTable';
+    }
+    console.log('changes == ' + JSON.stringify(changes));
+
+    // user confirmation dialog
+    ipcRenderer.send('save-video-confirm', changes, originalVid);
+
   }
 
   componentDidMount(props) {
@@ -666,7 +694,7 @@ class MynSettings extends MynOpenablePane {
       paneID: 'settings-pane',
 
       views: {
-        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.kinds} />),
+        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
         playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
         collections : (<MynSettingsCollections collections={this.props.collections} />),
         themes : (<MynSettingsThemes themes={this.props.settings.themes} />)
@@ -1000,7 +1028,7 @@ class MynEditor extends MynOpenablePane {
     event.preventDefault();
 
     /* make sure all the fields are valid before submitting */
-    console.log(JSON.stringify(this.state.valid));
+    // console.log(JSON.stringify(this.state.valid));
     let valid = true;
     let invalidFields = [];
     for (var i=0, keys=Object.keys(this.state.valid); i<keys.length; i++) {
@@ -1031,20 +1059,36 @@ class MynEditor extends MynOpenablePane {
         }
       });
       this.handleChange({'artwork':newArtworkPath});
-      console.log("updated state var: " + this.state.video.artwork);
+      // console.log("updated state var: " + this.state.video.artwork);
     }
 
     /* Submit */
     // console.log('saving...');
 
-    // first, save the video object
+    // first, save the video data in library.media
     let index = library.media.findIndex((video) => video.id === this.props.video.id);
     library.replace("media." + index, this.state.video);
 
-    // then, if any collections were changed, save the collections object
+    // then, if any collections were changed, save the collections object in library.collections
     if (!_.isEqual(this.props.collections,this.state.collections)) {
       library.replace("collections", this.state.collections);
     }
+
+    // then, add any new tags to the library.settings.used.tags list so they'll be available
+    // as options for the next video the user edits
+    let tags = [...this.props.settings.used.tags];
+    tags = tags.concat(this.state.video.tags.filter(tag => tags.indexOf(tag) < 0)).sort();
+    library.replace("settings.used.tags",tags);
+
+    // and then do the same for genres
+    let genres = [...this.props.settings.used.genres];
+    if (this.state.video.genre !== '' && genres.indexOf(this.state.video.genre) < 0) {
+      // library.add("settings.used.genres.0",this.state.video.genre);
+      genres.push(this.state.video.genre);
+      genres.sort();
+      library.replace("settings.used.genres",genres);
+    }
+
   }
 
   componentDidMount() {
@@ -1314,8 +1358,8 @@ class MynEditorEdit extends React.Component {
           tip: "Allowed: a-z A-Z 0-9 _ - . , ' [space]"
         },
         tags: {
-          exp: /^[a-zA-Z0-9_\-\.]+$/,
-          tip: "Allowed: a-z A-Z 0-9 _ - ."
+          exp: /^[a-zA-Z0-9_\-\.&]+$/,
+          tip: "Allowed: a-z A-Z 0-9 _ - . &"
         },
         generous: {
           exp: /^[^=;{}]+$/,
@@ -1489,7 +1533,8 @@ class MynEditorEdit extends React.Component {
               movie={this.props.video}
               property="tags"
               update={this.props.handleChange}
-              options={["many","tags","happy","joy","existing","already-used"]}
+              options={this.props.settings.used.tags}
+              storeTransform={value => value.toLowerCase()}
               validator={this.state.validators.tags.exp}
               validatorTip={this.state.validators.tags.tip}
               handleValidity={this.handleValidity}
@@ -1540,7 +1585,8 @@ class MynEditorEdit extends React.Component {
             video={this.props.video}
             property="genre"
             update={this.props.handleChange}
-            options={["sci-fi","action","drama","comedy"]}
+            options={this.props.settings.used.genres}
+            storeTransform={value => value.replace(/\b\w/g,letter => letter.toUpperCase())}
             validator={this.state.validators.tags.exp}
             validatorTip={this.state.validators.tags.tip}
             handleValidity={this.handleValidity}
@@ -1550,15 +1596,15 @@ class MynEditorEdit extends React.Component {
     );
 
     /* KIND */
+    let options = this.props.settings.used.kinds.map(kind => (
+      <option key={kind} value={kind}>{kind}</option>
+    ));
     let kind = (
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
           <select id="edit-field-kind" name="kind" value={this.props.video.kind} onChange={(e) => this.props.handleChange({'kind':e.target.value})}>
-            <option value="movie">movie</option>
-            <option value="show">show</option>
-            <option value="stand-up">stand-up</option>
-            <option value="instructional">instructional</option>
+            {options}
           </select>
         </div>
       </div>
@@ -1694,7 +1740,7 @@ class MynEditorEdit extends React.Component {
     // } catch(err) {
     //   options = (<option key='N/A' value='N/A'>N/A</option>);
     // }
-    let options = ['N/A','','G','PG','PG-13','R','NC-17','X','','TV-G','TV-Y','TV-Y7','TV-PG','TV-14','TV-MA','','Not Rated'];
+    options = ['N/A','','G','PG','PG-13','R','NC-17','X','','TV-G','TV-Y','TV-Y7','TV-PG','TV-14','TV-MA','','Not Rated'];
     options = options.map((option,i) => {
       if (option !== '') {
         return (<option key={i} value={option}>{option}</option>);
@@ -1749,12 +1795,6 @@ class MynEditorEdit extends React.Component {
         </div>
       </div>
     );
-
-          // JSX = (
-          //   <div key={index} className={'edit-field ' + property}>
-          //     <span className="edit-field-name">{property.replace(/\b\w/g,(letter) => letter.toUpperCase())}: </span>
-          //     <input type="text" value={video[property]} placeholder={'[' + property + ']'} onChange={(e) => this.handleChange(e)} />
-          //   </div>
 
     return (
       <div id="edit-container">
@@ -2122,8 +2162,18 @@ class MynEditCollections extends React.Component {
 
   // create display of tree of collections in which this movie participates
   createCollectionsMap() {
-    console.log("Creating new collections map");
-    return this.props.collections.map(collection => (this.findCollections(collection))).map(result => result.jsx);
+    // console.log("Creating new collections map");
+    let results = []
+    this.props.collections.map(collection => (this.findCollections(collection))).map(result => {
+      // put hidden collections (ones that this video doesn't belong to, but the user might add it to)
+      // at the top of the list, so that when they're added, the user can see them easily
+      if (result.show) {
+        results.push(result.jsx);
+      } else {
+        results.unshift(result.jsx);
+      }
+    });
+    return results;
   }
 
   // recursive function that walks down the collections and returns each branch as JSX
@@ -2139,13 +2189,17 @@ class MynEditCollections extends React.Component {
       // loop through the subcollections and call ourselves recursively on each one
       for (let i=0; i<collection.collections.length; i++) {
         let child = this.findCollections(collection.collections[i]);
-        // add child to results array
-        results.push(child);
 
         // if this child isn't being shown (i.e. our video isn't in its branch)
-        // add it to the list of options to display to the user for adding the video to its branch
+        // add it to the beginning of the results array, so that if the user adds it, it appears at the top;
+        // also add it to the list of options to display to the user for adding the video to its branch
         if (child.show === false) {
+          results.unshift(child)
           childrenOpts.push(collection.collections[i].name);
+        } else {
+          // if the child IS being shown, add it to the end of the results array,
+          // so that it appears after any hidden collections that the user might add
+          results.push(child);
         }
       }
       // if there are no sub-collections within this collection
@@ -2186,7 +2240,6 @@ class MynEditCollections extends React.Component {
     // if there were any collections returned from the level below,
     // or any videos found at this level, they will be in the results array;
     // place them within this collection and return them upward to the next level;
-    // if our video was in this branch,
     if (results.length > 0) {
       // if any results have their 'show' as positive
       // set show here to true
@@ -2383,7 +2436,7 @@ class MynEditText extends React.Component {
 
     // if there is anything in the input field, add a class to display the clear button
     let pseudoEmpty = this.props.displayTransform ? this.props.displayTransform('') : '';
-    console.log('display transform of empty string: ' + pseudoEmpty);
+    // console.log('display transform of empty string: ' + pseudoEmpty);
     if (value !== pseudoEmpty) {
       this.input.current.classList.add('filled');
     } else {
@@ -2724,7 +2777,13 @@ class MynEditGraphicalWidget extends React.Component {
   updateValue(value, event) {
     console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value.user + "! ...but not really. JSON library has not been updated!");
     event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
-    this.props.movie[this.state.property] = value;
+    // this.props.movie[this.state.property] = value;
+
+    // update the value
+    if (this.props.update) {
+      this.props.update(this.state.property,value);
+    }
+
     // event.target.parentNode.classList.remove('over');
     findNearestOfClass(event.target,"edit-widget").classList.remove('over');
   }
@@ -3003,13 +3062,22 @@ class MynEditAddToList extends MynEditListWidget {
 
   addItem(event) {
     const input = document.getElementById(this.state.id + "-input");
-    const item = input.value;
+    let item = input.value;
     if (item === "") {
       // do nothing
     } else if (this.props.validator.test(item)) {
+      // if we're given a transform function (i.e. we want the saved value to be different
+      // in some way than the value of the input form), transform the value here before updating it
+      if (this.props.storeTransform) {
+        item = this.props.storeTransform(item);
+        // console.log('transformed to ' + item);
+      }
+
       let temp = this.state.list;
       try {
-        temp.push(item);
+        if (!this.state.list.includes(item)) {
+          temp.push(item);
+        }
       } catch(e) {
         temp = [item];
       }
@@ -3057,7 +3125,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
     return (
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
-        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} options={this.props.options} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} handleValidity={this.props.handleValidity} />
+        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} handleValidity={this.props.handleValidity} />
       </ul>
     );
   }

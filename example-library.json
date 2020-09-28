@@ -35,10 +35,37 @@
         }
       ]
     },
-    "kinds" : [
-      "movie",
-      "show"
-    ]
+    "used" : {
+      "kinds" : [
+        "movie",
+        "show"
+      ],
+      "genres" : [
+        "Drama",
+        "Action",
+        "Sci-Fi"
+      ],
+      "tags" : [
+        "sci-fi",
+        "action",
+        "cyber-punk",
+        "90s",
+        "super-hero",
+        "marvel",
+        "ensemble",
+        "fun",
+        "00s",
+        "drama",
+        "existentialist",
+        "philosophical",
+        "50s",
+        "b&w",
+        "space",
+        "aliens",
+        "80s",
+        "B-movie"
+      ]
+    }
   },
   "playlists" : [
     {

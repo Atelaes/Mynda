@@ -952,11 +952,18 @@ in lieu of that, we will use a negative margin on the selected element instead (
   right: 0em;
 }
 
+#editor-pane {
+  --collectionheader-width: 60%;
+  --collectionheader-paddingleft: .5em;
+  --collectionheader-borderleftwidth: 4px; /*.17em;*/
+  --collectionheader-borderbottomwidth: 3px; /*.12em;*/
+}
+
 #editor-pane .collection-header,
 #editor-pane .add-collection-form select {
   /* --border-grad: linear-gradient(90deg, var(--light-bg) 0%, var(--light-bg-rgba0) 100%); */
-  border-bottom-width: .12em;
-  border-left-width: .17em;
+  border-bottom-width: var(--collectionheader-borderbottomwidth);
+  border-left-width: var(--collectionheader-borderleftwidth);
   border-bottom-style: solid;
   border-left-style: solid;
   border-left-color: var(--med-bg);
@@ -965,8 +972,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* border-image: var(--border-grad);
   border-image-slice: 1; */
   /* border-radius: 0em 0em 0em .5em; */
-  border-bottom-left-radius: .5em;
-  padding-left: .5em;
+  border-bottom-left-radius: var(--collectionheader-paddingleft);
+  padding-left: var(--collectionheader-paddingleft);
 
   /* background: var(--border-grad);
   -webkit-mask-image: radial-gradient(transparent 0 65px, #000 65.5px);
@@ -989,11 +996,33 @@ in lieu of that, we will use a negative margin on the selected element instead (
   box-sizing: border-box;
   border-image: var(--border-grad);
   border-image-slice: 1;
-  border-image-width: 0em 0em 0em .17em;
+  border-image-width: 0em 0em 0em var(--collectionheader-borderleftwidth);
 }
 
 #editor-pane .collection-header {
-  width:100%;
+  width: var(--collectionheader-width);
+  white-space: nowrap;
+}
+
+#editor-pane .collection::after {
+  content:'';
+  position: absolute;
+  top: 0;
+  right: 0;
+  /* bottom: 0; */
+  left: calc(var(--collectionheader-width) + var(--collectionheader-paddingleft) + var(--collectionheader-borderleftwidth));
+  width: calc((100% - var(--collectionheader-width)) - var(--collectionheader-paddingleft) - var(--collectionheader-borderleftwidth));
+  --border-grad: linear-gradient(90deg, var(--med-bg) 0%, var(--med-bg-rgba0) 80%);
+  /* border-left-width: .15rem; */
+  border-bottom-style: solid;
+  /* box-sizing: border-box; */
+  border-image: var(--border-grad);
+  border-image-slice: 1;
+  border-image-width: 0em 0em var(--collectionheader-borderbottomwidth) 0em;
+}
+#editor-pane .collection-header,
+#editor-pane .collection::after {
+  height: 1.3em;
 }
 
 #editor-pane .add-collection-form {
@@ -1004,6 +1033,21 @@ in lieu of that, we will use a negative margin on the selected element instead (
 #editor-pane .add-collection-form select {
   border-top-left-radius: 0em;
   /* border-bottom-left-radius: 0em; */
+}
+
+.collection-terminal-node,
+.collection-header {
+  animation: collection-flash 1s ease 1;
+  animation-delay: 0s;
+  animation-direction: alternate;
+}
+
+@keyframes collection-flash {
+  0% {
+    background-color: var(--lightest-bg);
+  }
+  100% {
+  }
 }
 
 .edit-field.ratings .edit-field-editor {

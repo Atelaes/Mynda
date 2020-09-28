@@ -253,10 +253,14 @@ let defaultLibrary = {
         }
       ]
     },
-    "kinds" : [
-      "movie",
-      "show"
-    ]
+    "used" : {
+      "kinds" : [
+        "movie",
+        "show"
+      ],
+      "genres" : [],
+      "tags" : []
+    }
   },
   "playlists" : [
     {

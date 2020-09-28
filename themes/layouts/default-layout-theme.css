@@ -95,7 +95,7 @@
 #edit-container form {
   display:grid;
   grid-template-columns: 2fr 1fr 1fr minmax(10rem,2fr);
-  grid-template-rows: repeat(11, auto);
+  grid-template-rows: repeat(14, auto);
 
   grid-gap: 0.5em;
 }
@@ -150,7 +150,7 @@
   grid-column: 1 / span 3;
 }
 .edit-field.collections {
-  grid-row: 9 / span 100;
+  grid-row: 9 / span 10;
   grid-column: 1 / span 3;
 }
 

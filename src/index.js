@@ -180,3 +180,37 @@ ipcMain.on('download', (event, url, destination) => {
     event.sender.send('downloaded', response);
   });
 })
+
+ipcMain.on('save-video-confirm', (event, changes, video) => {
+  console.log('save-video-confirm!!!');
+  // create message
+  let message = 'Are you sure you want to ';
+  if (Object.keys(changes).length === 1) { // changing only one property
+    let property = Object.keys(changes)[0];
+    let value = changes[property];
+    if (property === 'ratings') {
+      value = value.user; // for now let's assume that if we're changing the rating, we're only changing the user rating, i.e. from the table view
+      message += `rate ${video.title} ${value} star${value > 1 ? 's' : ''}?`
+    } else if (property === 'seen') {
+      message += `mark ${video.title} as ${value ? 'seen' : 'unseen'}?`
+    } else {
+      message += `change the [${property}] of ${video.title} to ${JSON.stringify(value)}?`
+    }
+  } else { // changing multiple properties
+    message += `make the following changes to ${video.title}?\n\n`
+    Object.keys(changes).forEach(key => {
+      message += `${key} : ${changes[key]}\n`
+    });
+  }
+
+  let options = {
+    type : 'question',
+    buttons : ['Yes','No'],
+    message : message
+  };
+
+  dialog.showMessageBox(options).then(result => {
+  event.sender.send('save-video-confirm', result.response, changes, video);
+}).catch(err => {
+  console.log(err)
+})})
