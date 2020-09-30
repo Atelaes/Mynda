@@ -294,7 +294,7 @@
   --dropdownarrow-color: var(--collectionheader-text);
 /* } */
 
-/* #movie-table { */
+/* .movie-table { */
   --th-bg: var(--pane-bg-0);
   --th-bg-hover: var(--th-bg); /*var(--light-bg);*/
   --th-text: var(--dim-text);
@@ -669,7 +669,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 /* bump the table right up to the collection header in hierarchical playlists */
-.collection #movie-table {
+.collection .movie-table {
   margin-top: calc(-1 * var(--collectionheader-margin-bottom));
 }
 
@@ -691,7 +691,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 
 /* make the dateadded text spacing skinnier */
-#movie-table .mono {
+.movie-table .mono {
   word-spacing: -.3em;
   /* position: relative;
   bottom: 0.5px; */
@@ -726,28 +726,30 @@ in lieu of that, we will use a negative margin on the selected element instead (
 .detail-title-text {
   text-shadow: 0em 0em .2em #000000;
   white-space: nowrap;
+  margin:0;
+  /* width:fit-content; */
 }
 
 /* add marquee effect to detail title if it's too long */
-/* .detail-title-text.overflow {
-  animation: details-scroll-left 7s ease-in infinite;
-  animation-delay: 2s;
+#details-pane:hover .detail-title-text.overflow {
+  animation: details-scroll-left 6s cubic-bezier(.5, 0, .8, 1) infinite;
+  animation-delay: .5s;
   animation-direction: alternate;
   animation-fill-mode: both;
-} */
+}
 
 @keyframes details-scroll-left {
   0% {
     transform: translateX(0%);
   }
   100% {
-    transform: translateX(-120%);
+    transform: translateX(-101%);
   }
 }
 
-.table-title-text.overflow {
+.movie-row .title:hover .table-title-text.overflow {
   /* marquee effect */
-  animation: table-scroll-left 5s ease-in infinite;
+  animation: table-scroll-left 5s cubic-bezier(.5, 0, .8, 1) infinite;
   animation-delay: 0s;
   animation-direction: alternate;
   animation-fill-mode: both;
@@ -758,7 +760,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
     transform: translateX(0%);
   }
   100% {
-    transform: translateX(-90%);
+    transform: translateX(-110%);
   }
 }
 

@@ -32,7 +32,7 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-select, .collection h1, #movie-table th, #nav-playlists li, .edit-widget *, .movie-row, .clickable {
+select, .collection h1, .movie-table th, #nav-playlists li, .edit-widget *, .movie-row, .clickable {
   cursor: pointer;
   user-select: none;
 }
@@ -283,25 +283,25 @@ button:hover, input[type=submit]:hover {
 th, tr, td {
   border-width:0px;
 }
-#movie-table {
+.movie-table {
   border-collapse: collapse;
   width: 100%;
 }
-#movie-table thead {
+.movie-table thead {
   /* position:fixed; */
 }
 
-#movie-table th {
+.movie-table th {
   background-color: var(--th-bg);
   color: var(--th-text);
   font-family: var(--th-font);
   font-size: var(--th-font-size);
 }
-#movie-table th:hover {
+.movie-table th:hover {
   background-color:var(--th-bg-hover);
   color:var(--th-text-hover);
 }
-#movie-table td {
+.movie-table td {
   padding: var(--tablecell-padding);
   white-space: nowrap;
 }
@@ -363,7 +363,7 @@ th, tr, td {
   font-size: var(--movie-row-year-font-size) !important;
 }
 
-#movie-table .mono {
+.movie-table .mono {
   font-family: var(--table-cell-monofont);
   font-size: var(--table-cell-monofont-size);
   font-weight: var(--table-cell-monofont-weight);

@@ -444,22 +444,22 @@ class MynLibTable extends React.Component {
     // detect if the movie title is too long for the table cell
     // and if so, add the 'overflow' class during mouseover
     // so the css can show the whole thing, however it wants to handle that
-    if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
-      let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
-      if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
-        titleDiv.classList.add('overflow');
-      }
-    }
+    // if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
+    //   let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
+    //   if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
+    //     titleDiv.classList.add('overflow');
+    //   }
+    // }
   }
 
   titleOut(e) {
     // console.log("leave");
     e.stopPropagation();
-    // remove the 'overflow' class in case it was added
-    if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
-      let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
-      titleDiv.classList.remove('overflow');
-    }
+    // // remove the 'overflow' class in case it was added
+    // if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
+    //   let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
+    //   titleDiv.classList.remove('overflow');
+    // }
   }
 
   requestSort(key) {
@@ -563,13 +563,42 @@ class MynLibTable extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    if (oldProps.movies !== this.props.movies) {
+    // if (oldProps.movies !== this.props.movies) {
+    if (!_.isEqual(oldProps.movies,this.props.movies)) {
       this.onChange();
+
     }
+
+    // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
+    // so that when the CSS scrolls to 100%, that means it will scroll just enough to show the end of the text
+    // and give it the 'overflow' class so the css can scroll it (or whatever it wants to do)
+    Array.from(document.getElementsByClassName('movie-table')).map((table) => {
+      Array.from(table.getElementsByClassName('table-title-text')).map((titleDiv) => {
+        // if (titleDiv.innerHTML == 'The Adventures of Buckaroo Banzai Across the 8th Dimension') {
+        // if (titleDiv.innerHTML == 'The Matrix') {
+        //   console.log(titleDiv.innerHTML);
+        //   console.log('parent offsetWidth: ' + titleDiv.parentNode.offsetWidth);
+        //   console.log('self offsetWidth: ' + titleDiv.offsetWidth);
+        //   console.log('scrollWidth: ' + titleDiv.scrollWidth);
+        // }
+
+         // text is overflowing
+        if (titleDiv.parentNode.offsetWidth < titleDiv.scrollWidth) {// && !/\boverflow\b/.test(titleDiv.className)) {
+          // console.log('--found overflowing title: ' + titleDiv.innerHTML);
+          titleDiv.style.marginRight = titleDiv.parentNode.offsetWidth; // necessary to force the parent element (the <td>) to stay wide; otherwise if this is the only overflowing row, the <td> will shrink if we don't add this margin
+          titleDiv.style.width = titleDiv.scrollWidth - titleDiv.parentNode.offsetWidth;
+
+          titleDiv.classList.add('overflow');
+        }
+
+        // console.log('width: ' + titleDiv.style.width);
+      });
+    });
+
   }
 
   render() {
-    return  (<table id="movie-table">
+    return  (<table className="movie-table">
               <thead>
                 <tr id="main-table-header-row">
                   <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
@@ -614,15 +643,43 @@ class MynDetails extends React.Component {
     return displaydate;
   }
 
-  componentDidUpdate(oldProps) {
+  // if the title text overflows its container,
+  // set up title div with the appropriate width and class name for the css to apply a marquee effect
+  setTitleMarquee() {
     try {
       let titleDiv = document.getElementById('detail-title').getElementsByClassName('detail-title-text')[0];
+      // titleDiv.style.width = '100%';
+      titleDiv.style.width = window.getComputedStyle(titleDiv.parentNode, null).getPropertyValue('width');
+
+      let computed = window.getComputedStyle(titleDiv, null);
+      console.log(titleDiv.innerHTML);
+      console.log('width: ' + titleDiv.style.width);
+      console.log('actual width: ' + computed.getPropertyValue('width'));
+      console.log('offsetWidth: ' + titleDiv.offsetWidth);
+      console.log('scrollWidth: ' + titleDiv.scrollWidth);
+      console.log('getBoundingClientRect().width: ' + titleDiv.getBoundingClientRect().width);
+      console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
+      console.log('font-size: ' + computed.getPropertyValue('font-size'));
+
       if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
+        titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth;
         titleDiv.classList.add('overflow');
+      } else {
+        titleDiv.classList.remove('overflow');
       }
+
+      console.log('new width: ' + titleDiv.style.width);
     } catch(e) {
 
     }
+  }
+
+  componentDidUpdate(oldProps) {
+    this.setTitleMarquee();
+  }
+
+  componentDidMount() {
+    // this.setTitleMarquee();
   }
 
   render() {
