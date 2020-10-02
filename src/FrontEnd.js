@@ -405,7 +405,7 @@ class MynLibTable extends React.Component {
 
     this.state = {
       sortKey: null,
-      sortDirection: 'ascending',
+      sortAscending: true,
       sortedRows: [],
       displayOrderColumn: "table-cell"
     }
@@ -463,12 +463,21 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key) {
+    // the default direction of a sort is ascending
+    let ascending = true;
 
-    let direction = 'ascending';
-    if (this.state.sortKey === key && this.state.sortDirection === 'ascending') {
-     direction = 'descending';
+    // except for the following fields, which should have a default sort direction of descending
+    let descendingFields = ['rating','dateadded'];
+    if (descendingFields.includes(key)) {
+      ascending = false;
     }
-    let asc = direction === 'ascending' ? true : false;
+
+    // if the user clicked on the same column that was previously sorted by,
+    // then we override the defaults and just reverse the sort direction of the previous sort
+    if (this.state.sortKey === key) {
+     ascending = !this.state.sortAscending;
+    }
+
     let sortFunctions = {
      title: (a, b) => this.removeArticle(a.title) > this.removeArticle(b.title),
      year: (a, b) => a.year > b.year,
@@ -483,7 +492,7 @@ class MynLibTable extends React.Component {
     let rows = this.props.movies.sort((a, b) => {
 
       let result = sortFunctions[key](a, b) ? 1 : -1;
-      result = asc ? result : -1 * result;
+      result *= ascending ? 1 : -1;
 
       return result;
     }).map((movie) => {
@@ -508,7 +517,7 @@ class MynLibTable extends React.Component {
         </tr>
     )});
 
-    this.setState({ sortKey: key, sortDirection: direction , sortedRows: rows});
+    this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
   }
 
   onChange() {
