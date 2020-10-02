@@ -958,10 +958,70 @@ class MynSettingsFolders extends React.Component {
 class MynSettingsPlaylists extends React.Component {
   constructor(props) {
     super(props);
+
+    this.state = {
+      playlists : props.playlists
+    }
+  }
+
+  updateValue(index,prop,value) {
+    let playlists = _.cloneDeep(this.state.playlists);
+    playlists[index][prop] = value;
+    this.setState({playlists: playlists});
+  }
+
+  reportValid(property,valid) {
+    console.log(property + ' is ' + (!valid ? 'not ':'') + 'valid');
   }
 
   render() {
-    return (<h1>I'm a Playlists!!!</h1>)
+    let playlists = this.state.playlists.map((playlist,i) => (
+      <tr key={i}>
+        <td><input type='checkbox' /></td>
+        <td>
+          <MynEditText
+            object={playlist}
+            property='name'
+            update={(...args) => this.updateValue(i,...args)}
+            options={null}
+            validator={/[^\s]/}
+            validatorTip={'At least 1 non-whitespace character'}
+            allowedEmpty={false}
+            reportValid={this.reportValid}
+          />
+        </td>
+        <td>
+          <select value={playlist.view} onChange={(e) => this.updateValue(i,'view',e.value)}>
+            <option value='flat'>Flat</option>
+            <option value='hierarchical'>Hierarchical</option>
+          </select>
+        </td>
+        <td>
+          <button>Edit</button>
+        </td>
+        <td>
+          <button>Delete</button>
+        </td>
+      </tr>
+    ));
+
+    return (
+      <div>
+        <button>Add New...</button>
+        <table>
+          <thead>
+            <tr>
+              <th>Tab</th>
+              <th>Name</th>
+              <th>View</th>
+              <th></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>{playlists}</tbody>
+        </table>
+      </div>
+    );
   }
 }
 
@@ -1008,9 +1068,9 @@ class MynEditor extends MynOpenablePane {
     this.reportValid = this.reportValid.bind(this);
   }
 
-  reportValid(property,value) {
-    if (typeof value === 'boolean') {
-      this.state.valid[property] = value;
+  reportValid(property,valid) {
+    if (typeof valid === 'boolean') {
+      this.state.valid[property] = valid;
     }
   }
 
@@ -1454,31 +1514,6 @@ class MynEditorEdit extends React.Component {
     }
 
     this.render = this.render.bind(this);
-    this.handleValidity = this.handleValidity.bind(this);
-  }
-
-  handleValidity(valid, property, element, tip) {
-    if (valid) {
-      this.props.reportValid(property,true);
-      element.classList.remove("invalid");
-    } else {
-      this.props.reportValid(property,false);
-      element.classList.add("invalid");
-    }
-
-    // show validator tip on the element, if we were given one
-    let tipper = document.getElementById(property + "-tip");
-    if (tipper) {
-      tipper.parentNode.removeChild(tipper);
-    }
-    if (tip) {
-      console.log(tip);
-      tipper = document.createElement('div')
-      tipper.id = property + "-tip";
-      tipper.className = "tip";
-      tipper.innerHTML = tip;
-      element.parentNode.appendChild(tipper);
-    }
   }
 
   componentDidMount() {
@@ -1504,13 +1539,13 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="title">Title: </label>
         <div className="edit-field-editor">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="title"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.everything.exp}
             validatorTip={this.state.validators.everything.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1522,13 +1557,13 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="year">Year: </label>
         <div className="edit-field-editor">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="year"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.year.exp}
             validatorTip={this.state.validators.year.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1540,13 +1575,13 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="director">Director: </label>
         <div className="edit-field-editor">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="director"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.exp}
             validatorTip={this.state.validators.people.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1558,13 +1593,13 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="directorsort">Director Sort: </label>
         <div className="edit-field-editor">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="directorsort"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.exp}
             validatorTip={this.state.validators.people.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1602,7 +1637,7 @@ class MynEditorEdit extends React.Component {
               storeTransform={value => value.toLowerCase()}
               validator={this.state.validators.tags.exp}
               validatorTip={this.state.validators.tags.tip}
-              handleValidity={this.handleValidity}
+              reportValid={this.props.reportValid}
             />
           </div>
         </div>
@@ -1635,7 +1670,7 @@ class MynEditorEdit extends React.Component {
             options={null}
             validator={this.state.validators.people.exp}
             validatorTip={this.state.validators.people.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1647,14 +1682,14 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="genre">Genre: </label>
         <div className="edit-field-editor select-container select-hovericon">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="genre"
             update={this.props.handleChange}
             options={this.props.settings.used.genres}
             storeTransform={value => value.replace(/\b\w/g,letter => letter.toUpperCase())}
             validator={this.state.validators.tags.exp}
             validatorTip={this.state.validators.tags.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1684,7 +1719,7 @@ class MynEditorEdit extends React.Component {
             movie={this.props.video}
             property="dateadded"
             update={this.props.handleChange}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1699,7 +1734,7 @@ class MynEditorEdit extends React.Component {
             movie={this.props.video}
             property="lastseen"
             update={this.props.handleChange}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1747,7 +1782,7 @@ class MynEditorEdit extends React.Component {
             update={this.props.handleChange}
             validator={this.state.validators.posint.exp}
             validatorTip={this.state.validators.posint.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1765,7 +1800,7 @@ class MynEditorEdit extends React.Component {
             update={this.props.handleChange}
             validator={this.state.validators.numrange.exp}
             validatorTip={this.state.validators.numrange.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1777,7 +1812,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="boxoffice">Box Office: </label>
         <div className="edit-field-editor">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="boxoffice"
             update={this.props.handleChange}
             options={null}
@@ -1785,7 +1820,7 @@ class MynEditorEdit extends React.Component {
             displayTransform={value => accounting.formatMoney(value,'$',0)}
             validator={this.state.validators.money.exp}
             validatorTip={this.state.validators.money.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1837,7 +1872,7 @@ class MynEditorEdit extends React.Component {
             options={null}
             validator={this.state.validators.generous.exp}
             validatorTip={this.state.validators.generous.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1849,13 +1884,13 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="country">Country: </label>
         <div className="edit-field-editor">
           <MynEditText
-            video={this.props.video}
+            object={this.props.video}
             property="country"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.generous.exp}
             validatorTip={this.state.validators.generous.tip}
-            handleValidity={this.handleValidity}
+            reportValid={this.props.reportValid}
           />
         </div>
       </div>
@@ -1893,7 +1928,56 @@ class MynEditorEdit extends React.Component {
   }
 }
 
-class MynEditRatings extends React.Component {
+class MynEdit extends React.Component {
+  constructor(props) {
+    super(props)
+  }
+
+  handleValidity(valid, property, element, tip) {
+    if (valid) {
+      if (this.props.reportValid) {
+        this.props.reportValid(property,true);
+      }
+      element.classList.remove("invalid");
+    } else {
+      if (this.props.reportValid) {
+        this.props.reportValid(property,false);
+      }
+      element.classList.add("invalid");
+    }
+
+    // show validator tip on the element, if we were given one
+    let tipper = document.getElementById(property + '-tip');
+    if (tipper) {
+      tipper.parentNode.removeChild(tipper);
+    }
+    if (tip) {
+      // console.log(tip);
+      tipper = document.createElement('div')
+      tipper.id = property + '-tip';
+      tipper.className = "tip";
+      tipper.innerHTML = tip;
+      element.parentNode.appendChild(tipper);
+    }
+  }
+
+  render() {
+    return null;
+  }
+}
+
+class MynEditWidget extends MynEdit {
+  constructor(props) {
+    super(props)
+  }
+
+  render() {
+    return null;
+  }
+}
+
+
+class MynEditRatings extends MynEdit {
   constructor(props) {
     super(props)
 
@@ -1932,11 +2016,11 @@ class MynEditRatings extends React.Component {
     // let target = event.target;
     // let value = target.value;
     if (value === "") {
-      this.props.handleValidity(true,this.props.property,target);
+      super.handleValidity(true,this.props.property,target);
     } else if (this.props.validator.test(value,min,max)) {
-      this.props.handleValidity(true,this.props.property,target);
+      super.handleValidity(true,this.props.property,target);
     } else {
-      this.props.handleValidity(false,this.props.property,target,this.props.validatorTip(min,max));
+      super.handleValidity(false,this.props.property,target,this.props.validatorTip(min,max));
       // console.log('validation error!');
       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
     }
@@ -2007,7 +2091,7 @@ class MynEditRatings extends React.Component {
   }
 }
 
-class MynEditCollections extends React.Component {
+class MynEditCollections extends MynEdit {
   constructor(props) {
     super(props)
 
@@ -2397,9 +2481,9 @@ class MynEditCollections extends React.Component {
     this.update({collections: updated});
 
     if (this.props.validator.test(order)) {
-      this.props.handleValidity(true,this.props.property,target);
+      super.handleValidity(true,this.props.property,target);
     } else {
-      this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
+      super.handleValidity(false,this.props.property,target,this.props.validatorTip);
     }
 
     if (order !== '') {
@@ -2442,7 +2526,7 @@ class MynEditCollections extends React.Component {
   }
 }
 
-class MynEditText extends React.Component {
+class MynEditText extends MynEdit {
   constructor(props) {
     super(props)
 
@@ -2466,12 +2550,14 @@ class MynEditText extends React.Component {
     this.setStateValue(value);
 
     // handle validation
-    if (value === "") {
-      this.props.handleValidity(true,this.props.property,target);
-    } else if (this.props.validator.test(value)) {
-      this.props.handleValidity(true,this.props.property,target);
-    } else {
-      this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
+    if (this.props.validator) {
+      if (value === "" && this.props.allowedEmpty !== false) {
+        super.handleValidity(true,this.props.property,target);
+      } else if (this.props.validator.test(value)) {
+        super.handleValidity(true,this.props.property,target);
+      } else {
+        super.handleValidity(false,this.props.property,target,this.props.validatorTip);
+      }
     }
 
     // if we're given a transform function (i.e. we want the saved value to be different
@@ -2487,7 +2573,7 @@ class MynEditText extends React.Component {
   }
 
   setStateValuesFromProps() {
-    this.setStateValue(this.props.video[this.props.property]);
+    this.setStateValue(this.props.object[this.props.property]);
   }
 
   // set state form value with optional transform
@@ -2510,7 +2596,7 @@ class MynEditText extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    if (oldProps.video[this.props.property] !== this.props.video[this.props.property]) {
+    if (oldProps.object[this.props.property] !== this.props.object[this.props.property]) {
       this.setStateValuesFromProps();
       // this.handleInput();
     }
@@ -2545,7 +2631,7 @@ class MynEditText extends React.Component {
           type="text"
           name="text"
           value={this.state.value}
-          placeholder={'[' + this.props.property + ']'}
+          placeholder={this.props.placeholder || ''}
           onChange={() => this.handleInput()}
         />
         {options}
@@ -2614,7 +2700,7 @@ class MynEditText extends React.Component {
 //   }
 // }
 
-class MynEditArtwork extends React.Component {
+class MynEditArtwork extends MynEdit {
   constructor(props) {
     super(props)
 
@@ -2826,7 +2912,7 @@ class MynEditArtwork extends React.Component {
 }
 
 // ######  ###### //
-class MynEditGraphicalWidget extends React.Component {
+class MynEditGraphicalWidget extends MynEditWidget {
   constructor(props) {
     super(props)
 
@@ -3027,25 +3113,6 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   // }
 }
 
-class MynEditWidget extends React.Component {
-  constructor(props) {
-    super(props)
-  }
-
-  // handleInputValidity(valid, event) {
-  //   if (valid) {
-  //     event.target.classList.remove("invalid");
-  //   } else {
-  //     event.target.classList.add("invalid");
-  //     console.log("INVALID INPUT!!");
-  //   }
-  // }
-
-  render() {
-    return null;
-  }
-}
-
 // ######  ###### //
 class MynEditListWidget extends MynEditWidget {
   constructor(props) {
@@ -3115,11 +3182,11 @@ class MynEditAddToList extends MynEditListWidget {
     const input = document.getElementById(this.state.id + "-input");
     const item = input.value;
     if (item === "") {
-      this.props.handleValidity(true,this.props.property,input);
+      super.handleValidity(true,this.props.property,input);
     } else if (this.props.validator.test(item)) {
-      this.props.handleValidity(true,this.props.property,input);
+      super.handleValidity(true,this.props.property,input);
     } else {
-      this.props.handleValidity(false,this.props.property,input,this.props.validatorTip);
+      super.handleValidity(false,this.props.property,input,this.props.validatorTip);
       // console.log('validation error!');
       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
     }
@@ -3190,7 +3257,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
     return (
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
-        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} handleValidity={this.props.handleValidity} />
+        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
       </ul>
     );
   }
@@ -3242,7 +3309,7 @@ class MynEditDateWidget extends MynEditWidget {
 
   handleValidity(valid, tip) {
     let element = this.input.current;
-    this.props.handleValidity(valid,this.props.property,element,tip);
+    super.handleValidity(valid,this.props.property,element,tip);
   }
 
   handleInput(event) {
@@ -3301,7 +3368,7 @@ class MynEditDateWidget extends MynEditWidget {
     // console.log("PROPSCHANGE\nold: " + oldProps.movie[this.props.property] + "\nnew: " + this.props.movie[this.props.property] + '\nste: ' + this.state.inputValueTimestamp);
     if (oldProps.movie[this.props.property] != this.props.movie[this.props.property]) {// && this.props.movie[this.props.property] != this.state.inputValueTimestamp) {
       this.setStateValuesFromProps();
-      this.handleValidity(true);
+      super.handleValidity(true);
     }
   }
 
