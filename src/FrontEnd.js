@@ -147,14 +147,14 @@ class Mynda extends React.Component {
             case "director":
             case "description":
             case "genre":
-            case "tags":
               if (regex.test(video[field])) {
                 flag = true;
                 break fieldLoop;
               }
               break;
-            // cast is an array
+            // cast and tags are an array
             case "cast":
+            case "tags":
               for(let i=0; i<video[field].length; i++) {
                 if (regex.test(video[field])) {
                   flag = true;
@@ -482,32 +482,31 @@ class MynLibTable extends React.Component {
 
     let rows = this.props.movies.sort((a, b) => {
 
-      let result = sortFunctions[key](a, b);
-      result = asc ? result : !result;
+      let result = sortFunctions[key](a, b) ? 1 : -1;
+      result = asc ? result : -1 * result;
 
       return result;
     }).map((movie) => {
+      let displaydate = new Date(movie.dateadded * 1000)
+      displaydate = displaydate.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+      // let seenmark = movie.seen ? "\u2714" : "\u2718"
 
-    let displaydate = new Date(movie.dateadded * 1000)
-    displaydate = displaydate.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
-    // let seenmark = movie.seen ? "\u2714" : "\u2718"
+      // if (movie.order === undefined) {
+      //   movie.order = null;
+      // }
 
-    // if (movie.order === undefined) {
-    //   movie.order = null;
-    // }
-
-    return (
-      <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)} onMouseOut={(e) => this.rowOut(movie.id,e)}>
-        <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
-        <td className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>
-        <td className="year centered mono">{movie.year}</td>
-        <td className="director">{movie.director}</td>
-        <td className="genre">{movie.genre}</td>
-        <td className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
-        <td className="rating centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
-        <td className="dateadded centered mono">{displaydate}</td>
-      </tr>
-    )})
+      return (
+        <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)} onMouseOut={(e) => this.rowOut(movie.id,e)}>
+          <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
+          <td className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>
+          <td className="year centered mono">{movie.year}</td>
+          <td className="director">{movie.director}</td>
+          <td className="genre">{movie.genre}</td>
+          <td className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
+          <td className="rating centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
+          <td className="dateadded centered mono">{displaydate}</td>
+        </tr>
+    )});
 
     this.setState({ sortKey: key, sortDirection: direction , sortedRows: rows});
   }
@@ -570,7 +569,7 @@ class MynLibTable extends React.Component {
     }
 
     // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
-    // so that when the CSS scrolls to 100%, that means it will scroll just enough to show the end of the text
+    // so that when the CSS marquee scrolls to 100%, that means it will scroll just enough to show the end of the text;
     // and give it the 'overflow' class so the css can scroll it (or whatever it wants to do)
     Array.from(document.getElementsByClassName('movie-table')).map((table) => {
       Array.from(table.getElementsByClassName('table-title-text')).map((titleDiv) => {
@@ -650,16 +649,16 @@ class MynDetails extends React.Component {
       let titleDiv = document.getElementById('detail-title').getElementsByClassName('detail-title-text')[0];
       // titleDiv.style.width = '100%';
       titleDiv.style.width = window.getComputedStyle(titleDiv.parentNode, null).getPropertyValue('width');
-
       let computed = window.getComputedStyle(titleDiv, null);
-      console.log(titleDiv.innerHTML);
-      console.log('width: ' + titleDiv.style.width);
-      console.log('actual width: ' + computed.getPropertyValue('width'));
-      console.log('offsetWidth: ' + titleDiv.offsetWidth);
-      console.log('scrollWidth: ' + titleDiv.scrollWidth);
-      console.log('getBoundingClientRect().width: ' + titleDiv.getBoundingClientRect().width);
-      console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
-      console.log('font-size: ' + computed.getPropertyValue('font-size'));
+      // console.log(titleDiv.innerHTML);
+      // console.log('width: ' + titleDiv.style.width);
+      // console.log('actual width: ' + computed.getPropertyValue('width'));
+      // console.log('offsetWidth: ' + titleDiv.offsetWidth);
+      // console.log('scrollWidth: ' + titleDiv.scrollWidth);
+      // console.log('getBoundingClientRect().width: ' + titleDiv.getBoundingClientRect().width);
+      // console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
+      // console.log('font-size: ' + computed.getPropertyValue('font-size'));
+      // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
 
       if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
         titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth;
@@ -668,7 +667,7 @@ class MynDetails extends React.Component {
         titleDiv.classList.remove('overflow');
       }
 
-      console.log('new width: ' + titleDiv.style.width);
+      // console.log('new width: ' + titleDiv.style.width);
     } catch(e) {
 
     }
