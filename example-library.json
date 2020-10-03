@@ -72,19 +72,22 @@
       "id" : 0,
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
-      "view" : "flat"
+      "view" : "flat",
+      "tab" : true
     },
     {
       "id" : 1,
       "name" : "Shows",
       "filterFunction" : "video.kind === 'show'",
-      "view" : "hierarchical"
+      "view" : "hierarchical",
+      "tab" : true
     },
     {
       "id" : 2,
       "name" : "Sci-Fi",
       "filterFunction" : "video.tags.includes('sci-fi')",
-      "view" : "flat"
+      "view" : "flat",
+      "tab" : false
     }
   ],
   "collections" : [

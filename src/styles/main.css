@@ -32,12 +32,12 @@ body ::-webkit-scrollbar {
 
 /*  collection titles, table headers, playlist tabs, edit widgets, and table rows
     should have a pointer cursor and not have selectable text */
-select, .collection h1, .movie-table th, #nav-playlists li, .edit-widget *, .movie-row, .clickable {
+select, .collection h1, .movie-table th, #nav-playlists li, .edit-widget *, .movie-row, input[type=checkbox] .clickable {
   cursor: pointer;
   user-select: none;
 }
 
-input[type=text], select {
+input[type=text], select, textarea {
   font-family: var(--textinput-font);
   font-size: var(--textinput-font-size);
   font-weight: var(--textinput-font-weight);
@@ -1070,4 +1070,62 @@ input[type=text]#edit-field-title {
 #editor-pane .collection-terminal-node input[type=text] {
   width:4.3em;
   height: var(--coltermnode-height);
+}
+
+#settings-playlists table th {
+  color: var(--th-text);
+  font-family: var(--th-font);
+  /* font-size: 1rem; */
+  font-size: calc(var(--th-font-size) * .8);
+}
+
+#settings-playlists table th button {
+  color: var(--button-text);
+  font-family: var(--button-font);
+  font-size: var(--button-fontsize);
+  font-weight: var(--button-fontweight);
+}
+
+#settings-playlists table tr {
+  vertical-align: top;
+}
+
+#settings-playlists table td {
+  text-align:center;
+}
+
+#settings-playlists table .name-and-filter {
+  text-align:left;
+}
+
+#settings-playlists .drag-button {
+  opacity:.3;
+  user-select: none;
+  cursor:grab;
+}
+
+#settings-playlists .drag-button:active {
+  cursor:grabbing;
+}
+
+#settings-playlists .drag-button,
+#settings-playlists .checkbox {
+  line-height: var(--textinput-height);
+}
+
+#settings-playlists .checkbox input {
+  height: var(--textinput-height);
+  margin:0;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#settings-playlists table textarea {
+  font-family: var(--table-cell-monofont);
+  font-size: calc(var(--textinput-font-size) * .8);
+  width:100%;
+  height:5em;
+  padding: .3em .5em .3em .5em;
+  margin-top:.15rem;
+  margin-bottom:.3rem;
 }

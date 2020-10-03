@@ -960,11 +960,12 @@ class MynSettingsPlaylists extends React.Component {
     super(props);
 
     this.state = {
-      playlists : props.playlists
+      playlists : _.cloneDeep(props.playlists)
     }
   }
 
   updateValue(index,prop,value) {
+    console.log(`Updating ${index}: ${prop} = ${value}`);
     let playlists = _.cloneDeep(this.state.playlists);
     playlists[index][prop] = value;
     this.setState({playlists: playlists});
@@ -974,11 +975,25 @@ class MynSettingsPlaylists extends React.Component {
     console.log(property + ' is ' + (!valid ? 'not ':'') + 'valid');
   }
 
+  showEditPlaylistFilter(playlist) {
+    let editField = document.getElementById('edit-filter-field-' + playlist.id);
+    if (editField.style.display === 'none') {
+      editField.style.display = 'block';
+    } else {
+      editField.style.display = 'none';
+    }
+  }
+
+  deletePlaylist(playlist) {
+
+  }
+
   render() {
     let playlists = this.state.playlists.map((playlist,i) => (
-      <tr key={i}>
-        <td><input type='checkbox' /></td>
-        <td>
+      <tr key={i} id={'settings-playlists-row-' + playlist.id}>
+        <td className='drag-button'>{'\u2630'}</td>
+        <td className='checkbox'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.updateValue(i,'tab',e.target.checked)} /></td>
+        <td className='name-and-filter'>
           <MynEditText
             object={playlist}
             property='name'
@@ -989,33 +1004,42 @@ class MynSettingsPlaylists extends React.Component {
             allowedEmpty={false}
             reportValid={this.reportValid}
           />
+          <textarea
+            id={'edit-filter-field-' + playlist.id}
+            className='edit-filter-field'
+            name="playlist filter"
+            value={playlist.filterFunction}
+            placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
+            onChange={(e) => this.updateValue(i,'filterFunction',e.target.value)}
+            style={{display: 'none'}}
+          />
         </td>
         <td>
-          <select value={playlist.view} onChange={(e) => this.updateValue(i,'view',e.value)}>
+          <select value={playlist.view} onChange={(e) => this.updateValue(i,'view',e.target.value)}>
             <option value='flat'>Flat</option>
             <option value='hierarchical'>Hierarchical</option>
           </select>
         </td>
         <td>
-          <button>Edit</button>
+          <button onClick={() => this.showEditPlaylistFilter(playlist)}>Edit</button>
         </td>
         <td>
-          <button>Delete</button>
+          <button onClick={() => this.deletePlaylist(playlist)}>Delete</button>
         </td>
       </tr>
     ));
 
     return (
-      <div>
-        <button>Add New...</button>
-        <table>
+      <div id='settings-playlists'>
+        <table id='settings-playlists-table'>
           <thead>
             <tr>
-              <th>Tab</th>
+              <th></th>
+              <th title="Checked playlists will display as tabs. Unchecked playlists will only appear in the dropdown">Tab</th>
               <th>Name</th>
-              <th>View</th>
+              <th title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</th>
               <th></th>
-              <th></th>
+              <th><button>Add...</button></th>
             </tr>
           </thead>
           <tbody>{playlists}</tbody>
