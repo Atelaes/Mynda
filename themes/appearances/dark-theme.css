@@ -249,10 +249,22 @@
 
   --settingstabs-container-padding: 0em;
   --settingstabs-container-margin: 0em;
-  --settingstabs-bgcolor-selected: #444444;
+  --settingstabs-text: var(--dim-text);
+  --settingstabs-bgcolor: var(--med-bg);
   --settingstabs-padding: .1em .5em .1em .5em;
   --settingstabs-margin: initial;
-  --settingstabs-border: 1px solid gray;
+  --settingstabs-borderwidth-width: .08em;
+  --settingstabs-borderwidth: 0 0 var(--settingstabs-borderwidth-width) 0;
+  --settingstabs-bordercolor: var(--light-bg);
+  --settingstabs-borderstyle: solid;
+  --settingstabs-border-radius: 0px;
+
+  --settingstabs-bgcolor-selected: initial;
+  --settingstabs-text-selected: var(--bright-text);
+  --settingstabs-borderwidth-selected: 0px; /*var(--settingstabs-borderwidth-width) var(--settingstabs-borderwidth-width) 0 var(--settingstabs-borderwidth-width); */
+  --settingstabs-bordercolor-selected: var(--settingstabs-bordercolor);
+  --settingstabs-borderstyle-selected: solid;
+  --settingstabs-border-radius-selected: 0px;
 
   --settingscontent-padding: 1em;
 
@@ -643,6 +655,7 @@ input[type=checkbox]::after {
   visibility:visible;
   /* z-index:-1000; */
   box-sizing: border-box;
+  cursor:pointer;
   position:absolute;
   left: calc(50% - (var(--width)/2));
   top: calc(50% - (var(--width)/2));
@@ -1100,4 +1113,13 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 .edit-field.ratings .edit-field-editor table td {
   user-select: none;
+}
+
+/* #settings-tabs li.selected + li { */
+#settings-tabs li.after-selected {
+  /* border-radius: 0 0 0 var(--playlisttab-borderradius-radius); */
+}
+
+#settings-tabs li.before-selected {
+  /* border-radius: 0 0 var(--playlisttab-borderradius-radius) 0; */
 }

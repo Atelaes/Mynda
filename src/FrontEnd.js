@@ -770,13 +770,30 @@ class MynSettings extends MynOpenablePane {
     // this.render = this.render.bind(this);
   }
 
-  setView(view,event) {
+  setView(view,event,index) {
+    // if the index isn't passed to us, find it from the view name;
+    // even though object keys aren't in a reliable order, these should be
+    // in the same order as they were when we generated the tabs
+    if (index === undefined) {
+      Object.keys(this.state.views).forEach((v,i) => {
+        if (v == view) {
+          index = i;
+        }
+      });
+    }
+
+    // console.log('index: ' + index);
     this.setState({settingView : this.state.views[view]});
 
     // remove "selected" class from all the tabs
     try {
-      Array.from(document.getElementById("settings-tabs").getElementsByClassName("tab")).map((tab) => {
+      Array.from(document.getElementById("settings-tabs").getElementsByClassName("tab")).map((tab,i) => {
+        // console.log('i: ' + i);
         tab.classList.remove("selected");
+
+        // make classes for the selected-adjacent tabs
+        if (i == index-1) { tab.classList.add("before-selected"); } else { tab.classList.remove("before-selected"); }
+        if (i == index+1) { tab.classList.add("after-selected"); } else { tab.classList.remove("after-selected"); }
       });
     } catch(e) {
       console.log('There was an error updating classes for the settings tabs: ' + e.toString());
@@ -802,8 +819,8 @@ class MynSettings extends MynOpenablePane {
 
   createContentJSX() {
     const tabs = [];
-    Object.keys(this.state.views).forEach((tab) => {
-      tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
+    Object.keys(this.state.views).forEach((tab,i) => {
+      tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e,i)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
     });
 
     return (
@@ -1015,10 +1032,12 @@ class MynSettingsPlaylists extends React.Component {
           />
         </td>
         <td>
-          <select value={playlist.view} onChange={(e) => this.updateValue(i,'view',e.target.value)}>
-            <option value='flat'>Flat</option>
-            <option value='hierarchical'>Hierarchical</option>
-          </select>
+          <div className='select-container select-alwaysicon'>
+            <select value={playlist.view} onChange={(e) => this.updateValue(i,'view',e.target.value)}>
+              <option value='flat'>Flat</option>
+              <option value='hierarchical'>Hierarchical</option>
+            </select>
+          </div>
         </td>
         <td>
           <button onClick={() => this.showEditPlaylistFilter(playlist)}>Edit</button>

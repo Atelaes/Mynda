@@ -562,12 +562,23 @@ th, tr, td {
   list-style-type: none;
   cursor:pointer;
   user-select: none;
+  box-sizing: border-box;
   padding: var(--settingstabs-padding);
   margin: var(--settingstabs-margin);
-  border: var(--settingstabs-border);
+  border-width: var(--settingstabs-borderwidth);
+  border-color: var(--settingstabs-bordercolor);
+  border-style: var(--settingstabs-borderstyle);
+  border-radius: var(--settingstabs-border-radius);
+  background-color: var(--settingstabs-bgcolor);
+  color: var(--settingstabs-text);
 }
 #settings-tabs .selected {
+  color: var(--settingstabs-text-selected);
   background-color: var(--settingstabs-bgcolor-selected);
+  border-width: var(--settingstabs-borderwidth-selected);
+  border-color: var(--settingstabs-bordercolor-selected);
+  border-style: var(--settingstabs-borderstyle-selected);
+  border-radius: var(--settingstabs-border-radius-selected);
 }
 #settings-content {
   padding: var(--settingscontent-padding);
