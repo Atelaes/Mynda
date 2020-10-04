@@ -214,3 +214,18 @@ ipcMain.on('save-video-confirm', (event, changes, video) => {
 }).catch(err => {
   console.log(err)
 })})
+
+ipcMain.on('generic-confirm', (event, message, id) => {
+  console.log('generic-confirm!!!');
+
+  let options = {
+    type : 'question',
+    buttons : ['Yes','No'],
+    message : message
+  };
+
+  dialog.showMessageBox(options).then(result => {
+  event.sender.send('generic-confirm', result.response, id);
+}).catch(err => {
+  console.log(err)
+})})

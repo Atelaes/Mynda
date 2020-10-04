@@ -670,7 +670,7 @@ th, tr, td {
   text-transform: capitalize;
 }
 
-input[type=text]#edit-field-title {
+#editor-pane input[type=text].edit-field-title {
   text-align:center;
   font-family: var(--editor-input-title-font);
   font-size: var(--editor-input-title-font-size);

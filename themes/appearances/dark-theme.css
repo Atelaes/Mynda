@@ -1121,5 +1121,25 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 #settings-tabs li.before-selected {
+  /* border-right-width: var(--settingstabs-borderwidth-width); */
   /* border-radius: 0 0 var(--playlisttab-borderradius-radius) 0; */
+}
+
+#settings-tabs li.selected {
+  /* border-right-width: var(--settingstabs-borderwidth-width); */
+}
+
+#settings-tabs::after {
+  content: '\2007';
+  width:100%;
+  height:100%;
+  box-sizing: border-box;
+  padding: var(--settingstabs-padding);
+  margin: var(--settingstabs-margin);
+  border-width: var(--settingstabs-borderwidth);
+  border-color: var(--settingstabs-bordercolor);
+  border-style: var(--settingstabs-borderstyle);
+  border-radius: var(--settingstabs-border-radius);
+  background-color: var(--settingstabs-bgcolor);
+  color: var(--settingstabs-text);
 }

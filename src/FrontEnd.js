@@ -979,6 +979,16 @@ class MynSettingsPlaylists extends React.Component {
     this.state = {
       playlists : _.cloneDeep(props.playlists)
     }
+
+    ipcRenderer.on('generic-confirm', (event, response, id) => {
+      if (response === 0) { // yes
+        // delete playlist
+        let playlists = _.cloneDeep(this.state.playlists).filter(playlist => playlist.id !== id);
+        this.setState({playlists:playlists});
+      } else {
+        console.log('Deletion cancelled by user')
+      }
+    });
   }
 
   updateValue(index,prop,value) {
@@ -1002,12 +1012,28 @@ class MynSettingsPlaylists extends React.Component {
   }
 
   deletePlaylist(playlist) {
+    let playlistName = playlist.name != '' ? `the '${playlist.name}' playlist` : 'this playlist'
+    ipcRenderer.send('generic-confirm', `Are you sure you want to delete ${playlistName}?`, playlist.id);
+  }
 
+  addPlaylist() {
+    let newPlaylist = {
+      id : uuidv4(),
+      name : "",
+      filterFunction : "false",
+      view : "flat",
+      tab : true
+    }
+    let playlists = _.cloneDeep(this.state.playlists);
+    playlists.unshift(newPlaylist);
+    this.setState({playlists : playlists});
   }
 
   render() {
+    console.log(JSON.stringify(this.state.playlists));
+
     let playlists = this.state.playlists.map((playlist,i) => (
-      <tr key={i} id={'settings-playlists-row-' + playlist.id}>
+      <tr key={playlist.id} id={'settings-playlists-row-' + playlist.id}>
         <td className='drag-button'>{'\u2630'}</td>
         <td className='checkbox'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.updateValue(i,'tab',e.target.checked)} /></td>
         <td className='name-and-filter'>
@@ -1058,7 +1084,7 @@ class MynSettingsPlaylists extends React.Component {
               <th>Name</th>
               <th title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</th>
               <th></th>
-              <th><button>Add...</button></th>
+              <th><button onClick={() => this.addPlaylist()}>Add...</button></th>
             </tr>
           </thead>
           <tbody>{playlists}</tbody>
@@ -1989,15 +2015,21 @@ class MynEdit extends React.Component {
       element.classList.add("invalid");
     }
 
+    // if the element doesn't already have an id, we need to create a unique one,
+    // so that we can reference it below to add/remove the tip div
+    if (!element.id) {
+      element.id = uuidv4();
+    }
+
     // show validator tip on the element, if we were given one
-    let tipper = document.getElementById(property + '-tip');
+    let tipper = document.getElementById(property + '-tip-' + element.id);
     if (tipper) {
       tipper.parentNode.removeChild(tipper);
     }
     if (tip) {
       // console.log(tip);
       tipper = document.createElement('div')
-      tipper.id = property + '-tip';
+      tipper.id = property + '-tip-' + element.id;
       tipper.className = "tip";
       tipper.innerHTML = tip;
       element.parentNode.appendChild(tipper);
@@ -2656,7 +2688,7 @@ class MynEditText extends MynEdit {
     if (this.props.options) {
       listName = "used-" + this.props.property;
       options = (
-        <datalist id={listName}>
+        <datalist className={listName}>
           {this.props.options.map((option) => (<option key={option} value={option} />))}
         </datalist>
       );
@@ -2669,7 +2701,7 @@ class MynEditText extends MynEdit {
       <div>
         <input
           ref={this.input}
-          id={"edit-field-" + this.props.property}
+          className={"edit-field-" + this.props.property}
           list={listName}
           type="text"
           name="text"
