@@ -1,4 +1,5 @@
-//const React = require('React');
+const React = require('react');
+const ReactDOM = require('react-dom');
 const electron = require('electron');
 const { ipcRenderer } = require('electron');
 const _ = require('lodash');
@@ -12,6 +13,7 @@ const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -989,12 +991,24 @@ class MynSettingsPlaylists extends React.Component {
         console.log('Deletion cancelled by user')
       }
     });
+
+    this.updateValue = this.updateValue.bind(this);
+    this.reportValid = this.reportValid.bind(this);
+    this.showEditPlaylistFilter = this.showEditPlaylistFilter.bind(this);
+    this.deletePlaylist = this.deletePlaylist.bind(this);
+    this.addPlaylist = this.addPlaylist.bind(this);
+    this.onDragEnd = this.onDragEnd.bind(this);
   }
 
   updateValue(index,prop,value) {
     console.log(`Updating ${index}: ${prop} = ${value}`);
     let playlists = _.cloneDeep(this.state.playlists);
     playlists[index][prop] = value;
+
+    if (prop === 'tab') {
+      playlists = this.sortByTab(playlists);
+    }
+
     this.setState({playlists: playlists});
   }
 
@@ -1029,67 +1043,140 @@ class MynSettingsPlaylists extends React.Component {
     this.setState({playlists : playlists});
   }
 
+  // order playlist array according to the user's drag and drop action
+  onDragEnd(result) {
+    const { destination, source, draggableId } = result;
+    // if the user actually moved an item
+    if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
+      // re-order the array
+      const playlists = _.cloneDeep(this.state.playlists);
+      const movedItems = playlists.splice(source.index, 1);
+      playlists.splice(destination.index, 0, movedItems[0]);
+
+      // now change the 'tab' value of the playlist if it was moved amongst or away from the 'tab'-ed playlists
+      if (playlists[destination.index + 1] && playlists[destination.index + 1].tab) {
+        playlists[destination.index].tab = true;
+      }
+      if (playlists[destination.index - 1] && !playlists[destination.index - 1].tab) {
+        playlists[destination.index].tab = false;
+      }
+
+      this.setState({playlists:playlists});
+    }
+  }
+
+  sortByTab(playlists) {
+    playlists.sort((a,b) => {
+      return a.tab > b.tab ? -1 : 1;
+    });
+    return playlists;
+  }
+
   render() {
     console.log(JSON.stringify(this.state.playlists));
 
     let playlists = this.state.playlists.map((playlist,i) => (
-      <tr key={playlist.id} id={'settings-playlists-row-' + playlist.id}>
-        <td className='drag-button'>{'\u2630'}</td>
-        <td className='checkbox'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.updateValue(i,'tab',e.target.checked)} /></td>
+      <Draggable key={playlist.id} draggableId={'' + playlist.id} index={i}>
+        {(provided) => (
+          <MynSettingsPlaylistsTableRow
+            playlist={playlist}
+            index={i}
+            updateValue={this.updateValue}
+            showEditPlaylistFilter={this.showEditPlaylistFilter}
+            deletePlaylist={this.deletePlaylist}
+            reportValid={this.reportValid}
+            innerRef={provided.innerRef}
+            provided={provided}
+          />
+        )}
+      </Draggable>
+    ));
+
+    // add a divider at the end of the tab==true playlists
+    // for (let i=0; i<this.state.playlists.length; i++) {
+    //   if (this.state.playlists[i-1] && !this.state.playlists[i].tab && this.state.playlists[i-1].tab) {
+    //     playlists.splice(i,0,(<tr id='settings-playlists-rowdivider' key='-1'><td/><td/><td/><td/><td/><td/></tr>));
+    //   }
+    // }
+
+    return (
+      <div id='settings-playlists'>
+        <DragDropContext onDragEnd={this.onDragEnd}>
+          <table id='settings-playlists-table'>
+            <thead>
+              <tr>
+                <th></th>
+                <th title="Checked playlists will display as tabs. Unchecked playlists will only appear in the dropdown">Tab</th>
+                <th>Name</th>
+                <th title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</th>
+                <th></th>
+                <th><button onClick={() => this.addPlaylist()}>Add...</button></th>
+              </tr>
+            </thead>
+              <Droppable droppableId='settings-playlist-table'>
+                {(provided) => (
+                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
+                    {playlists}
+                    {provided.placeholder}
+                  </tbody>
+                )}
+              </Droppable>
+          </table>
+        </DragDropContext>
+      </div>
+    );
+  }
+}
+
+class MynSettingsPlaylistsTableRow extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    let playlist = this.props.playlist;
+
+    return (
+      <tr id={'settings-playlists-row-' + playlist.id} ref={this.props.innerRef} {...this.props.provided.draggableProps}>
+        <td className='drag-button' {...this.props.provided.dragHandleProps}>{'\u2630'}</td>
+        <td className='checkbox'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.props.updateValue(this.props.index,'tab',e.target.checked)} /></td>
         <td className='name-and-filter'>
           <MynEditText
             object={playlist}
             property='name'
-            update={(...args) => this.updateValue(i,...args)}
+            update={(...args) => this.props.updateValue(this.props.index,...args)}
             options={null}
             validator={/[^\s]/}
             validatorTip={'At least 1 non-whitespace character'}
             allowedEmpty={false}
-            reportValid={this.reportValid}
+            reportValid={this.props.reportValid}
           />
-          <textarea
-            id={'edit-filter-field-' + playlist.id}
-            className='edit-filter-field'
-            name="playlist filter"
-            value={playlist.filterFunction}
-            placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
-            onChange={(e) => this.updateValue(i,'filterFunction',e.target.value)}
-            style={{display: 'none'}}
-          />
+          <div id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
+            Filter:
+            <textarea
+              className='edit-filter-field'
+              name="playlist filter"
+              value={playlist.filterFunction}
+              placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
+              onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
+            />
+          </div>
         </td>
-        <td>
+        <td className='view'>
           <div className='select-container select-alwaysicon'>
-            <select value={playlist.view} onChange={(e) => this.updateValue(i,'view',e.target.value)}>
+            <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
               <option value='flat'>Flat</option>
               <option value='hierarchical'>Hierarchical</option>
             </select>
           </div>
         </td>
         <td>
-          <button onClick={() => this.showEditPlaylistFilter(playlist)}>Edit</button>
+          <button onClick={() => this.props.showEditPlaylistFilter(playlist)}>Edit</button>
         </td>
         <td>
-          <button onClick={() => this.deletePlaylist(playlist)}>Delete</button>
+          <button onClick={() => this.props.deletePlaylist(playlist)}>Delete</button>
         </td>
       </tr>
-    ));
-
-    return (
-      <div id='settings-playlists'>
-        <table id='settings-playlists-table'>
-          <thead>
-            <tr>
-              <th></th>
-              <th title="Checked playlists will display as tabs. Unchecked playlists will only appear in the dropdown">Tab</th>
-              <th>Name</th>
-              <th title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</th>
-              <th></th>
-              <th><button onClick={() => this.addPlaylist()}>Add...</button></th>
-            </tr>
-          </thead>
-          <tbody>{playlists}</tbody>
-        </table>
-      </div>
     );
   }
 }
@@ -1610,6 +1697,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="title"
+            className="edit-field-title"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.everything.exp}
@@ -1628,6 +1716,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="year"
+            className="edit-field-year"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.year.exp}
@@ -1646,6 +1735,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="director"
+            className="edit-field-director"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.exp}
@@ -1664,6 +1754,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="directorsort"
+            className="edit-field-directorsort"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.exp}
@@ -1753,6 +1844,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="genre"
+            className="edit-field-genre"
             update={this.props.handleChange}
             options={this.props.settings.used.genres}
             storeTransform={value => value.replace(/\b\w/g,letter => letter.toUpperCase())}
@@ -1883,6 +1975,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="boxoffice"
+            className="edit-field-boxoffice"
             update={this.props.handleChange}
             options={null}
             storeTransform={value => Math.round(accounting.unformat(value))}
@@ -1955,6 +2048,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="country"
+            className="edit-field-country"
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.generous.exp}
@@ -2701,7 +2795,7 @@ class MynEditText extends MynEdit {
       <div>
         <input
           ref={this.input}
-          className={"edit-field-" + this.props.property}
+          className={this.props.className || ''}
           list={listName}
           type="text"
           name="text"

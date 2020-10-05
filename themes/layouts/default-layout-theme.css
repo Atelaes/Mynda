@@ -50,8 +50,7 @@
 .openable-pane {
   z-index: var(--openablepane-zindex);
   position: absolute;
-  min-width: var(--openablepane-width);
-  max-width: 100%;
+  width: var(--openablepane-width);
   min-height: var(--openablepane-height);
   top: var(--openablepane-top);
   left: var(--openablepane-left);
