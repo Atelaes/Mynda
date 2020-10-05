@@ -43,6 +43,7 @@ input[type=text], select, textarea {
   font-weight: var(--textinput-font-weight);
   height: var(--textinput-height);
   outline: none;
+  box-sizing: border-box;
   background-color: var(--textinput-bg-color);
   color: var(--textinput-text);
   border: var(--textinput-border);
@@ -251,7 +252,7 @@ button:hover, input[type=submit]:hover {
   font-weight: var(--searchinput-font-weight);
   height: var(--searchinput-height);
   outline: none;
-  box-sizing: border-box;
+  /* box-sizing: border-box; */
   background-color: var(--searchinput-bg);
   color: var(--searchinput-text);
   border: var(--searchinput-border);
