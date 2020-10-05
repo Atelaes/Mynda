@@ -251,6 +251,7 @@ button:hover, input[type=submit]:hover {
   font-weight: var(--searchinput-font-weight);
   height: var(--searchinput-height);
   outline: none;
+  box-sizing: border-box;
   background-color: var(--searchinput-bg);
   color: var(--searchinput-text);
   border: var(--searchinput-border);
