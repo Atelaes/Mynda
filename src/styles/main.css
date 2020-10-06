@@ -946,7 +946,7 @@ th, tr, td {
   bottom: 0em; /*calc(-1 * var(--tip-fontsize));*/
 }
 
-#editor-pane .tip {
+.tip {
   position:absolute;
   font-size: var(--tip-fontsize);
   opacity:.7;

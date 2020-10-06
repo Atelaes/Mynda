@@ -86,7 +86,7 @@ class Mynda extends React.Component {
     try {
       filteredVids = this.state.videos.filter(video => eval(playlist.filterFunction))
     } catch(err) {
-      console.error(`Unable to execute playlist filter: ${err}`);
+      console.error(`Unable to execute filter for ${playlist.name} playlist: ${err}`);
     }
     return filteredVids;
   }
@@ -259,9 +259,14 @@ class MynNav extends React.Component {
   render() {
     return (<div id="nav-pane" className="pane">
         <ul id="nav-playlists">
-          {this.props.playlists.map((playlist, index) => (
-            <li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>
-          ))}
+          {this.props.playlists.map((playlist, index) => {
+            // if playlist is selected to be displayed in as a tab in the navbar
+            if (playlist.tab) {
+              return (<li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>);
+            } else {
+              // eventually we'll add the others to a dropdown/flyout menu
+            }
+          })}
         </ul>
         <div id="nav-controls">
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
@@ -757,19 +762,57 @@ class MynSettings extends MynOpenablePane {
   constructor(props) {
     super(props)
 
+    this.save = this.save.bind(this);
+
     this.state = {
       paneID: 'settings-pane',
 
       views: {
-        folders : (<MynSettingsFolders folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
-        playlists : (<MynSettingsPlaylists playlists={this.props.playlists} />),
-        collections : (<MynSettingsCollections collections={this.props.collections} />),
-        themes : (<MynSettingsThemes themes={this.props.settings.themes} />)
+        folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
+        playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} />),
+        collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
+        themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />)
       },
-      settingView: null
+      settingView: null,
+      delaySave: false
     }
 
-    // this.render = this.render.bind(this);
+  }
+
+  save(saveObj) {
+    if (!this.state.delaySave) {
+      console.log('Timer not running, saving now!!');
+      // SAVE
+      // saveObj should be an object with the keys being the 'replace' parameter in the library.replace function
+      // (i.e. a string address in dot notation pointing to the object being updated in the library)
+      // and the values should be the object being updated;
+      // then we just loop over all the keys, and save everything to the library
+      Object.keys(saveObj).forEach((address) => {
+        library.replace(address, saveObj[address]);
+      });
+
+      // set delay timer
+      console.log('Setting new timer...');
+      this.setState({delaySave:true});
+      const timer = setTimeout(() => {
+        console.log('Timer ended');
+        this.setState({delaySave:false});
+        // if at the end of the timer, there is an update waiting to be saved, save it
+        if (this.state.toSave) {
+          console.log('Timer ended, there was an update waiting to be saved, calling save function again');
+          this.save(_.cloneDeep(this.state.toSave));
+          // and clear it for next time
+          this.setState({toSave:null});
+        } else {
+          console.log('Timer ended, no update waiting to be saved');
+        }
+      },5000);
+    } else {
+      // the delay timer is running, so instead of saving, store the object in state
+      // to be saved at the end of the timer
+      console.log('Tried to save, but timer running!! Saving this update for timer end.');
+      this.setState({toSave:saveObj});
+    }
   }
 
   setView(view,event,index) {
@@ -979,14 +1022,17 @@ class MynSettingsPlaylists extends React.Component {
     super(props);
 
     this.state = {
-      playlists : _.cloneDeep(props.playlists)
+      playlists : _.cloneDeep(props.playlists),
+      valid : {}
     }
 
     ipcRenderer.on('generic-confirm', (event, response, id) => {
       if (response === 0) { // yes
         // delete playlist
         let playlists = _.cloneDeep(this.state.playlists).filter(playlist => playlist.id !== id);
-        this.setState({playlists:playlists});
+        this.setState({playlists:playlists}, () => {
+          this.updateValue(); // force a save to the library
+        });
       } else {
         console.log('Deletion cancelled by user')
       }
@@ -1003,17 +1049,33 @@ class MynSettingsPlaylists extends React.Component {
   updateValue(index,prop,value) {
     console.log(`Updating ${index}: ${prop} = ${value}`);
     let playlists = _.cloneDeep(this.state.playlists);
-    playlists[index][prop] = value;
 
-    if (prop === 'tab') {
-      playlists = this.sortByTab(playlists);
+    // if an index is given, update that playlist
+    if (!isNaN(index) && index >= 0) {
+      playlists[index][prop] = value;
+
+      if (prop === 'tab') {
+        playlists = this.sortByTab(playlists);
+      }
+
+      // update the playlists object in state (this is what is displayed in the editor)
+      this.setState({playlists: playlists});
     }
 
-    this.setState({playlists: playlists});
+    // if there are no invalid fields, save the updated playlists to the library
+    let invalidFields = Object.keys(this.state.valid).filter(key => this.state.valid[key] === false);
+    if (invalidFields.length == 0) {
+      this.props.save({'playlists':playlists});
+    } else {
+      console.log('Not saving, the following fields are invalid: ' + invalidFields);
+    }
   }
 
   reportValid(property,valid) {
     console.log(property + ' is ' + (!valid ? 'not ':'') + 'valid');
+    if (typeof valid === 'boolean') {
+      this.state.valid[property] = valid;
+    }
   }
 
   showEditPlaylistFilter(playlist) {
@@ -1041,6 +1103,10 @@ class MynSettingsPlaylists extends React.Component {
     let playlists = _.cloneDeep(this.state.playlists);
     playlists.unshift(newPlaylist);
     this.setState({playlists : playlists});
+    // we do NOT want to call this.updateValue here to force a save,
+    // because we don't want the new playlists to start being saved until a name
+    // is entered by the user. The playlist will be saved automatically when that
+    // or any other change is made to the playlist by the user
   }
 
   // order playlist array according to the user's drag and drop action
@@ -1061,7 +1127,9 @@ class MynSettingsPlaylists extends React.Component {
         playlists[destination.index].tab = false;
       }
 
-      this.setState({playlists:playlists});
+      this.setState({playlists:playlists}, () => {
+        this.updateValue(); // passing no parameters means nothing will be updated, but the whole (newly ordered) array will still be saved
+      });
     }
   }
 
