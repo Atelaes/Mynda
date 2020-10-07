@@ -35,6 +35,33 @@
         }
       ]
     },
+    "preferences" : {
+      "defaultcolumns" : {
+        "used" : [
+          "title",
+          "year",
+          "director",
+          "genre",
+          "seen",
+          "ratings_user",
+          "dateadded"
+        ],
+        "unused" : [
+          "kind",
+          "lastseen",
+          "ratings_rt",
+          "ratings_imdb",
+          "ratings_metacritic",
+          "ratings_avg",
+          "boxoffice",
+          "rated",
+          "country",
+          "languages",
+          "duration"
+        ]
+      },
+      "hidedescription" : false
+    },
     "used" : {
       "kinds" : [
         "movie",

@@ -37,6 +37,7 @@ class Library {
 
     this.Queue = [];
     this.waitConfirm = null;
+    // this.lastUpdate = Date.now();
   }
 
   // Master changing function used by add, replace, and remove.
@@ -116,6 +117,11 @@ class Library {
         //If this was a local operation, request other library mirror it
         this.sync({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       }
+      // console.log("Library.js lastUpdate before: " + this.lastUpdate);
+      // this.lastUpdate = Date.now();
+      // console.log("Library.js lastUpdate after: " + this.lastUpdate);
+      savedPing.saved(address);
+
     } catch(e) {
       console.log(`Error with library alter event.  op: ${opType}, add: ${address}, ent: ${entry}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
@@ -252,6 +258,33 @@ let defaultLibrary = {
           "dependencies" : {}
         }
       ]
+    },
+    "preferences" : {
+      "defaultcolumns" : {
+        "used" : [
+          "title",
+          "year",
+          "director",
+          "genre",
+          "seen",
+          "ratings_user",
+          "dateadded"
+        ],
+        "unused" : [
+          "kind",
+          "lastseen",
+          "ratings_rt",
+          "ratings_imdb",
+          "ratings_metacritic",
+          "ratings_avg",
+          "boxoffice",
+          "rated",
+          "country",
+          "languages",
+          "duration"
+        ]
+      },
+      "hidedescription" : false
     },
     "used" : {
       "kinds" : [

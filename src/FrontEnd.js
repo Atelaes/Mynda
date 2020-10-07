@@ -14,6 +14,7 @@ const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+let savedPing = {};
 
 class Mynda extends React.Component {
   constructor(props) {
@@ -34,7 +35,7 @@ class Mynda extends React.Component {
       prevQuery: '',
 
       settingsPane: null,
-      editorPane: null
+      editorPane: null,
     }
 
     this.render = this.render.bind(this);
@@ -46,6 +47,34 @@ class Mynda extends React.Component {
     // this.showSettings = this.showSettings.bind(this);
     // this.hideSettings = this.hideSettings.bind(this);
   }
+
+  displayColumnName(name) {
+    const substitutions = {
+      "ratings_user" : "rating",
+      "dateadded" : "added",
+      "lastseen" : "seen",
+      "ratings_rt" : (<img src="../images/logos/rt-logo.png" />),
+      "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" />),
+      "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" />),
+      "ratings_avg" : "avg rating",
+      "boxoffice" : "box office",
+      "languages" : "language",
+      "duration" : "runtime",
+    }
+
+    let result = name;
+
+    if (Object.keys(substitutions).includes(name)) {
+      result = substitutions[name];
+    }
+
+    if (typeof result === 'string') {
+      result = result.replace(/\b\w/g,(letter) => letter.toUpperCase());
+    }
+
+    return result;
+  }
+
 
   loadLibrary() {
     const library = this.props.library;
@@ -192,7 +221,7 @@ class Mynda extends React.Component {
     let stateObj = {};
     switch(name) {
       case "settingsPane":
-        stateObj[name] = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} hideFunction={() => {this.hideOpenablePane(name)}}/>
+        stateObj[name] = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane(name)}}/>
         break;
       case "editorPane":
         stateObj[name] = <MynEditor video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
@@ -223,17 +252,36 @@ class Mynda extends React.Component {
     } catch(e) {
       console.log("Error displaying first playlist: no playlists found? " + e.toString());
     }
+
+    savedPing.saved = (address) => {
+      console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
+
+      // if a movie was changed
+      if (address.includes('media')) {
+        // update the currently displayed playlist
+        this.setPlaylist(this.state.currentPlaylistID);
+        // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
+        this.setState({detailMovie : this.state.videos.filter(video => video.id === this.state.detailMovie.id)[0]});
+      }
+
+    };
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(oldProps) {
+    console.log('UPDATING MYNDA');
+    console.log('lastUpdate: ' + this.props.lastUpdate);
     // console.log('results: ' + this.state.filteredVideos.map((video) => video.title));
+    if (oldProps.lastUpdate !== this.props.lastUpdate) {
+      console.log('Mynda props.library.media changed!!!');
+      this.setPlaylist(this.state.currentPlaylistID);
+    }
   }
 
   render () {
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
-        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} showDetails={this.showDetails} />
+        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} displayColumnName={this.displayColumnName} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} showEditor={() => {this.showOpenablePane("editorPane")}}/>
         {this.state.settingsPane}
         {this.state.editorPane}
@@ -368,7 +416,7 @@ class MynLibrary extends React.Component {
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
+        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} /></div></div>)
       } else {
         return null;
       }
@@ -394,7 +442,7 @@ class MynLibrary extends React.Component {
 
     } else if (this.props.view === "flat") {
 
-      content = (<MynLibTable movies={this.props.movies} view={this.props.view} showDetails={this.props.showDetails} />)
+      content = (<MynLibTable movies={this.props.movies} view={this.props.view} displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} />)
 
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
@@ -474,7 +522,7 @@ class MynLibTable extends React.Component {
     let ascending = true;
 
     // except for the following fields, which should have a default sort direction of descending
-    let descendingFields = ['rating','dateadded'];
+    let descendingFields = ['ratings_user','dateadded'];
     if (descendingFields.includes(key)) {
       ascending = false;
     }
@@ -491,7 +539,7 @@ class MynLibTable extends React.Component {
      director: (a, b) => a.directorsort > b.directorsort,
      genre: (a, b) => a.genre > b.genre,
      seen: (a, b) => a.seen > b.seen,
-     rating: (a, b) => a.ratings.user > b.ratings.user,
+     ratings_user: (a, b) => a.ratings.user > b.ratings.user,
      dateadded: (a, b) => parseInt(a.dateadded) > parseInt(b.dateadded),
      order: (a, b) => a.order > b.order
     }
@@ -519,7 +567,7 @@ class MynLibTable extends React.Component {
           <td className="director">{movie.director}</td>
           <td className="genre">{movie.genre}</td>
           <td className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
-          <td className="rating centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
+          <td className="ratings_user centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
           <td className="dateadded centered mono">{displaydate}</td>
         </tr>
     )});
@@ -528,6 +576,8 @@ class MynLibTable extends React.Component {
   }
 
   onChange() {
+
+
     // decide whether to show the 'order' column
     // if (this.props.movies.filter(movie => (movie.order === undefined || movie.order === null)).length == this.props.movies.length) {
       // if none of the movies handed to us have an "order" property
@@ -578,8 +628,10 @@ class MynLibTable extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
+    console.log('UPDATING MynTable');
     // if (oldProps.movies !== this.props.movies) {
     if (!_.isEqual(oldProps.movies,this.props.movies)) {
+      console.log('MynTable props changed!!!');
       this.onChange();
 
     }
@@ -617,12 +669,12 @@ class MynLibTable extends React.Component {
               <thead>
                 <tr id="main-table-header-row">
                   <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
-                  <th onClick={() => this.requestSort('title')}>Title</th>
+                  <th onClick={() => this.requestSort('title')}>{this.props.displayColumnName('title')}</th>
                   <th onClick={() => this.requestSort('year')}>Year</th>
                   <th onClick={() => this.requestSort('director')}>Director</th>
                   <th onClick={() => this.requestSort('genre')}>Genre</th>
                   <th onClick={() => this.requestSort('seen')}>Seen</th>
-                  <th onClick={() => this.requestSort('rating')}>Rating</th>
+                  <th onClick={() => this.requestSort('ratings_user')}>Rating</th>
                   <th onClick={() => this.requestSort('dateadded')}>Added</th>
                 </tr>
               </thead>
@@ -771,7 +823,8 @@ class MynSettings extends MynOpenablePane {
         folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
         playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} />),
         collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
-        themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />)
+        // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
+        preferences :     (<MynSettingsPrefs      save={this.save} settings={this.props.settings} />)
       },
       settingView: null,
       delaySave: false
@@ -1196,6 +1249,88 @@ class MynSettingsPlaylists extends React.Component {
   }
 }
 
+class MynSettingsPrefs extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      defCols : {
+        used : _.cloneDeep(props.settings.preferences.defaultcolumns.used),
+        unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
+      },
+      hideDescrip : props.settings.preferences.hidedescription
+    }
+  }
+
+  render() {
+    return (
+      <div id='settings-preferences'>
+        <ul>
+          <li id='settings-prefs-cols'>Default Columns for new playlists:
+            <MynSettingsColumns used={this.state.defCols.used} unused={this.state.defCols.unused} />
+          </li>
+          <li id='settings-prefs-hidedescrip'>Hide video plot descriptions</li>
+        </ul>
+      </div>
+    );
+  }
+}
+
+class MynSettingsColumns extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.onDragEnd = this.onDragEnd.bind(this);
+  }
+
+  onDragEnd(result) {
+    const { destination, source, draggableId } = result;
+    // if the user actually moved an item
+    if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
+      // move the item
+      const movedItems = this.props[source.droppableId].splice(source.index,1);
+      this.props[destination.droppableId].splice(destination.index, 0, movedItems[0]);
+    }
+  }
+
+  render() {
+    return (
+      <DragDropContext onDragEnd={this.onDragEnd}>
+        <div>
+          <Droppable droppableId='used'>
+            {(provided) => (
+              <ul className="columns-list used" ref={provided.innerRef} {...provided.droppableProps}>
+                {this.props.used.map((col,i) => (
+                  <Draggable key={col} draggableId={col} index={i}>
+                    {(provided) => (
+                      <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>{col}</li>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </ul>
+            )}
+          </Droppable>
+          <Droppable droppableId='unused'>
+          {(provided) => (
+            <ul className="columns-list unused" ref={provided.innerRef} {...provided.droppableProps}>
+              {this.props.unused.map((col,i) => (
+                <Draggable key={col} draggableId={col} index={i}>
+                  {(provided) => (
+                    <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>{col}</li>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </ul>
+          )}
+          </Droppable>
+        </div>
+      </DragDropContext>
+    );
+  }
+}
+
 class MynSettingsPlaylistsTableRow extends React.Component {
   constructor(props) {
     super(props);
@@ -1306,7 +1441,7 @@ class MynEditor extends MynOpenablePane {
   // }
 
   handleChange(...args) {
-    console.log("UPDATING");
+    // console.log("UPDATING");
 
     let update;
     if (args.length == 2 && typeof args[0] === "string") {
@@ -3711,6 +3846,5 @@ function getCollectionObject(id, collectionsRoot, copy) {
   return copy ? _.cloneDeep(result) : result;
 }
 
-
 const library = new Library;
-ReactDOM.render(<Mynda library={library} />, document.getElementById('root'));
+ReactDOM.render(<Mynda library={library} lastUpdate={library.lastUpdate}/>, document.getElementById('root'));
