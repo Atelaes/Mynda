@@ -82,6 +82,38 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: BalooTamma2;
+  src: url('../_fonts/BalooTamma2-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: BalooTamma2;
+  src: url('../_fonts/BalooTamma2-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: BalooTamma2;
+  src: url('../_fonts/BalooTamma2-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+}
+@font-face {
+  font-family: BalooTamma2;
+  src: url('../_fonts/BalooTamma2-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: BalooTamma2;
+  src: url('../_fonts/BalooTamma2-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+}
+
+
 :root {
   /* font styling */
   --main-font: HKGrotesk, Helvetica, sans-serif;
@@ -109,6 +141,7 @@
   --detaildescrip-font-size: inherit;
   --detaillabel-font-size: var(--main-font-size);
   --detaillabel-font-style: normal;
+  --alt-font: BalooTamma2, Helvetica, sans-serif;
 
   /* background colors */
   --transparent-black-bg: rgba(0,0,0,.25);
@@ -633,9 +666,18 @@
   --editsearch-resultsrow-link-bgcolor-hover: var(--button-bgcolor-hover);
   --editsearch-resultsrow-link-bg-hover: var(--button-bg-hover);
   --editsearch-resultsrow-link-border-hover: var(--button-border-hover);
+
+  --settings-subheader-font: var(--alt-font);
+  --settings-subheader-fontsize: 1rem;
+  --settings-subheader-fontstyle: normal;
+  --settings-subheader-fontweight: 400;
 }
 
 /******************************************/
+
+h1, h2 {
+  margin: .5em 0 .5em 0;
+}
 
 /* custom checkbox style */
 input[type=checkbox] {
@@ -1142,4 +1184,17 @@ in lieu of that, we will use a negative margin on the selected element instead (
   border-radius: var(--settingstabs-border-radius);
   background-color: var(--settingstabs-bgcolor);
   color: var(--settingstabs-text);
+}
+
+#settings-pane .subsection h2 {
+  text-transform: uppercase;
+
+  --border-grad: linear-gradient(90deg, var(--light-bg) 0%, var(--light-bg-rgba0) 80%);
+  /* border-left-width: .15rem; */
+  border-bottom-style: solid;
+  /* box-sizing: border-box; */
+  border-image: var(--border-grad);
+  border-image-slice: 1;
+  border-image-width: 0em 0em .1em 0em;
+
 }

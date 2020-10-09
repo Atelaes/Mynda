@@ -959,9 +959,14 @@ class MynSettingsFolders extends React.Component {
       existingFolders : [],
       folderToAdd: null
     }
+
     ipcRenderer.on('settings-watchfolder-selected', (event, args) => {
       this.changeTargetFolder(args);
-    })
+    });
+
+    ipcRenderer.on('settings-watchfolder-add-error', (event, args) => {
+      
+    });
   }
 
   // create JSX for an options dropdown of the possible media kinds
@@ -979,10 +984,6 @@ class MynSettingsFolders extends React.Component {
     return options;
   }
 
-  editWatched(event, index) {
-    console.log("user toggled 'watch' for index " + index);
-  };
-
   editRemove(path, index) {
     console.log("user wants to remove " + path + " which is at index " + index);
   }
@@ -995,7 +996,7 @@ class MynSettingsFolders extends React.Component {
     this.setState({folderToAdd: folder});
     console.log('Changed target folder to ' + folder);
 
-    const inputField = document.getElementById('folder-settings-choose-path');
+    const inputField = document.getElementById('settings-folders-choose-path');
     if (folder == "") {
       inputField.classList.remove('filled');
       inputField.classList.add('empty');
@@ -1006,12 +1007,11 @@ class MynSettingsFolders extends React.Component {
   }
 
   submitFolderToServer() {
-    let folderAddress = document.getElementById("folder-settings-choose-path").value;
-    let watchBoolean = document.getElementById("folder-settings-choose-watched").checked;
-    let defaultType = document.getElementById("folder-settings-choose-kind").value;
-    let submitObject = {address: folderAddress, boolean: watchBoolean, type: defaultType};
+    let folderAddress = document.getElementById("settings-folders-choose-path").value;
+    let defaultKind = document.getElementById("settings-folders-choose-kind").value;
+    let submitObject = {address: folderAddress, kind: defaultKind};
     console.log(submitObject);
-    ipcRenderer.send('settings-watchfolder-add', submitObject)
+    ipcRenderer.send('settings-watchfolder-add', submitObject);
   }
 
   displayFolders() {
@@ -1019,9 +1019,12 @@ class MynSettingsFolders extends React.Component {
     try {
       folders = this.state.existingFolders.map((folder, index) => (
         <tr key={index}>
-          <td><input type="checkbox" checked={folder.watch} onChange={(e) => this.editWatched(e,index)} className="" /></td>
-          <td>{folder.path}</td>
-          <td><select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select></td>
+          <td className='path'>{folder.path}</td>
+          <td>
+            <span className='select-container select-alwaysicon'>
+              <select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
+            </span>
+          </td>
           <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
         </tr>
       ));
@@ -1038,37 +1041,49 @@ class MynSettingsFolders extends React.Component {
 
   render() {
     // console.log(JSON.stringify(this.props.folders));
-    return (<div id="folder-settings"><h1>Folders</h1>
-      <div id="folder-settings-choose">
-        <div className="input-container">
-          <input type="text" id="folder-settings-choose-path" className="empty" value={this.state.folderToAdd || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
-          <div className="input-clear-button hover" onClick={() => this.changeTargetFolder('')}></div>
+    return (
+      <div id="settings-folders">
+
+        <div id="settings-folders-choose" className='subsection'>
+          <h2>Add new watchfolder</h2>
+          <div className="choose-section kind">
+            <label htmlFor="settings-folders-choose-kind">Default kind: </label>
+            <span className='select-container select-alwaysicon'>
+              <select id="settings-folders-choose-kind">
+                {this.formFieldKindOptions()}
+              </select>
+            </span>
+          </div>
+          <div className="choose-section path">
+            <label htmlFor="settings-folders-choose-path">Path: </label>
+            <div className="input-container">
+              <input type="text" id="settings-folders-choose-path" className="empty" value={this.state.folderToAdd || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
+              <div className="input-clear-button hover" onClick={() => this.changeTargetFolder('')}></div>
+            </div>
+          </div>
+          <div className="choose-section buttons">
+            <button onClick={() => ipcRenderer.send('settings-watchfolder-select')}>Browse</button>
+            <button onClick={this.submitFolderToServer}>Add</button>
+          </div>
         </div>
-        <button onClick={() => ipcRenderer.send('settings-watchfolder-select')}>Browse</button>
-        <label htmlFor="folder-settings-choose-watched">Watchfolder?</label><input type="checkbox" id="folder-settings-choose-watched" />
-        <label htmlFor="folder-settings-choose-kind">Default kind: </label>
-        <select id="folder-settings-choose-kind">
-          {this.formFieldKindOptions()}
-        </select>
-       <button onClick={this.submitFolderToServer}>Add</button>
+
+        <div id="settings-folders-folders" className='subsection'>
+          <h2>Watchfolders</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Default Kind</th>
+                <th>Remove</th>
+              </tr>
+            </thead>
+            <tbody>
+              {this.displayFolders()}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div id="folder-settings-folders">
-        <table>
-          <thead>
-            <tr>
-              <th>Watched</th>
-              <th>Path</th>
-              <th>Default Kind</th>
-              <th>Remove</th>
-            </tr>
-          </thead>
-          <tbody>
-            {this.displayFolders()}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    )
+    );
   }
 
 }
@@ -1269,10 +1284,10 @@ class MynSettingsPrefs extends React.Component {
     return (
       <div id='settings-preferences'>
         <ul>
-          <li id='settings-prefs-cols'>Default Columns for new playlists:
+          <li id='settings-prefs-cols' className='subsection'>Default Columns for new playlists:
             <MynSettingsColumns used={this.state.defCols.used} unused={this.state.defCols.unused} />
           </li>
-          <li id='settings-prefs-hidedescrip'>Hide video plot descriptions</li>
+          <li id='settings-prefs-hidedescrip' className='subsection'>Hide video plot descriptions</li>
         </ul>
       </div>
     );

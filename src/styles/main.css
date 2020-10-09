@@ -1085,10 +1085,25 @@ th, tr, td {
   height: var(--coltermnode-height);
 }
 
-#settings-playlists table th {
+#settings-pane .subsection {
+  margin-bottom: 1em;
+  margin-left:.5rem;
+}
+
+#settings-pane .subsection h2 {
+  line-height: var(--settings-subheader-fontsize);
+  margin-left:-.5rem;
+  margin-top: 0em;
+  font-family: var(--settings-subheader-font);
+  font-size: var(--settings-subheader-fontsize);
+  font-style: var(--settings-subheader-fontstyle);
+  font-weight: var(--settings-subheader-fontweight);
+}
+
+
+#settings-pane table th {
   color: var(--th-text);
   font-family: var(--th-font);
-  /* font-size: 1rem; */
   font-size: calc(var(--th-font-size) * .8);
 }
 
@@ -1174,4 +1189,41 @@ th, tr, td {
 #settings-preferences .columns-list li {
   list-style-type: none;
   user-select: none;
+}
+
+#settings-folders-choose {
+  display:flex;
+  flex-direction:column;
+}
+
+#settings-folders-choose .choose-section {
+  margin-bottom:.5em
+}
+
+#settings-folders-choose label {
+  display:block;
+  margin: var(--editfield-name-margin);
+  font-family: var(--editfield-name-font);
+  font-size: var(--editfield-name-fontsize);
+  font-style: var(--editfield-name-fontstyle);
+  font-weight: var(--editfield-name-fontweight);
+}
+
+#settings-folders-choose button {
+  margin-right:.5em;
+}
+
+/* text input for choosing watch folder path */
+#settings-folders-choose-path {
+  width:100%;
+}
+
+/* container for the above input */
+#settings-folders-choose .path .input-container {
+  width:100%;
+}
+
+#settings-folders-folders .path {
+  font-size: .8em;
+  font-weight: 300;
 }

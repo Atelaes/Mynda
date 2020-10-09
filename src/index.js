@@ -140,9 +140,25 @@ ipcMain.on('settings-watchfolder-select', (event) => {
   console.log(err)
 })})
 
-ipcMain.on('settings-watchfolder-add', (event, arg) => {
-  //Add to library
-  findVideosFromFolder(arg['address'], arg['type'].toLowerCase());
+ipcMain.on('settings-watchfolder-add', (event, args) => {
+  const path = args['address'];
+  const kind = args['kind'].toLowerCase();
+
+  // check if path exists and is a folder, not a file
+  fs.lstat(path, (err, stats) => {
+    // if path exists and is a folder
+    if(!err && stats.isDirectory()) {
+      // add to library
+      findVideosFromFolder(path, kind);
+    } else {
+      // if not, display an error dialog
+      dialog.showMessageBox({
+        type : 'error',
+        buttons : ['Ok'],
+        message : 'Error: not a valid directory'
+      });
+    }
+  });
 })
 
 ipcMain.on('editor-artwork-select', (event) => {
