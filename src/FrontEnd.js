@@ -253,15 +253,28 @@ class Mynda extends React.Component {
       console.log("Error displaying first playlist: no playlists found? " + e.toString());
     }
 
+    // this callback function will be executed by Library.js every time
+    // something is saved. So here we must take any actions necessary to update
+    // the view in real time whenever that happens
     savedPing.saved = (address) => {
       console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
 
       // if a movie was changed
       if (address.includes('media')) {
+        console.log('a video was edited')
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
         this.setState({detailMovie : this.state.videos.filter(video => video.id === this.state.detailMovie.id)[0]});
+      }
+
+      // if a playlist was changed
+      if (address.includes('playlists')) {
+        console.log('a playlist was edited')
+        // reload the playlists, and then re-render the current playlist
+        this.setState({playlists:this.props.library.playlists}, () => {
+          this.setPlaylist(this.state.currentPlaylistID);
+        });
       }
 
     };
@@ -827,14 +840,24 @@ class MynSettings extends MynOpenablePane {
         preferences :     (<MynSettingsPrefs      save={this.save} settings={this.props.settings} />)
       },
       settingView: null,
-      delaySave: false
+      delaySave: false,
+      timer: null
     }
 
   }
 
   save(saveObj) {
-    if (!this.state.delaySave) {
-      console.log('Timer not running, saving now!!');
+    // if the timer is already running
+    if (this.state.timer !== null) {
+      // cancel the old timer before we set a new one
+      clearTimeout(this.state.timer);
+    }
+
+    // set new delay timer
+    console.log('Setting new timer...');
+    this.state.timer = setTimeout(() => {
+      console.log('Timer ended; saving');
+
       // SAVE
       // saveObj should be an object with the keys being the 'replace' parameter in the library.replace function
       // (i.e. a string address in dot notation pointing to the object being updated in the library)
@@ -844,28 +867,8 @@ class MynSettings extends MynOpenablePane {
         library.replace(address, saveObj[address]);
       });
 
-      // set delay timer
-      console.log('Setting new timer...');
-      this.setState({delaySave:true});
-      const timer = setTimeout(() => {
-        console.log('Timer ended');
-        this.setState({delaySave:false});
-        // if at the end of the timer, there is an update waiting to be saved, save it
-        if (this.state.toSave) {
-          console.log('Timer ended, there was an update waiting to be saved, calling save function again');
-          this.save(_.cloneDeep(this.state.toSave));
-          // and clear it for next time
-          this.setState({toSave:null});
-        } else {
-          console.log('Timer ended, no update waiting to be saved');
-        }
-      },5000);
-    } else {
-      // the delay timer is running, so instead of saving, store the object in state
-      // to be saved at the end of the timer
-      console.log('Tried to save, but timer running!! Saving this update for timer end.');
-      this.setState({toSave:saveObj});
-    }
+      this.setState({timer:null});
+    },500);
   }
 
   setView(view,event,index) {
