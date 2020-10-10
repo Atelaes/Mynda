@@ -60,7 +60,7 @@
           "duration"
         ]
       },
-      "hidedescription" : false
+      "hidedescription" : "hide"
     },
     "used" : {
       "kinds" : [

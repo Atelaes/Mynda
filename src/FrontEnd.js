@@ -261,7 +261,7 @@ class Mynda extends React.Component {
 
       // if a movie was changed
       if (address.includes('media')) {
-        console.log('a video was edited')
+        console.log('a video was edited');
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
@@ -270,24 +270,34 @@ class Mynda extends React.Component {
 
       // if a playlist was changed
       if (address.includes('playlists')) {
-        console.log('a playlist was edited')
+        console.log('a playlist was edited');
         // reload the playlists, and then re-render the current playlist
         this.setState({playlists:this.props.library.playlists}, () => {
           this.setPlaylist(this.state.currentPlaylistID);
         });
       }
 
+      // if the settings were changed
+      if (address.includes('settings')) {
+        console.log('settings was edited');
+        // this.setState({settings : this.props.library.settings}, () => {
+        //   this.hideOpenablePane('settingsPane');
+        //   this.showOpenablePane('settingsPane');
+        // });
+      }
+
+
     };
   }
 
   componentDidUpdate(oldProps) {
-    console.log('UPDATING MYNDA');
-    console.log('lastUpdate: ' + this.props.lastUpdate);
-    // console.log('results: ' + this.state.filteredVideos.map((video) => video.title));
-    if (oldProps.lastUpdate !== this.props.lastUpdate) {
-      console.log('Mynda props.library.media changed!!!');
-      this.setPlaylist(this.state.currentPlaylistID);
-    }
+    // console.log('UPDATING MYNDA');
+    // console.log('lastUpdate: ' + this.props.lastUpdate);
+    // // console.log('results: ' + this.state.filteredVideos.map((video) => video.title));
+    // if (oldProps.lastUpdate !== this.props.lastUpdate) {
+    //   console.log('Mynda props.library.media changed!!!');
+    //   this.setPlaylist(this.state.currentPlaylistID);
+    // }
   }
 
   render () {
@@ -965,7 +975,7 @@ class MynSettingsFolders extends React.Component {
     });
 
     ipcRenderer.on('settings-watchfolder-add-error', (event, args) => {
-      
+
     });
   }
 
@@ -1272,22 +1282,73 @@ class MynSettingsPrefs extends React.Component {
     super(props);
 
     this.state = {
-      defCols : {
+      defaultcolumns : {
         used : _.cloneDeep(props.settings.preferences.defaultcolumns.used),
         unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
       },
-      hideDescrip : props.settings.preferences.hidedescription
+      hidedescription : props.settings.preferences.hidedescription,
+      kinds : props.settings.used.kinds
     }
+
+    this.update = this.update.bind(this);
+  }
+
+  update(property, value) {
+    let address = '';
+    switch(property) {
+      case "columns" :
+        address = "settings.preferences.defaultcolumns";
+        this.setState({defaultcolumns:value});
+        break;
+      case "hide-description" :
+        address = "settings.preferences.hidedescription";
+        this.setState({hidedescription:value});
+        break;
+      case "kinds" :
+        address = "settings.used.kinds";
+        this.setState({kinds:value});
+        break;
+    }
+
+    let saveObj = {};
+    saveObj[address] = value;
+    this.props.save(saveObj);
   }
 
   render() {
     return (
       <div id='settings-preferences'>
         <ul>
-          <li id='settings-prefs-cols' className='subsection'>Default Columns for new playlists:
-            <MynSettingsColumns used={this.state.defCols.used} unused={this.state.defCols.unused} />
+          <li id='settings-prefs-cols' className='subsection'>
+            Default Columns for new playlists:
+            <MynSettingsColumns
+              used={this.state.defaultcolumns.used}
+              unused={this.state.defaultcolumns.unused}
+              update={this.update}
+            />
           </li>
-          <li id='settings-prefs-hidedescrip' className='subsection'>Hide video plot descriptions</li>
+          <li id='settings-prefs-kinds' className='subsection'>
+            Media Kinds:
+            <MynEditInlineAddListWidget
+              object={this.state}
+              property="kinds"
+              update={this.update}
+              options={null}
+              storeTransform={value => value.toLowerCase()}
+              displayTransform={value => value.replace(/\b\w/g,letter => letter.toUpperCase())}
+              validator={/^[a-zA-Z0-9_\-\.&]+$/}
+              validatorTip={"Allowed: a-z A-Z 0-9 _ - . &"}
+              reportValid={() => {}}
+            />
+          </li>
+          <li id='settings-prefs-hidedescrip' className='subsection'>
+            <input
+              type='checkbox'
+              checked={this.state.hidedescription === "hide" ? true : false}
+              onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
+            />
+            Hide video plot descriptions
+          </li>
         </ul>
       </div>
     );
@@ -1298,17 +1359,28 @@ class MynSettingsColumns extends React.Component {
   constructor(props) {
     super(props);
 
+    // this.state = {
+    //   used : _.cloneDeep(props.used),
+    //   unused : _.cloneDeep(props.unused)
+    // }
+
     this.onDragEnd = this.onDragEnd.bind(this);
   }
 
   onDragEnd(result) {
+    let temp = {};
+    temp.used = _.cloneDeep(this.props.used);
+    temp.unused = _.cloneDeep(this.props.unused);
+
     const { destination, source, draggableId } = result;
     // if the user actually moved an item
     if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
       // move the item
-      const movedItems = this.props[source.droppableId].splice(source.index,1);
-      this.props[destination.droppableId].splice(destination.index, 0, movedItems[0]);
+      const movedItems = temp[source.droppableId].splice(source.index,1);
+      temp[destination.droppableId].splice(destination.index, 0, movedItems[0]);
     }
+
+    this.props.update('columns',temp);//{ used : this.props.used, unused : this.props.unused });
   }
 
   render() {
@@ -2011,7 +2083,7 @@ class MynEditorEdit extends React.Component {
         <div className="edit-field-editor">
           <div className="select-container">
             <MynEditInlineAddListWidget
-              movie={this.props.video}
+              object={this.props.video}
               property="tags"
               update={this.props.handleChange}
               options={this.props.settings.used.tags}
@@ -2045,7 +2117,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="cast">Cast: </label>
         <div className="edit-field-editor">
           <MynEditInlineAddListWidget
-            movie={this.props.video}
+            object={this.props.video}
             property="cast"
             update={this.props.handleChange}
             options={null}
@@ -2249,7 +2321,7 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="languages">Languages: </label>
         <div className="edit-field-editor">
           <MynEditInlineAddListWidget
-            movie={this.props.video}
+            object={this.props.video}
             property="languages"
             update={this.props.handleChange}
             options={null}
@@ -3316,7 +3388,7 @@ class MynEditGraphicalWidget extends MynEditWidget {
   }
 
   updateValue(value, event) {
-    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value.user + "! ...but not really. JSON library has not been updated!");
+    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value.user);
     event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     // this.props.movie[this.state.property] = value;
 
@@ -3534,12 +3606,12 @@ class MynEditListWidget extends MynEditWidget {
   }
 
   componentDidMount(props) {
-    this.updateList(this.props.movie[this.props.property]);
+    this.updateList(this.props.object[this.props.property]);
   }
 
   componentDidUpdate(oldProps) {
-    if (oldProps.movie[this.props.property] !== this.props.movie[this.props.property]) {
-      this.updateList(this.props.movie[this.props.property]);
+    if (oldProps.object[this.props.property] !== this.props.object[this.props.property]) {
+      this.updateList(this.props.object[this.props.property]);
     }
   }
 
@@ -3647,7 +3719,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
     return (
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
-        <MynEditAddToList movie={this.props.movie} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
+        <MynEditAddToList object={this.props.object} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
       </ul>
     );
   }

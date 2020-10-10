@@ -628,7 +628,9 @@ th, tr, td {
 }
 
 #editor-pane select,
-#editor-pane .select-container input[type=text] {
+#editor-pane .select-container input[type=text],
+/* #settings-pane select, */
+#settings-pane .select-container input[type=text] {
   width: var(--editor-select-width);
   font-size: var(--editor-select-font-size);
   font-weight: var(--editor-select-font-weight);
@@ -791,7 +793,8 @@ th, tr, td {
   /* max-width: var(--listwidgetadd-input-maxwidth); */
 }
 
-#editor-pane .list-widget-add.inline {
+#editor-pane .list-widget-add.inline,
+#settings-pane .list-widget-add.inline {
   font-family: var(--listwidgetadd-inline-font);
   font-size: var(--listwidgetadd-inline-fontsize);
   font-style: var(--listwidgetadd-inline-fontstyle);
@@ -807,7 +810,8 @@ th, tr, td {
   padding: var(--listwidgetadd-inline-padding);
 }
 
-#editor-pane .list-widget-add.inline input.list-widget-add-input {
+#editor-pane .list-widget-add.inline input.list-widget-add-input,
+#settings-pane .list-widget-add.inline input.list-widget-add-input {
   height: 100%;
   width: 100%;
   padding: var(--listwidget-item-padding);

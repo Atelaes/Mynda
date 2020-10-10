@@ -46,7 +46,7 @@ class Library {
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
   alter({opType=null, address=null, entry=null, sync=false, origin=null} = {}) {
-    console.log(`alter(${opType}, ${address}, ${entry}, ${sync}, ${origin})`);
+    console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     try {
       //Start with some basic validation
       if (!['add', 'replace', 'remove'].includes(opType)) {
@@ -117,13 +117,12 @@ class Library {
         //If this was a local operation, request other library mirror it
         this.sync({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       }
-      // console.log("Library.js lastUpdate before: " + this.lastUpdate);
-      // this.lastUpdate = Date.now();
-      // console.log("Library.js lastUpdate after: " + this.lastUpdate);
+
+      // let React know that we've done a save, so that it can perform whatever re-rendering it needs to
       savedPing.saved(address);
 
     } catch(e) {
-      console.log(`Error with library alter event.  op: ${opType}, add: ${address}, ent: ${entry}, sync: ${sync}, origin: ${origin} - ${e}`);
+      console.log(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
   }
 

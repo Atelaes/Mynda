@@ -500,7 +500,7 @@
   --listwidget-item-width: initial;
   --listwidget-item-margin: 0em .2em .2em 0em; /*.5em 0em .5em 0em; */
   --listwidget-item-padding-top: .2em;
-  --listwidget-item-padding: var(--listwidget-item-padding-top) 1em var(--listwidget-item-padding-top) .5em;
+  --listwidget-item-padding: var(--listwidget-item-padding-top) 1.6em var(--listwidget-item-padding-top) .5em;
   --listwidget-item-font: var(--main-font);
   --listwidget-item-fontsize-size: .8;
   --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1em);
@@ -983,7 +983,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
   border-radius: 0em 0em var(--editor-textinput-borderradius-radius) var(--editor-textinput-borderradius-radius);
 }
 
-.list-widget-list.cast {
+.list-widget-list.cast,
+.list-widget-list.kinds {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, 10em);
   grid-auto-columns: minmax(7em, 10em);
