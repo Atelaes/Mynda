@@ -56,8 +56,8 @@ class Mynda extends React.Component {
       "ratings_rt" : (<img src="../images/logos/rt-logo.png" style={{height:'1em'}} className='ratings-icon' />),
       "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" style={{height:'1em'}} className='ratings-icon' />),
       "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" style={{height:'1em'}} className='ratings-icon' />),
-      "ratings_avg" : "avg rating",
-      "boxoffice" : "box office",
+      "ratings_avg" : "AvgRating",
+      "boxoffice" : "BoxOffice",
       "languages" : "language",
       "duration" : "runtime",
     }
@@ -1358,7 +1358,7 @@ class MynSettingsPrefs extends React.Component {
               checked={this.state.hidedescription === "hide" ? true : false}
               onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
             />
-            Hide video plot descriptions until mouseover
+            Hide plot summaries until mouseover
           </li>
         </ul>
       </div>

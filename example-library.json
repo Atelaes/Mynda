@@ -100,21 +100,48 @@
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
       "view" : "flat",
-      "tab" : true
+      "tab" : true,
+      "columns" : [
+        "title",
+        "year",
+        "director",
+        "genre",
+        "seen",
+        "ratings_user",
+        "dateadded"
+      ]
     },
     {
       "id" : 1,
       "name" : "Shows",
       "filterFunction" : "video.kind === 'show'",
       "view" : "hierarchical",
-      "tab" : true
+      "tab" : true,
+      "columns" : [
+        "title",
+        "year",
+        "director",
+        "genre",
+        "seen",
+        "ratings_user",
+        "dateadded"
+      ]
     },
     {
       "id" : 2,
       "name" : "Sci-Fi",
       "filterFunction" : "video.tags.includes('sci-fi')",
       "view" : "flat",
-      "tab" : false
+      "tab" : false,
+      "columns" : [
+        "title",
+        "year",
+        "director",
+        "genre",
+        "seen",
+        "ratings_user",
+        "dateadded"
+      ]
     }
   ],
   "collections" : [

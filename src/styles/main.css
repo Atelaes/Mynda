@@ -115,6 +115,7 @@ input::-webkit-calendar-picker-indicator {
   user-select: none;
   cursor: pointer;
   height: var(--select-arrow-height);
+  line-height: var(--select-arrow-height);
   content: var(--select-arrow-content);
   left: var(--select-arrow-left);
   right: var(--select-arrow-right);
@@ -591,7 +592,7 @@ th, tr, td {
 }
 
 #settings-pane .subsection {
-  font-size: .8em;
+  /* font-size: .8em; *//* for some reason this line really screws up the select arrow icons. I cannot figure out why */
   margin-bottom: 1em;
   margin-left:.5rem;
 }
@@ -696,6 +697,7 @@ th, tr, td {
   list-style-type: none;
   padding: 0;
   margin: 0;
+  font-size:.8em;
 }
 
 #settings-prefs-cols div {
@@ -713,6 +715,7 @@ th, tr, td {
 #settings-preferences .columns-list li {
   list-style-type: none;
   user-select: none;
+  white-space: nowrap;
 }
 
 #settings-folders-choose {
@@ -749,6 +752,7 @@ th, tr, td {
 
 #settings-folders-folders .path {
   font-weight: 300;
+  font-size: .8em;
 }
 
 /*************************************/
@@ -1100,7 +1104,7 @@ th, tr, td {
 }
 
 .ratings-icon {
-  opacity: var(--editratingsicon-opacity);
+  opacity: var(--ratingsicon-opacity);
 }
 
 #editor-pane .edit-field.ratings .ratings-input input[type=text] {

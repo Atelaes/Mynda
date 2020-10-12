@@ -208,11 +208,11 @@
   --inputicon-background-filled: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%;
   --inputicon-bg-size: calc(var(--textinput-height) * .6) calc(var(--textinput-height) * .6);
 
-  --select-arrow-height: var(--textinput-height);
+  --select-arrow-height: calc(var(--textinput-height));
   --select-arrow-content: '\30C';
   --select-arrow-left: initial;
   --select-arrow-right: .5rem;
-  --select-arrow-top: calc((var(--textinput-height) / 2) - (var(--select-arrow-height) / 2.6));
+  --select-arrow-top: .45rem; /* calc((var(--textinput-height) / 2) - (var(--select-arrow-height) / 2.6));*/
   --select-arrow-bottom: initial;
   --select-arrow-text: inherit;
   --select-arrow-font: inherit;
@@ -490,14 +490,14 @@
   --editfield-descrip-fontstyle: italic;
   --editfield-descrip-fontweight: 300;
 
-  --listwidget-item-maxwidth: 15em;
+  --listwidget-item-maxwidth: 15rem;
   --listwidget-item-bg: initial;
   --listwidget-item-bg-color: rgba(37,39,43,1); /*rgba(54,59,69,.3);*/ /*var(--light-bg);*/
   --listwidget-item-text: inherit;
   --listwidget-item-borderradius-radius: 999px;
   --listwidget-item-borderradius: var(--listwidget-item-borderradius-radius); /*calc(var(--playlisttab-borderradius-radius)/2);*/
   --listwidget-item-height: 1.3rem;
-  --listwidget-item-width: initial;
+  --listwidget-item-width: 100%;
   --listwidget-item-margin: 0em .2em .2em 0em; /*.5em 0em .5em 0em; */
   --listwidget-item-padding-top: .2em;
   --listwidget-item-padding: var(--listwidget-item-padding-top) 1.6em var(--listwidget-item-padding-top) .5em;
@@ -595,6 +595,9 @@
   --positionwidget-width: 8em;
   --positionwidget-height: .4em; /*.3em;*/
 
+  --ratingsicon-opacity: .5;
+  --ratingsicon-opacity-hover: .8;
+
   --editartwork-img-width: 100%;
   --editartwork-img-height: auto;
 
@@ -645,7 +648,6 @@
   --editratings-fontsize: .8rem;
   --editratings-borderradius-radius: var(--textinput-borderradius);
   --editratings-borderradius: var(--editratings-borderradius-radius) 0em 0em var(--editratings-borderradius-radius);
-  --editratingsicon-opacity: .5;
 
   --editsearch-clearbtn-text-hover: var(--bright-text);
   --editsearch-clearbtn-textshadow-hover: 0em 0em .1em rgba(220,225,255,.5);
@@ -680,7 +682,8 @@ h1, h2 {
 }
 
 /* custom checkbox style */
-input[type=checkbox] {
+input[type=checkbox],
+input[type=radio] {
   visibility:hidden;
   position:relative;
   --height: .8rem;
@@ -688,7 +691,8 @@ input[type=checkbox] {
   width: var(--width);
   height: var(--height);
 }
-input[type=checkbox]::after {
+input[type=checkbox]::after,
+input[type=radio]::after {
   --color: var(--textinput-text);
   /* --color-transparent: rgba(139, 146, 158, .7); */
   --border-width: .08rem;
@@ -713,7 +717,11 @@ input[type=checkbox]::after {
   border: var(--border-width) solid var(--color);
   border-radius: .2rem;
 }
-input[type=checkbox]:checked::after {
+input[type=radio] {
+  border-radius: calc(var(--height)/2);
+}
+input[type=checkbox]:checked::after,
+input[type=radio]:checked::after {
   /* content:'\25A0'; */
   box-shadow: inset 0px 0px 0px 3px black, inset 0px 0px 0px 500px var(--dimmer-text);
 }
@@ -986,8 +994,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
 .list-widget-list.cast,
 .list-widget-list.kinds {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, 10em);
-  grid-auto-columns: minmax(7em, 10em);
+  grid-template-columns: repeat(auto-fill, 10rem);
+  grid-auto-columns: minmax(7rem, 10rem);
   grid-auto-flow: row;
   white-space: nowrap;
 }
@@ -1210,7 +1218,15 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 #settings-preferences .columns-list.unused {
-  opacity: .8;
+  opacity: .7;
+}
+
+#settings-preferences .columns-list.used li.col {
+  color: var(--th-text-hover);
+  background-color: var(--th-bg-hover);
+}
+
+#settings-preferences .columns-list.unused li.col {
 }
 
 #settings-preferences .columns-list li.col {
@@ -1231,4 +1247,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* not sure why this is necessary, but I'm tired of troubleshooting right now */
   position:relative;
   top:.1em;
+}
+
+#settings-preferences .columns-list.used li.col img {
+  opacity: var(--ratingsicon-opacity-hover);
 }
