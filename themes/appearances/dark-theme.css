@@ -503,7 +503,7 @@
   --listwidget-item-padding: var(--listwidget-item-padding-top) 1.6em var(--listwidget-item-padding-top) .5em;
   --listwidget-item-font: var(--main-font);
   --listwidget-item-fontsize-size: .8;
-  --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1em);
+  --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1rem);
   --listwidget-item-fontstyle: initial;
   --listwidget-item-fontweight: 300;
   --listwidget-item-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--listwidget-item-bg-color) 30%);
@@ -1198,4 +1198,37 @@ in lieu of that, we will use a negative margin on the selected element instead (
   border-image-slice: 1;
   border-image-width: 0em 0em .1em 0em;
 
+}
+
+#settings-preferences .subsection h2 {
+  text-transform: none;
+  border: none;
+}
+
+#settings-preferences .columns-list.used {
+  margin-right:.5em;
+}
+
+#settings-preferences .columns-list.unused {
+  opacity: .8;
+}
+
+#settings-preferences .columns-list li.col {
+  text-align: center;
+  background-color: var(--th-bg);
+  color: var(--th-text);
+  font-family: var(--th-font);
+  font-size: calc(.8 * var(--th-font-size));
+  /* width:4em; */
+  padding: 0 .3em 0 .3em;
+  height:1.2em;
+  line-height:1.2em;
+  vertical-align: middle;
+  margin-bottom: .3em;
+}
+
+#settings-preferences .columns-list li img {
+  /* not sure why this is necessary, but I'm tired of troubleshooting right now */
+  position:relative;
+  top:.1em;
 }

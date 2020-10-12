@@ -556,6 +556,10 @@ th, tr, td {
 #settings-pane {
 }
 
+#settings-pane #settings-content {
+  overflow-x: scroll;
+}
+
 #settings-tabs {
   padding: var(--settingstabs-container-padding);
   margin: var(--settingstabs-container-margin);
@@ -584,6 +588,167 @@ th, tr, td {
 }
 #settings-content {
   padding: var(--settingscontent-padding);
+}
+
+#settings-pane .subsection {
+  font-size: .8em;
+  margin-bottom: 1em;
+  margin-left:.5rem;
+}
+
+#settings-pane .subsection h2,
+#settings-pane .subsection h3,
+#settings-pane .subsection h4 {
+  margin-top: 0em;
+  font-family: var(--settings-subheader-font);
+  font-style: var(--settings-subheader-fontstyle);
+  font-weight: var(--settings-subheader-fontweight);
+  line-height: var(--settings-subheader-fontsize);
+  font-size: var(--settings-subheader-fontsize);
+}
+
+#settings-pane .subsection h2 {
+  margin-left:-.5rem;
+}
+
+#settings-pane .subsection h3,
+#settings-pane .subsection h4 {
+  margin-bottom: .5em;
+}
+
+#settings-pane table th {
+  color: var(--th-text);
+  font-family: var(--th-font);
+  font-size: calc(var(--th-font-size) * .8);
+}
+
+#settings-playlists table th button {
+  color: var(--button-text);
+  font-family: var(--button-font);
+  font-size: var(--button-fontsize);
+  font-weight: var(--button-fontweight);
+}
+
+#settings-playlists table tr {
+  vertical-align: top;
+}
+
+#settings-playlists table td {
+  text-align:center;
+}
+
+#settings-playlists table .name-and-filter {
+  text-align:left;
+}
+
+#settings-playlists table .view select {
+  font-size: calc(var(--textinput-font-size) * .8);
+}
+
+
+#settings-playlists .drag-button {
+  opacity:.3;
+  user-select: none;
+  cursor:grab;
+}
+
+#settings-playlists .drag-button:active {
+  cursor:grabbing;
+}
+
+#settings-playlists .drag-button,
+#settings-playlists .checkbox {
+  line-height: var(--textinput-height);
+}
+
+#settings-playlists .checkbox input {
+  height: var(--textinput-height);
+  margin:0;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#settings-playlists table textarea {
+  font-family: var(--table-cell-monofont);
+  font-size: calc(var(--textinput-font-size) * .8);
+  width:100%;
+  height:5em;
+  padding: .3em .5em .3em .5em;
+  margin-top:.15rem;
+  margin-bottom:.3rem;
+}
+
+#settings-playlists-rowdivider {
+  /* border-bottom:.1em solid var(--dim-text); */
+  width: 100%;
+  height: .3em;
+  background-color: var(--dim-text);
+}
+
+/* #settings-playlists-rowdivider td::after {
+  content:'';
+  display:block;
+  width:100%;
+  height:.3em;
+} */
+
+#settings-preferences ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+#settings-prefs-cols div {
+  display: flex;
+  flex-direction: column;
+}
+
+#settings-preferences .columns-list {
+  margin:0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+#settings-preferences .columns-list li {
+  list-style-type: none;
+  user-select: none;
+}
+
+#settings-folders-choose {
+  display:flex;
+  flex-direction:column;
+}
+
+#settings-folders-choose .choose-section {
+  margin-bottom:.5em
+}
+
+#settings-folders-choose label {
+  display:block;
+  margin: var(--editfield-name-margin);
+  font-family: var(--editfield-name-font);
+  font-size: var(--editfield-name-fontsize);
+  font-style: var(--editfield-name-fontstyle);
+  font-weight: var(--editfield-name-fontweight);
+}
+
+#settings-folders-choose button {
+  margin-right:.5em;
+}
+
+/* text input for choosing watch folder path */
+#settings-folders-choose-path {
+  width:100%;
+}
+
+/* container for the above input */
+#settings-folders-choose .path .input-container {
+  width:100%;
+}
+
+#settings-folders-folders .path {
+  font-weight: 300;
 }
 
 /*************************************/
@@ -932,6 +1097,9 @@ th, tr, td {
 .edit-field.ratings .ratings-icon img {
   width:1.5em;
   height:1.5em;
+}
+
+.ratings-icon {
   opacity: var(--editratingsicon-opacity);
 }
 
@@ -1087,147 +1255,4 @@ th, tr, td {
 #editor-pane .collection-terminal-node input[type=text] {
   width:4.3em;
   height: var(--coltermnode-height);
-}
-
-#settings-pane .subsection {
-  margin-bottom: 1em;
-  margin-left:.5rem;
-}
-
-#settings-pane .subsection h2 {
-  line-height: var(--settings-subheader-fontsize);
-  margin-left:-.5rem;
-  margin-top: 0em;
-  font-family: var(--settings-subheader-font);
-  font-size: var(--settings-subheader-fontsize);
-  font-style: var(--settings-subheader-fontstyle);
-  font-weight: var(--settings-subheader-fontweight);
-}
-
-
-#settings-pane table th {
-  color: var(--th-text);
-  font-family: var(--th-font);
-  font-size: calc(var(--th-font-size) * .8);
-}
-
-#settings-playlists table th button {
-  color: var(--button-text);
-  font-family: var(--button-font);
-  font-size: var(--button-fontsize);
-  font-weight: var(--button-fontweight);
-}
-
-#settings-playlists table tr {
-  vertical-align: top;
-}
-
-#settings-playlists table td {
-  text-align:center;
-}
-
-#settings-playlists table .name-and-filter {
-  text-align:left;
-}
-
-#settings-playlists table .view select {
-  font-size: calc(var(--textinput-font-size) * .8);
-}
-
-
-#settings-playlists .drag-button {
-  opacity:.3;
-  user-select: none;
-  cursor:grab;
-}
-
-#settings-playlists .drag-button:active {
-  cursor:grabbing;
-}
-
-#settings-playlists .drag-button,
-#settings-playlists .checkbox {
-  line-height: var(--textinput-height);
-}
-
-#settings-playlists .checkbox input {
-  height: var(--textinput-height);
-  margin:0;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-#settings-playlists table textarea {
-  font-family: var(--table-cell-monofont);
-  font-size: calc(var(--textinput-font-size) * .8);
-  width:100%;
-  height:5em;
-  padding: .3em .5em .3em .5em;
-  margin-top:.15rem;
-  margin-bottom:.3rem;
-}
-
-#settings-playlists-rowdivider {
-  /* border-bottom:.1em solid var(--dim-text); */
-  width: 100%;
-  height: .3em;
-  background-color: var(--dim-text);
-}
-
-/* #settings-playlists-rowdivider td::after {
-  content:'';
-  display:block;
-  width:100%;
-  height:.3em;
-} */
-
-#settings-prefs-cols div {
-  display: flex;
-  flex-direction: row;
-}
-
-#settings-preferences .columns-list {
-  margin:0;
-}
-
-#settings-preferences .columns-list li {
-  list-style-type: none;
-  user-select: none;
-}
-
-#settings-folders-choose {
-  display:flex;
-  flex-direction:column;
-}
-
-#settings-folders-choose .choose-section {
-  margin-bottom:.5em
-}
-
-#settings-folders-choose label {
-  display:block;
-  margin: var(--editfield-name-margin);
-  font-family: var(--editfield-name-font);
-  font-size: var(--editfield-name-fontsize);
-  font-style: var(--editfield-name-fontstyle);
-  font-weight: var(--editfield-name-fontweight);
-}
-
-#settings-folders-choose button {
-  margin-right:.5em;
-}
-
-/* text input for choosing watch folder path */
-#settings-folders-choose-path {
-  width:100%;
-}
-
-/* container for the above input */
-#settings-folders-choose .path .input-container {
-  width:100%;
-}
-
-#settings-folders-folders .path {
-  font-size: .8em;
-  font-weight: 300;
 }

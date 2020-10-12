@@ -48,14 +48,14 @@ class Mynda extends React.Component {
     // this.hideSettings = this.hideSettings.bind(this);
   }
 
-  displayColumnName(name) {
+  displayColumnName(name, reverse) {
     const substitutions = {
       "ratings_user" : "rating",
       "dateadded" : "added",
       "lastseen" : "seen",
-      "ratings_rt" : (<img src="../images/logos/rt-logo.png" />),
-      "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" />),
-      "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" />),
+      "ratings_rt" : (<img src="../images/logos/rt-logo.png" style={{height:'1em'}} className='ratings-icon' />),
+      "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" style={{height:'1em'}} className='ratings-icon' />),
+      "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" style={{height:'1em'}} className='ratings-icon' />),
       "ratings_avg" : "avg rating",
       "boxoffice" : "box office",
       "languages" : "language",
@@ -64,8 +64,16 @@ class Mynda extends React.Component {
 
     let result = name;
 
-    if (Object.keys(substitutions).includes(name)) {
-      result = substitutions[name];
+    if (!reverse) {
+      if (Object.keys(substitutions).includes(name)) {
+        result = substitutions[name];
+      }
+    } else {
+      Object.keys(substitutions).forEach(key => {
+        if (_.isEqual(substitutions[key],name)) {
+          result = key;
+        }
+      });
     }
 
     if (typeof result === 'string') {
@@ -847,7 +855,7 @@ class MynSettings extends MynOpenablePane {
         playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} />),
         collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
         // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
-        preferences :     (<MynSettingsPrefs      save={this.save} settings={this.props.settings} />)
+        preferences :     (<MynSettingsPrefs      save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
       },
       settingView: null,
       delaySave: false,
@@ -1318,36 +1326,39 @@ class MynSettingsPrefs extends React.Component {
   render() {
     return (
       <div id='settings-preferences'>
-        <ul>
+        <ul className='sections-container'>
           <li id='settings-prefs-cols' className='subsection'>
-            Default Columns for new playlists:
+            <h2>Default Columns for new playlists:</h2>
             <MynSettingsColumns
               used={this.state.defaultcolumns.used}
               unused={this.state.defaultcolumns.unused}
               update={this.update}
+              displayTransform={this.props.displayColumnName}
+              storeTransform={(val) => this.props.displayColumnName(val,true)}
             />
           </li>
           <li id='settings-prefs-kinds' className='subsection'>
-            Media Kinds:
+            <h2>Media Kinds:</h2>
             <MynEditInlineAddListWidget
               object={this.state}
               property="kinds"
               update={this.update}
               options={null}
               storeTransform={value => value.toLowerCase()}
-              displayTransform={value => value.replace(/\b\w/g,letter => letter.toUpperCase())}
+              displayTransform={value => value.replace(/\b\w/g,(letter) => letter.toUpperCase())}
               validator={/^[a-zA-Z0-9_\-\.&]+$/}
               validatorTip={"Allowed: a-z A-Z 0-9 _ - . &"}
               reportValid={() => {}}
             />
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
+            <h2>Hide Descriptions:</h2>
             <input
               type='checkbox'
               checked={this.state.hidedescription === "hide" ? true : false}
               onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
             />
-            Hide video plot descriptions
+            Hide video plot descriptions until mouseover
           </li>
         </ul>
       </div>
@@ -1377,6 +1388,16 @@ class MynSettingsColumns extends React.Component {
     if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
       // move the item
       const movedItems = temp[source.droppableId].splice(source.index,1);
+
+      // transform the item if given a transform function
+      let movedItem;
+      try {
+        movedItem = this.props.storeTransform(movedItems[0]);
+      } catch(err) {
+        movedItem = movedItems[0];
+      }
+
+      // store the item in the new location
       temp[destination.droppableId].splice(destination.index, 0, movedItems[0]);
     }
 
@@ -1387,32 +1408,38 @@ class MynSettingsColumns extends React.Component {
     return (
       <DragDropContext onDragEnd={this.onDragEnd}>
         <div>
-          <Droppable droppableId='used'>
+          <Droppable droppableId='used' direction='horizontal'>
             {(provided) => (
-              <ul className="columns-list used" ref={provided.innerRef} {...provided.droppableProps}>
-                {this.props.used.map((col,i) => (
+              <div>
+                <div>Used:</div>
+                <ul className="columns-list used" ref={provided.innerRef} {...provided.droppableProps}>
+                  {this.props.used.map((col,i) => (
+                    <Draggable key={col} draggableId={col} index={i}>
+                      {(provided) => (
+                        <li className='col' ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>{this.props.displayTransform ? this.props.displayTransform(col) : col}</li>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </ul>
+              </div>
+            )}
+          </Droppable>
+          <Droppable droppableId='unused' direction='horizontal'>
+          {(provided) => (
+            <div>
+              <div>Available:</div>
+              <ul className="columns-list unused" ref={provided.innerRef} {...provided.droppableProps}>
+                {this.props.unused.map((col,i) => (
                   <Draggable key={col} draggableId={col} index={i}>
                     {(provided) => (
-                      <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>{col}</li>
+                      <li className='col' ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>{this.props.displayTransform ? this.props.displayTransform(col) : col}</li>
                     )}
                   </Draggable>
                 ))}
                 {provided.placeholder}
               </ul>
-            )}
-          </Droppable>
-          <Droppable droppableId='unused'>
-          {(provided) => (
-            <ul className="columns-list unused" ref={provided.innerRef} {...provided.droppableProps}>
-              {this.props.unused.map((col,i) => (
-                <Draggable key={col} draggableId={col} index={i}>
-                  {(provided) => (
-                    <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>{col}</li>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </ul>
+            </div>
           )}
           </Droppable>
         </div>
@@ -3600,9 +3627,16 @@ class MynEditListWidget extends MynEditWidget {
   }
 
   displayList() {
-    return this.state.list.map((item, index) => (
-      <li key={index} className="list-widget-item">{item}<div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>
-    ));
+    return this.state.list.map((item, index) => {
+      let displayItem
+      try {
+        displayItem = this.props.displayTransform(item);
+      } catch(err) {
+        displayItem = item
+      }
+
+      return (<li key={index} className="list-widget-item">{displayItem}<div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>);
+    });
   }
 
   componentDidMount(props) {
@@ -3633,7 +3667,8 @@ class MynEditAddToList extends MynEditListWidget {
     super(props)
 
     this.state = {
-      id : "list-widget-add-" + props.property
+      id : "list-widget-add-" + props.property,
+      value : ''
     }
 
     this.render = this.render.bind(this);
@@ -3642,6 +3677,14 @@ class MynEditAddToList extends MynEditListWidget {
   /* test for valid input */
   handleInput(event) {
     const input = document.getElementById(this.state.id + "-input");
+
+    // update form field to reflect user actions, applying a transform if it was given
+    try {
+      this.setState({value:this.props.displayTransform(input.value)});
+    } catch(err) {
+      this.setState({value:input.value});
+    }
+
     const item = input.value;
     if (item === "") {
       super.handleValidity(true,this.props.property,input);
@@ -3676,7 +3719,8 @@ class MynEditAddToList extends MynEditListWidget {
         temp = [item];
       }
       this.updateList(temp);
-      input.value = '';
+      // input.value = '';
+      this.setState({value:''});
     } else {
       // do nothing
       // console.log('validation error!');
@@ -3700,7 +3744,7 @@ class MynEditAddToList extends MynEditListWidget {
 
     return (
       <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "")}>
-        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." minLength="1" onChange={(e) => this.handleInput(e)} />
+        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." value={this.state.value} minLength="1" onChange={(e) => this.handleInput(e)} />
         <button className="editor-inline-button" onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
         {options}
       </div>
@@ -3719,7 +3763,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
     return (
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
-        <MynEditAddToList object={this.props.object} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
+        <MynEditAddToList object={this.props.object} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
       </ul>
     );
   }

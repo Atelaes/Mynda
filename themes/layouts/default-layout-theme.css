@@ -206,3 +206,15 @@
   grid-row: 14;
   grid-column: 4;
 }
+
+#settings-preferences .sections-container {
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  /* grid-template-rows: repeat(14, auto); */
+  grid-gap: 0.5em;
+}
+
+#settings-prefs-cols {
+  grid-row: 1;
+  grid-column: 1 / span 2;
+}
