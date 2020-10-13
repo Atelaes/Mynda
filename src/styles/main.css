@@ -480,6 +480,33 @@ th, tr, td {
   font-size: var(--detaildescrip-font-size);
 }
 
+/* if the user selects this preference, blur the video descriptions */
+#detail-description.hide {
+  --maxheight: 3.5em;
+  max-height: var(--maxheight);
+  position:relative;
+}
+#detail-description.hide div {
+  max-height: var(--maxheight);
+  overflow:hidden;
+  filter: blur(.3em);
+}
+#detail-description.hide:hover {
+  cursor: pointer;
+  user-select: none;
+}
+#detail-description.hide:hover::after {
+  content:"Click to show";
+  position:absolute;
+  left:50%;
+  top:calc(var(--maxheight)/2);
+  transform: translate(-50%, -50%);
+  padding:.5em;
+  background-color: var(--openable-bgcolor);
+  border-radius: var(--editbutton-borderradius);
+  white-space: nowrap;
+}
+
 #edit-button {
   display: inline-block;
   cursor:pointer;

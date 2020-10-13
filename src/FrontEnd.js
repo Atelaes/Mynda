@@ -313,7 +313,7 @@ class Mynda extends React.Component {
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} displayColumnName={this.displayColumnName} showDetails={this.showDetails} />
-        <MynDetails movie={this.state.detailMovie} showEditor={() => {this.showOpenablePane("editorPane")}}/>
+        <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}}/>
         {this.state.settingsPane}
         {this.state.editorPane}
       </div>
@@ -722,7 +722,6 @@ class MynDetails extends React.Component {
     super(props)
 
     this.render = this.render.bind(this);
-
   }
 
   lastseenDisplayDate(lastseen) {
@@ -772,12 +771,23 @@ class MynDetails extends React.Component {
     }
   }
 
+  clickDescrip(e) {
+    if (this.props.settings.preferences.hidedescription === "hide") {
+      document.getElementById('detail-description').classList.toggle('hide');
+    }
+  }
+
   componentDidUpdate(oldProps) {
     this.setTitleMarquee();
+    if (!_.isEqual(oldProps.movie, this.props.movie)) {
+      // this.setTitleMarquee();
+      if (this.props.settings.preferences.hidedescription === "hide") {
+        document.getElementById('detail-description').classList.add('hide');
+      }
+    }
   }
 
   componentDidMount() {
-    // this.setTitleMarquee();
   }
 
   render() {
@@ -791,7 +801,7 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-artwork"><img src={movie.artwork} /></li>
           <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={movie} /></li>
-          <li className="detail" id="detail-description">{movie.description}</li>
+          <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{movie.description}</div></li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
           <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
           <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags.map((tag) => <span key={tag}>{tag} </span>)}</li>
