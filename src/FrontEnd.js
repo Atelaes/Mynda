@@ -53,9 +53,9 @@ class Mynda extends React.Component {
       "ratings_user" : "rating",
       "dateadded" : "added",
       "lastseen" : "seen",
-      "ratings_rt" : (<img src="../images/logos/rt-logo.png" style={{height:'1em'}} className='ratings-icon' />),
-      "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" style={{height:'1em'}} className='ratings-icon' />),
-      "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" style={{height:'1em'}} className='ratings-icon' />),
+      "ratings_rt" : (<img src="../images/logos/rt-logo.png" className='ratings-icon' />),
+      "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" className='ratings-icon' />),
+      "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" className='ratings-icon' />),
       "ratings_avg" : "AvgRating",
       "boxoffice" : "BoxOffice",
       "languages" : "language",
@@ -724,17 +724,17 @@ class MynDetails extends React.Component {
     this.render = this.render.bind(this);
   }
 
-  lastseenDisplayDate(lastseen) {
+  displayDate(value) {
     let date;
     let displaydate = "";
-    if (lastseen === null) {
+    if (value === null) {
       return "(never)";
     }
     try {
-      date = new Date(parseInt(lastseen) * 1000);
+      date = new Date(parseInt(value) * 1000);
       displaydate = date.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
     } catch(e) {
-      console.log("MynDetails: could not resolve date for lastseen: " + e.toString());
+      console.log("MynDetails: could not resolve date: " + e.toString());
       displaydate = "";
     }
     return displaydate;
@@ -773,8 +773,40 @@ class MynDetails extends React.Component {
 
   clickDescrip(e) {
     if (this.props.settings.preferences.hidedescription === "hide") {
-      document.getElementById('detail-description').classList.toggle('hide');
+      try {
+        document.getElementById('detail-description').classList.toggle('hide');
+      } catch(err) {
+        console.log(err);
+      }
     }
+  }
+
+  displayRatings() {
+    let ratings = this.props.movie.ratings;
+    console.log(JSON.stringify(ratings));
+    return Object.keys(ratings).map(source => {
+      console.log(source);
+      if (source === 'user') return null;
+
+      let rating = Number(ratings[source]);
+
+      // image path
+      let path = '../images/logos/' + source + '-logo';
+      if (source === 'rt' && rating < 60) {
+        path += '-splat';
+      }
+      path += '.png';
+      console.log(path);
+
+      // units/display
+      let units = '';
+      if (source === 'imdb') rating = rating.toFixed(1); // no units, just display 1 decimal place
+      if (source === 'rt') units = '/100';
+      if (source === 'metacritic') units = '%';
+
+      return (
+      <div key={source}><img src={path} className='ratings-icon' /> {rating + units}</div>
+    )});
   }
 
   componentDidUpdate(oldProps) {
@@ -782,7 +814,11 @@ class MynDetails extends React.Component {
     if (!_.isEqual(oldProps.movie, this.props.movie)) {
       // this.setTitleMarquee();
       if (this.props.settings.preferences.hidedescription === "hide") {
-        document.getElementById('detail-description').classList.add('hide');
+        try {
+          document.getElementById('detail-description').classList.add('hide');
+        } catch(err) {
+          console.log(err);
+        }
       }
     }
   }
@@ -802,16 +838,23 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={movie} /></li>
           <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{movie.description}</div></li>
+          <li className="detail" id="detail-ratings">{this.displayRatings()}</li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
           <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
           <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags.map((tag) => <span key={tag}>{tag} </span>)}</li>
-          <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.lastseenDisplayDate(movie.lastseen)}</li>
+          <li className="detail" id="detail-rated"><span className="label">Rated:</span> {movie.rated}</li>
+          <li className="detail" id="detail-country"><span className="label">Country:</span> {movie.country}</li>
+          <li className="detail" id="detail-languages"><span className="label">Languages:</span> {movie.languages.join(", ")}</li>
+          <li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(movie.boxoffice,'$',0) || ''}</li>
+          <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(movie.dateadded)}</li>
+          <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(movie.lastseen)}</li>
+
         </ul>
       );
     } catch (error) {
       // eventually we'll put some kind of better placeholder here
       details = <div>No Details</div>
-      // console.log(error.toString());
+      // console.error(error.toString());
 
       if (!isValidVideo(this.props.movie)) {
         details = null;
@@ -1368,7 +1411,7 @@ class MynSettingsPrefs extends React.Component {
               checked={this.state.hidedescription === "hide" ? true : false}
               onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
             />
-            Hide plot summaries until mouseover
+            Hide plot summaries
           </li>
         </ul>
       </div>

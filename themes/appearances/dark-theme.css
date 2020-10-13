@@ -139,6 +139,8 @@
   --detailtitle-font-size: calc(var(--main-font-size) * 25 / 6);
   --detailtags-font-style: italic;
   --detaildescrip-font-size: inherit;
+  --detaillabel-font: var(--alt-font);
+  --detaillabel-font-weight: 300;
   --detaillabel-font-size: var(--main-font-size);
   --detaillabel-font-style: normal;
   --alt-font: BalooTamma2, Helvetica, sans-serif;
@@ -165,6 +167,7 @@
   --bright-text: #d8dde5; /*#cfd4dc;*/
   --dim-text: #8b929e; /*#7e848f;*/
   --dimmer-text: #4f5259;
+  --colorful-text: #7d91b3;
 
   /* other colors */
   --glow-bright: rgba(220,225,255,.2);
@@ -246,6 +249,9 @@
   --button-text-hover: var(--bright-text);
   --button-border-hover: var(--button-border-width) solid var(--dim-text);
 
+  --ratingsicon-size: 1.5em;
+  --ratingsicon-opacity: .5;
+  --ratingsicon-opacity-hover: .8;
 /* } */
 
 /* #nav-pane { */
@@ -374,6 +380,8 @@
   --detailposition-outer-border: var(--positionwidget-borderwidth) solid var(--detailposition-outer-bordercolor);
   --detailposition-inner-bgcolor: var(--detailposition-outer-bordercolor);
   --detailposition-opacity-hover: .6;
+  --detaillabel-text: var(--colorful-text);
+
 
   --editbutton-position: absolute;
   --editbutton-top: .3em;
@@ -594,9 +602,6 @@
   --positionwidgetinner-bg: var(--positionwidget-bordercolor);
   --positionwidget-width: 8em;
   --positionwidget-height: .4em; /*.3em;*/
-
-  --ratingsicon-opacity: .5;
-  --ratingsicon-opacity-hover: .8;
 
   --editartwork-img-width: 100%;
   --editartwork-img-height: auto;

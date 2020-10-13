@@ -164,6 +164,15 @@ button:hover, input[type=submit]:hover {
   border: var(--button-border-hover);
 }
 
+.ratings-icon {
+  opacity: var(--ratingsicon-opacity);
+}
+
+img.ratings-icon {
+  width: var(--ratingsicon-size);
+  height: var(--ratingsicon-size);
+}
+
 /*************************************/
 /*######## MAIN GRID LAYOUT #########*/
 /*************************************/
@@ -423,15 +432,18 @@ th, tr, td {
 }
 
 .detail {
-  margin-bottom:8px;
+  margin-bottom:.3rem;
   margin-left:5%;
   margin-right:5%;
   font-weight:100;
 }
 .detail .label {
-  font-weight:bold;
+  color: var(--detaillabel-text);
+  font-family: var(--detaillabel-font);
+  font-weight: var(--detaillabel-font-weight);
   font-size: var(--detaillabel-font-size);
   font-style: var(--detaillabel-font-style);
+  line-height: calc(var(--detaillabel-font-size) * .8);
 }
 #detail-title {
   --padding: 100px;
@@ -478,6 +490,7 @@ th, tr, td {
 }
 #detail-description {
   font-size: var(--detaildescrip-font-size);
+  margin-bottom: .5em;
 }
 
 /* if the user selects this preference, blur the video descriptions */
@@ -485,6 +498,7 @@ th, tr, td {
   --maxheight: 3.5em;
   max-height: var(--maxheight);
   position:relative;
+  margin-bottom: 1em;
 }
 #detail-description.hide div {
   max-height: var(--maxheight);
@@ -505,6 +519,27 @@ th, tr, td {
   background-color: var(--openable-bgcolor);
   border-radius: var(--editbutton-borderradius);
   white-space: nowrap;
+}
+
+#detail-ratings {
+  display:flex;
+  flex-direction: row;
+  justify-content: space-around;
+}
+
+#detail-ratings > div {
+  margin: 0 .2em 0 .2em;
+}
+
+#detail-ratings * {
+  height:  var(--ratingsicon-size);
+  line-height: var(--ratingsicon-size);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+#detail-ratings img {
+  vertical-align: bottom;
 }
 
 #edit-button {
@@ -737,6 +772,12 @@ th, tr, td {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
+}
+
+#settings-preferences .columns-list .ratings-icon,
+#main-table-header-row img {
+  width: 1em;
+  height: 1em;
 }
 
 #settings-preferences .columns-list li {
@@ -1126,12 +1167,8 @@ th, tr, td {
 }
 
 .edit-field.ratings .ratings-icon img {
-  width:1.5em;
-  height:1.5em;
-}
-
-.ratings-icon {
-  opacity: var(--ratingsicon-opacity);
+  width: var(--ratingsicon-size);
+  height: var(--ratingsicon-size);
 }
 
 #editor-pane .edit-field.ratings .ratings-input input[type=text] {
