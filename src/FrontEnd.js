@@ -1397,6 +1397,7 @@ class MynSettingsPrefs extends React.Component {
               property="kinds"
               update={this.update}
               options={null}
+              deleteDialog={'Videos of this kind will not be affected until edited.'}
               storeTransform={value => value.toLowerCase()}
               displayTransform={value => value.replace(/\b\w/g,(letter) => letter.toUpperCase())}
               validator={/^[a-zA-Z0-9_\-\.&]+$/}
@@ -3664,6 +3665,15 @@ class MynEditListWidget extends MynEditWidget {
       list: []
     }
 
+    ipcRenderer.on('generic-confirm', (event, response, index) => {
+      if (response === 0) { // yes
+        // delete item (pass 'true' so as not to prompt another dialog)
+        this.deleteItem(index, true);
+      } else {
+        console.log('Deletion cancelled by user')
+      }
+    });
+
     this.render = this.render.bind(this);
     this.updateList = this.updateList.bind(this);
   }
@@ -3673,7 +3683,12 @@ class MynEditListWidget extends MynEditWidget {
     this.props.update(this.props.property,list);
   }
 
-  deleteItem(index) {
+  deleteItem(index, skipDialog) {
+    if (this.props.deleteDialog && !skipDialog) {
+      ipcRenderer.send('generic-confirm', `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`, index);
+      return;
+    }
+
     var temp = this.state.list;
     temp.splice(index, 1);
     this.updateList(temp);
