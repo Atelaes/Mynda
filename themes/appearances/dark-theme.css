@@ -184,7 +184,7 @@
   --library-bg: var(--main-bg);
   --details-bg: var(--pane-bg-1);
 
-  --textinput-font-size: calc(var(--main-font-size));/* * 3 / 4);*/
+  --textinput-font-size: 1rem; /*calc(var(--main-font-size));/* * 3 / 4);*/
   --textinput-font-weight: 300;
   --textinput-height: calc(var(--textinput-font-size) * 7 / 5);
   --textinput-bg-color: var(--transparent-black-bg);
@@ -912,6 +912,25 @@ in lieu of that, we will use a negative margin on the selected element instead (
   }
 }
 
+/* The following was a nice idea, but the element sizes are not consistently dependent upon their parent elements
+   so to change the sizes without changing the size of everything on the whole page would be a nightmare */
+/* @media (min-width: 1600px) {
+  body {
+    --size: 1.2rem;
+  }
+  #editor-pane {
+    font-size: var(--size);
+  }
+  #editor-pane .list-widget-item {
+    font-size:calc(var(--size) * var(--listwidget-item-fontsize-size));
+    height: calc(var(--size) * var(--listwidget-item-height));
+  }
+  #editor-pane .list-widget-delete-item {
+    font-size: calc(var(--size) * var(--listwidgetdel-item-fontsize));
+  }
+} */
+
+
 #editor-pane input.filled + .input-clear-button {
   /* position: var(--inputicon-position);
   top: var(--inputicon-top);
@@ -1012,7 +1031,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 .list-widget-list.tags {
  display:flex;
  flex-wrap: wrap;
- justify-content: space-between;
+ justify-content: left;
 }
 .list-widget-list.tags > * {
   flex-grow: 1;

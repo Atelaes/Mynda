@@ -11,6 +11,7 @@
   --openablepane-height-factor: .8;
   --openablepane-width: calc(var(--openablepane-width-factor) * 100%);
   --openablepane-height: calc(var(--openablepane-height-factor) * 100%);
+  --openablepane-maxwidth: 40em;
   --openablepane-left: calc((100% - var(--openablepane-width)) / 2);
   --openablepane-top: calc((100% - var(--openablepane-height)) / 2);
 }
@@ -51,9 +52,11 @@
   z-index: var(--openablepane-zindex);
   position: absolute;
   width: var(--openablepane-width);
+  max-width: var(--openablepane-maxwidth);
   min-height: var(--openablepane-height);
   top: var(--openablepane-top);
-  left: var(--openablepane-left);
+  left: 50%; /*var(--openablepane-left);*/
+  transform: translateX(-50%);
   box-sizing: border-box;
 }
 
@@ -67,6 +70,9 @@
   z-index: calc(var(--openablepane-zindex) + 2);
 }
 
+#editor-pane {
+}
+
 #edit-search {
   position:relative;
   z-index: calc(var(--openablepane-zindex) + 3);
@@ -78,10 +84,12 @@
   z-index: calc(var(--openablepane-zindex) - 1);
   display: block;
   position: absolute;
-  left: calc(1 / var(--openablepane-width-factor) * var(--openablepane-left) * -1);
-  top: calc(1 / var(--openablepane-height-factor) * var(--openablepane-top) * -1);
-  width: 100vw;
-  height: 100vh;
+  /* left: calc(1 / var(--openablepane-width-factor) * var(--openablepane-left) * -1); */
+  /* top: calc(1 / var(--openablepane-height-factor) * var(--openablepane-top) * -1); */
+  left: -100vw;
+  top: calc(var(--openablepane-top) * -1);
+  width: 200vw;
+  height: 200vh;
 }
 
 #settings-tabs {
@@ -99,6 +107,12 @@
 
   grid-gap: 0.5em;
 }
+
+/* @media (min-width: 1600px) {
+  #edit-container form {
+    column-gap: 1.5em;
+  }
+} */
 
 #edit-container .edit-field {
 
@@ -141,69 +155,62 @@
   grid-row: 5;
   grid-column: 2 / span 2;
 }
+.edit-field.rated {
+  grid-row: 6;
+  grid-column: 1;
+}
+.edit-field.boxoffice {
+  grid-row: 6;
+  grid-column: 2 / span 2;
+}
 .edit-field.cast {
-  grid-row: 6 / span 2;
+  grid-row: 7 / span 2;
   grid-column: 1 / span 3;
 }
 .edit-field.tags {
-  grid-row: 8;
+  grid-row: 9;
   grid-column: 1 / span 3;
 }
 .edit-field.collections {
-  grid-row: 9 / span 10;
+  grid-row: 10 / span 10;
   grid-column: 1 / span 3;
 }
 
 /* column 4 */
 .edit-field.artwork {
-  grid-row: 1 / span 4;
+  grid-row: 1 / span 5;
   grid-column: 4;
 }
 .edit-field.position {
-  grid-row: 5;
-  grid-column: 4;
-}
-.edit-field.lastseen {
   grid-row: 6;
   grid-column: 4;
 }
-.edit-field.dateadded {
+.edit-field.lastseen {
   grid-row: 7;
   grid-column: 4;
 }
-
-.edit-field.ratings {
+.edit-field.dateadded {
   grid-row: 8;
   grid-column: 4;
 }
-
-.edit-field.boxoffice {
+.edit-field.ratings {
   grid-row: 9;
   grid-column: 4;
 }
-
-.edit-field.rated {
+.edit-field.country {
   grid-row: 10;
   grid-column: 4;
 }
-
-.edit-field.country {
+.edit-field.languages {
   grid-row: 11;
   grid-column: 4;
 }
-
-.edit-field.languages {
+.edit-field.revert-btn {
   grid-row: 12;
   grid-column: 4;
 }
-
-.edit-field.revert-btn {
-  grid-row: 13;
-  grid-column: 4;
-}
-
 .edit-field.save-btn {
-  grid-row: 14;
+  grid-row: 13;
   grid-column: 4;
 }
 

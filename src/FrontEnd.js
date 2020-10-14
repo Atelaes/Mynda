@@ -845,7 +845,7 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-rated"><span className="label">Rated:</span> {movie.rated}</li>
           <li className="detail" id="detail-country"><span className="label">Country:</span> {movie.country}</li>
           <li className="detail" id="detail-languages"><span className="label">Languages:</span> {movie.languages.join(", ")}</li>
-          <li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(movie.boxoffice,'$',0) || ''}</li>
+          {movie.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(movie.boxoffice,'$',0) || ''}</li>) : null}
           <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(movie.dateadded)}</li>
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(movie.lastseen)}</li>
 

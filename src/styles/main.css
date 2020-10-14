@@ -503,7 +503,7 @@ th, tr, td {
 #detail-description.hide div {
   max-height: var(--maxheight);
   overflow:hidden;
-  filter: blur(.3em);
+  filter: blur(.2em);
 }
 #detail-description.hide:hover {
   cursor: pointer;
@@ -991,6 +991,11 @@ th, tr, td {
   font-size: var(--listwidget-item-fontsize);
   font-style: var(--listwidget-item-fontstyle);
   font-weight: var(--listwidget-item-fontweight);
+}
+.list-widget-list.tags .list-widget-item,
+.list-widget-list.tags .list-widget-add {
+  width:auto;
+  max-width:10em;
 }
 
 .list-widget-item::after {
