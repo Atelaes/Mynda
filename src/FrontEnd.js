@@ -905,10 +905,10 @@ class MynSettings extends MynOpenablePane {
 
       views: {
         folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
-        playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} />),
+        playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
         collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
         // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
-        preferences :     (<MynSettingsPrefs      save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
+        preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
       },
       settingView: null,
       delaySave: false,
@@ -1291,10 +1291,12 @@ class MynSettingsPlaylists extends React.Component {
           <MynSettingsPlaylistsTableRow
             playlist={playlist}
             index={i}
+            allColumns={this.props.defaultcolumns.used.concat(this.props.defaultcolumns.unused)}
             updateValue={this.updateValue}
             showEditPlaylistFilter={this.showEditPlaylistFilter}
             deletePlaylist={this.deletePlaylist}
             reportValid={this.reportValid}
+            displayColumnName={this.props.displayColumnName}
             innerRef={provided.innerRef}
             provided={provided}
           />
@@ -1461,11 +1463,11 @@ class MynSettingsColumns extends React.Component {
   render() {
     return (
       <DragDropContext onDragEnd={this.onDragEnd}>
-        <div>
+        <div className='settings-columns'>
           <Droppable droppableId='used' direction='horizontal'>
             {(provided) => (
               <div>
-                <div>Used:</div>
+                <label>Used:</label>
                 <ul className="columns-list used" ref={provided.innerRef} {...provided.droppableProps}>
                   {this.props.used.map((col,i) => (
                     <Draggable key={col} draggableId={col} index={i}>
@@ -1482,7 +1484,7 @@ class MynSettingsColumns extends React.Component {
           <Droppable droppableId='unused' direction='horizontal'>
           {(provided) => (
             <div>
-              <div>Available:</div>
+              <label>Available:</label>
               <ul className="columns-list unused" ref={provided.innerRef} {...provided.droppableProps}>
                 {this.props.unused.map((col,i) => (
                   <Draggable key={col} draggableId={col} index={i}>
@@ -1514,7 +1516,7 @@ class MynSettingsPlaylistsTableRow extends React.Component {
       <tr id={'settings-playlists-row-' + playlist.id} ref={this.props.innerRef} {...this.props.provided.draggableProps}>
         <td className='drag-button' {...this.props.provided.dragHandleProps}>{'\u2630'}</td>
         <td className='checkbox'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.props.updateValue(this.props.index,'tab',e.target.checked)} /></td>
-        <td className='name-and-filter'>
+        <td className='name-and-edit'>
           <MynEditText
             object={playlist}
             property='name'
@@ -1526,13 +1528,21 @@ class MynSettingsPlaylistsTableRow extends React.Component {
             reportValid={this.props.reportValid}
           />
           <div id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
-            Filter:
+            <div className='settings-playlists-header'>Filter</div>
             <textarea
               className='edit-filter-field'
               name="playlist filter"
               value={playlist.filterFunction}
               placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
               onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
+            />
+            <div className='settings-playlists-header columns'>Columns</div>
+            <MynSettingsColumns
+              used={playlist.columns}
+              unused={this.props.allColumns.filter(col => !playlist.columns.includes(col)).sort()}
+              update={(prop, columns) => this.props.updateValue(this.props.index,prop,columns.used)}
+              displayTransform={this.props.displayColumnName}
+              storeTransform={(val) => this.props.displayColumnName(val,true)}
             />
           </div>
         </td>
@@ -1544,10 +1554,10 @@ class MynSettingsPlaylistsTableRow extends React.Component {
             </select>
           </div>
         </td>
-        <td>
+        <td className='editBtn'>
           <button onClick={() => this.props.showEditPlaylistFilter(playlist)}>Edit</button>
         </td>
-        <td>
+        <td className='deleteBtn'>
           <button onClick={() => this.props.deletePlaylist(playlist)}>Delete</button>
         </td>
       </tr>

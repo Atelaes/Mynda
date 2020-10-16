@@ -744,7 +744,7 @@ input[type=radio]:checked::after {
   border-radius: var(--playlisttab-borderradius-radius) var(--playlisttab-borderradius-radius) 0em 0em;
   padding-left: .7em !important;
   margin-left: calc(-1 * var(--playlisttab-borderwidth-selected));
-  z-index:10000 !important;
+  z-index:100 !important;
 }
 
 /* the below is not supported yet. It would remove the right border of the previous tab
@@ -1237,23 +1237,23 @@ in lieu of that, we will use a negative margin on the selected element instead (
   border: none;
 }
 
-#settings-preferences .columns-list.used {
+#settings-pane .columns-list.used {
   margin-right:.5em;
 }
 
-#settings-preferences .columns-list.unused {
+#settings-pane .columns-list.unused {
   opacity: .7;
 }
 
-#settings-preferences .columns-list.used li.col {
+#settings-pane .columns-list.used li.col {
   color: var(--th-text-hover);
   background-color: var(--th-bg-hover);
 }
 
-#settings-preferences .columns-list.unused li.col {
+#settings-pane .columns-list.unused li.col {
 }
 
-#settings-preferences .columns-list li.col {
+#settings-pane .columns-list li.col {
   text-align: center;
   background-color: var(--th-bg);
   color: var(--th-text);
@@ -1267,12 +1267,12 @@ in lieu of that, we will use a negative margin on the selected element instead (
   margin-bottom: .3em;
 }
 
-#settings-preferences .columns-list li img {
+#settings-pane .columns-list li img {
   /* not sure why this is necessary, but I'm tired of troubleshooting right now */
   position:relative;
   top:.1em;
 }
 
-#settings-preferences .columns-list.used li.col img {
+#settings-pane .columns-list.used li.col img {
   opacity: var(--ratingsicon-opacity-hover);
 }

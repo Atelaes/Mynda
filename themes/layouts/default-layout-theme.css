@@ -6,14 +6,16 @@
 
   --navcontrols-top: calc(var(--header-row-size) / 2 - (var(--navcontrols-height) / 2));
 
-  --openablepane-zindex: 999999;
+  --openablepane-zindex: 200;
   --openablepane-width-factor: .7;
   --openablepane-height-factor: .8;
   --openablepane-width: calc(var(--openablepane-width-factor) * 100%);
   --openablepane-height: calc(var(--openablepane-height-factor) * 100%);
   --openablepane-maxwidth: 40em;
+  --openablepane-minwidth: 28em;
   --openablepane-left: calc((100% - var(--openablepane-width)) / 2);
   --openablepane-top: calc((100% - var(--openablepane-height)) / 2);
+  --openablepane-breakpt: calc(var(--openablepane-maxwidth) / var(--openablepane-width-factor));
 }
 
 #grid-container {
@@ -53,12 +55,30 @@
   position: absolute;
   width: var(--openablepane-width);
   max-width: var(--openablepane-maxwidth);
+  min-width: var(--openablepane-minwidth);
   min-height: var(--openablepane-height);
   top: var(--openablepane-top);
-  left: 50%; /*var(--openablepane-left);*/
-  transform: translateX(-50%);
+  left: var(--openablepane-left);
+  /* transform: translateX(-50%); /* turns out we can't use translate because it screws up react-beautiful-dnd, so instead we have to use media queries to set the positioning */
   box-sizing: border-box;
 }
+
+@media (min-width: 1524px) { /* 1524px = --openablepane-maxwidth (40em) / --openablepane-width-factor (.7) */
+  .openable-pane {
+    left: calc(50% - (var(--openablepane-maxwidth)/2));
+  }
+}
+@media (max-width: 1067px) { /* 1067px = --openablepane-minwidth (28em) / --openablepane-width-factor (.7) */
+  .openable-pane {
+    left: calc(50% - (var(--openablepane-minwidth)/2));
+  }
+}
+@media (max-width: 747px) { /* 747px = --openablepane-minwidth (28em) */
+  .openable-pane {
+    left: 0;
+  }
+}
+
 
 /* so that everything appears above the ::before element which obscures the background */
 .openable-pane * {
