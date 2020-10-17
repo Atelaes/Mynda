@@ -133,11 +133,16 @@ class Mynda extends React.Component {
     if (!element) {
       element = document.getElementById("playlist-" + id);
     }
+    
+    // if this playlist is one of the tabs, bring that tab to the front
+    if (element) {
+      Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
+      element.classList.add('selected');
+    }
+
     let videos = this.playlistFilter(id);
     this.setState({playlistVideos : videos, filteredVideos : videos, view : this.state.playlists.filter(playlist => playlist.id == id)[0].view, currentPlaylistID : id})
     // this.setState({}); // filteredVideos is what is actually displayed
-    Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
-    element.classList.add('selected');
   }
 
   // called when the search input is changed
