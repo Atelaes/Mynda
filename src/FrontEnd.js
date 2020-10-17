@@ -341,7 +341,7 @@ class MynNav extends React.Component {
           {this.props.playlists.map((playlist, index) => {
             // if playlist is selected to be displayed in as a tab in the navbar
             if (playlist.tab) {
-              return (<li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 9999 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>);
+              return (<li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 100 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>);
             } else {
               // eventually we'll add the others to a dropdown/flyout menu
             }
@@ -1182,7 +1182,7 @@ class MynSettingsPlaylists extends React.Component {
 
     this.updateValue = this.updateValue.bind(this);
     this.reportValid = this.reportValid.bind(this);
-    this.showEditPlaylistFilter = this.showEditPlaylistFilter.bind(this);
+    this.showEditPlaylist = this.showEditPlaylist.bind(this);
     this.deletePlaylist = this.deletePlaylist.bind(this);
     this.addPlaylist = this.addPlaylist.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
@@ -1220,13 +1220,20 @@ class MynSettingsPlaylists extends React.Component {
     }
   }
 
-  showEditPlaylistFilter(playlist) {
-    let editField = document.getElementById('edit-filter-field-' + playlist.id);
-    if (editField.style.display === 'none') {
-      editField.style.display = 'block';
-    } else {
-      editField.style.display = 'none';
-    }
+  showEditPlaylist(playlist) {
+    let hiddenEls = [];
+    hiddenEls.push(document.getElementById('edit-filter-header-' + playlist.id));
+    hiddenEls.push(document.getElementById('edit-filter-field-' + playlist.id));
+    hiddenEls.push(document.getElementById('edit-columns-header-' + playlist.id));
+    hiddenEls.push(document.getElementById('edit-columns-field-' + playlist.id));
+
+    hiddenEls.map(el => {
+      if (el.style.display === 'none') {
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    });
   }
 
   deletePlaylist(playlist) {
@@ -1293,7 +1300,7 @@ class MynSettingsPlaylists extends React.Component {
             index={i}
             allColumns={this.props.defaultcolumns.used.concat(this.props.defaultcolumns.unused)}
             updateValue={this.updateValue}
-            showEditPlaylistFilter={this.showEditPlaylistFilter}
+            showEditPlaylist={this.showEditPlaylist}
             deletePlaylist={this.deletePlaylist}
             reportValid={this.reportValid}
             displayColumnName={this.props.displayColumnName}
@@ -1314,26 +1321,22 @@ class MynSettingsPlaylists extends React.Component {
     return (
       <div id='settings-playlists'>
         <DragDropContext onDragEnd={this.onDragEnd}>
-          <table id='settings-playlists-table'>
-            <thead>
-              <tr>
-                <th></th>
-                <th title="Checked playlists will display as tabs. Unchecked playlists will only appear in the dropdown">Tab</th>
-                <th>Name</th>
-                <th title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</th>
-                <th></th>
-                <th><button onClick={() => this.addPlaylist()}>Add...</button></th>
-              </tr>
-            </thead>
-              <Droppable droppableId='settings-playlist-table'>
-                {(provided) => (
-                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
-                    {playlists}
-                    {provided.placeholder}
-                  </tbody>
-                )}
-              </Droppable>
-          </table>
+          <div className="table" id='settings-playlists-table'>
+            <div className="header row">
+              <div className="header cell tab" title="Checked playlists will display as tabs. Unchecked playlists will only appear in the dropdown">Tab</div>
+              <div className="header cell name">Name</div>
+              <div className="header cell view" title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</div>
+              <div className="header cell add-btn"><button onClick={() => this.addPlaylist()}>Add...</button></div>
+            </div>
+            <Droppable droppableId='settings-playlist-table'>
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {playlists}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </div>
         </DragDropContext>
       </div>
     );
@@ -1513,10 +1516,12 @@ class MynSettingsPlaylistsTableRow extends React.Component {
     let playlist = this.props.playlist;
 
     return (
-      <tr id={'settings-playlists-row-' + playlist.id} ref={this.props.innerRef} {...this.props.provided.draggableProps}>
-        <td className='drag-button' {...this.props.provided.dragHandleProps}>{'\u2630'}</td>
-        <td className='checkbox'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.props.updateValue(this.props.index,'tab',e.target.checked)} /></td>
-        <td className='name-and-edit'>
+      <div className="row" id={'settings-playlists-row-' + playlist.id} ref={this.props.innerRef} {...this.props.provided.draggableProps}>
+        <div className='cell drag-button' {...this.props.provided.dragHandleProps}>{'\u2630'}</div>
+
+        <div className='cell tab'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.props.updateValue(this.props.index,'tab',e.target.checked)} /></div>
+
+        <div className='cell name name-and-edit'>
           <MynEditText
             object={playlist}
             property='name'
@@ -1527,40 +1532,49 @@ class MynSettingsPlaylistsTableRow extends React.Component {
             allowedEmpty={false}
             reportValid={this.props.reportValid}
           />
-          <div id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
-            <div className='settings-playlists-header'>Filter</div>
-            <textarea
-              className='edit-filter-field'
-              name="playlist filter"
-              value={playlist.filterFunction}
-              placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
-              onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
-            />
-            <div className='settings-playlists-header columns'>Columns</div>
-            <MynSettingsColumns
-              used={playlist.columns}
-              unused={this.props.allColumns.filter(col => !playlist.columns.includes(col)).sort()}
-              update={(prop, columns) => this.props.updateValue(this.props.index,prop,columns.used)}
-              displayTransform={this.props.displayColumnName}
-              storeTransform={(val) => this.props.displayColumnName(val,true)}
-            />
-          </div>
-        </td>
-        <td className='view'>
+        </div>
+
+        <div className='header filter' id={'edit-filter-header-' + playlist.id} style={{display: 'none'}}>Filter</div>
+
+        <div className="cell filter" id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
+          <textarea
+            className='edit-filter-field'
+            name="playlist filter"
+            value={playlist.filterFunction}
+            placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
+            onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
+          />
+        </div>
+
+        <div className='header columns' id={'edit-columns-header-' + playlist.id} style={{display: 'none'}}>Columns</div>
+
+        <div className="cell columns" id={'edit-columns-field-' + playlist.id} style={{display: 'none'}}>
+          <MynSettingsColumns
+            used={playlist.columns}
+            unused={this.props.allColumns.filter(col => !playlist.columns.includes(col)).sort()}
+            update={(prop, columns) => this.props.updateValue(this.props.index,prop,columns.used)}
+            displayTransform={this.props.displayColumnName}
+            storeTransform={(val) => this.props.displayColumnName(val,true)}
+          />
+        </div>
+
+        <div className='cell view'>
           <div className='select-container select-alwaysicon'>
             <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
               <option value='flat'>Flat</option>
               <option value='hierarchical'>Hierarchical</option>
             </select>
           </div>
-        </td>
-        <td className='editBtn'>
-          <button onClick={() => this.props.showEditPlaylistFilter(playlist)}>Edit</button>
-        </td>
-        <td className='deleteBtn'>
+        </div>
+
+        <div className='cell edit-btn'>
+          <button onClick={() => this.props.showEditPlaylist(playlist)}>Edit</button>
+        </div>
+
+        <div className='cell delete-btn'>
           <button onClick={() => this.props.deletePlaylist(playlist)}>Delete</button>
-        </td>
-      </tr>
+        </div>
+      </div>
     );
   }
 }

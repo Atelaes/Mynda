@@ -680,8 +680,7 @@ th, tr, td {
   margin-bottom: .5em;
 }
 
-#settings-pane table th,
-.settings-playlists-header {
+#settings-pane .table .header {
   text-align: center;
   color: var(--th-text);
   font-family: var(--th-font);
@@ -689,32 +688,91 @@ th, tr, td {
   font-weight:bold;
 }
 
-#settings-playlists table th button {
+#settings-playlists .table .header button {
   color: var(--button-text);
   font-family: var(--button-font);
   font-size: var(--button-fontsize);
   font-weight: var(--button-fontweight);
 }
 
-#settings-playlists table tr {
-  vertical-align: top;
+#settings-playlists .table .row {
+  vertical-align: middle;
+  display:grid;
+  grid-template-columns: 1rem 1.5rem 13rem 7rem 2.2rem 3rem;
+  column-gap: .2rem;
+  margin-bottom: .2rem;
 }
 
-#settings-playlists table td {
+.header.tab {grid-column: 2;}
+.header.name {grid-column: 3;}
+.header.view {grid-column: 4;}
+.header.add-btn {grid-column: 6;}
+.header.filter {grid-row: 2; grid-column: 3;}
+.header.columns {grid-row: 4; grid-column: 3;}
+
+.cell.tab {
+  grid-row: 1;
+  grid-column: 2;
+}
+.cell.name {
+  grid-row: 1;
+  grid-column: 3;
+}
+.cell.view {
+  grid-row: 1;
+  grid-column: 4;
+}
+.cell.edit-btn {
+  grid-row: 1;
+  grid-column: 5;
+}
+.cell.delete-btn {
+  grid-row: 1;
+  grid-column: 6;
+}
+.cell.filter {
+  grid-row: 3;
+  grid-column: 3 / span 2;
+}
+.cell.columns {
+  grid-row: 5;
+  grid-column: 3 / span 3;
+}
+
+.cell.drag-button,
+.cell.tab,
+.cell.edit-btn,
+.cell.delete-btn {
   text-align:center;
 }
 
-#settings-playlists table .name-and-edit {
+#settings-playlists .table .cell select,
+#settings-playlists .table .cell input[type=text] {
+  width:100%;
+}
+
+#settings-pane .table .cell > * {
+  vertical-align: middle;
+  /* line-height:100%; */
+  /* height: 100%; */
+}
+
+#settings-pane .table .cell input[type=checkbox] {
+  margin:0;
+}
+
+
+/* #settings-playlists .table .name-and-edit {
   text-align:left;
   width: 13em;
   max-width: 13em;
 }
-#settings-playlists table .name-and-edit input {
+#settings-playlists .table .name-and-edit input {
   width: 100%;
-}
+} */
 
 
-#settings-playlists table .view select {
+#settings-playlists .table .view select {
   font-size: calc(var(--textinput-font-size) * .8);
 }
 
@@ -741,7 +799,7 @@ th, tr, td {
   margin-right: auto;
 }
 
-#settings-playlists table textarea {
+#settings-playlists .table textarea {
   font-family: var(--table-cell-monofont);
   font-size: calc(var(--textinput-font-size) * .8);
   width:100%;
@@ -765,14 +823,14 @@ th, tr, td {
   height:.3em;
 } */
 
-#settings-playlists .settings-columns {
+/* #settings-playlists .settings-columns {
   z-index: calc(var(--openablepane-zindex) + 4);
 }
 #settings-playlists td.view,
-#settings-playlists td.editBtn,
-#settings-playlists td.deleteBtn {
+#settings-playlists td.edit-btn,
+#settings-playlists td.delete-btn {
   z-index: 0;
-}
+} */
 
 #settings-preferences ul {
   list-style-type: none;
@@ -789,6 +847,8 @@ th, tr, td {
 .settings-columns {
   font-size:.8em;
   font-weight:300;
+  text-align: left;
+  bottom:.5em;
 }
 
 .settings-columns label {
