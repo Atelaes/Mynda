@@ -60,6 +60,30 @@
           "duration"
         ]
       },
+      "defaultdefaultcolumns" : {
+        "used" : [
+          "title",
+          "year",
+          "director",
+          "genre",
+          "seen",
+          "ratings_user",
+          "dateadded"
+        ],
+        "unused" : [
+          "kind",
+          "lastseen",
+          "ratings_rt",
+          "ratings_imdb",
+          "ratings_mc",
+          "ratings_avg",
+          "boxoffice",
+          "rated",
+          "country",
+          "languages",
+          "duration"
+        ]
+      },
       "hidedescription" : "hide"
     },
     "used" : {
@@ -242,7 +266,10 @@
       "boxoffice" : 0,
       "rated" : "R",
       "ratings" : {
-        "user": 3
+        "user" : 3,
+        "rt" : 21,
+        "imdb" : 9,
+        "mc" : 94
       },
       "dateadded" : "946684800",
       "lastseen" : "946692300",
@@ -278,7 +305,7 @@
       "duration" : 6900,
       "country" : "Sweden",
       "languages" : ["Swedish"],
-      "boxoffice" : 0,
+      "boxoffice" : 42123,
       "rated" : "n/a",
       "ratings" : {
         "user" : 5
@@ -317,10 +344,12 @@
       "duration" : 7200,
       "country" : "United States",
       "languages" : ["English"],
-      "boxoffice" : 0,
+      "boxoffice" : 1530000001,
       "rated" : "PG-13",
       "ratings" : {
-        "user" : 4
+        "user" : 4,
+        "imdb" : 8.3,
+        "rt" : 91
       },
       "dateadded" : "1383523200",
       "lastseen" : "1456692300",
@@ -419,10 +448,13 @@
       "duration" : 2700,
       "country" : "United States",
       "languages" : ["English"],
-      "boxoffice" : 0,
+      "boxoffice" : 2318571,
       "rated" : "PG",
       "ratings" : {
-        "user" : 2
+        "user" : 2,
+        "mc" : 32,
+        "rt" : 4,
+        "imdb" : 3.14159265358979
       },
       "dateadded" : "1303525600",
       "lastseen" : "756092300",

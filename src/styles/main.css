@@ -313,6 +313,12 @@ th, tr, td {
   background-color:var(--th-bg-hover);
   color:var(--th-text-hover);
 }
+.movie-table th img {
+  /* vertical-align:middle; */
+  position:relative;
+  top:.1em;
+  margin: 0 .1em 0 .1em;
+}
 .movie-table td {
   padding: var(--tablecell-padding);
   white-space: nowrap;
@@ -375,7 +381,9 @@ th, tr, td {
 .movie-row .year {
   font-size: var(--movie-row-year-font-size) !important;
 }
-
+.movie-row .ratings {
+  font-size: var(--movie-row-ratings-font-size) !important;
+}
 .movie-table .mono {
   font-family: var(--table-cell-monofont);
   font-size: var(--table-cell-monofont-size);

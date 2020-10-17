@@ -29,13 +29,16 @@ class Mynda extends React.Component {
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
-      detailId: null,
-      detailMovie: {},
+      detailId : null,
+      detailMovie : {},
       currentPlaylistID : null,
-      prevQuery: '',
+      prevQuery : '',
 
-      settingsPane: null,
-      editorPane: null,
+      // openablePane: null
+      show : {
+        settingsPane : false,
+        editorPane : false
+      }
     }
 
     this.render = this.render.bind(this);
@@ -56,7 +59,7 @@ class Mynda extends React.Component {
       "ratings_rt" : (<img src="../images/logos/rt-logo.png" className='ratings-icon' />),
       "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" className='ratings-icon' />),
       "ratings_mc" : (<img src="../images/logos/mc-logo.png" className='ratings-icon' />),
-      "ratings_avg" : "AvgRating",
+      "ratings_avg" : "avg",
       "boxoffice" : "BoxOffice",
       "languages" : "language",
       "duration" : "runtime",
@@ -81,6 +84,23 @@ class Mynda extends React.Component {
     }
 
     return result;
+  }
+
+  calcAvgRatings(ratings, purpose) {
+    let keys = Object.keys(ratings);
+
+    if (keys.length === 0) return purpose === 'sort' ? -1 : '';
+
+    let avg = 0;
+    keys.map(r => {
+      let normalized = 0;
+      if (r === 'user') normalized = ratings[r] * 20;
+      else if (r === 'imdb') normalized = ratings[r] * 10;
+      else normalized = ratings[r];
+      avg += normalized;
+    });
+    avg /= keys.length;
+    return purpose === 'sort' ? Number(avg) : Math.round(avg) + '%';
   }
 
   loadLibrary() {
@@ -122,7 +142,8 @@ class Mynda extends React.Component {
     try {
       filteredVids = this.state.videos.filter(video => eval(playlist.filterFunction))
     } catch(err) {
-      console.error(`Unable to execute filter for ${playlist.name} playlist: ${err}`);
+      let name = playlist ? playlist.name : 'nonexistent';
+      console.error(`Unable to execute filter for ${name} playlist: ${err}`);
     }
     return filteredVids;
   }
@@ -141,7 +162,9 @@ class Mynda extends React.Component {
 
     // set the playlist
     let videos = this.playlistFilter(id);
-    this.setState({playlistVideos : videos, filteredVideos : videos, view : this.state.playlists.filter(playlist => playlist.id == id)[0].view, currentPlaylistID : id})
+    let playlist = this.state.playlists.filter(playlist => playlist.id == id)[0];
+    let view = playlist ? playlist.view : null;
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id})
     // this.setState({}); // filteredVideos is what is actually displayed
   }
 
@@ -231,22 +254,28 @@ class Mynda extends React.Component {
       pane.classList.add('blurred');
     });
 
-    let stateObj = {};
-    switch(name) {
-      case "settingsPane":
-        stateObj[name] = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane(name)}}/>
-        break;
-      case "editorPane":
-        stateObj[name] = <MynEditor video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
-        break;
-    };
-    this.setState(stateObj);
+    let show = _.cloneDeep(this.state.show);
+    Object.keys(show).map(key => {show[key] = false});
+    show[name] = true;
+    this.setState({show:show});
+
+    // let paneJSX;
+    // switch(name) {
+    //   case "settingsPane":
+    //     paneJSX = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane(name)}}/>
+    //     break;
+    //   case "editorPane":
+    //     paneJSX = <MynEditor video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
+    //     break;
+    // };
+    // this.setState({openablePane:paneJSX});
   }
 
   hideOpenablePane(name) {
-    let stateObj = {};
-    stateObj[name] = null;
-    this.setState(stateObj);
+    // this.setState({openablePane:null});
+    let show = _.cloneDeep(this.state.show);
+    show[name] = false;
+    this.setState({show:show});
 
     // remove 'blurred' class from all panes
     Array.from(document.getElementsByClassName('pane')).map((pane) => {
@@ -293,10 +322,11 @@ class Mynda extends React.Component {
       // if the settings were changed
       if (address.includes('settings')) {
         console.log('settings was edited');
-        // this.setState({settings : this.props.library.settings}, () => {
-        //   this.hideOpenablePane('settingsPane');
-        //   this.showOpenablePane('settingsPane');
-        // });
+        this.setState({settings : this.props.library.settings}, () => {
+        });
+        // if (address === 'settings.preferences.defaultcolumns') {
+        //
+        // }
       }
 
 
@@ -325,10 +355,10 @@ class Mynda extends React.Component {
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
-        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} showDetails={this.showDetails} />
+        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}}/>
-        {this.state.settingsPane}
-        {this.state.editorPane}
+        <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
+        <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
     );
   }
@@ -460,7 +490,7 @@ class MynLibrary extends React.Component {
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" columns={this.props.columns} displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} /></div></div>)
+        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" columns={this.props.columns} displayColumnName={this.props.displayColumnName} calcAvgRatings={this.props.calcAvgRatings} showDetails={this.props.showDetails} /></div></div>)
       } else {
         return null;
       }
@@ -486,7 +516,7 @@ class MynLibrary extends React.Component {
 
     } else if (this.props.view === "flat") {
 
-      content = (<MynLibTable movies={this.props.movies} view={this.props.view} columns={this.props.columns} displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} />)
+      content = (<MynLibTable movies={this.props.movies} view={this.props.view} columns={this.props.columns} displayColumnName={this.props.displayColumnName} calcAvgRatings={this.props.calcAvgRatings} showDetails={this.props.showDetails} />)
 
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
@@ -566,7 +596,7 @@ class MynLibTable extends React.Component {
     let ascending = true;
 
     // except for the following fields, which should have a default sort direction of descending
-    let descendingFields = ['ratings_user','dateadded','lastseen'];
+    let descendingFields = ['ratings_user','ratings_imdb','ratings_rt','ratings_mc','ratings_avg','dateadded','lastseen'];
     if (descendingFields.includes(key)) {
       ascending = false;
     }
@@ -608,13 +638,14 @@ class MynLibTable extends React.Component {
      ratings_rt: (a, b) => {let ar = a.ratings.rt ? a.ratings.rt : -1; let br = b.ratings.rt ? b.ratings.rt : -1; return ar > br},
      ratings_imdb: (a, b) => {let ar = a.ratings.imdb ? a.ratings.imdb : -1; let br = b.ratings.imdb ? b.ratings.imdb : -1; return ar > br},
      ratings_mc: (a, b) => {let ar = a.ratings.mc ? a.ratings.mc : -1; let br = b.ratings.mc ? b.ratings.mc : -1; return ar > br},
-     ratings_avg: (a, b) => {
-       let a_avg = (a.ratings.rt + (a.ratings.imdb*10) + a.ratings.mc)/3;
-       if (isNaN(a_avg)) a_avg = -1;
-       let b_avg = (b.ratings.rt + (b.ratings.imdb*10) + b.ratings.mc)/3;
-       if (isNaN(b_avg)) b_avg = -1;
-       return a_avg > b_avg;
-     },
+     ratings_avg: (a, b) => this.props.calcAvgRatings(a.ratings,'sort') > this.props.calcAvgRatings(b.ratings,'sort'),
+     // ratings_avg: (a, b) => {
+     //   let a_avg = (a.ratings.rt + (a.ratings.imdb*10) + a.ratings.mc)/3;
+     //   if (isNaN(a_avg)) a_avg = -1;
+     //   let b_avg = (b.ratings.rt + (b.ratings.imdb*10) + b.ratings.mc)/3;
+     //   if (isNaN(b_avg)) b_avg = -1;
+     //   return a_avg > b_avg;
+     // },
      boxoffice: (a, b) => a.boxoffice > b.boxoffice,
      rated: (a, b) => ratedOrder[a.rated.toUpperCase()] > ratedOrder[b.rated.toUpperCase()],
      country: (a, b) => a.country > b.country,
@@ -639,7 +670,6 @@ class MynLibTable extends React.Component {
       // if (movie.order === undefined) {
       //   movie.order = null;
       // }
-      let ratings_avg = (ratings) => {let avg = (ratings.rt + (ratings.imdb*10) + ratings.mc)/3; return !isNaN(avg) ? avg + '%' : '';};
 
       let cellJSX = {
         order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>),
@@ -652,10 +682,10 @@ class MynLibTable extends React.Component {
         dateadded: (<td key="dateadded" className="dateadded centered mono">{displaydate(movie.dateadded)}</td>),
         kind: (<td key="kind" className="kind">{movie.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase())}</td>),
         lastseen: (<td key="lastseen" className="lastseen centered mono">{displaydate(movie.lastseen)}</td>),
-        ratings_rt: (<td key="ratings_rt" className="ratings_rt">{movie.ratings.rt ? movie.ratings.rt + '%' : ''}</td>),
-        ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb">{movie.ratings.imdb ? Number(movie.ratings.imdb).toFixed(1) : ''}</td>),
-        ratings_mc: (<td key="ratings_mc" className="ratings_mc">{movie.ratings.mc ? movie.ratings.mc : ''}</td>),
-        ratings_avg: (<td key="ratings_avg" className="ratings_avg centered">{ratings_avg(movie.ratings)}</td>),
+        ratings_rt: (<td key="ratings_rt" className="ratings_rt ratings centered">{movie.ratings.rt ? movie.ratings.rt + '%' : ''}</td>),
+        ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb ratings centered">{movie.ratings.imdb ? Number(movie.ratings.imdb).toFixed(1) : ''}</td>),
+        ratings_mc: (<td key="ratings_mc" className="ratings_mc ratings centered">{movie.ratings.mc ? movie.ratings.mc : ''}</td>),
+        ratings_avg: (<td key="ratings_avg" className="ratings_avg ratings centered">{this.props.calcAvgRatings(movie.ratings)}</td>),
         boxoffice: (<td key="boxoffice" className="boxoffice">{movie.boxoffice === 0 ? '' : accounting.formatMoney(Number(movie.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}B` : 'B')}</td>),
         rated: (<td key="rated" className="rated">{movie.rated}</td>),
         country: (<td key="country" className="country">{movie.country}</td>),
@@ -877,8 +907,8 @@ class MynDetails extends React.Component {
       // units/display
       let units = '';
       if (source === 'imdb') rating = rating.toFixed(1); // no units, just display 1 decimal place
-      if (source === 'rt') units = '/100';
-      if (source === 'mc') units = '%';
+      if (source === 'rt') units = '%';
+      if (source === 'mc') units = '/100';
 
       return (
       <div key={source}><img src={path} className='ratings-icon' /> {rating + units}</div>
@@ -960,6 +990,10 @@ class MynOpenablePane extends React.Component {
 
   // child class must supply 'content' variable when calling super.render()
   render(content) {
+    if (this.props.show === false) {
+      return null;
+    }
+
     return (
       <div id={this.state.paneID} className="pane openable-pane">
         <div className="openable-close-btn" onClick={() => this.props.hideFunction(this.state.paneID)}>{"\u2715"}</div>
@@ -978,19 +1012,22 @@ class MynSettings extends MynOpenablePane {
 
     this.state = {
       paneID: 'settings-pane',
-
-      views: {
-        folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
-        playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
-        collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
-        // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
-        preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
-      },
       settingView: null,
+      settingViewName: props.view,
       delaySave: false,
       timer: null
     }
+  }
 
+  setStateViewsFromProps(callback) {
+    let views = {
+      folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
+      playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
+      collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
+      // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
+      preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
+    }
+    this.setState({views:views},callback);
   }
 
   save(saveObj) {
@@ -1031,7 +1068,7 @@ class MynSettings extends MynOpenablePane {
     }
 
     // console.log('index: ' + index);
-    this.setState({settingView : this.state.views[view]});
+    this.setState({settingView : this.state.views[view], settingViewName : view});
 
     // remove "selected" class from all the tabs
     try {
@@ -1067,9 +1104,13 @@ class MynSettings extends MynOpenablePane {
 
   createContentJSX() {
     const tabs = [];
-    Object.keys(this.state.views).forEach((tab,i) => {
-      tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e,i)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
-    });
+    try {
+      Object.keys(this.state.views).forEach((tab,i) => {
+        tabs.push(<li key={tab} id={"settings-tab-" + tab} className="tab" onClick={(e) => this.setView(tab,e,i)}>{tab.replace(/\b\w/g,(letter) => letter.toUpperCase())}</li>)
+      });
+    } catch(err) {
+      // this.state.views has not been created yet
+    }
 
     return (
         <div>
@@ -1082,11 +1123,39 @@ class MynSettings extends MynOpenablePane {
   }
 
   componentDidMount(props) {
-    // set the view to the 'folders' tab
-    this.setView('folders');
+    // create the views
+    // and set the initial view to the 'folders' tab
+    // --------
+    // NOTE: this no longer works, because the rendering process relies on
+    // finding existing DOM nodes (e.g. document.getElementById("settings-tabs") for styling),
+    // and when props.show is false, those don't exist;
+    // this is always the case when the component mounts, because props.show isn't
+    // set to true until the user clicks to open the pane;
+    // it doesn't matter though, because we're calling the same function
+    // in componentDidUpdate anyway
+    // --------
+    // this.setStateViewsFromProps(() => this.setView('folders'));
   }
 
-  componentDidUpdate(props) {
+  componentDidUpdate(oldProps) {
+    console.log('MynSettings: component has updated');
+    if (!_.isEqual(oldProps,this.props)) {
+      console.log('MynSettings: PROPS HAVE CHANGED:\n' + JSON.stringify(this.props.show));
+
+      // if the view was changed from outside, call up that view;
+      // OR, whenever the pane is closed, also set to props.view
+      // so that it will open to that view the next time the user opens the pane;
+      // (if we want the open tab to be persistent through close, just get rid of the 'or' statement)
+      // otherwise stay with the view we're on, so that if an update happens
+      // while the pane is open, it doesn't throw the user to a different tab
+      let viewName = this.state.settingViewName;
+      if (this.props.view !== oldProps.view || this.props.show === false) {
+        viewName = this.props.view;
+      }
+
+      // update everything
+      this.setStateViewsFromProps(() => this.setView(viewName));
+    }
   }
 
   render() {
@@ -1323,7 +1392,8 @@ class MynSettingsPlaylists extends React.Component {
       name : "",
       filterFunction : "false",
       view : "flat",
-      tab : true
+      tab : true,
+      columns : _.cloneDeep(this.props.defaultcolumns.used)
     }
     let playlists = _.cloneDeep(this.state.playlists);
     playlists.unshift(newPlaylist);
@@ -1375,6 +1445,7 @@ class MynSettingsPlaylists extends React.Component {
             playlist={playlist}
             index={i}
             allColumns={this.props.defaultcolumns.used.concat(this.props.defaultcolumns.unused)}
+            defaultcolumns={this.props.defaultcolumns}
             updateValue={this.updateValue}
             showEditPlaylist={this.showEditPlaylist}
             deletePlaylist={this.deletePlaylist}
@@ -1466,6 +1537,7 @@ class MynSettingsPrefs extends React.Component {
             <MynSettingsColumns
               used={this.state.defaultcolumns.used}
               unused={this.state.defaultcolumns.unused}
+              defaultcolumns={this.props.settings.preferences.defaultdefaultcolumns}
               update={this.update}
               displayTransform={this.props.displayColumnName}
               storeTransform={(val) => this.props.displayColumnName(val,true)}
@@ -1577,6 +1649,7 @@ class MynSettingsColumns extends React.Component {
             </div>
           )}
           </Droppable>
+          <button onClick={() => this.props.update('columns',this.props.defaultcolumns)}>Restore Default Columns</button>
         </div>
       </DragDropContext>
     );
@@ -1627,7 +1700,8 @@ class MynSettingsPlaylistsTableRow extends React.Component {
         <div className="cell columns" id={'edit-columns-field-' + playlist.id} style={{display: 'none'}}>
           <MynSettingsColumns
             used={playlist.columns}
-            unused={this.props.allColumns.filter(col => !playlist.columns.includes(col)).sort()}
+            defaultcolumns={this.props.defaultcolumns}
+            unused={this.props.allColumns.filter(col => !playlist.columns.includes(col))}
             update={(prop, columns) => this.props.updateValue(this.props.index,prop,columns.used)}
             displayTransform={this.props.displayColumnName}
             storeTransform={(val) => this.props.displayColumnName(val,true)}
@@ -1846,6 +1920,12 @@ class MynEditor extends MynOpenablePane {
 
   }
 
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(oldProps.video,this.props.video)) {
+      this.setState({video:_.cloneDeep(this.props.video)});
+    }
+  }
+
   componentDidMount() {
     this._isMounted = true;
   }
@@ -1868,6 +1948,7 @@ class MynEditor extends MynOpenablePane {
         />
 
         <MynEditorEdit
+          show={this.props.show}
           video={this.state.video}
           collections={this.state.collections}
           settings={this.props.settings}
@@ -2155,9 +2236,13 @@ class MynEditorEdit extends React.Component {
   }
 
   render() {
+    if (this.props.show === false) {
+      return null;
+    }
+
     const video = this.props.video;
     if (!isValidVideo(video)) {
-      console.log("Invalid video passed to editor");
+      console.log("Invalid video passed to editor: " + JSON.stringify(video));
       return (
         <div className="error-message">Error: Invalid video object</div>
       );

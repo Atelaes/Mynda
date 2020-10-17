@@ -131,6 +131,7 @@
   --table-cell-monofont-weight: 300;
   --movie-row-date-font-size: calc(var(--main-font-size) * 5 / 6);
   --movie-row-year-font-size: calc(var(--main-font-size) * 7 / 8);
+  --movie-row-ratings-font-size: var(--movie-row-year-font-size);
   --collectionheader-font: var(--main-font);
   --collectionheader-font-size: var(--main-font-size);
   --collectionheader-font-weight: 600;
