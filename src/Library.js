@@ -274,7 +274,7 @@ let defaultLibrary = {
           "lastseen",
           "ratings_rt",
           "ratings_imdb",
-          "ratings_metacritic",
+          "ratings_mc",
           "ratings_avg",
           "boxoffice",
           "rated",

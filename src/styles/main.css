@@ -368,7 +368,8 @@ th, tr, td {
 .movie-row:hover .title::after {
   background: var(--tablecell-ellipsis-grad-hover);
 }
-.movie-row .dateadded {
+.movie-row .dateadded,
+.movie-row .lastseen {
   font-size: var(--movie-row-date-font-size) !important;
 }
 .movie-row .year {

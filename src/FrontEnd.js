@@ -52,10 +52,10 @@ class Mynda extends React.Component {
     const substitutions = {
       "ratings_user" : "rating",
       "dateadded" : "added",
-      "lastseen" : "seen",
+      "lastseen" : "last seen",
       "ratings_rt" : (<img src="../images/logos/rt-logo.png" className='ratings-icon' />),
       "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" className='ratings-icon' />),
-      "ratings_metacritic" : (<img src="../images/logos/metacritic-logo.png" className='ratings-icon' />),
+      "ratings_mc" : (<img src="../images/logos/mc-logo.png" className='ratings-icon' />),
       "ratings_avg" : "AvgRating",
       "boxoffice" : "BoxOffice",
       "languages" : "language",
@@ -82,7 +82,6 @@ class Mynda extends React.Component {
 
     return result;
   }
-
 
   loadLibrary() {
     const library = this.props.library;
@@ -133,13 +132,14 @@ class Mynda extends React.Component {
     if (!element) {
       element = document.getElementById("playlist-" + id);
     }
-    
-    // if this playlist is one of the tabs, bring that tab to the front
+
+    // if this playlist is one of the tabs, visually bring that tab to the front
     if (element) {
       Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
       element.classList.add('selected');
     }
 
+    // set the playlist
     let videos = this.playlistFilter(id);
     this.setState({playlistVideos : videos, filteredVideos : videos, view : this.state.playlists.filter(playlist => playlist.id == id)[0].view, currentPlaylistID : id})
     // this.setState({}); // filteredVideos is what is actually displayed
@@ -314,10 +314,18 @@ class Mynda extends React.Component {
   }
 
   render () {
+    let columns;
+    try {
+      columns = this.state.playlists.filter(playlist => playlist.id == this.state.currentPlaylistID)[0].columns;
+    } catch(err) {
+      // no current playlist yet, set columns to an empty array
+      columns = [];
+    }
+
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
-        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} displayColumnName={this.displayColumnName} showDetails={this.showDetails} />
+        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}}/>
         {this.state.settingsPane}
         {this.state.editorPane}
@@ -452,7 +460,7 @@ class MynLibrary extends React.Component {
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} /></div></div>)
+        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" columns={this.props.columns} displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} /></div></div>)
       } else {
         return null;
       }
@@ -478,7 +486,7 @@ class MynLibrary extends React.Component {
 
     } else if (this.props.view === "flat") {
 
-      content = (<MynLibTable movies={this.props.movies} view={this.props.view} displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} />)
+      content = (<MynLibTable movies={this.props.movies} view={this.props.view} columns={this.props.columns} displayColumnName={this.props.displayColumnName} showDetails={this.props.showDetails} />)
 
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
@@ -558,7 +566,7 @@ class MynLibTable extends React.Component {
     let ascending = true;
 
     // except for the following fields, which should have a default sort direction of descending
-    let descendingFields = ['ratings_user','dateadded'];
+    let descendingFields = ['ratings_user','dateadded','lastseen'];
     if (descendingFields.includes(key)) {
       ascending = false;
     }
@@ -569,6 +577,23 @@ class MynLibTable extends React.Component {
      ascending = !this.state.sortAscending;
     }
 
+    let ratedOrder = {
+        'G':        0,
+        'TV-G':     1,
+        'TV-Y':     2,
+        'TV-Y7':    3,
+        'PG':       4,
+        'TV-PG':    5,
+        'PG-13':    6,
+        'TV-14':    7,
+        'R':        8,
+        'TV-MA':    9,
+        'NC-17':    10,
+        'X':        11,
+        'Not Rated':12,
+        'N/A':      13
+      };
+
     let sortFunctions = {
      title: (a, b) => this.removeArticle(a.title) > this.removeArticle(b.title),
      year: (a, b) => a.year > b.year,
@@ -577,7 +602,24 @@ class MynLibTable extends React.Component {
      seen: (a, b) => a.seen > b.seen,
      ratings_user: (a, b) => a.ratings.user > b.ratings.user,
      dateadded: (a, b) => parseInt(a.dateadded) > parseInt(b.dateadded),
-     order: (a, b) => a.order > b.order
+     order: (a, b) => a.order > b.order,
+     kind: (a, b) => a.kind > b.kind,
+     lastseen: (a, b) => parseInt(a.lastseen) > parseInt(b.lastseen),
+     ratings_rt: (a, b) => {let ar = a.ratings.rt ? a.ratings.rt : -1; let br = b.ratings.rt ? b.ratings.rt : -1; return ar > br},
+     ratings_imdb: (a, b) => {let ar = a.ratings.imdb ? a.ratings.imdb : -1; let br = b.ratings.imdb ? b.ratings.imdb : -1; return ar > br},
+     ratings_mc: (a, b) => {let ar = a.ratings.mc ? a.ratings.mc : -1; let br = b.ratings.mc ? b.ratings.mc : -1; return ar > br},
+     ratings_avg: (a, b) => {
+       let a_avg = (a.ratings.rt + (a.ratings.imdb*10) + a.ratings.mc)/3;
+       if (isNaN(a_avg)) a_avg = -1;
+       let b_avg = (b.ratings.rt + (b.ratings.imdb*10) + b.ratings.mc)/3;
+       if (isNaN(b_avg)) b_avg = -1;
+       return a_avg > b_avg;
+     },
+     boxoffice: (a, b) => a.boxoffice > b.boxoffice,
+     rated: (a, b) => ratedOrder[a.rated.toUpperCase()] > ratedOrder[b.rated.toUpperCase()],
+     country: (a, b) => a.country > b.country,
+     languages: (a, b) => a.languages[0] > b.languages[0],
+     duration: (a, b) => parseInt(a.duration) > parseInt(b.duration)
     }
 
     let rows = this.props.movies.sort((a, b) => {
@@ -587,26 +629,49 @@ class MynLibTable extends React.Component {
 
       return result;
     }).map((movie) => {
-      let displaydate = new Date(movie.dateadded * 1000)
-      displaydate = displaydate.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+      let displaydate = (date) => {
+        let result = new Date(date * 1000)
+        result = result.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+        return result;
+      }
       // let seenmark = movie.seen ? "\u2714" : "\u2718"
 
       // if (movie.order === undefined) {
       //   movie.order = null;
       // }
+      let ratings_avg = (ratings) => {let avg = (ratings.rt + (ratings.imdb*10) + ratings.mc)/3; return !isNaN(avg) ? avg + '%' : '';};
+
+      let cellJSX = {
+        order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>),
+        title: (<td key="title" className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>),
+        year: (<td key="year" className="year centered mono">{movie.year}</td>),
+        director: (<td key="director" className="director">{movie.director}</td>),
+        genre: (<td key="genre" className="genre">{movie.genre}</td>),
+        seen: (<td key="seen" className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>),
+        ratings_user: (<td key="ratings_user" className="ratings_user centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>),
+        dateadded: (<td key="dateadded" className="dateadded centered mono">{displaydate(movie.dateadded)}</td>),
+        kind: (<td key="kind" className="kind">{movie.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase())}</td>),
+        lastseen: (<td key="lastseen" className="lastseen centered mono">{displaydate(movie.lastseen)}</td>),
+        ratings_rt: (<td key="ratings_rt" className="ratings_rt">{movie.ratings.rt ? movie.ratings.rt + '%' : ''}</td>),
+        ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb">{movie.ratings.imdb ? Number(movie.ratings.imdb).toFixed(1) : ''}</td>),
+        ratings_mc: (<td key="ratings_mc" className="ratings_mc">{movie.ratings.mc ? movie.ratings.mc : ''}</td>),
+        ratings_avg: (<td key="ratings_avg" className="ratings_avg centered">{ratings_avg(movie.ratings)}</td>),
+        boxoffice: (<td key="boxoffice" className="boxoffice">{movie.boxoffice === 0 ? '' : accounting.formatMoney(Number(movie.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}B` : 'B')}</td>),
+        rated: (<td key="rated" className="rated">{movie.rated}</td>),
+        country: (<td key="country" className="country">{movie.country}</td>),
+        languages: (<td key="languages" className="languages">{movie.languages[0]}</td>),
+        duration: (<td key="duration" className="duration">{Math.round(Number(movie.duration)/60)}min</td>)
+      };
+
+      let cells = this.props.columns.map(column => cellJSX[column]);
 
       return (
         <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)} onMouseOut={(e) => this.rowOut(movie.id,e)}>
-          <td className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>
-          <td className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>
-          <td className="year centered mono">{movie.year}</td>
-          <td className="director">{movie.director}</td>
-          <td className="genre">{movie.genre}</td>
-          <td className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
-          <td className="ratings_user centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>
-          <td className="dateadded centered mono">{displaydate}</td>
+          {cellJSX.order}
+          {cells}
         </tr>
-    )});
+      );
+    });
 
     this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
   }
@@ -701,17 +766,23 @@ class MynLibTable extends React.Component {
   }
 
   render() {
+
+    // <th onClick={() => this.requestSort('title')}>{this.props.displayColumnName('title')}</th>
+    // <th onClick={() => this.requestSort('year')}>Year</th>
+    // <th onClick={() => this.requestSort('director')}>Director</th>
+    // <th onClick={() => this.requestSort('genre')}>Genre</th>
+    // <th onClick={() => this.requestSort('seen')}>Seen</th>
+    // <th onClick={() => this.requestSort('ratings_user')}>Rating</th>
+    // <th onClick={() => this.requestSort('dateadded')}>Added</th>
+
+
     return  (<table className="movie-table">
               <thead>
                 <tr id="main-table-header-row">
                   <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
-                  <th onClick={() => this.requestSort('title')}>{this.props.displayColumnName('title')}</th>
-                  <th onClick={() => this.requestSort('year')}>Year</th>
-                  <th onClick={() => this.requestSort('director')}>Director</th>
-                  <th onClick={() => this.requestSort('genre')}>Genre</th>
-                  <th onClick={() => this.requestSort('seen')}>Seen</th>
-                  <th onClick={() => this.requestSort('ratings_user')}>Rating</th>
-                  <th onClick={() => this.requestSort('dateadded')}>Added</th>
+                  {this.props.columns.map(col => (
+                    <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -807,7 +878,7 @@ class MynDetails extends React.Component {
       let units = '';
       if (source === 'imdb') rating = rating.toFixed(1); // no units, just display 1 decimal place
       if (source === 'rt') units = '/100';
-      if (source === 'metacritic') units = '%';
+      if (source === 'mc') units = '%';
 
       return (
       <div key={source}><img src={path} className='ratings-icon' /> {rating + units}</div>
@@ -1987,7 +2058,7 @@ class MynEditorSearch extends React.Component {
             ratings.rt = Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)); // / 100;
           } catch(err) { console.log(`OMDB parse: ${err}`); }
           try {
-            ratings.metacritic = Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
+            ratings.mc = Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
           } catch(err) { console.log(`OMDB parse: ${err}`); }
           newData.ratings = ratings;
 
@@ -2567,7 +2638,7 @@ class MynEditRatings extends MynEdit {
           display: "Rotten Tomatoes",
           units: "%"
         },
-        "metacritic" : {
+        "mc" : {
           min: 0,
           max: 100,
           display: "Metacritic",
