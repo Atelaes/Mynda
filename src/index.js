@@ -6,6 +6,7 @@ const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const dl = require('./download');
+const _ = require('lodash');
 
 let library = new Library;
 const app = electron.app;
@@ -85,12 +86,38 @@ function isDVDRip(folder) {
   return positiveEvidence;
 }
 
+let videoTemplate =   {
+    "id" : null,
+    "title" : null,
+    "year" : null,
+    "director" : null,
+    "directorsort" : null,
+    "cast" : [],
+    "description" : null,
+    "genre" : null,
+    "tags" : [],
+    "seen" : false,
+    "position" : 0,
+    "duration" : 0,
+    "country" : null,
+    "languages" : [],
+    "boxoffice" : 0,
+    "rated" : null,
+    "ratings" : {},
+    "dateadded" : null,
+    "lastseen" : null,
+    "kind" : null,
+    "artwork" : null,
+    "filename" : null,
+    "collections" : {}
+  }
+
 //Takes a full directory address and adds it to library
 function addDVDRip(folder, type) {
   if (isAlreadyInLibrary(folder)) {
     return;
   } else {
-    addObj = {};
+    addObj = _.cloneDeep(videoTemplate);
     addObj.filename = folder;
     addObj.title = path.basename(folder);
     addObj.kind = type;
@@ -106,7 +133,7 @@ function addVideoFile(file, type) {
   if (isAlreadyInLibrary(file)) {
     return;
   } else {
-    addObj = {};
+    addObj = _.cloneDeep(videoTemplate);
     addObj.filename = file;
     let fileExt = path.extname(file)
     addObj.title = path.basename(file, fileExt);

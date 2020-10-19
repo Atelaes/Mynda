@@ -11,6 +11,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@babel/cli": "^7.12.1",
+    "@babel/core": "^7.12.1",
+    "@babel/preset-react": "^7.12.1",
+    "@babel/register": "^7.12.1",
     "accounting": "^0.4.1",
     "axios": "^0.20.0",
     "datejs": "^1.0.0-rc3",

@@ -2,7 +2,8 @@
 const electron = require('electron');
 const path = require('path');
 const fs = require('fs');
-const _ = require('lodash')
+const _ = require('lodash');
+const { ipcRenderer } = require('electron');
 
 class Library {
   constructor() {
@@ -283,6 +284,30 @@ let defaultLibrary = {
           "duration"
         ]
       },
+      "defaultdefaultcolumns" : {
+        "used" : [
+          "title",
+          "year",
+          "director",
+          "genre",
+          "seen",
+          "ratings_user",
+          "dateadded"
+        ],
+        "unused" : [
+          "kind",
+          "lastseen",
+          "ratings_rt",
+          "ratings_imdb",
+          "ratings_mc",
+          "ratings_avg",
+          "boxoffice",
+          "rated",
+          "country",
+          "languages",
+          "duration"
+        ]
+      },
       "hidedescription" : false
     },
     "used" : {
@@ -299,13 +324,33 @@ let defaultLibrary = {
       "id" : 0,
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
-      "view" : "flat"
+      "view" : "flat",
+      "tab" : true,
+      "columns" : [
+        "title",
+        "year",
+        "director",
+        "genre",
+        "seen",
+        "ratings_user",
+        "dateadded"
+      ]
     },
     {
       "id" : 1,
       "name" : "Shows",
       "filterFunction" : "video.kind === 'show'",
-      "view" : "hierarchical"
+      "view" : "hierarchical",
+      "tab" : true,
+      "columns" : [
+        "title",
+        "year",
+        "director",
+        "genre",
+        "seen",
+        "ratings_user",
+        "dateadded"
+      ]
     }
   ],
   "collections" : [],

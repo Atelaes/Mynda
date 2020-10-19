@@ -13,7 +13,7 @@ const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+const { DragDropContext, Droppable, Draggable } = require('react-beautiful-dnd');
 let savedPing = {};
 
 class Mynda extends React.Component {
@@ -1990,7 +1990,7 @@ class MynEditorSearch extends React.Component {
     // we want to query the database using the existing field values
     // of the movie object, if present;
     // if the title field is empty, we will substitute the file name
-    const filename = this.props.video.filename.match(/[^/]+(?=\.\w{2,4}$)/)[0]; // get just the filename from the path
+    const filename = this.props.video.filename.match(/[^/]+(?=\.\w{2,4}$)?/)[0]; // get just the filename from the path
     console.log('filename: ' + filename);
     const titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
     const yearQuery = this.props.video.year !== '' ? this.props.video.year : null
@@ -4234,4 +4234,4 @@ function getCollectionObject(id, collectionsRoot, copy) {
 }
 
 const library = new Library;
-ReactDOM.render(<Mynda library={library} lastUpdate={library.lastUpdate}/>, document.getElementById('root'));
+ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));
