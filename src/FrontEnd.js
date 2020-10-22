@@ -680,7 +680,7 @@ class MynLibTable extends React.Component {
         seen: (<td key="seen" className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>),
         ratings_user: (<td key="ratings_user" className="ratings_user centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>),
         dateadded: (<td key="dateadded" className="dateadded centered mono">{displaydate(movie.dateadded)}</td>),
-        kind: (<td key="kind" className="kind">{movie.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase())}</td>),
+        kind: (<td key="kind" className="kind">{movie.kind ? movie.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase()) : null}</td>),
         lastseen: (<td key="lastseen" className="lastseen centered mono">{displaydate(movie.lastseen)}</td>),
         ratings_rt: (<td key="ratings_rt" className="ratings_rt ratings centered">{movie.ratings.rt ? movie.ratings.rt + '%' : ''}</td>),
         ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb ratings centered">{movie.ratings.imdb ? Number(movie.ratings.imdb).toFixed(1) : ''}</td>),
@@ -940,7 +940,7 @@ class MynDetails extends React.Component {
       const movie = this.props.movie
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img src={movie.artwork} /></li>
+          <li className="detail" id="detail-artwork"><img src={movie.artwork || '../images/qmark.png'} /></li>
           <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={movie} /></li>
           <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{movie.description}</div></li>
@@ -962,10 +962,12 @@ class MynDetails extends React.Component {
       details = <div>No Details</div>
       // console.error(error.toString());
 
-      if (!isValidVideo(this.props.movie)) {
-        details = null;
-        editBtn = null;
-      }
+      // eventually we should use validateVideo to actually fix the video
+      // if (validateVideo(this.props.movie) !== true) {
+      //   details = null;
+      //   editBtn = null;
+      // }
+      validateVideo(this.props.movie);
     }
 
     return  (
@@ -2241,12 +2243,13 @@ class MynEditorEdit extends React.Component {
     }
 
     const video = this.props.video;
-    if (!isValidVideo(video)) {
-      console.log("Invalid video passed to editor: " + JSON.stringify(video));
-      return (
-        <div className="error-message">Error: Invalid video object</div>
-      );
-    }
+    validateVideo(video);
+    // if (validateVideo(video) !== true) {
+    //   console.log("Invalid video passed to editor: " + JSON.stringify(video));
+    //   return (
+    //     <div className="error-message">Error: Invalid video object</div>
+    //   );
+    // }
 
     /* TITLE */
     let title = (
@@ -3621,7 +3624,7 @@ class MynEditArtwork extends MynEdit {
       <div ref={this.container}>
         <img
           id="edit-artwork-image"
-          src={this.props.movie.artwork}
+          src={this.props.movie.artwork || this.props.placeholderImage}
           width="100"
           onMouseOver={(e) => this.imageOver(e)}
           onMouseLeave={(e) => this.imageOut(e)}
@@ -4143,41 +4146,90 @@ class MynEditDateWidget extends MynEditWidget {
 // helper function to test whether a video object is a valid video
 // all it does right now is check for top-level properties
 // eventually it should do more than that
-function isValidVideo(video) {
-  const properties = [
-    'id',
-    'title',
-    'year',
-    'director',
-    'directorsort',
-    'cast',
-    'description',
-    'genre',
-    'tags',
-    'seen',
-    'position',
-    'duration',
-    'ratings',
-    'dateadded',
-    'lastseen',
-    'kind',
-    'filename',
-    'artwork',
-    'collections',
-    'boxoffice',
-    'rated',
-    'languages',
-    'country'
-  ];
+function validateVideo(video) {
+  // let repaired = _.cloneDeep(video);
+  let repaired = video;
 
-  for(const property of properties){
-    if (Object.keys(video).includes(property)) {
-       continue;
+  const properties = {
+    'id':'integer',
+    'title':'string',
+    'year':'integer',
+    'director':'string',
+    'directorsort':'string',
+    'cast':'array',
+    'description':'string',
+    'genre':'string',
+    'tags':'array',
+    'seen':'boolean',
+    'position':'integer',
+    'duration':'integer',
+    'ratings':'object',
+    'dateadded':'integer',
+    'lastseen':'integer',
+    'kind':'string',
+    'filename':'string',
+    'artwork':'string',
+    'collections':'object',
+    'boxoffice':'number',
+    'rated':'string',
+    'languages':'array',
+    'country':'string'
+  };
+
+  let vidProps = Object.keys(video);
+  let propKeys = Object.keys(properties);
+  for(const property of propKeys){
+    if (vidProps.includes(property)) {
+      // repair any malformed properties
+      switch(properties[property]) {
+        // ratings, collections
+        case 'object' :
+          if (typeof property !=='object' || typeof property === null) {
+            repaired[property] = {};
+          }
+          break;
+        // tags, cast, languages
+        case 'array' :
+          if (!Array.isArray(property)) {
+            repaired[property] = [];
+          }
+          break;
+        // id, year, position, duration, dateadded, lastseen
+        case 'integer' :
+          if (!Number.isInteger(property)) {
+            repaired[property] = 0;
+          }
+          break;
+        // boxoffice
+        case 'number' :
+          if (isNaN(property)) {
+            repaired[property] = 0;
+          }
+          break;
+        // seen
+        case 'boolean' :
+          if (typeof property !== 'boolean') {
+            repaired[property] = false;
+          }
+          break;
+        // most things
+        case 'string' :
+          if (typeof property !== 'string') {
+            repaired[property] = '';
+          }
+      }
     } else {
-       return false;
+      // the property doesn't exist, so create it
+      repaired[property] = null;
     }
   }
-  return true;
+  if (!_.isEqual(video,repaired)) {
+    console.log('video had to be repaired: ' + video.title);
+    // return repaired;
+    return false;
+  } else {
+    return true;
+  }
 }
 
 // helper function to determine if a string is a valid URL
