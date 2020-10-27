@@ -1878,9 +1878,16 @@ class MynEditor extends MynOpenablePane {
     // in its original location on the user's local drive (in the case that
     // the user browsed to it or entered its path manually), or it may be
     // saved in a temp folder (in the case that it was downloaded from a URL)
-    if (this._isMounted) {
+    if (this._isMounted && typeof this.state.video.artwork === 'string' && this.state.video.artwork !== '') {
+      let fileExt;
+      try {
+        fileExt = this.state.video.artwork.match(/.\w{3,4}$/)[0];
+      } catch(err) {
+        fileExt = '.jpg'; // just use .jpg as the extension if we can't find one, i guess?
+      }
+
       const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
-      const newArtworkPath = path.join(artworkFolder, uuidv4() + this.state.video.artwork.match(/.\w{3,4}$/)[0]);
+      const newArtworkPath = path.join(artworkFolder, uuidv4() + fileExt);
       const oldArtworkPath = path.resolve(__dirname, this.state.video.artwork); // create the correct absolute path, in case it was a relative one
       fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
         if (err) {
