@@ -30,7 +30,7 @@ class Mynda extends React.Component {
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
       detailId : null,
-      detailMovie : {},
+      detailMovie : null,
       currentPlaylistID : null,
       prevQuery : '',
 
@@ -114,7 +114,7 @@ class Mynda extends React.Component {
   }
 
   showDetails(id, e) {
-    let detailMovie = {};
+    let detailMovie = null;
     try {
       detailMovie = this.state.filteredVideos.filter(video => video.id === id)[0]
     } catch(error) {
@@ -299,7 +299,7 @@ class Mynda extends React.Component {
     // something is saved. So here we must take any actions necessary to update
     // the view in real time whenever that happens
     savedPing.saved = (address) => {
-      console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
+      // console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
 
       // if a movie was changed
       if (address.includes('media')) {
@@ -428,7 +428,7 @@ class MynLibrary extends React.Component {
   }
 
   createCollectionsMap() {
-    console.log("Creating new collections map");
+    // console.log("Creating new collections map");
     this.state.hierarchy = this.props.collections.map(collection => (this.findCollections(collection)));
   }
 
@@ -770,7 +770,7 @@ class MynLibTable extends React.Component {
   }
 
   saveEdited(originalVid, ...args) {
-    console.log('save-edited!!!');
+    // console.log('save-edited!!!');
     let changes = {};
     if (args.length == 2 && typeof args[0] === "string") {
       changes[args[0]] = args[1];
@@ -779,7 +779,7 @@ class MynLibTable extends React.Component {
     } else {
       throw 'Incorrect parameters passed to saveEdited in MynLibTable';
     }
-    console.log('changes == ' + JSON.stringify(changes));
+    // console.log('changes == ' + JSON.stringify(changes));
 
     // user confirmation dialog
     ipcRenderer.send('save-video-confirm', changes, originalVid);
@@ -792,10 +792,9 @@ class MynLibTable extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    console.log('UPDATING MynTable');
-    // if (oldProps.movies !== this.props.movies) {
+    // console.log('UPDATING MynTable');
     if (!_.isEqual(oldProps.movies,this.props.movies)) {
-      console.log('MynTable props changed!!!');
+      // console.log('MynTable props changed!!!');
       this.onChange();
 
     }
@@ -922,9 +921,9 @@ class MynDetails extends React.Component {
 
   displayRatings() {
     let ratings = this.props.movie.ratings;
-    console.log(JSON.stringify(ratings));
+    // console.log(JSON.stringify(ratings));
     return Object.keys(ratings).map(source => {
-      console.log(source);
+      // console.log(source);
       if (source === 'user') return null;
 
       let rating = Number(ratings[source]);
@@ -935,7 +934,7 @@ class MynDetails extends React.Component {
         path += '-splat';
       }
       path += '.png';
-      console.log(path);
+      // console.log(path);
 
       // units/display
       let units = '';
@@ -993,6 +992,8 @@ class MynDetails extends React.Component {
     } catch (error) {
       // eventually we'll put some kind of better placeholder here
       details = <div>No Details</div>
+      editBtn = null; // in the case of no movie, we don't want an edit button
+
       // console.error(error.toString());
 
       // eventually we should use validateVideo to actually fix the video
@@ -1000,7 +1001,7 @@ class MynDetails extends React.Component {
       //   details = null;
       //   editBtn = null;
       // }
-      validateVideo(this.props.movie);
+      // validateVideo(this.props.movie);
     }
 
     return  (
@@ -1073,9 +1074,9 @@ class MynSettings extends MynOpenablePane {
     }
 
     // set new delay timer
-    console.log('Setting new timer...');
+    // console.log('Setting new timer...');
     this.state.timer = setTimeout(() => {
-      console.log('Timer ended; saving');
+      // console.log('Timer ended; saving');
 
       // SAVE
       // saveObj should be an object with the keys being the 'replace' parameter in the library.replace function
@@ -1116,7 +1117,8 @@ class MynSettings extends MynOpenablePane {
         if (i == index+1) { tab.classList.add("after-selected"); } else { tab.classList.remove("after-selected"); }
       });
     } catch(e) {
-      console.log('There was an error updating classes for the settings tabs: ' + e.toString());
+      // this will happen when the settings pane is not visible
+      // console.log('There was an error updating classes for the settings tabs: ' + e.toString());
     }
 
     // add "selected" class to the clicked tab
@@ -1173,9 +1175,9 @@ class MynSettings extends MynOpenablePane {
   }
 
   componentDidUpdate(oldProps) {
-    console.log('MynSettings: component has updated');
+    // console.log('MynSettings: component has updated');
     if (!_.isEqual(oldProps,this.props)) {
-      console.log('MynSettings: PROPS HAVE CHANGED:\n' + JSON.stringify(this.props.show));
+      // console.log('MynSettings: PROPS HAVE CHANGED:\n' + JSON.stringify(this.props.show));
 
       // if the view was changed from outside, call up that view;
       // OR, whenever the pane is closed, also set to props.view
@@ -1229,7 +1231,7 @@ class MynSettingsFolders extends React.Component {
       ));
       options.unshift(<option key="none" value="none">(none)</option>);
     } catch(e) {
-      console.log("Unable to find list of media kinds in library: " + e.toString());
+      console.error("Unable to find list of media kinds in library: " + e.toString());
       // should display error message to user
     }
     return options;
@@ -1245,7 +1247,7 @@ class MynSettingsFolders extends React.Component {
 
   changeTargetFolder(folder) {
     this.setState({folderToAdd: folder});
-    console.log('Changed target folder to ' + folder);
+    // console.log('Changed target folder to ' + folder);
 
     const inputField = document.getElementById('settings-folders-choose-path');
     if (folder == "") {
@@ -1280,7 +1282,7 @@ class MynSettingsFolders extends React.Component {
         </tr>
       ));
     } catch(e) {
-      console.log("Error finding watchfolders from library: " + e.toString());
+      console.error("Error finding watchfolders from library: " + e.toString());
     }
     return folders;
   }
@@ -1369,7 +1371,7 @@ class MynSettingsPlaylists extends React.Component {
   }
 
   updateValue(index,prop,value) {
-    console.log(`Updating ${index}: ${prop} = ${value}`);
+    // console.log(`Updating ${index}: ${prop} = ${value}`);
     let playlists = _.cloneDeep(this.state.playlists);
 
     // if an index is given, update that playlist
@@ -1471,7 +1473,7 @@ class MynSettingsPlaylists extends React.Component {
   }
 
   render() {
-    console.log(JSON.stringify(this.state.playlists));
+    // console.log(JSON.stringify(this.state.playlists));
 
     let playlists = this.state.playlists.map((playlist,i) => (
       <Draggable key={playlist.id} draggableId={'' + playlist.id} index={i}>
@@ -2033,7 +2035,7 @@ class MynEditorSearch extends React.Component {
     // of the movie object, if present;
     // if the title field is empty, we will substitute the file name
     const filename = this.props.video.filename.match(/[^/]+(?=\.\w{2,4}$)?/)[0]; // get just the filename from the path
-    console.log('filename: ' + filename);
+    // console.log('filename: ' + filename);
     const titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
     const yearQuery = this.props.video.year !== '' ? this.props.video.year : null
     const typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
@@ -2157,32 +2159,32 @@ class MynEditorSearch extends React.Component {
           };
           try {
             newData.boxoffice = accounting.parse(response.data.BoxOffice) || 0; //parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             newData.directorsort = /^\w+\s\w+$/.test(response.data.Director) ? response.data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : response.data.Director; // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             newData.cast = response.data.Actors.split(', ');
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             newData.genre = response.data.Genre.split(', ')[0]; // just pick the first genre for genre, since we only allow one
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             newData.languages = response.data.Language.split(', ');
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             newData.tags = Array.from(new Set(response.data.Genre.split(', ').map((item) => item.toLowerCase()).concat(this.props.video.tags))); // add new tags to existing tags, removing duplicates
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           let ratings = _.cloneDeep(this.props.video.ratings);
           try {
             ratings.imdb = Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)); // / 10;
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             ratings.rt = Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)); // / 100;
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           try {
             ratings.mc = Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
-          } catch(err) { console.log(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse: ${err}`); }
           newData.ratings = ratings;
 
           console.log(newData);
@@ -3315,7 +3317,7 @@ class MynEditText extends MynEdit {
       value = target.value;
     }
 
-    console.log("value: " + value);
+    // console.log("value: " + value);
 
     // keep the input field updated with what the user is typing
     this.setStateValue(value);
@@ -3528,18 +3530,19 @@ class MynEditArtwork extends MynEdit {
 
     let extReg = /\.(jpg|jpeg|png|gif)$/i;
     if (isValidURL(value) && extReg.test(value)) {
-      console.log("Valid URL? " + value);
+      console.log("Valid URL: " + value);
       // then this is a valid url with an image extension at the end
       // try to download it
       this.download(value);
 
     } else if (extReg.test(value)) {
-      console.log("Possible local path? " + value);
+      console.log("Possible local path: " + value);
       // then this MIGHT be a valid local path,
       // we'll see if we can find it
       this.handleLocalFile(value);
     } else {
       // do nothing?
+      console.log("Neither URL nor local path (doing nothing): " + value);
     }
 
   }
@@ -3561,7 +3564,7 @@ class MynEditArtwork extends MynEdit {
         return console.error(err);
       }
       this.update(path);
-      console.log("Asynchronous read successful");
+      console.log("read local file successfully, updated path");
     });
   }
 
@@ -3602,7 +3605,7 @@ class MynEditArtwork extends MynEdit {
     // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
     // then we want to download it, and point the movie metadata to the downloaded local file instead
     if (oldProps.movie.artwork !== this.props.movie.artwork && isValidURL(this.props.movie.artwork)) {
-      console.log("artwork changed from outside?!");
+      console.log("artwork changed from outside (i.e. from search results)");
       this.download(this.props.movie.artwork);
     }
   }
@@ -4150,7 +4153,7 @@ class MynEditDateWidget extends MynEditWidget {
         this.props.update(this.props.property,null);
       }
     } catch(error) {
-      console.log(error);
+      console.error(error);
     }
   }
 
@@ -4195,6 +4198,9 @@ class MynEditDateWidget extends MynEditWidget {
 // all it does right now is check for top-level properties
 // eventually it should do more than that
 function validateVideo(video) {
+  if (video === null) {
+    return false;
+  }
   // let repaired = _.cloneDeep(video);
   let repaired = video;
 
