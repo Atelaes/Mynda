@@ -14,7 +14,7 @@ const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
 const { DragDropContext, Droppable, Draggable } = require('react-beautiful-dnd');
-let savedPing = {};
+// let savedPing = {};
 
 class Mynda extends React.Component {
   constructor(props) {
