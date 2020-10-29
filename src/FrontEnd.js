@@ -2433,7 +2433,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
-          <select id="edit-field-kind" name="kind" value={this.props.video.kind} onChange={(e) => this.props.handleChange({'kind':e.target.value})}>
+          <select id="edit-field-kind" name="kind" value={this.props.video.kind || ''} onChange={(e) => this.props.handleChange({'kind':e.target.value})}>
             {options}
           </select>
         </div>
@@ -4204,7 +4204,7 @@ function validateVideo(video) {
         // id, year, position, duration, dateadded, lastseen
         case 'integer' :
           if (!Number.isInteger(property)) {
-            repaired[property] = 0;
+            repaired[property] = '';
           }
           break;
         // boxoffice
