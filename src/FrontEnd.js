@@ -346,7 +346,8 @@ class Mynda extends React.Component {
   render () {
     let columns;
     try {
-      columns = this.state.playlists.filter(playlist => playlist.id == this.state.currentPlaylistID)[0].columns;
+      let playlist = this.state.playlists.filter(playlist => playlist.id == this.state.currentPlaylistID)[0];
+      columns = playlist.columns;
     } catch(err) {
       // no current playlist yet, set columns to an empty array
       columns = [];
@@ -490,7 +491,21 @@ class MynLibrary extends React.Component {
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" columns={this.props.columns} displayColumnName={this.props.displayColumnName} calcAvgRatings={this.props.calcAvgRatings} showDetails={this.props.showDetails} /></div></div>)
+        return (
+          <div className="collection collapsed" key={object.name}>
+            <h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1>
+            <div className="container hidden">
+              <MynLibTable
+                movies={movies}
+                initialSort="order"
+                columns={this.props.columns}
+                displayColumnName={this.props.displayColumnName}
+                calcAvgRatings={this.props.calcAvgRatings}
+                showDetails={this.props.showDetails}
+              />
+            </div>
+          </div>
+        )
       } else {
         return null;
       }
@@ -516,7 +531,16 @@ class MynLibrary extends React.Component {
 
     } else if (this.props.view === "flat") {
 
-      content = (<MynLibTable movies={this.props.movies} view={this.props.view} columns={this.props.columns} displayColumnName={this.props.displayColumnName} calcAvgRatings={this.props.calcAvgRatings} showDetails={this.props.showDetails} />)
+      content = (
+        <MynLibTable
+          movies={this.props.movies}
+          view={this.props.view}
+          columns={this.props.columns}
+          displayColumnName={this.props.displayColumnName}
+          calcAvgRatings={this.props.calcAvgRatings}
+          showDetails={this.props.showDetails}
+        />
+      )
 
     } else {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
@@ -631,13 +655,13 @@ class MynLibTable extends React.Component {
      genre: (a, b) => a.genre > b.genre,
      seen: (a, b) => a.seen > b.seen,
      ratings_user: (a, b) => a.ratings.user > b.ratings.user,
-     dateadded: (a, b) => parseInt(a.dateadded) > parseInt(b.dateadded),
+     dateadded: (a, b) => {let a_added = isNaN(parseInt(a.dateadded)) ? -1 : parseInt(a.dateadded); let b_added = isNaN(parseInt(b.dateadded)) ? -1 : parseInt(b.dateadded); return a_added > b_added;},
      order: (a, b) => a.order > b.order,
      kind: (a, b) => a.kind > b.kind,
-     lastseen: (a, b) => parseInt(a.lastseen) > parseInt(b.lastseen),
-     ratings_rt: (a, b) => {let ar = a.ratings.rt ? a.ratings.rt : -1; let br = b.ratings.rt ? b.ratings.rt : -1; return ar > br},
-     ratings_imdb: (a, b) => {let ar = a.ratings.imdb ? a.ratings.imdb : -1; let br = b.ratings.imdb ? b.ratings.imdb : -1; return ar > br},
-     ratings_mc: (a, b) => {let ar = a.ratings.mc ? a.ratings.mc : -1; let br = b.ratings.mc ? b.ratings.mc : -1; return ar > br},
+     lastseen: (a, b) => {let a_ls = isNaN(parseInt(a.lastseen)) ? -1 : parseInt(a.lastseen); let b_ls = isNaN(parseInt(b.lastseen)) ? -1 : parseInt(b.lastseen); return a_ls > b_ls;},
+     ratings_rt: (a, b) => {let a_r = a.ratings.rt ? a.ratings.rt : -1; let b_r = b.ratings.rt ? b.ratings.rt : -1; return a_r > b_r},
+     ratings_imdb: (a, b) => {let a_r = a.ratings.imdb ? a.ratings.imdb : -1; let b_r = b.ratings.imdb ? b.ratings.imdb : -1; return a_r > b_r},
+     ratings_mc: (a, b) => {let a_r = a.ratings.mc ? a.ratings.mc : -1; let b_r = b.ratings.mc ? b.ratings.mc : -1; return a_r > b_r},
      ratings_avg: (a, b) => this.props.calcAvgRatings(a.ratings,'sort') > this.props.calcAvgRatings(b.ratings,'sort'),
      // ratings_avg: (a, b) => {
      //   let a_avg = (a.ratings.rt + (a.ratings.imdb*10) + a.ratings.mc)/3;
@@ -661,8 +685,17 @@ class MynLibTable extends React.Component {
       return result;
     }).map((movie) => {
       let displaydate = (date) => {
-        let result = new Date(date * 1000)
-        result = result.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+        let result;
+        if (date === null || date === "") {
+          result = "";
+        } else {
+          try {
+            result = new Date(date * 1000);
+            result = result.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+          } catch(err) {
+            result = "";
+          }
+        }
         return result;
       }
       // let seenmark = movie.seen ? "\u2714" : "\u2718"
@@ -833,7 +866,7 @@ class MynDetails extends React.Component {
   displayDate(value) {
     let date;
     let displaydate = "";
-    if (value === null) {
+    if (value === null || value === "") {
       return "(never)";
     }
     try {
@@ -3849,6 +3882,14 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   //   // ReactDOM.findDOMNode(this.refs.outer)
   //   return super.componentDidMount(props);
   // }
+
+  render() {
+    if (this.props.movie.duration === 0 || this.props.movie.duration === '') {
+      return null;
+    } else {
+      return super.render();
+    }
+  }
 }
 
 // ######  ###### //
