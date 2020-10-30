@@ -2030,21 +2030,29 @@ class MynEditorSearch extends React.Component {
   // search online movie database to auto-fill fields
   handleSearch(event) {
     event.preventDefault();
-
-    // we want to query the database using the existing field values
-    // of the movie object, if present;
-    // if the title field is empty, we will substitute the file name
-    const filename = this.props.video.filename.match(/[^/]+(?=\.\w{2,4}$)?/)[0]; // get just the filename from the path
-    // console.log('filename: ' + filename);
-    const titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
-    const yearQuery = this.props.video.year !== '' ? this.props.video.year : null
-    const typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
-
-    // compose query url
     let urlParts = [this.state.searchBaseURL];
-    urlParts.push(`s=${titleQuery}`);
-    if (yearQuery) urlParts.push(`y=${yearQuery}`);
-    if (typeQuery) urlParts.push(`type=${typeQuery}`);
+
+    // first check to see if the user has entered an IMDb ID
+    let imdbSearchID = document.getElementById('editor-search-imdbID').value;
+    if (imdbSearchID !== '') {
+      // if they have, then we add that to the search
+      urlParts.push(`i=${imdbSearchID}`);
+    } else {
+      // otherwise, we want to query the database using the existing field values
+      // of the movie object, if present; OMDB only allows us to search by Title,
+      // Year, and Type;
+      // if the title field is empty, we will substitute the file name
+      const filename = this.props.video.filename.match(/[^/]+$/)[0]; // get just the filename from the path // /[^/]+(?=\.\w{2,4}$)/
+      console.log('filename: ' + filename);
+      const titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
+      const yearQuery = this.props.video.year !== '' ? this.props.video.year : null
+      const typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
+
+      // compose query url
+      urlParts.push(`s=${titleQuery}`);
+      if (yearQuery) urlParts.push(`y=${yearQuery}`);
+      if (typeQuery) urlParts.push(`type=${typeQuery}`);
+    }
 
     // execute query
     this.executeSearchQuery(urlParts);
@@ -2090,13 +2098,30 @@ class MynEditorSearch extends React.Component {
       // and clear the previous results
       this.clearSearch();
       alert('Error getting search results: ' + results.Error);
-    } else if (results.Response === 'False' || !results.hasOwnProperty('Search')) {
+    } else if (results.Response === 'False') { // || !results.hasOwnProperty('Search')) {
       // then there were no results found
       // during testing, just use an alert to tell the user
       this.setState({results:null});
-      alert('No results found! Try editing the title and searching again.');
+      alert('No results found! Try editing the title and searching again, or enter the IMDb ID for an exact match.');
     } else {
+      // if we're here, we got results
       console.log(results);
+
+      // if the user entered an IMDb ID, then only one movie object should have been returned
+      // instead of an array of search results; in this case, we'll just package that movie
+      // into an array so that we can display it as though it were a single-hit search result
+      if (!results.hasOwnProperty('Search')) {
+        results.Search = [
+          {
+            Poster: results.Poster,
+            Title: results.Title,
+            Type: results.Type,
+            Year: results.Year,
+            imdbID: results.imdbID
+          }
+        ];
+      }
+
       // display search results
       let movies = results.Search.map((movie) => {
         if (movie.Type === 'series') return; // don't want to display series results
@@ -2204,7 +2229,13 @@ class MynEditorSearch extends React.Component {
     let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>);
     return (
         <div id='edit-search'>
-          {searchBtn}
+          <div id='edit-search-controls'>
+            {searchBtn}
+            <div className="input-container controls">
+              <input id="editor-search-imdbID" className="filled" type="text" placeholder="IMDb ID (optional)" />
+              <div className="input-clear-button hover" onClick={() => {document.getElementById('editor-search-imdbID').value = ''}}></div>
+            </div>
+          </div>
           <table id='edit-search-results'>
             <thead>
               <tr>
