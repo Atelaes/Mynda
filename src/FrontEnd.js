@@ -1022,6 +1022,43 @@ class MynOpenablePane extends React.Component {
     }
 
     this.render = this.render.bind(this);
+
+    ipcRenderer.on('generic-confirm', (event, response, id, checked) => {
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (checked) {
+        console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.overridedialogs) {
+          prefs.overridedialogs = {};
+        }
+        prefs.overridedialogs[`Myn${id}ConfirmExit`] = true;
+        library.replace("settings.preferences",prefs);
+      }
+
+      if (response === 0) { // yes
+        // close pane
+        this.props.hideFunction(id);
+      } else {
+        console.log('Exit pane cancelled by user')
+      }
+    });
+  }
+
+  closePane(id,confirm,msg) {
+    // if we're supposed to confirm before exiting:
+    if (confirm) {
+      ipcRenderer.send(
+        'generic-confirm',
+        {
+          message: msg || 'Are you sure you want to exit?',
+          checkboxLabel: `Don't show this dialog again`
+        },
+        id
+      );
+    } else {
+      this.props.hideFunction(id);
+    }
   }
 
   // child class must supply 'content' variable when calling super.render()
@@ -1032,8 +1069,8 @@ class MynOpenablePane extends React.Component {
 
     return (
       <div id={this.state.paneID} className="pane openable-pane">
-        <div className="openable-close-btn" onClick={() => this.props.hideFunction(this.state.paneID)}>{"\u2715"}</div>
-        {content}
+        <div className="openable-close-btn" onClick={() => this.closePane(this.state.paneID,content.confirmExit,content.confirmMsg)}>{"\u2715"}</div>
+        {content.jsx}
       </div>
     );
   }
@@ -1196,7 +1233,7 @@ class MynSettings extends MynOpenablePane {
   }
 
   render() {
-    return super.render(this.createContentJSX());
+    return super.render({jsx:this.createContentJSX()});
   }
 }
 
@@ -1537,13 +1574,14 @@ class MynSettingsPrefs extends React.Component {
         unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
       },
       hidedescription : props.settings.preferences.hidedescription,
-      kinds : props.settings.used.kinds
+      kinds : props.settings.used.kinds,
+      overridedialogs : props.settings.preferences.overridedialogs
     }
 
     this.update = this.update.bind(this);
   }
 
-  update(property, value) {
+  update(property, value, subProp) {
     let address = '';
     switch(property) {
       case "columns" :
@@ -1558,6 +1596,13 @@ class MynSettingsPrefs extends React.Component {
         address = "settings.used.kinds";
         this.setState({kinds:value});
         break;
+      case "override-dialogs" :
+        address = "settings.preferences.overridedialogs";
+        let new_od = _.cloneDeep(this.state.overridedialogs);
+        new_od[subProp] = value;
+        value = new_od;
+        this.setState({overridedialogs:value});
+        break;
     }
 
     let saveObj = {};
@@ -1566,6 +1611,10 @@ class MynSettingsPrefs extends React.Component {
   }
 
   render() {
+    const dialogDescriptions = {
+      MynEditorSearchConfirmSelect : 'Confirm selection of search result in video editor'
+    }
+
     return (
       <div id='settings-preferences'>
         <ul className='sections-container'>
@@ -1603,6 +1652,19 @@ class MynSettingsPrefs extends React.Component {
               onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
             />
             Hide plot summaries
+          </li>
+          <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.overridedialogs && Object.keys(this.props.settings.preferences.overridedialogs).length > 0 ? 'block' : 'none'}}>
+            <h2>Show Dialogs:</h2>
+            {this.state.overridedialogs ? Object.keys(this.state.overridedialogs).map(dialogName => (
+              <div key={dialogName}>
+                <input
+                  type='checkbox'
+                  checked={!this.state.overridedialogs[dialogName]}
+                  onChange={(e) => this.update('override-dialogs',!e.target.checked,dialogName)}
+                />
+                {dialogDescriptions[dialogName] || dialogName}
+              </div>
+            )) : null}
           </li>
         </ul>
       </div>
@@ -1686,7 +1748,7 @@ class MynSettingsColumns extends React.Component {
             </div>
           )}
           </Droppable>
-          <button onClick={() => this.props.update('columns',this.props.defaultcolumns)}>Restore Default Columns</button>
+          <button className='settings-prefs-restore-btn' onClick={() => this.props.update('columns',this.props.defaultcolumns)}>Restore Default Columns</button>
         </div>
       </DragDropContext>
     );
@@ -1987,6 +2049,7 @@ class MynEditor extends MynOpenablePane {
       <div>
         <MynEditorSearch
           video={this.state.video}
+          settings={this.props.settings}
           placeholderImage={this.state.placeholderImage}
           handleChange={this.handleChange}
         />
@@ -2007,7 +2070,12 @@ class MynEditor extends MynOpenablePane {
   }
 
   render() {
-    return super.render(this.createContentJSX());
+
+    return super.render({
+      jsx: this.createContentJSX(),
+      confirmExit: () => (!_.isEqual(this.props.video,this.state.video)), // boolean for whether or not to show confirmation dialog upon exiting the pane
+      confirmMsg: 'Are you sure you want to exit without saving? Your changes will be lost'
+    });
   }
 
 }
@@ -2025,6 +2093,29 @@ class MynEditorSearch extends React.Component {
     this.handleSearch = this.handleSearch.bind(this);
     this.clearSearch = this.clearSearch.bind(this);
     this.render = this.render.bind(this);
+
+    ipcRenderer.on('generic-confirm', (event, response, video, checked) => {
+      console.log('CONFIRMATION OF SEARCH RESULTS HAS FIRED')
+      console.log(event);
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (checked) {
+        console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.overridedialogs) {
+          prefs.overridedialogs = {};
+        }
+        prefs.overridedialogs['MynEditorSearchConfirmSelect'] = true;
+        library.replace("settings.preferences",prefs);
+      }
+
+      if (response === 0) { // yes
+        // choose search result and fill in the fields with it
+        this.retrieveResult(video);
+      } else {
+        console.log('Selection cancelled by user')
+      }
+    });
   }
 
   // search online movie database to auto-fill fields
@@ -2132,7 +2223,7 @@ class MynEditorSearch extends React.Component {
 
         return (
           <tr key={movie.imdbID} onClick={() => (this.chooseResult(movie))}>
-            <td className='artwork'><img src={movie.Poster} width='50' /></td>
+            <td className='artwork'><img src={movie.Poster} /></td>
             <td className='title'>{movie.Title}</td>
             <td className='year'>{movie.Year}</td>
             <td><a href={`https://www.imdb.com/title/${movie.imdbID}`} target='_blank' onClick={(e) => {e.stopPropagation()}}>IMDb</a></td>
@@ -2148,11 +2239,27 @@ class MynEditorSearch extends React.Component {
   }
 
   chooseResult(movie) {
-    // first we ask the user to confirm, because this will overwrite any metadata
-    // the movie currently has (although the revert button will still work until
-    // the user saves the changes)
-    // for the moment, we're just sending a browser alert; later we'll make this an electron confirmation dialog
-    alert('chose ' + movie.imdbID + '!!');
+    // if the user hasn't previously selected the preference to override this confirmation dialog
+    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs.MynEditorSearchConfirmSelect) {
+      // we ask the user to confirm, because this will overwrite any metadata
+      // the movie currently has (although the revert button will still work until
+      // the user saves the changes)
+      ipcRenderer.send(
+        'generic-confirm',
+        {
+          message: `Are you sure you want to choose ${movie.Title} (${movie.Year})? This will overwrite most of the existing information for this video.`,
+          checkboxLabel: `Don't show this dialog again`
+        },
+        movie
+      );
+    } else {
+      // skip the dialog
+      this.retrieveResult(movie);
+    }
+  }
+
+  retrieveResult(movie) {
+    // clear the search results
     this.clearSearch();
 
     // next, we have to get the actual movie object from the database
@@ -2212,6 +2319,7 @@ class MynEditorSearch extends React.Component {
           } catch(err) { console.error(`OMDB parse: ${err}`); }
           newData.ratings = ratings;
 
+          // put the new data into the editor fields
           console.log(newData);
           this.props.handleChange(newData);
         }

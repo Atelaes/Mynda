@@ -84,7 +84,10 @@
           "duration"
         ]
       },
-      "hidedescription" : "hide"
+      "hidedescription" : "hide",
+      "overridedialogs" : {
+
+      }
     },
     "used" : {
       "kinds" : [

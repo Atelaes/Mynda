@@ -697,6 +697,10 @@ th, tr, td {
   font-weight:bold;
 }
 
+#settings-preferences .subsection {
+  white-space: nowrap;
+}
+
 #settings-playlists .table .header button {
   color: var(--button-text);
   font-family: var(--button-font);
@@ -851,6 +855,10 @@ th, tr, td {
 #settings-prefs-cols div {
   display: flex;
   flex-direction: column;
+}
+
+.settings-prefs-restore-btn {
+  width: 13em;
 }
 
 .settings-columns {
@@ -1347,6 +1355,7 @@ th, tr, td {
 #edit-search-results {
   align-self: center;
   border-collapse: collapse;
+  border-spacing: 0;
 }
 
 #edit-search-results tbody tr {
@@ -1395,7 +1404,7 @@ th, tr, td {
 
 #edit-search-results td.artwork img {
   width:3em;
-  height: 4.5em;
+  height:4.5em;
   opacity: .7;
 }
 

@@ -258,17 +258,27 @@ ipcMain.on('save-video-confirm', (event, changes, video) => {
   console.log(err)
 })})
 
-ipcMain.on('generic-confirm', (event, message, id) => {
+ipcMain.on('generic-confirm', (event, opts, data) => {
   console.log('generic-confirm!!!');
 
   let options = {
     type : 'question',
     buttons : ['Yes','No'],
-    message : message
   };
 
+  // if the opts parameter is a string
+  // then we assume it's just a message
+  if (typeof opts === 'string') {
+    options.message = opts;
+  }
+
+  // if it's an object, add its data to the options
+  if (typeof opts === 'object' && opts !== null) {
+    options = {...options, ...opts};
+  }
+
   dialog.showMessageBox(options).then(result => {
-  event.sender.send('generic-confirm', result.response, id);
+  event.sender.send('generic-confirm', result.response, data, result.checkboxChecked);
 }).catch(err => {
   console.log(err)
 })})

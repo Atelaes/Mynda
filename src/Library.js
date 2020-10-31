@@ -308,7 +308,8 @@ let defaultLibrary = {
           "duration"
         ]
       },
-      "hidedescription" : false
+      "hidedescription" : false,
+      "overridedialogs" : {}
     },
     "used" : {
       "kinds" : [
