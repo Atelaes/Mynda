@@ -4229,14 +4229,14 @@ class MynEditDateWidget extends MynEditWidget {
 // all it does right now is check for top-level properties
 // eventually it should do more than that
 function validateVideo(video) {
-  if (video === null) {
+  if (typeof video === undefined || video === null) {
     return false;
   }
   // let repaired = _.cloneDeep(video);
   let repaired = video;
 
   const properties = {
-    'id':'integer',
+    'id':'string',
     'title':'string',
     'year':'integer',
     'director':'string',
@@ -4269,37 +4269,38 @@ function validateVideo(video) {
       switch(properties[property]) {
         // ratings, collections
         case 'object' :
-          if (typeof property !=='object' || typeof property === null) {
+          if (typeof video[property] !=='object' || typeof video[property] === null) {
             repaired[property] = {};
           }
           break;
         // tags, cast, languages
         case 'array' :
-          if (!Array.isArray(property)) {
+          if (!Array.isArray(video[property])) {
             repaired[property] = [];
           }
           break;
         // id, year, position, duration, dateadded, lastseen
         case 'integer' :
-          if (!Number.isInteger(property)) {
+          repaired[property] = parseInt(video[property]);
+          if (!Number.isInteger(repaired[property])) {
             repaired[property] = '';
           }
           break;
         // boxoffice
         case 'number' :
-          if (isNaN(property)) {
+          if (isNaN(video[property])) {
             repaired[property] = 0;
           }
           break;
         // seen
         case 'boolean' :
-          if (typeof property !== 'boolean') {
+          if (typeof video[property] !== 'boolean') {
             repaired[property] = false;
           }
           break;
         // most things
         case 'string' :
-          if (typeof property !== 'string') {
+          if (typeof video[property] !== 'string') {
             repaired[property] = '';
           }
       }
@@ -4308,6 +4309,13 @@ function validateVideo(video) {
       repaired[property] = null;
     }
   }
+
+  // if no id, create one
+  if (!video.id || video.id === '') {
+    video.id = uuidv4();
+    console.log('validateVideo had to create an ID for this video: ' + video.filename);
+  }
+
   if (!_.isEqual(video,repaired)) {
     console.log('video had to be repaired: ' + video.title);
     // return repaired;
