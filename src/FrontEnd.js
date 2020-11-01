@@ -1023,7 +1023,7 @@ class MynOpenablePane extends React.Component {
 
     this.render = this.render.bind(this);
 
-    ipcRenderer.on('generic-confirm', (event, response, id, checked) => {
+    ipcRenderer.on('MynOpenablePane-confirm-exit', (event, response, id, checked) => {
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
       if (checked) {
@@ -1032,7 +1032,7 @@ class MynOpenablePane extends React.Component {
         if (!prefs.overridedialogs) {
           prefs.overridedialogs = {};
         }
-        prefs.overridedialogs[`Myn${id}ConfirmExit`] = true;
+        prefs.overridedialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`] = true;
         library.replace("settings.preferences",prefs);
       }
 
@@ -1047,9 +1047,13 @@ class MynOpenablePane extends React.Component {
 
   closePane(id,confirm,msg) {
     // if we're supposed to confirm before exiting:
-    if (confirm) {
+    // i.e. the confirm boolean variable tells us whether the pane wants us to confirm exit,
+    // but that can be overridden by the user preference to override the confirmation dialog,
+    // hence the rest of the conditional here
+    if (confirm && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`])) {
       ipcRenderer.send(
         'generic-confirm',
+        'MynOpenablePane-confirm-exit',
         {
           message: msg || 'Are you sure you want to exit?',
           checkboxLabel: `Don't show this dialog again`
@@ -1387,7 +1391,7 @@ class MynSettingsPlaylists extends React.Component {
       valid : {}
     }
 
-    ipcRenderer.on('generic-confirm', (event, response, id) => {
+    ipcRenderer.on('MynSettingsPlaylists-confirm-delete-playlist', (event, response, id) => {
       if (response === 0) { // yes
         // delete playlist
         let playlists = _.cloneDeep(this.state.playlists).filter(playlist => playlist.id !== id);
@@ -1457,7 +1461,7 @@ class MynSettingsPlaylists extends React.Component {
 
   deletePlaylist(playlist) {
     let playlistName = playlist.name != '' ? `the '${playlist.name}' playlist` : 'this playlist'
-    ipcRenderer.send('generic-confirm', `Are you sure you want to delete ${playlistName}?`, playlist.id);
+    ipcRenderer.send('generic-confirm', 'MynSettingsPlaylists-confirm-delete-playlist', `Are you sure you want to delete ${playlistName}?`, playlist.id);
   }
 
   addPlaylist() {
@@ -1612,7 +1616,8 @@ class MynSettingsPrefs extends React.Component {
 
   render() {
     const dialogDescriptions = {
-      MynEditorSearchConfirmSelect : 'Confirm selection of search result in video editor'
+      'MynEditorSearch-confirm-select' : 'Confirm selection of search result in video editor',
+      'MynEditor-confirm-exit' : 'Confirm on exiting editor without saving'
     }
 
     return (
@@ -2094,7 +2099,7 @@ class MynEditorSearch extends React.Component {
     this.clearSearch = this.clearSearch.bind(this);
     this.render = this.render.bind(this);
 
-    ipcRenderer.on('generic-confirm', (event, response, video, checked) => {
+    ipcRenderer.on('MynEditorSearch-confirm-select', (event, response, video, checked) => {
       console.log('CONFIRMATION OF SEARCH RESULTS HAS FIRED')
       console.log(event);
       // if the user checked the checkbox to override the confirmation dialog,
@@ -2105,7 +2110,7 @@ class MynEditorSearch extends React.Component {
         if (!prefs.overridedialogs) {
           prefs.overridedialogs = {};
         }
-        prefs.overridedialogs['MynEditorSearchConfirmSelect'] = true;
+        prefs.overridedialogs['MynEditorSearch-confirm-select'] = true;
         library.replace("settings.preferences",prefs);
       }
 
@@ -2240,12 +2245,13 @@ class MynEditorSearch extends React.Component {
 
   chooseResult(movie) {
     // if the user hasn't previously selected the preference to override this confirmation dialog
-    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs.MynEditorSearchConfirmSelect) {
+    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynEditorSearch-confirm-select']) {
       // we ask the user to confirm, because this will overwrite any metadata
       // the movie currently has (although the revert button will still work until
       // the user saves the changes)
       ipcRenderer.send(
         'generic-confirm',
+        'MynEditorSearch-confirm-select',
         {
           message: `Are you sure you want to choose ${movie.Title} (${movie.Year})? This will overwrite most of the existing information for this video.`,
           checkboxLabel: `Don't show this dialog again`
@@ -4043,7 +4049,7 @@ class MynEditListWidget extends MynEditWidget {
       list: []
     }
 
-    ipcRenderer.on('generic-confirm', (event, response, index) => {
+    ipcRenderer.on('MynEditListWidget-confirm-delete-item', (event, response, index) => {
       if (response === 0) { // yes
         // delete item (pass 'true' so as not to prompt another dialog)
         this.deleteItem(index, true);
@@ -4063,7 +4069,7 @@ class MynEditListWidget extends MynEditWidget {
 
   deleteItem(index, skipDialog) {
     if (this.props.deleteDialog && !skipDialog) {
-      ipcRenderer.send('generic-confirm', `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`, index);
+      ipcRenderer.send('generic-confirm', 'MynEditListWidget-confirm-delete-item', `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`, index);
       return;
     }
 

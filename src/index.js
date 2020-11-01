@@ -258,7 +258,7 @@ ipcMain.on('save-video-confirm', (event, changes, video) => {
   console.log(err)
 })})
 
-ipcMain.on('generic-confirm', (event, opts, data) => {
+ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
   console.log('generic-confirm!!!');
 
   let options = {
@@ -278,7 +278,7 @@ ipcMain.on('generic-confirm', (event, opts, data) => {
   }
 
   dialog.showMessageBox(options).then(result => {
-  event.sender.send('generic-confirm', result.response, data, result.checkboxChecked);
+  event.sender.send(returnTo, result.response, data, result.checkboxChecked);
 }).catch(err => {
   console.log(err)
 })})
