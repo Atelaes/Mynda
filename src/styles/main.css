@@ -338,6 +338,59 @@ th, tr, td {
   background-color: var(--movie-row-bg-hover);
   color: var(--movie-row-text-hover);
 }
+.movie-row.locked {
+  /* box-shadow: var(--movie-row-boxshadow-locked); */
+  background: var(--movie-row-bg-locked);
+  color: var(--movie-row-text-locked);
+  position:relative; /* necessary for the animation below */
+}
+.movie-row.locked::after,
+.movie-row.unlocking::after {
+  content:'';
+  position:absolute;
+  left:0;
+  height:var(--movie-row-height);
+  line-height:var(--movie-row-height);
+  width:100%;
+  text-align: center;
+  background-color:rgba(0,0,0,.5);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: calc(var(--movie-row-height) * .8);
+  /* background: linear-gradient(90deg, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%); */
+  color:white;
+  overflow:hidden;
+  white-space: nowrap;
+  animation: row-locked-flash .5s ease-in 1;
+  animation-delay: 0s;
+  animation-fill-mode: forwards;
+}
+.movie-row.locked::after {
+  background-image: url('../../images/padlock-lock-animation_white.gif');
+}
+.movie-row.unlocking::after {
+  background-image: url('../../images/padlock-unlock-animation_white.gif');
+}
+
+@keyframes row-locked-flash {
+  0% {
+    opacity: 1;
+    background-color:rgba(0,0,0,.5);
+  }
+  50% {
+    width:100%;
+    background-color:rgba(0,0,0,.5);
+  }
+  99% {
+    opacity: 0;
+    width:100%;
+    background-color:rgba(0,0,0,0);
+  }
+  100% {
+    width:0;
+  }
+}
+
 
 .movie-row .title {
   overflow:hidden;
@@ -373,6 +426,10 @@ th, tr, td {
 }
 .movie-row:hover .title::after {
   background: var(--tablecell-ellipsis-grad-hover);
+}
+.movie-row.locked .title::after,
+.movie-row.locked:hover .title::after {
+  background: var(--tablecell-ellipsis-grad-locked);
 }
 .movie-row .dateadded,
 .movie-row .lastseen {

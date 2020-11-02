@@ -155,6 +155,7 @@
   --light-bg: #363b45;
   --lighter-bg: #464c59;
   --lightest-bg: #656d80;
+  --light-colorful-bg: rgba(74,79,120,1);
 
   --darker-bg-rgba0: rgba(24,26,30,0);
   --dark-bg-rgba0: rgba(30,33,38,0);
@@ -162,6 +163,7 @@
   --medlight-bg-rgba0: rgba(45,49,58,0);
   --light-bg-rgba0: rgba(54,59,69,0);
   --lighter-bg-rgba0: rgba(70,76,89,0);
+  --light-colorful-bg-rgba0: rgba(74,79,120,0);
 
   /* text colors */
   --main-text: #b6b9bf; /*#a1a9b7;*/
@@ -360,6 +362,9 @@
   --movie-row-bg-hover-odd: var(--movie-row-bg-hover);
   --movie-row-bg-hover-even: var(--movie-row-bg-hover);
   --movie-row-text-hover: var(--bright-text);
+  --movie-row-bg-locked: var(--light-colorful-bg); /*linear-gradient(90deg, rgba(74,79,120,1) 0%, rgba(74,79,100,1) 60%);*/
+  --movie-row-text-locked: black; /*var(--bright-text);*/
+  --movie-row-boxshadow-locked: inset 0em 0em .7em -.1em var(--glow-bright);
 
   --tablecell-padding: 0em .3em 0em .3em;
 
@@ -369,6 +374,7 @@
   --tablecell-ellipsis-grad-hover: linear-gradient(90deg, var(--light-bg-rgba0) 0%, var(--movie-row-bg-hover) 100%);
   --tablecell-ellipsis-grad-hover-odd: var(--tablecell-ellipsis-grad-hover);
   --tablecell-ellipsis-grad-hover-even: var(--tablecell-ellipsis-grad-hover);
+  --tablecell-ellipsis-grad-locked: linear-gradient(90deg, var(--light-colorful-bg-rgba0) 0%, var(--light-colorful-bg) 100%);
 
   --editwidget-text-hover: ;
   --editwidget-opacity-hover: .3;

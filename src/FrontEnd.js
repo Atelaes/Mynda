@@ -560,7 +560,8 @@ class MynLibTable extends React.Component {
       sortKey: null,
       sortAscending: true,
       sortedRows: [],
-      displayOrderColumn: "table-cell"
+      displayOrderColumn: "table-cell",
+      lockedRow: null
     }
 
     this.requestSort = this.requestSort.bind(this);
@@ -583,12 +584,49 @@ class MynLibTable extends React.Component {
 
   rowHovered(id, e) {
     // show details in details pane
-    this.props.showDetails(id, e);
+    if (!this.state.lockedRow) {
+      this.props.showDetails(id, e);
+    }
   }
 
   rowOut(id, e) {
     // hide details in details pane
     // this.props.showDetails(null, e);
+  }
+
+  rowClick(id, e) {
+    const row = findNearestOfClass(e.target,'movie-row');
+    // first remove the 'locked' class from any currently locked row
+    if (this.state.lockedRow !== null) {
+      // in the case of a hierarchical playlist, there may be more than one row
+      // (in a different table) of the same video, so we have to check any/all of them
+      // with the same id
+      Array.from(document.getElementsByClassName(this.state.lockedRow)).map((rowWithThisId) => {
+        rowWithThisId.classList.remove('locked');
+      });
+    }
+
+    // if this row is already locked, unlock it
+    // WARNING: this will be a problem if a different row of the same video
+    // was the one that was locked; the user will have to click twice then to get
+    // this row to lock, which is unexpected behavior. Something to address.
+    if (this.state.lockedRow === id) {
+      this.setState({lockedRow : null});
+      row.classList.remove('locked');
+      setTimeout(() => {
+        row.classList.add('unlocking');
+        setTimeout(() => {
+          row.classList.remove('unlocking');
+        },1000);
+      },50);
+      setTimeout(() => {row.classList.remove('unlocking');},1000);
+    } else {
+      // if a different row, or no row, was locked,
+      // lock this row
+      this.setState({lockedRow : id});
+      row.classList.add('locked');
+      this.props.showDetails(id, e); // this is necessary in case we go from one locked row to another without unlocking in between
+    }
   }
 
   titleHovered(e) {
@@ -729,7 +767,13 @@ class MynLibTable extends React.Component {
       let cells = this.props.columns.map(column => cellJSX[column]);
 
       return (
-        <tr className="movie-row" key={movie.id} onMouseOver={(e) => this.rowHovered(movie.id,e)} onMouseOut={(e) => this.rowOut(movie.id,e)}>
+        <tr
+          className={"movie-row " + movie.id}
+          key={movie.id}
+          onMouseOver={(e) => this.rowHovered(movie.id,e)}
+          onMouseOut={(e) => this.rowOut(movie.id,e)}
+          onClick={(e) => this.rowClick(movie.id,e)}
+        >
           {cellJSX.order}
           {cells}
         </tr>
@@ -1617,7 +1661,8 @@ class MynSettingsPrefs extends React.Component {
   render() {
     const dialogDescriptions = {
       'MynEditorSearch-confirm-select' : 'Confirm selection of search result in video editor',
-      'MynEditor-confirm-exit' : 'Confirm on exiting editor without saving'
+      'MynEditor-confirm-exit' : 'Confirm on exiting video editor without saving',
+      'MynEditorEdit-confirm-revert' : 'Confirm on reverting to saved values in video editor'
     }
 
     return (
@@ -1946,9 +1991,9 @@ class MynEditor extends MynOpenablePane {
     }
   }
 
-  revertChanges(event) {
+  revertChanges() {
     // console.log('reverting...');
-    event.preventDefault();
+    // event.preventDefault();
     this._isMounted && this.setState(
       {
         video : _.cloneDeep(this.props.video),
@@ -2414,6 +2459,49 @@ class MynEditorEdit extends React.Component {
     }
 
     this.render = this.render.bind(this);
+
+    ipcRenderer.on('MynEditorEdit-confirm-revert', (event, response, data, checked) => {
+      console.log(event);
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (checked) {
+        console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.overridedialogs) {
+          prefs.overridedialogs = {};
+        }
+        prefs.overridedialogs['MynEditorEdit-confirm-revert'] = true;
+        library.replace("settings.preferences",prefs);
+      }
+
+      if (response === 0) { // yes
+        // choose search result and fill in the fields with it
+        this.props.revertChanges();
+      } else {
+        console.log('Reversion cancelled by user');
+      }
+    });
+  }
+
+  requestRevert(e) {
+    e.preventDefault();
+
+    // if the user hasn't previously selected the preference to override this confirmation dialog
+    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynEditorEdit-confirm-revert']) {
+      // we ask the user to confirm, because this will erase any metadata
+      // that hasn't been saved
+      ipcRenderer.send(
+        'generic-confirm',
+        'MynEditorEdit-confirm-revert',
+        {
+          message: `Are you sure you want to revert to the saved values? You will lose any unsaved changes.`,
+          checkboxLabel: `Don't show this dialog again`
+        }
+      );
+    } else {
+      // skip the dialog
+      this.props.revertChanges();
+    }
   }
 
   componentDidMount() {
@@ -2832,7 +2920,7 @@ class MynEditorEdit extends React.Component {
           {rated}
           {country}
           {languages}
-          <button className="edit-field revert-btn" onClick={(e) => this.props.revertChanges(e)}>Revert to Saved</button>
+          <button className="edit-field revert-btn" onClick={(e) => this.requestRevert(e)}>Revert to Saved</button>
           <input className="edit-field save-btn" type="submit" value="Save" />
         </form>
       </div>
