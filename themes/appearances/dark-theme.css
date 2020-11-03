@@ -896,8 +896,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 #details-pane #details-scroll-btn {
-  display: none;
-  position:absolute;
+  visibility: hidden;
+  position: absolute;
   font-size: .6em;
   padding: .3em .5em .3em .5em;
   background-color: var(--darker-bg);
@@ -910,7 +910,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 #details-pane:hover #details-scroll-btn {
-  display: block;
+  visibility: visible;
 }
 
 #edit-button {
