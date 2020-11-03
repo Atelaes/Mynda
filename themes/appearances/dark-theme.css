@@ -895,6 +895,24 @@ in lieu of that, we will use a negative margin on the selected element instead (
   filter: blur(.15em);
 }
 
+#details-pane #details-scroll-btn {
+  display: none;
+  position:absolute;
+  font-size: .6em;
+  padding: .3em .5em .3em .5em;
+  background-color: var(--darker-bg);
+  border-radius: 0 0 .6em 0;
+}
+
+#details-pane #details-scroll-btn:hover {
+  color: var(--bright-text);
+  background-color: var(--med-bg);
+}
+
+#details-pane:hover #details-scroll-btn {
+  display: block;
+}
+
 #edit-button {
   visibility: hidden;
 }

@@ -123,6 +123,53 @@ class Mynda extends React.Component {
     this.setState({detailId: id, detailMovie: detailMovie});
   }
 
+  scrollToVideo(id) {
+    let els = document.getElementsByClassName('movie-row ' + id);
+    if (els && els.length > 0) {
+      els[0].scrollIntoView();
+    } else {
+      console.log('Could not find table row to scroll to for ' + id);
+    }
+  }
+
+  isElementOffScreen(el) {
+    let rect = el.getBoundingClientRect();
+    return (
+         (rect.x + rect.width) < 0
+      || (rect.y + rect.height) < 0
+      || (rect.x > window.innerWidth || rect.y > window.innerHeight)
+    );
+  }
+
+  // tells if the table row for a given video id
+  // is visible: i.e. it is within the viewport (not scrolled offscreen)
+  // and its collections hierarchy is expanded (if applicable)
+  isRowVisible(id) {
+    // first find the row
+    let row = null;
+    try {
+      row = document.getElementsByClassName('movie-row ' + id)[0];
+    } catch(err) {
+      console.log('Cannot tell if row is visible. Unable to find row for movie ' + id);
+      return false;
+    }
+
+    // then test if it is scrolled out of view
+    let boundary = document.getElementById('library-pane').getBoundingClientRect();
+    let rect = row.getBoundingClientRect();
+    let inViewport = false;
+    if (rect.top < window.innerHeight || rect.bottom > boundary.top) {
+      inViewport = true;
+    }
+
+    // then test if it or any of its parents is set to display:none
+    let isNotHidden = row.offsetParent !== null;
+
+    // return if it its scroll position is onscreen and it is not hidden
+    // return inViewport && isNotHidden;
+    return false; // just until we get the rest of the infrastructure written
+  }
+
   // filter the movies we'll hand off to the table component
   // based on the given playlist
   playlistFilter(id) {
@@ -357,7 +404,7 @@ class Mynda extends React.Component {
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
-        <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}}/>
+        <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
@@ -904,6 +951,7 @@ class MynDetails extends React.Component {
     super(props)
 
     this.render = this.render.bind(this);
+    this.scrollBtn = React.createRef();
   }
 
   displayDate(value) {
@@ -1003,6 +1051,17 @@ class MynDetails extends React.Component {
         }
       }
     }
+
+    // if the user has scrolled, we want to show or not show the scroll button
+    // depending on whether the row of the details movie is still in view
+    if (oldProps.libraryScroll !== this.props.libraryScroll) {
+      if (this.scrollBtn.current && !this.props.isRowVisible(movie.id)) {
+        console.log(movie.title + ' is NOT visible!');
+        this.scrollBtn.current.style.display = 'block';
+      } else {
+        this.scrollBtn.current.style.display = 'none';
+      }
+    }
   }
 
   componentDidMount() {
@@ -1011,6 +1070,7 @@ class MynDetails extends React.Component {
   render() {
     let details;
     let editBtn = (<div id="edit-button" onClick={() => this.props.showEditor()}>Edit</div>);
+    let scrollBtn = null;
 
     try {
       const movie = this.props.movie
@@ -1033,10 +1093,18 @@ class MynDetails extends React.Component {
 
         </ul>
       );
+
+      scrollBtn = (
+        <div id='details-scroll-btn' ref={this.scrollBtn} className='clickable' style={{display: this.props.isRowVisible(movie.id) ? 'none' : 'block'}} onClick={() => this.props.scrollToVideo(movie.id)}>
+          Scroll to Video
+        </div>
+      );
+
     } catch (error) {
       // eventually we'll put some kind of better placeholder here
       details = <div>No Details</div>
       editBtn = null; // in the case of no movie, we don't want an edit button
+      scrollBtn = null; // same with this
 
       // console.error(error.toString());
 
@@ -1050,6 +1118,7 @@ class MynDetails extends React.Component {
 
     return  (
       <aside id="details-pane" className="pane">
+        {scrollBtn}
         {editBtn}
         {details}
       </aside>
