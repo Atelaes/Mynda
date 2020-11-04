@@ -28,6 +28,14 @@ function createWindow() {
 
 }
 
+function checkWatchFolders() {
+  let folders = library.settings.watchfolders;
+  for (let i=0; i<folders.length; i++) {
+    let thisFolder = folders[i];
+    findVideosFromFolder(thisFolder.path, thisFolder.type);
+  }
+}
+
 //Takes a full folder address and looks for videos in it,
 //adding any it finds to the library
 function findVideosFromFolder(folder, type) {
@@ -176,6 +184,7 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
     // if path exists and is a folder
     if(!err && stats.isDirectory()) {
       // add to library
+      library.add('settings.watchfolders', {"path" : path, "kind" : kind});
       findVideosFromFolder(path, kind);
     } else {
       // if not, display an error dialog

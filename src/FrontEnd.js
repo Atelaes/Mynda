@@ -759,7 +759,7 @@ class MynLibTable extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    console.log('UPDATING MynTable');
+    //console.log('UPDATING MynTable');
     // if (oldProps.movies !== this.props.movies) {
     if (!_.isEqual(oldProps.movies,this.props.movies)) {
       console.log('MynTable props changed!!!');
@@ -889,9 +889,9 @@ class MynDetails extends React.Component {
 
   displayRatings() {
     let ratings = this.props.movie.ratings;
-    console.log(JSON.stringify(ratings));
+    //console.log(JSON.stringify(ratings));
     return Object.keys(ratings).map(source => {
-      console.log(source);
+      //console.log(source);
       if (source === 'user') return null;
 
       let rating = Number(ratings[source]);
@@ -902,7 +902,7 @@ class MynDetails extends React.Component {
         path += '-splat';
       }
       path += '.png';
-      console.log(path);
+      //console.log(path);
 
       // units/display
       let units = '';
@@ -1081,7 +1081,7 @@ class MynSettings extends MynOpenablePane {
         if (i == index+1) { tab.classList.add("after-selected"); } else { tab.classList.remove("after-selected"); }
       });
     } catch(e) {
-      console.log('There was an error updating classes for the settings tabs: ' + e.toString());
+      //console.log('There was an error updating classes for the settings tabs: ' + e.toString());
     }
 
     // add "selected" class to the clicked tab
@@ -1093,7 +1093,7 @@ class MynSettings extends MynOpenablePane {
       try {
         element = document.getElementById('settings-tab-' + view);
       } catch(e) {
-        console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
+        //console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
       }
     }
     try {
@@ -1138,9 +1138,9 @@ class MynSettings extends MynOpenablePane {
   }
 
   componentDidUpdate(oldProps) {
-    console.log('MynSettings: component has updated');
+    //console.log('MynSettings: component has updated');
     if (!_.isEqual(oldProps,this.props)) {
-      console.log('MynSettings: PROPS HAVE CHANGED:\n' + JSON.stringify(this.props.show));
+      //console.log('MynSettings: PROPS HAVE CHANGED:\n' + JSON.stringify(this.props.show));
 
       // if the view was changed from outside, call up that view;
       // OR, whenever the pane is closed, also set to props.view
