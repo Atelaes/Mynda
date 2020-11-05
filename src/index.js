@@ -87,9 +87,9 @@ function isDVDRip(folder) {
 }
 
 let videoTemplate =   {
-    "id" : null,
+    "id" : '',
     "title" : '',
-    "year" : null,
+    "year" : '',
     "director" : '',
     "directorsort" : '',
     "cast" : [],
@@ -104,8 +104,8 @@ let videoTemplate =   {
     "boxoffice" : 0,
     "rated" : '',
     "ratings" : {},
-    "dateadded" : null,
-    "lastseen" : null,
+    "dateadded" : '',
+    "lastseen" : '',
     "kind" : '',
     "artwork" : '',
     "filename" : '',

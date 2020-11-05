@@ -14,6 +14,7 @@ const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
 const { DragDropContext, Droppable, Draggable } = require('react-beautiful-dnd');
+const hashObject = require('object-hash');
 // let savedPing = {};
 
 class Mynda extends React.Component {
@@ -87,16 +88,19 @@ class Mynda extends React.Component {
   }
 
   calcAvgRatings(ratings, purpose) {
-    let keys = Object.keys(ratings);
+    // get list of sources, but
+    // ignore sources with a value of empty string
+    let keys = Object.keys(ratings).filter(key => ratings[key] !== '');
 
     if (keys.length === 0) return purpose === 'sort' ? -1 : '';
 
     let avg = 0;
     keys.map(r => {
+      let value = Number(ratings[r]);
       let normalized = 0;
-      if (r === 'user') normalized = ratings[r] * 20;
-      else if (r === 'imdb') normalized = ratings[r] * 10;
-      else normalized = ratings[r];
+      if (r === 'user') normalized = value * 20;
+      else if (r === 'imdb') normalized = value * 10;
+      else normalized = value;
       avg += normalized;
     });
     avg /= keys.length;
@@ -1017,6 +1021,7 @@ class MynDetails extends React.Component {
     return Object.keys(ratings).map(source => {
       // console.log(source);
       if (source === 'user') return null;
+      if (ratings[source] === '') return null;
 
       let rating = Number(ratings[source]);
 
@@ -1096,7 +1101,7 @@ class MynDetails extends React.Component {
 
       scrollBtn = (
         <div id='details-scroll-btn' ref={this.scrollBtn} className='clickable' style={{display: this.props.isRowVisible(movie.id) ? 'none' : 'block'}} onClick={() => this.props.scrollToVideo(movie.id)}>
-          Scroll to Video
+          Scroll to Row
         </div>
       );
 
@@ -1108,11 +1113,6 @@ class MynDetails extends React.Component {
 
       // console.error(error.toString());
 
-      // eventually we should use validateVideo to actually fix the video
-      // if (validateVideo(this.props.movie) !== true) {
-      //   details = null;
-      //   editBtn = null;
-      // }
       // validateVideo(this.props.movie);
     }
 
@@ -1159,6 +1159,11 @@ class MynOpenablePane extends React.Component {
   }
 
   closePane(id,confirm,msg) {
+    try {
+      // in case confirm is a function instead of just a boolean
+      confirm = confirm();
+    } catch(err) {}
+
     // if we're supposed to confirm before exiting:
     // i.e. the confirm boolean variable tells us whether the pane wants us to confirm exit,
     // but that can be overridden by the user preference to override the confirmation dialog,
@@ -1980,7 +1985,8 @@ class MynEditor extends MynOpenablePane {
       video: _.cloneDeep(props.video),
       collections: _.cloneDeep(props.collections),
       placeholderImage: "../images/qmark.png",
-      valid: {}
+      valid: {},
+      saveHash: hashObject(props.video)
     }
 
     this.render = this.render.bind(this);
@@ -2072,7 +2078,9 @@ class MynEditor extends MynOpenablePane {
   }
 
   saveChanges(event) {
-    event.preventDefault();
+    if (event) {
+      event.preventDefault();
+    }
 
     /* make sure all the fields are valid before submitting */
     // console.log(JSON.stringify(this.state.valid));
@@ -2143,11 +2151,16 @@ class MynEditor extends MynOpenablePane {
       library.replace("settings.used.genres",genres);
     }
 
+    this.setState({saveHash: hashObject(this.state.video) });
   }
 
   componentDidUpdate(oldProps) {
     if (!_.isEqual(oldProps.video,this.props.video)) {
-      this.setState({video:_.cloneDeep(this.props.video)});
+      // console.log('MynEditor props.video has changed!!!');
+      this.setState({video: _.cloneDeep(this.props.video)});
+      // when a new movie is loaded, update the saveHash
+      // (which is used for testing whether or not anything has changed since last save)
+      this.setState({saveHash: hashObject(this.props.video)});
     }
   }
 
@@ -2183,6 +2196,7 @@ class MynEditor extends MynOpenablePane {
           saveChanges={this.saveChanges}
           placeholderImage={this.state.placeholderImage}
           reportValid={this.reportValid}
+          saveHash={this.state.saveHash}
         />
       </div>
     );
@@ -2192,7 +2206,12 @@ class MynEditor extends MynOpenablePane {
 
     return super.render({
       jsx: this.createContentJSX(),
-      confirmExit: () => (!_.isEqual(this.props.video,this.state.video)), // boolean for whether or not to show confirmation dialog upon exiting the pane
+      confirmExit: () => {
+        // console.log('EXITING EDITOR PANE!!! isEqual: ' + _.isEqual(this.props.video,this.state.video));
+        // console.log('props: ' + JSON.stringify(this.props.video));
+        // console.log('state: ' + JSON.stringify(this.state.video));
+        return !_.isEqual(this.props.video,this.state.video);
+      }, // boolean for whether or not to show confirmation dialog upon exiting the pane
       confirmMsg: 'Are you sure you want to exit without saving? Your changes will be lost'
     });
   }
@@ -2530,7 +2549,6 @@ class MynEditorEdit extends React.Component {
     this.render = this.render.bind(this);
 
     ipcRenderer.on('MynEditorEdit-confirm-revert', (event, response, data, checked) => {
-      console.log(event);
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
       if (checked) {
@@ -2555,8 +2573,15 @@ class MynEditorEdit extends React.Component {
   requestRevert(e) {
     e.preventDefault();
 
-    // if the user hasn't previously selected the preference to override this confirmation dialog
-    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynEditorEdit-confirm-revert']) {
+    // whether the video has been changed since load or the last save
+    const newHash = hashObject(this.props.video);
+    const saved = this.props.saveHash === newHash;
+    // console.log('video has changed since load/last save? ' + !saved);
+    // console.log('\n' + this.props.saveHash + '\n' + newHash);
+
+    // if the video has been changed without saving
+    // and if the user hasn't previously selected the preference to override this confirmation dialog
+    if (!saved && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynEditorEdit-confirm-revert'])) {
       // we ask the user to confirm, because this will erase any metadata
       // that hasn't been saved
       ipcRenderer.send(
@@ -2575,6 +2600,13 @@ class MynEditorEdit extends React.Component {
 
   componentDidMount() {
     this._isMounted = true;
+
+    // validate the video in place (function fixes any broken values)
+    // and also, if any changes were made (i.e. broken values fixed)
+    // save the changes
+    if (validateVideo(this.props.video) !== true) {
+      this.props.saveChanges();
+    }
   }
 
   componentWillUnmount() {
@@ -2587,7 +2619,8 @@ class MynEditorEdit extends React.Component {
     }
 
     const video = this.props.video;
-    validateVideo(video);
+    // validateVideo(video);
+
     // if (validateVideo(video) !== true) {
     //   console.log("Invalid video passed to editor: " + JSON.stringify(video));
     //   return (
@@ -4504,7 +4537,8 @@ function validateVideo(video) {
     return false;
   }
   // let repaired = _.cloneDeep(video);
-  let repaired = video;
+  let repaired = video; // don't clone, because we want to alter the video in place
+  let oldVidCopy = _.cloneDeep(video); // but do clone a copy for comparison at the end
 
   const properties = {
     'id':'string',
@@ -4554,7 +4588,7 @@ function validateVideo(video) {
         case 'integer' :
           repaired[property] = parseInt(video[property]);
           if (!Number.isInteger(repaired[property])) {
-            repaired[property] = '';
+            repaired[property] = ''; // going with empty string instead of some integer like 0 or -1, for a variety of reasons
           }
           break;
         // boxoffice
@@ -4577,7 +4611,7 @@ function validateVideo(video) {
       }
     } else {
       // the property doesn't exist, so create it
-      repaired[property] = null;
+      repaired[property] = '';
     }
   }
 
@@ -4587,7 +4621,19 @@ function validateVideo(video) {
     console.log('validateVideo had to create an ID for this video: ' + video.filename);
   }
 
-  if (!_.isEqual(video,repaired)) {
+  // if the ratings object doesn't have all the sources, fill it with empty values;
+  // most things will work fine if we don't do this, but the bit of logic
+  // that tests whether or not a video has changed in the video editor since last save
+  // breaks without the keys present in this object (MynEditRatings doesn't
+  // add them on load, but DOES add them on revert-to-saved, making MynEditorEdit think
+  // that the video has changed even right after it's reverted)
+  const keys = Object.keys(video.ratings);
+  const sources = ['imdb','rt','mc'];
+  sources.map(source => {
+    if (!keys.includes(source)) video.ratings[source] = '';
+  });
+
+  if (!_.isEqual(oldVidCopy,repaired)) {
     console.log('video had to be repaired: ' + video.title);
     // return repaired;
     return false;
