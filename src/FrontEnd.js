@@ -409,7 +409,7 @@ class Mynda extends React.Component {
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
-        <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
+        <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
     );
@@ -1218,7 +1218,7 @@ class MynSettings extends MynOpenablePane {
     let views = {
       folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
-      collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} />),
+      collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
     }
@@ -1957,8 +1957,74 @@ class MynSettingsCollections extends React.Component {
     super(props);
   }
 
+  createAddCollectionBtn() {
+    return (
+      <div key='add' className='add-collection'>
+        <h1>{'\uFF0B'}</h1>
+      </div>
+    );
+  }
+
+  findCollections(collections) {
+    let collectionsJSX = collections.map(collection => {
+      let children = null;
+
+      // if this collection has child collections
+      if (collection.collections) {
+        // attach those collections as children
+        children = this.findCollections(collection.collections);
+
+      // if the collection does not have child collections,
+      // it is a bottom-level collection, probably containing videos
+      // (though it may not contain videos)
+      // so if it contains videos, attach those videos as children
+      } else if (collection.videos) {
+        children = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
+          let video = null;
+          try {
+            video = this.props.videos.filter(video => video.id === vidToken.id)[0];
+
+            return (
+              <div key={vidToken.order} className='video'>
+                {vidToken.order}: {video.title}
+              </div>
+            );
+          } catch(err) {
+            console.error(`Error: could not find video (id: ${vidToken.id}) from collection "${collection.name}" in library`);
+          }
+          return null;
+        });
+      // if the collection contains neither collections nor videos
+      // it is an empty bottom-level collection, in which case the user
+      // is still allowed to create a child collection for it
+      // (making it no longer a bottom-level collection)
+      // so we attach an add button as a child
+      } else {
+        children = this.createAddCollectionBtn();
+      }
+
+      return (
+        <div key={collection.id} className='collection'>
+          <h1>{collection.name}</h1>
+          {children}
+        </div>
+      );
+    });
+
+    return (
+        <div className='collections'>
+          {this.createAddCollectionBtn()}
+          {collectionsJSX}
+        </div>
+    );
+  }
+
   render() {
-    return (<h1>I'm a Collections!!!</h1>)
+    return (
+      <div id='settings-collections'>
+        {this.findCollections(this.props.collections)}
+      </div>
+    );
   }
 }
 

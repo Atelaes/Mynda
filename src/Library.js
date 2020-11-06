@@ -308,7 +308,7 @@ let defaultLibrary = {
           "duration"
         ]
       },
-      "hidedescription" : false,
+      "hidedescription" : "show",
       "overridedialogs" : {}
     },
     "used" : {

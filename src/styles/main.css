@@ -319,6 +319,9 @@ th, tr, td {
   top:.1em;
   margin: 0 .1em 0 .1em;
 }
+.movie-table th:hover img {
+  opacity:1;
+}
 .movie-table td {
   padding: var(--tablecell-padding);
   white-space: nowrap;
@@ -989,6 +992,40 @@ th, tr, td {
 #settings-folders-folders .path {
   font-weight: 300;
   font-size: .8em;
+}
+
+#settings-collections .collection .video {
+  font-size: var(--settings-collectionvideo-font-size);
+  margin-left: var(--collection-marginleft);
+}
+
+#settings-collections .add-collection {
+  margin-left: var(--collection-marginleft);
+}
+
+#settings-collections .collection h1 {
+  cursor: default;
+  font-size: var(--settings-collectionheader-font-size);
+  padding: var(--settings-collectionheader-padding);
+}
+
+#settings-collections .add-collection h1 {
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--settings-collectionheader-font-size);
+  padding: var(--settings-addcollection-padding);
+  width: var(--settings-addcollection-width);
+  text-align: center;
+
+  display:block;
+  background: var(--settings-addcollection-bg);
+  color: var(--settings-addcollection-text);
+  margin: var(--collectionheader-margin);
+  text-transform: uppercase;
+  font-weight: var(--collectionheader-font-weight);
+  font-family: var(--collectionheader-font);
+  font-style: var(--collectionheader-font-style);
+
 }
 
 /*************************************/
