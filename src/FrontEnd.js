@@ -458,7 +458,8 @@ class MynLibrary extends React.Component {
     super(props)
 
     this.state = {
-      hierarchy : null
+      hierarchy : null,
+      vidsInHierarchy : []
     }
 
     this.render = this.render.bind(this);
@@ -481,6 +482,15 @@ class MynLibrary extends React.Component {
   createCollectionsMap() {
     // console.log("Creating new collections map");
     this.state.hierarchy = this.props.collections.map(collection => (this.findCollections(collection)));
+
+    // create dummy collection of leftover videos, if any
+    let leftovers = this.props.movies.filter(v => !this.state.vidsInHierarchy.includes(v.id));
+    let uncategorized = {
+      name: '[Uncategorized]',
+      videos: leftovers.map(v => {return {id:v.id}})
+    }
+    // and add it to the hierarchy
+    this.state.hierarchy.push(this.findCollections(uncategorized));
   }
 
   // recursive function that walks down the collections and returns each branch
@@ -513,7 +523,15 @@ class MynLibrary extends React.Component {
         // if this collection has a video in our playlist
         for (let i=0; i<object.videos.length; i++) {
           if (this.props.movies.filter(movie => (object.videos[i].id === movie.id)).length > 0) {
+            // add video to list of videos for this collection
             videos.push(object.videos[i]);
+            // also add its id to the vidsInHierarchy list
+            // (later we'll compare this to this.props.movies to see what leftovers we have;
+            // i.e. videos in the playlist that are not part of any collections)
+            if (object.name !== '[Uncategorized]') { // we don't want to add the leftovers themselves to vidsInHierarchy, or else they won't be displayed
+              this.state.vidsInHierarchy.push(object.videos[i].id);
+            }
+            // set flag
             vidsWereFound = true;
           }
         }
@@ -1955,11 +1973,57 @@ class MynSettingsPlaylistsTableRow extends React.Component {
 class MynSettingsCollections extends React.Component {
   constructor(props) {
     super(props);
+
+    this.state = {
+      collections : _.cloneDeep(props.collections)
+    }
+  }
+
+  addCollection(e) {
+    e.stopPropagation();
+
+    // DOM element of parent collection
+    const parentEl = findNearestOfClass(e.target,'collection');
+
+    // if we found a parent collection element
+    let parentCol, parentChildren;
+    if (parentEl) {
+      // get the actual collection object of the parent
+      parentCol = getCollectionObject(parentEl.id.split('_')[1], this.state.collections, false);
+
+      // then get the parent's array of child collections, creating one if it doesn't already exist
+      if (!parentCol.collections) {
+        parentCol.collections = [];
+      }
+      parentChildren = parentCol.collections;
+    } else {
+      // if we did not, we're adding a top-level collection,
+      // so set parentChildren to the top-level array itself
+      parentChildren = this.state.collections;
+    }
+
+    try {
+      console.log('Parent collection: ' + parentCol.name);
+    } catch(err) {
+      console.log('Parent collection: top level (none)');
+    }
+
+    parentChildren.push({
+      "id" : "1-1",
+      "name" : "Example",
+      "videos" : [
+        { "id" : 7, "order" : 1}
+      ]
+    });
+
+    // this.state.collections is actually altered in place
+    // but we need to explicitly set it in order to get a re-render
+    this.setState({collections: this.state.collections});
   }
 
   createAddCollectionBtn() {
     return (
-      <div key='add' className='add-collection'>
+      <div key='add' className='add-collection clickable' onClick={(e) => this.addCollection(e)}>
         <h1>{'\uFF0B'}</h1>
       </div>
     );
@@ -1968,11 +2032,17 @@ class MynSettingsCollections extends React.Component {
   findCollections(collections) {
     let collectionsJSX = collections.map(collection => {
       let children = null;
+      let addButton = null;
 
       // if this collection has child collections
       if (collection.collections) {
         // attach those collections as children
         children = this.findCollections(collection.collections);
+
+        // and create an add button so the user can create more child collections;
+        // since this is not a bottom-level collection containing videos,
+        // it is allowed to have child collections
+        addButton = this.createAddCollectionBtn();
 
       // if the collection does not have child collections,
       // it is a bottom-level collection, probably containing videos
@@ -1998,14 +2068,17 @@ class MynSettingsCollections extends React.Component {
       // it is an empty bottom-level collection, in which case the user
       // is still allowed to create a child collection for it
       // (making it no longer a bottom-level collection)
-      // so we attach an add button as a child
+      // so we create an add button
       } else {
-        children = this.createAddCollectionBtn();
+        addButton = this.createAddCollectionBtn();
       }
 
       return (
-        <div key={collection.id} className='collection'>
-          <h1>{collection.name}</h1>
+        <div key={collection.id} id={'settings-col_' + collection.id} className='collection'>
+          <header>
+            <h1>{collection.name}</h1>
+            {addButton}
+          </header>
           {children}
         </div>
       );
@@ -2013,7 +2086,6 @@ class MynSettingsCollections extends React.Component {
 
     return (
         <div className='collections'>
-          {this.createAddCollectionBtn()}
           {collectionsJSX}
         </div>
     );
@@ -2022,7 +2094,8 @@ class MynSettingsCollections extends React.Component {
   render() {
     return (
       <div id='settings-collections'>
-        {this.findCollections(this.props.collections)}
+        {this.createAddCollectionBtn()}
+        {this.findCollections(this.state.collections)}
       </div>
     );
   }
@@ -2063,7 +2136,7 @@ class MynEditor extends MynOpenablePane {
   }
 
   reportValid(property,valid) {
-    if (typeof valid === 'boolean') {
+    if (typeof valid === 'boolean' && property !== undefined) {
       this.state.valid[property] = valid;
     }
   }
@@ -2126,6 +2199,23 @@ class MynEditor extends MynOpenablePane {
           }
         }
       });
+
+      // update any changes to the order number of this video in its collections
+      const ids = Object.keys(collectionUpdate);
+      for (const id of ids) {
+        let collection = getCollectionObject(id, collectionsCopy, false);
+        if (collection) {
+          try {
+            let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
+            collection.videos[index].order = collectionUpdate[id];
+          } catch(err) {
+            console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Video not found in that collection.`);
+          }
+        } else {
+          console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Unable to retrieve collection object from that id.`);
+        }
+      }
+
 
       // console.log("collections after change: " + JSON.stringify(collectionsCopy));
       this._isMounted && this.setState({collections : collectionsCopy});
@@ -4101,7 +4191,7 @@ class MynEditGraphicalWidget extends MynEditWidget {
   }
 
   updateValue(value, event) {
-    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value.user);
+    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value);
     event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     // this.props.movie[this.state.property] = value;
 

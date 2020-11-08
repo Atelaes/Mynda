@@ -1001,6 +1001,7 @@ th, tr, td {
 
 #settings-collections .add-collection {
   margin-left: var(--collection-marginleft);
+  display: inline-block;
 }
 
 #settings-collections .collection h1 {
@@ -1010,8 +1011,6 @@ th, tr, td {
 }
 
 #settings-collections .add-collection h1 {
-  cursor: pointer;
-  user-select: none;
   font-size: var(--settings-collectionheader-font-size);
   padding: var(--settings-addcollection-padding);
   width: var(--settings-addcollection-width);
@@ -1025,8 +1024,12 @@ th, tr, td {
   font-weight: var(--collectionheader-font-weight);
   font-family: var(--collectionheader-font);
   font-style: var(--collectionheader-font-style);
-
 }
+
+#settings-collections .add-collection:hover h1 {
+  background: var(--settings-addcollection-bg-hover);
+}
+
 
 /*************************************/
 /*########### EDITOR PANE ###########*/

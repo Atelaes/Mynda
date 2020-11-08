@@ -348,11 +348,11 @@
   --collectionheader-padding: .5em 0em .5em .5em;
 
   --settings-collectionheader-padding: .3em 0em .3em .3em;
-  
+
   --settings-addcollection-width: 2em;
-  --settings-addcollection-bg: var(--lighter-bg);
+  --settings-addcollection-bg: var(--light-bg);
   /* --settings-addcollection-bg: linear-gradient(30deg, var(--lighter-bg) .5em, var(--medlight-bg) 4em, var(--medlight-bg) 60%, var(--medlight-bg-rgba0) 100%); */
-  --settings-addcollection-bg-hover: var(--lighter-bg);
+  --settings-addcollection-bg-hover: var(--lightest-bg);
   --settings-addcollection-text: var(--library-bg);
   --settings-addcollection-text-hover: var(--library-bg);
   --settings-addcollection-padding: .3em 0em .3em 0em; /*.3em 0em .3em .3em;*/
@@ -1312,4 +1312,19 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 #settings-pane .columns-list.used li.col img {
   opacity: var(--ratingsicon-opacity-hover);
+}
+
+#settings-collections .collections header {
+  /* overflow:hidden; */
+}
+
+#settings-collections header .add-collection {
+    margin-left: 0;
+    position:absolute;
+    right:0;
+    top:0;
+    /* height:100%;*/
+    line-height:100%;
+    padding:0;
+    z-index: calc(var(--openablepane-zindex) + 2);
 }
