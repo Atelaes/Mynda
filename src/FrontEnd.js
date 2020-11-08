@@ -30,7 +30,6 @@ class Mynda extends React.Component {
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
-      detailId : null,
       detailMovie : null,
       currentPlaylistID : null,
       prevQuery : '',
@@ -117,22 +116,22 @@ class Mynda extends React.Component {
     });
   }
 
-  showDetails(id, e) {
+  showDetails(id, rowID, e) {
     let detailMovie = null;
     try {
       detailMovie = this.state.filteredVideos.filter(video => video.id === id)[0]
     } catch(error) {
       console.log("Error: could not find video " + id)
     }
-    this.setState({detailId: id, detailMovie: detailMovie});
+    this.setState({detailRowID: rowID, detailMovie: detailMovie});
   }
 
-  scrollToVideo(id) {
-    let els = document.getElementsByClassName('movie-row ' + id);
+  scrollToVideo(rowID) {
+    let els = document.getElementsByClassName('movie-row ' + rowID);
     if (els && els.length > 0) {
       els[0].scrollIntoView();
     } else {
-      console.log('Could not find table row to scroll to for ' + id);
+      console.log('Could not find table row to scroll to for ' + rowID);
     }
   }
 
@@ -148,13 +147,13 @@ class Mynda extends React.Component {
   // tells if the table row for a given video id
   // is visible: i.e. it is within the viewport (not scrolled offscreen)
   // and its collections hierarchy is expanded (if applicable)
-  isRowVisible(id) {
+  isRowVisible(rowID) {
     // first find the row
     let row = null;
     try {
-      row = document.getElementsByClassName('movie-row ' + id)[0];
+      row = document.getElementsByClassName('movie-row ' + rowID)[0];
     } catch(err) {
-      console.log('Cannot tell if row is visible. Unable to find row for movie ' + id);
+      console.log('Cannot tell if row is visible. Unable to find row for movie ' + rowID);
       return false;
     }
 
@@ -408,7 +407,7 @@ class Mynda extends React.Component {
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
-        <MynDetails movie={this.state.detailMovie} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
+        <MynDetails movie={this.state.detailMovie} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
@@ -564,14 +563,20 @@ class MynLibrary extends React.Component {
           <div className="collection collapsed" key={object.name}>
             <h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1>
             <div className="container hidden">
-              <MynLibTable
-                movies={movies}
-                initialSort="order"
-                columns={this.props.columns}
-                displayColumnName={this.props.displayColumnName}
-                calcAvgRatings={this.props.calcAvgRatings}
-                showDetails={this.props.showDetails}
-              />
+              <Droppable droppableId={`table-${object.name}`}>
+                {(provided) => (
+                  <MynLibTable
+                    movies={movies}
+                    initialSort="order"
+                    columns={this.props.columns}
+                    displayColumnName={this.props.displayColumnName}
+                    calcAvgRatings={this.props.calcAvgRatings}
+                    collection={object.name}
+                    showDetails={this.props.showDetails}
+                    provided={provided}
+                  />
+                )}
+              </Droppable>
             </div>
           </div>
         )
@@ -591,13 +596,28 @@ class MynLibrary extends React.Component {
     element.parentNode.classList.toggle("collapsed");
   }
 
+  onDragEnd() {
+    console.log('drag ended');
+  }
+
   render() {
     let content = null;
+
+    // if the playlist view is hierarchical, create multiple tables
+    // in a hierarchy based on the collections that the videos in this
+    // playlist are members of, and display that hierarchy
     if (this.props.view === "hierarchical") {
       this.createCollectionsMap();
 
-      content = (<div id="collections-container">{this.state.hierarchy}</div>)
+      content = (
+        <DragDropContext onDragEnd={this.onDragEnd}>
+          <div id="collections-container">
+            {this.state.hierarchy}
+          </div>
+        </DragDropContext>
+      )
 
+    // if the playlist view is flat, we only need to display one table
     } else if (this.props.view === "flat") {
 
       content = (
@@ -651,35 +671,28 @@ class MynLibTable extends React.Component {
     });
   }
 
-  rowHovered(id, e) {
+  rowHovered(id, rowID, e) {
     // show details in details pane
     if (!this.state.lockedRow) {
-      this.props.showDetails(id, e);
+      this.props.showDetails(id, rowID, e);
     }
   }
 
-  rowOut(id, e) {
+  rowOut(id, rowID, e) {
     // hide details in details pane
     // this.props.showDetails(null, e);
   }
 
-  rowClick(id, e) {
+  rowClick(id, rowID, e) {
     const row = findNearestOfClass(e.target,'movie-row');
+
     // first remove the 'locked' class from any currently locked row
     if (this.state.lockedRow !== null) {
-      // in the case of a hierarchical playlist, there may be more than one row
-      // (in a different table) of the same video, so we have to check any/all of them
-      // with the same id
-      Array.from(document.getElementsByClassName(this.state.lockedRow)).map((rowWithThisId) => {
-        rowWithThisId.classList.remove('locked');
-      });
+      document.getElementsByClassName(this.state.lockedRow)[0].classList.remove('locked');
     }
 
     // if this row is already locked, unlock it
-    // WARNING: this will be a problem if a different row of the same video
-    // was the one that was locked; the user will have to click twice then to get
-    // this row to lock, which is unexpected behavior. Something to address.
-    if (this.state.lockedRow === id) {
+    if (this.state.lockedRow === rowID) {
       this.setState({lockedRow : null});
       row.classList.remove('locked');
       setTimeout(() => {
@@ -692,9 +705,9 @@ class MynLibTable extends React.Component {
     } else {
       // if a different row, or no row, was locked,
       // lock this row
-      this.setState({lockedRow : id});
+      this.setState({lockedRow : rowID});
       row.classList.add('locked');
-      this.props.showDetails(id, e); // this is necessary in case we go from one locked row to another without unlocking in between
+      this.props.showDetails(id, rowID, e); // this is necessary in case we go from one locked row to another without unlocking in between
     }
   }
 
@@ -790,7 +803,12 @@ class MynLibTable extends React.Component {
       result *= ascending ? 1 : -1;
 
       return result;
-    }).map((movie) => {
+    }).map((movie, index) => {
+      // this will ensure that we have a unique id for the row
+      // even if we're in a hierarchical playlist in which a video can appear
+      // in more than one table (in different collections)
+      let rowID = movie.id + (this.props.collection ? `_${this.props.collection}` : '');
+
       let displaydate = (date) => {
         let result;
         if (date === null || date === "") {
@@ -835,18 +853,32 @@ class MynLibTable extends React.Component {
 
       let cells = this.props.columns.map(column => cellJSX[column]);
 
-      return (
+      let row = (
         <tr
-          className={"movie-row " + movie.id}
+          className={"movie-row " + rowID}
           key={movie.id}
-          onMouseOver={(e) => this.rowHovered(movie.id,e)}
-          onMouseOut={(e) => this.rowOut(movie.id,e)}
-          onClick={(e) => this.rowClick(movie.id,e)}
+          onMouseOver={(e) => this.rowHovered(movie.id, rowID, e)}
+          onMouseOut={(e) => this.rowOut(movie.id, rowID, e)}
+          onClick={(e) => this.rowClick(movie.id, rowID, e)}
         >
           {cellJSX.order}
           {cells}
         </tr>
       );
+
+      if (this.props.provided) {
+        // row.props.ref = this.props.provided.innerRef;
+        // row.props = {...row.props, ...this.props.provided.draggableProps}
+        return (
+          <Draggable key={rowID} draggableId={rowID} index={index}>
+            {(provided) => (
+              React.cloneElement(row, { ref: provided.innerRef, ...provided.draggableProps, ...provided.dragHandleProps })
+            )}
+          </Draggable>
+        );
+      } else {
+        return row;
+      }
     });
 
     this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
@@ -942,14 +974,25 @@ class MynLibTable extends React.Component {
 
   render() {
 
-    // <th onClick={() => this.requestSort('title')}>{this.props.displayColumnName('title')}</th>
-    // <th onClick={() => this.requestSort('year')}>Year</th>
-    // <th onClick={() => this.requestSort('director')}>Director</th>
-    // <th onClick={() => this.requestSort('genre')}>Genre</th>
-    // <th onClick={() => this.requestSort('seen')}>Seen</th>
-    // <th onClick={() => this.requestSort('ratings_user')}>Rating</th>
-    // <th onClick={() => this.requestSort('dateadded')}>Added</th>
-
+    // if this table is part of a hierarchical playlist,
+    // then the rows are meant to be drag-n-droppable (using reacr-beautiful-dnd)
+    // in which case MynLibrary will have given us the 'provided' prop,
+    // so if it has, we add the appropriate bits to make the table body droppable
+    let tBody = null;
+    if (this.props.provided) {
+      tBody = (
+        <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
+          {this.state.sortedRows}
+          {this.props.provided.placeholder}
+        </tbody>
+      );
+    } else {
+      tBody = (
+        <tbody>
+          {this.state.sortedRows}
+        </tbody>
+      );
+    }
 
     return  (<table className="movie-table">
               <thead>
@@ -960,9 +1003,7 @@ class MynLibTable extends React.Component {
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {this.state.sortedRows}
-              </tbody>
+              {tBody}
             </table>)
   }
 }
@@ -1078,7 +1119,7 @@ class MynDetails extends React.Component {
     // if the user has scrolled, we want to show or not show the scroll button
     // depending on whether the row of the details movie is still in view
     if (oldProps.libraryScroll !== this.props.libraryScroll) {
-      if (this.scrollBtn.current && !this.props.isRowVisible(movie.id)) {
+      if (this.scrollBtn.current && !this.props.isRowVisible(rowID)) {
         console.log(movie.title + ' is NOT visible!');
         this.scrollBtn.current.style.display = 'block';
       } else {
@@ -1118,7 +1159,7 @@ class MynDetails extends React.Component {
       );
 
       scrollBtn = (
-        <div id='details-scroll-btn' ref={this.scrollBtn} className='clickable' style={{display: this.props.isRowVisible(movie.id) ? 'none' : 'block'}} onClick={() => this.props.scrollToVideo(movie.id)}>
+        <div id='details-scroll-btn' ref={this.scrollBtn} className='clickable' style={{display: this.props.isRowVisible(this.props.rowID) ? 'none' : 'block'}} onClick={() => this.props.scrollToVideo(this.props.rowID)}>
           Scroll to Row
         </div>
       );
