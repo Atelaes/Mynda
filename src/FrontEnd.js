@@ -463,6 +463,7 @@ class MynLibrary extends React.Component {
 
     this.render = this.render.bind(this);
     this.createCollectionsMap = this.createCollectionsMap.bind(this);
+    this.onDragEnd = this.onDragEnd.bind(this);
     // this.findCollections = this.findCollections.bind(this);
   }
 
@@ -485,6 +486,7 @@ class MynLibrary extends React.Component {
     // create dummy collection of leftover videos, if any
     let leftovers = this.props.movies.filter(v => !this.state.vidsInHierarchy.includes(v.id));
     let uncategorized = {
+      id: 'uncategorized',
       name: '[Uncategorized]',
       videos: leftovers.map(v => {return {id:v.id}})
     }
@@ -556,6 +558,8 @@ class MynLibrary extends React.Component {
         } catch(e) {
           console.log('Error assigning order to videos in collection ' + object.name + ': ' + e.toString());
         }
+
+        // console.log('Creating table for collection: ' + JSON.stringify(object));
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
@@ -563,7 +567,7 @@ class MynLibrary extends React.Component {
           <div className="collection collapsed" key={object.name}>
             <h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1>
             <div className="container hidden">
-              <Droppable droppableId={`table-${object.name}`}>
+              <Droppable droppableId={object.id}>
                 {(provided) => (
                   <MynLibTable
                     movies={movies}
@@ -571,7 +575,7 @@ class MynLibrary extends React.Component {
                     columns={this.props.columns}
                     displayColumnName={this.props.displayColumnName}
                     calcAvgRatings={this.props.calcAvgRatings}
-                    collection={object.name}
+                    collection={object.id}
                     showDetails={this.props.showDetails}
                     provided={provided}
                   />
@@ -596,8 +600,62 @@ class MynLibrary extends React.Component {
     element.parentNode.classList.toggle("collapsed");
   }
 
-  onDragEnd() {
-    console.log('drag ended');
+  onDragEnd(result) {
+    const { destination, source, draggableId } = result;
+    if (destination) {
+      let vidIndex = -1;
+      let video = _.cloneDeep(this.props.movies.filter((v,i) => {
+        if (v.id === draggableId.split('_')[0]) {
+          vidIndex = i;
+          return true;
+        } else {
+          return false;
+        }
+      })[0]);
+      if (!video) {
+        console.error('Could not find video object for dragged row: ' + draggableId);
+        return;
+      }
+      let modifiedCollections = _.cloneDeep(this.props.collections);
+
+      // if the row was dragged to a different collection
+      if (destination.droppableId !== source.droppableId) {
+        console.log(`${draggableId} was dragged to a different collection: ${destination.droppableId} (position ${destination.index})`);
+
+        // delete source collection from this video's collections object
+        delete video.collections[source.droppableId];
+
+        // add destination collection to this video's collections object
+        video.collections[destination.droppableId] = destination.index;
+
+        // delete video from source collection in collections object
+        var srcCol = getCollectionObject(source.droppableId, modifiedCollections, false);
+        let index = srcCol.videos.indexOf(srcCol.videos.filter(v => v.id === video.id)[0]);
+        srcCol.videos.splice(index,1);
+
+        // add video to destination collection in collections object
+        var destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+        destCol.videos.push({id: video.id, order: destination.index + 1}); // + 1 because the 'order' property is 1-indexed, not 0-indexed
+
+      }
+      // if the row was dragged to a different position in the same collection
+      else if (destination.index !== source.index) {
+        console.log(`${draggableId} was dragged to position ${destination.index} within the same collection: ${destination.droppableId}`);
+      }
+
+      console.log('CHANGES MADE:');
+      console.log('Video: ' + JSON.stringify(video.collections));
+      console.log('Source Collection: ' + JSON.stringify(srcCol));
+      console.log('Destination Collection: ' + JSON.stringify(destCol));
+      console.log('Modified Collections: ' + JSON.stringify(modifiedCollections));
+      
+      // here we will need to save the video
+      // but also we need to cascade the order of other videos in the affected collections
+      // i.e. if we moved a video to order #1, we need to move the old #1 to #2, #2 to #3, etc.
+
+      // library.replace("media." + vidIndex, video);
+      // library.replace("collections", modifiedCollections);
+    }
   }
 
   render() {
