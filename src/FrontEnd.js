@@ -349,7 +349,18 @@ class Mynda extends React.Component {
     // something is saved. So here we must take any actions necessary to update
     // the view in real time whenever that happens
     savedPing.saved = (address) => {
-      // console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
+      console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
+
+      // if the collections were changed
+      if (address.includes('collections')) {
+        console.log('collections was edited');
+        this.setState({collections : this.props.library.collections}, () => {
+          // we don't need to update the playlist here, because
+          // if the collections were edited, a video was edited too with
+          // the corresponding change to the video object;
+          // and that will cause the playlist to re-render
+        });
+      }
 
       // if a movie was changed
       if (address.includes('media')) {
@@ -603,6 +614,7 @@ class MynLibrary extends React.Component {
   onDragEnd(result) {
     const { destination, source, draggableId } = result;
     if (destination) {
+      // find video
       let vidIndex = -1;
       let video = _.cloneDeep(this.props.movies.filter((v,i) => {
         if (v.id === draggableId.split('_')[0]) {
@@ -617,30 +629,48 @@ class MynLibrary extends React.Component {
         return;
       }
       let modifiedCollections = _.cloneDeep(this.props.collections);
+      let srcCol, destCol;
+      let newOrder = destination.index + 1;
 
       // if the row was dragged to a different collection
       if (destination.droppableId !== source.droppableId) {
-        console.log(`${draggableId} was dragged to a different collection: ${destination.droppableId} (position ${destination.index})`);
+        console.log(`${draggableId} was dragged to a different collection: ${destination.droppableId} (order ${newOrder})`);
 
-        // delete source collection from this video's collections object
-        delete video.collections[source.droppableId];
+        // remove source collection
+        if (source.droppableId !== 'uncategorized') {
+          // delete source collection from this video's collections object
+          delete video.collections[source.droppableId];
 
-        // add destination collection to this video's collections object
-        video.collections[destination.droppableId] = destination.index;
+          // delete video from source collection in collections object
+          srcCol = getCollectionObject(source.droppableId, modifiedCollections, false);
+          let index = srcCol.videos.indexOf(srcCol.videos.filter(v => v.id === video.id)[0]);
+          srcCol.videos.splice(index,1);
+        }
 
-        // delete video from source collection in collections object
-        var srcCol = getCollectionObject(source.droppableId, modifiedCollections, false);
-        let index = srcCol.videos.indexOf(srcCol.videos.filter(v => v.id === video.id)[0]);
-        srcCol.videos.splice(index,1);
+        // add destination collection
+        if (destination.droppableId !== 'uncategorized') {
+          // add destination collection to this video's collections object
+          video.collections[destination.droppableId] = newOrder;
 
-        // add video to destination collection in collections object
-        var destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
-        destCol.videos.push({id: video.id, order: destination.index + 1}); // + 1 because the 'order' property is 1-indexed, not 0-indexed
+          // add video to destination collection in collections object
+          destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+          destCol.videos.push({id: video.id, order: newOrder}); // + 1 because the 'order' property is 1-indexed, not 0-indexed
+        }
 
       }
       // if the row was dragged to a different position in the same collection
       else if (destination.index !== source.index) {
-        console.log(`${draggableId} was dragged to position ${destination.index} within the same collection: ${destination.droppableId}`);
+        console.log(`${draggableId} was dragged to order ${newOrder} within the same collection: ${destination.droppableId}`);
+
+        if (destination.droppableId !== 'uncategorized') {
+          // change collection order in video's collections object
+          video.collections[destination.droppableId] = newOrder;
+
+          // change collection order in the master collections object
+          destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+          let index = destCol.videos.indexOf(destCol.videos.filter(v => v.id === video.id)[0]);
+          destCol.videos[index].order = newOrder;
+        }
       }
 
       console.log('CHANGES MADE:');
@@ -648,13 +678,13 @@ class MynLibrary extends React.Component {
       console.log('Source Collection: ' + JSON.stringify(srcCol));
       console.log('Destination Collection: ' + JSON.stringify(destCol));
       console.log('Modified Collections: ' + JSON.stringify(modifiedCollections));
-      
-      // here we will need to save the video
-      // but also we need to cascade the order of other videos in the affected collections
+
+      // before saving, we need to cascade the order of other videos in the affected collections
       // i.e. if we moved a video to order #1, we need to move the old #1 to #2, #2 to #3, etc.
 
-      // library.replace("media." + vidIndex, video);
-      // library.replace("collections", modifiedCollections);
+      // save the updated video and collections object
+      library.replace("media." + vidIndex, video);
+      library.replace("collections", modifiedCollections);
     }
   }
 
