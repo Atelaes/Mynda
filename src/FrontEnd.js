@@ -468,6 +468,8 @@ class MynLibrary extends React.Component {
     super(props)
 
     this.state = {
+      movies: _.cloneDeep(props.movies),
+      collections: _.cloneDeep(props.collections),
       hierarchy : null,
       vidsInHierarchy : []
     }
@@ -479,23 +481,26 @@ class MynLibrary extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    // if (oldProps.movies !== this.props.movies) {
-    //   // erase the top-level 'order' property added on any previous render,
-    //   // so that on this update we can add them only if we need them
-    //   this.props.movies.map(movie => {
-    //     if (movie.order !== undefined) {
-    //       movie.order = null
-    //     }
-    //   });
-    // }
+    if (oldProps.movies !== this.props.movies || oldProps.collections !== this.props.collections) {
+      this.setState({movies:_.cloneDeep(this.props.movies), collections:_.cloneDeep(this.props.collections)});
+    }
+  }
+
+  componentDidMount() {
+    // console.log(this.props.movies);
+    //
+    // this.setState({movies:this.props.movies},() => {
+    //   console.log(this.state.movies);
+    // });
+    //
   }
 
   createCollectionsMap() {
     // console.log("Creating new collections map");
-    this.state.hierarchy = this.props.collections.map(collection => (this.findCollections(collection)));
+    this.state.hierarchy = this.state.collections.map(collection => (this.findCollections(collection)));
 
     // create dummy collection of leftover videos, if any
-    let leftovers = this.props.movies.filter(v => !this.state.vidsInHierarchy.includes(v.id));
+    let leftovers = this.state.movies.filter(v => !this.state.vidsInHierarchy.includes(v.id));
     let uncategorized = {
       id: 'uncategorized',
       name: '[Uncategorized]',
@@ -534,11 +539,11 @@ class MynLibrary extends React.Component {
       try {
         // if this collection has a video in our playlist
         for (let i=0; i<object.videos.length; i++) {
-          if (this.props.movies.filter(movie => (object.videos[i].id === movie.id)).length > 0) {
+          if (this.state.movies.filter(movie => (object.videos[i].id === movie.id)).length > 0) {
             // add video to list of videos for this collection
             videos.push(object.videos[i]);
             // also add its id to the vidsInHierarchy list
-            // (later we'll compare this to this.props.movies to see what leftovers we have;
+            // (later we'll compare this to this.state.movies to see what leftovers we have;
             // i.e. videos in the playlist that are not part of any collections)
             if (object.name !== '[Uncategorized]') { // we don't want to add the leftovers themselves to vidsInHierarchy, or else they won't be displayed
               this.state.vidsInHierarchy.push(object.videos[i].id);
@@ -554,7 +559,7 @@ class MynLibrary extends React.Component {
       // in this collection, so wrap them in JSX and return them upward
       if (vidsWereFound) {
         // find only the movie objects (from the playlist) that match the videos found in this collection
-        let movies = this.props.movies.filter(movie => (videos.filter(collectionVideo => (collectionVideo.id === movie.id)).length > 0))
+        let movies = this.state.movies.filter(movie => (videos.filter(collectionVideo => (collectionVideo.id === movie.id)).length > 0))
         // console.log('movies: ' + JSON.stringify(movies) + '\nVideos from collection: ' + JSON.stringify(videos));
         try {
           // add the 'order' property to each movie for this collection
@@ -582,6 +587,7 @@ class MynLibrary extends React.Component {
                 {(provided) => (
                   <MynLibTable
                     movies={movies}
+                    view={this.props.view}
                     initialSort="order"
                     columns={this.props.columns}
                     displayColumnName={this.props.displayColumnName}
@@ -612,11 +618,60 @@ class MynLibrary extends React.Component {
   }
 
   onDragEnd(result) {
+    console.log(JSON.stringify(result));
     const { destination, source, draggableId } = result;
     if (destination) {
+      // [this doesn't work, it screws up react-beautiful-dnd]:
+      // // first, manually manipulate the DOM to make the drag persist
+      // // until the re-render kicks in on save to make the change permanent
+      // let row, srcTBody, destTBody, newYoungerSister;
+      // try {
+      //   row = document.getElementsByClassName(draggableId)[0];
+      //   srcTBody = findNearestOfClass(row,'movie-table').getElementsByTagName('tbody')[0];
+      //   destTBody = document.getElementById('table-' + destination.droppableId).getElementsByTagName('tbody')[0];
+      //   newYoungerSister = destTBody.children[destination.index];
+      //
+      //   destTBody.insertBefore(row, newYoungerSister);
+      //   srcTBody.removeChild(row);
+      // } catch(err) {
+      //   console.error('Unable to manually re-position element prior to re-render (for ' + draggableId + '): ' + err);
+      // }
+
+      // a deep copy of the whole collections object for modification, which we'll save when we're done
+      let modifiedCollections = _.cloneDeep(this.state.collections);
+
+      // source collection and destination collection
+      let srcCol, destCol;
+      if (destination.droppableId !== 'uncategorized') {
+        destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+      }
+
+      // set the new order for the dragged video by adding 1 to the order of the
+      // video it is being dropped immediately after
+      let newOrder;
+      if (destination.droppableId !== 'uncategorized') {
+        destCol.videos.sort((a,b) => a.order > b.order ? 1 : (a.order == b.order ? 0 : -1));
+        console.log(_.cloneDeep(destCol.videos));
+        console.log('source index: ' + source.index);
+        console.log('destination index: ' + destination.index);
+        let newIndex = destination.index;
+        // for the special case that we're dropping the video later in the same collection, the index must be adjusted
+        if (destination.droppableId === source.droppableId) {
+          newIndex = source.index < destination.index ? destination.index + 1 : destination.index;
+        }
+        console.log('new index: ' + newIndex);
+        if (newIndex > 0) {
+          newOrder = destCol.videos[newIndex - 1].order + 1;
+        } else {
+          newOrder = 1;
+        }
+      }
+
+      // now perform the actual changes to the video and collections objects
+
       // find video
       let vidIndex = -1;
-      let video = _.cloneDeep(this.props.movies.filter((v,i) => {
+      let video = _.cloneDeep(this.state.movies.filter((v,i) => {
         if (v.id === draggableId.split('_')[0]) {
           vidIndex = i;
           return true;
@@ -628,9 +683,6 @@ class MynLibrary extends React.Component {
         console.error('Could not find video object for dragged row: ' + draggableId);
         return;
       }
-      let modifiedCollections = _.cloneDeep(this.props.collections);
-      let srcCol, destCol;
-      let newOrder = destination.index + 1;
 
       // if the row was dragged to a different collection
       if (destination.droppableId !== source.droppableId) {
@@ -648,13 +700,13 @@ class MynLibrary extends React.Component {
         }
 
         // add destination collection
-        if (destination.droppableId !== 'uncategorized') {
+        if (destCol && destination.droppableId !== 'uncategorized') {
           // add destination collection to this video's collections object
           video.collections[destination.droppableId] = newOrder;
 
           // add video to destination collection in collections object
-          destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
-          destCol.videos.push({id: video.id, order: newOrder}); // + 1 because the 'order' property is 1-indexed, not 0-indexed
+          // destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+          destCol.videos.push({id: video.id, order: newOrder});
         }
 
       }
@@ -662,15 +714,20 @@ class MynLibrary extends React.Component {
       else if (destination.index !== source.index) {
         console.log(`${draggableId} was dragged to order ${newOrder} within the same collection: ${destination.droppableId}`);
 
-        if (destination.droppableId !== 'uncategorized') {
+
+
+        if (destCol && destination.droppableId !== 'uncategorized') {
           // change collection order in video's collections object
           video.collections[destination.droppableId] = newOrder;
 
           // change collection order in the master collections object
-          destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+          // destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
           let index = destCol.videos.indexOf(destCol.videos.filter(v => v.id === video.id)[0]);
           destCol.videos[index].order = newOrder;
         }
+      } else {
+        // nothing was changed, so we don't need to bother saving
+        return;
       }
 
       console.log('CHANGES MADE:');
@@ -681,6 +738,12 @@ class MynLibrary extends React.Component {
 
       // before saving, we need to cascade the order of other videos in the affected collections
       // i.e. if we moved a video to order #1, we need to move the old #1 to #2, #2 to #3, etc.
+
+      // prior to saving, we'll update the state variables;
+      // saving will cause a re-render, but it's slow, so we want
+      // to force one before then
+      this.state.movies.splice(vidIndex,1,video);
+      this.setState({movies:this.state.movies,collections:modifiedCollections});
 
       // save the updated video and collections object
       library.replace("media." + vidIndex, video);
@@ -710,7 +773,7 @@ class MynLibrary extends React.Component {
 
       content = (
         <MynLibTable
-          movies={this.props.movies}
+          movies={this.state.movies}
           view={this.props.view}
           columns={this.props.columns}
           displayColumnName={this.props.displayColumnName}
@@ -776,7 +839,7 @@ class MynLibTable extends React.Component {
 
     // first remove the 'locked' class from any currently locked row
     if (this.state.lockedRow !== null) {
-      document.getElementsByClassName(this.state.lockedRow)[0].classList.remove('locked');
+      document.getElementById(this.state.lockedRow).classList.remove('locked');
     }
 
     // if this row is already locked, unlock it
@@ -871,13 +934,6 @@ class MynLibTable extends React.Component {
      ratings_imdb: (a, b) => {let a_r = a.ratings.imdb ? a.ratings.imdb : -1; let b_r = b.ratings.imdb ? b.ratings.imdb : -1; return a_r > b_r},
      ratings_mc: (a, b) => {let a_r = a.ratings.mc ? a.ratings.mc : -1; let b_r = b.ratings.mc ? b.ratings.mc : -1; return a_r > b_r},
      ratings_avg: (a, b) => this.props.calcAvgRatings(a.ratings,'sort') > this.props.calcAvgRatings(b.ratings,'sort'),
-     // ratings_avg: (a, b) => {
-     //   let a_avg = (a.ratings.rt + (a.ratings.imdb*10) + a.ratings.mc)/3;
-     //   if (isNaN(a_avg)) a_avg = -1;
-     //   let b_avg = (b.ratings.rt + (b.ratings.imdb*10) + b.ratings.mc)/3;
-     //   if (isNaN(b_avg)) b_avg = -1;
-     //   return a_avg > b_avg;
-     // },
      boxoffice: (a, b) => a.boxoffice > b.boxoffice,
      rated: (a, b) => ratedOrder[a.rated.toUpperCase()] > ratedOrder[b.rated.toUpperCase()],
      country: (a, b) => a.country > b.country,
@@ -944,6 +1000,7 @@ class MynLibTable extends React.Component {
       let row = (
         <tr
           className={"movie-row " + rowID}
+          id={rowID}
           key={movie.id}
           onMouseOver={(e) => this.rowHovered(movie.id, rowID, e)}
           onMouseOut={(e) => this.rowOut(movie.id, rowID, e)}
@@ -1063,6 +1120,13 @@ class MynLibTable extends React.Component {
   render() {
 
     // if this table is part of a hierarchical playlist,
+    // we'll give it an id corresponding to the collection it is within
+    let tableID = '';
+    if (this.props.view === 'hierarchical' && this.props.collection) {
+      tableID = 'table-' + this.props.collection;
+    }
+
+    // if this table is part of a hierarchical playlist,
     // then the rows are meant to be drag-n-droppable (using reacr-beautiful-dnd)
     // in which case MynLibrary will have given us the 'provided' prop,
     // so if it has, we add the appropriate bits to make the table body droppable
@@ -1082,7 +1146,7 @@ class MynLibTable extends React.Component {
       );
     }
 
-    return  (<table className="movie-table">
+    return  (<table className="movie-table" id={tableID}>
               <thead>
                 <tr id="main-table-header-row">
                   <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
@@ -1199,7 +1263,7 @@ class MynDetails extends React.Component {
         try {
           document.getElementById('detail-description').classList.add('hide');
         } catch(err) {
-          console.log(err);
+          console.log('Error: could not find detail description: ' + err);
         }
       }
     }
