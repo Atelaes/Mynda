@@ -481,8 +481,13 @@ class MynLibrary extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    if (oldProps.movies !== this.props.movies || oldProps.collections !== this.props.collections) {
-      this.setState({movies:_.cloneDeep(this.props.movies), collections:_.cloneDeep(this.props.collections)});
+    if (!_.isEqual(oldProps.movies,this.props.movies)) {
+      // console.log('movies was changed!');
+      this.setState({movies:_.cloneDeep(this.props.movies)});
+    }
+    if (!_.isEqual(oldProps.collections,this.props.collections)) {
+      // console.log('collections was changed!');
+      this.setState({collections:_.cloneDeep(this.props.collections)});
     }
   }
 
@@ -651,15 +656,15 @@ class MynLibrary extends React.Component {
       let newOrder;
       if (destination.droppableId !== 'uncategorized') {
         destCol.videos.sort((a,b) => a.order > b.order ? 1 : (a.order == b.order ? 0 : -1));
-        console.log(_.cloneDeep(destCol.videos));
-        console.log('source index: ' + source.index);
-        console.log('destination index: ' + destination.index);
+        // console.log(_.cloneDeep(destCol.videos));
+        // console.log('source index: ' + source.index);
+        // console.log('destination index: ' + destination.index);
         let newIndex = destination.index;
         // for the special case that we're dropping the video later in the same collection, the index must be adjusted
         if (destination.droppableId === source.droppableId) {
           newIndex = source.index < destination.index ? destination.index + 1 : destination.index;
         }
-        console.log('new index: ' + newIndex);
+        // console.log('new index: ' + newIndex);
         if (newIndex > 0) {
           newOrder = destCol.videos[newIndex - 1].order + 1;
         } else {
@@ -684,8 +689,8 @@ class MynLibrary extends React.Component {
         return;
       }
 
-      // if the row was dragged to a different collection
-      if (destination.droppableId !== source.droppableId) {
+      // if the row was dragged to a different collection (and that collection doesn't already contain this video)
+      if (destination.droppableId !== source.droppableId && destCol.videos.filter(v => v.id === video.id).length === 0) {
         console.log(`${draggableId} was dragged to a different collection: ${destination.droppableId} (order ${newOrder})`);
 
         // remove source collection
@@ -711,7 +716,7 @@ class MynLibrary extends React.Component {
 
       }
       // if the row was dragged to a different position in the same collection
-      else if (destination.index !== source.index) {
+      else if (destination.droppableId === source.droppableId && destination.index !== source.index) {
         console.log(`${draggableId} was dragged to order ${newOrder} within the same collection: ${destination.droppableId}`);
 
 
@@ -2506,7 +2511,10 @@ class MynEditor extends MynOpenablePane {
   componentDidUpdate(oldProps) {
     if (!_.isEqual(oldProps.video,this.props.video)) {
       // console.log('MynEditor props.video has changed!!!');
-      this.setState({video: _.cloneDeep(this.props.video)});
+      this.setState({
+        video: _.cloneDeep(this.props.video),
+        collections : _.cloneDeep(this.props.collections)
+      });
       // when a new movie is loaded, update the saveHash
       // (which is used for testing whether or not anything has changed since last save)
       this.setState({saveHash: hashObject(this.props.video)});
