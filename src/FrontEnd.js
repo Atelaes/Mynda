@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
+const Collections = require('./Collections.js');
+const Collection = require('./Collection.js');
 const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
@@ -625,134 +627,72 @@ class MynLibrary extends React.Component {
   onDragEnd(result) {
     console.log(JSON.stringify(result));
     const { destination, source, draggableId } = result;
+
+    // if anything moved at all
     if (destination) {
-      // [this doesn't work, it screws up react-beautiful-dnd]:
-      // // first, manually manipulate the DOM to make the drag persist
-      // // until the re-render kicks in on save to make the change permanent
-      // let row, srcTBody, destTBody, newYoungerSister;
-      // try {
-      //   row = document.getElementsByClassName(draggableId)[0];
-      //   srcTBody = findNearestOfClass(row,'movie-table').getElementsByTagName('tbody')[0];
-      //   destTBody = document.getElementById('table-' + destination.droppableId).getElementsByTagName('tbody')[0];
-      //   newYoungerSister = destTBody.children[destination.index];
-      //
-      //   destTBody.insertBefore(row, newYoungerSister);
-      //   srcTBody.removeChild(row);
-      // } catch(err) {
-      //   console.error('Unable to manually re-position element prior to re-render (for ' + draggableId + '): ' + err);
-      // }
 
-      // a deep copy of the whole collections object for modification, which we'll save when we're done
-      let modifiedCollections = _.cloneDeep(this.state.collections);
+      // get video id
+      let videoID = draggableId.split('_')[0];
+      let newOrder, newIndex;
 
-      // source collection and destination collection
+      // make a deep copy of the whole collections object for modification, which we'll save when we're done
+      let colsCopy = new Collections(_.cloneDeep(this.state.collections));
+
+      // get source collection and destination collection
       let srcCol, destCol;
       if (destination.droppableId !== 'uncategorized') {
-        destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
+        destCol = colsCopy.get(destination.droppableId);
+      }
+      if (source.droppableId !== 'uncategorized') {
+        srcCol = colsCopy.get(source.droppableId);
       }
 
-      // set the new order for the dragged video by adding 1 to the order of the
-      // video it is being dropped immediately after
-      let newOrder;
-      if (destination.droppableId !== 'uncategorized') {
-        destCol.videos.sort((a,b) => a.order > b.order ? 1 : (a.order == b.order ? 0 : -1));
-        // console.log(_.cloneDeep(destCol.videos));
-        // console.log('source index: ' + source.index);
-        // console.log('destination index: ' + destination.index);
-        let newIndex = destination.index;
-        // for the special case that we're dropping the video later in the same collection, the index must be adjusted
-        if (destination.droppableId === source.droppableId) {
-          newIndex = source.index < destination.index ? destination.index + 1 : destination.index;
+      // only do anything if
+      if (
+        // the video was moved to a different collection that doesn't already contain it
+        (destination.droppableId !== source.droppableId && !destCol.containsVideo(videoID))
+        ||
+        // or the video was moved to a different position within the same collection
+        (destination.index !== source.index)
+      ) {
+
+        // remove video from original position
+        if (srcCol) {
+          srcCol.removeVideo(videoID);
         }
-        // console.log('new index: ' + newIndex);
-        if (newIndex > 0) {
-          newOrder = destCol.videos[newIndex - 1].order + 1;
-        } else {
-          newOrder = 1;
+
+        // add video to new position
+        if (destCol) {
+
+          // first we must find the proper index where the video was dropped
+          newIndex = destination.index;
+          if (destination.droppableId === source.droppableId && source.index < destination.index) {
+            // for the special case that we're dropping the video later in the same collection, the index must be adjusted
+            newIndex = destination.index + 1;
+          }
+
+          // and then create an order based on the order of the previous video
+          if (newIndex > 0) {
+            newOrder = destCol.videos[newIndex - 1].order + 1;
+          } else {
+            newOrder = 1;
+          }
+
+          // add the video
+          destCol.addVideo(videoID, newOrder, newIndex);
         }
+
+
+        // prior to saving, we'll update the state variables;
+        // saving will cause a re-render, but it's slow, so we want
+        // to force one before then
+        // this.state.movies.splice(vidIndex,1,video);
+        this.setState({movies:this.state.movies,collections:colsCopy.getAll()});
+
+        // save the updated video and collections object
+        // library.replace("media." + vidIndex, video);
+        library.replace("collections", colsCopy.getAll());
       }
-
-      // now perform the actual changes to the video and collections objects
-
-      // find video
-      let vidIndex = -1;
-      let video = _.cloneDeep(this.state.movies.filter((v,i) => {
-        if (v.id === draggableId.split('_')[0]) {
-          vidIndex = i;
-          return true;
-        } else {
-          return false;
-        }
-      })[0]);
-      if (!video) {
-        console.error('Could not find video object for dragged row: ' + draggableId);
-        return;
-      }
-
-      // if the row was dragged to a different collection (and that collection doesn't already contain this video)
-      if (destination.droppableId !== source.droppableId && destCol.videos.filter(v => v.id === video.id).length === 0) {
-        console.log(`${draggableId} was dragged to a different collection: ${destination.droppableId} (order ${newOrder})`);
-
-        // remove source collection
-        if (source.droppableId !== 'uncategorized') {
-          // delete source collection from this video's collections object
-          delete video.collections[source.droppableId];
-
-          // delete video from source collection in collections object
-          srcCol = getCollectionObject(source.droppableId, modifiedCollections, false);
-          let index = srcCol.videos.indexOf(srcCol.videos.filter(v => v.id === video.id)[0]);
-          srcCol.videos.splice(index,1);
-        }
-
-        // add destination collection
-        if (destCol && destination.droppableId !== 'uncategorized') {
-          // add destination collection to this video's collections object
-          video.collections[destination.droppableId] = newOrder;
-
-          // add video to destination collection in collections object
-          // destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
-          destCol.videos.push({id: video.id, order: newOrder});
-        }
-
-      }
-      // if the row was dragged to a different position in the same collection
-      else if (destination.droppableId === source.droppableId && destination.index !== source.index) {
-        console.log(`${draggableId} was dragged to order ${newOrder} within the same collection: ${destination.droppableId}`);
-
-
-
-        if (destCol && destination.droppableId !== 'uncategorized') {
-          // change collection order in video's collections object
-          video.collections[destination.droppableId] = newOrder;
-
-          // change collection order in the master collections object
-          // destCol = getCollectionObject(destination.droppableId, modifiedCollections, false);
-          let index = destCol.videos.indexOf(destCol.videos.filter(v => v.id === video.id)[0]);
-          destCol.videos[index].order = newOrder;
-        }
-      } else {
-        // nothing was changed, so we don't need to bother saving
-        return;
-      }
-
-      console.log('CHANGES MADE:');
-      console.log('Video: ' + JSON.stringify(video.collections));
-      console.log('Source Collection: ' + JSON.stringify(srcCol));
-      console.log('Destination Collection: ' + JSON.stringify(destCol));
-      console.log('Modified Collections: ' + JSON.stringify(modifiedCollections));
-
-      // before saving, we need to cascade the order of other videos in the affected collections
-      // i.e. if we moved a video to order #1, we need to move the old #1 to #2, #2 to #3, etc.
-
-      // prior to saving, we'll update the state variables;
-      // saving will cause a re-render, but it's slow, so we want
-      // to force one before then
-      this.state.movies.splice(vidIndex,1,video);
-      this.setState({movies:this.state.movies,collections:modifiedCollections});
-
-      // save the updated video and collections object
-      library.replace("media." + vidIndex, video);
-      library.replace("collections", modifiedCollections);
     }
   }
 
