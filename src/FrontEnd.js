@@ -2256,14 +2256,19 @@ class MynEditor extends MynOpenablePane {
     super(props)
 
     this._isMounted = false;
+    let collections = props.collections ? new Collections(_.cloneDeep(props.collections)) : null;
+    let vidCols = props.video && collections ? collections.getVideoCollections(props.video.id) : {};
+    // let videoWithCols = {...props.video, ...vidCols};
+    let videoWithCols = props.video;
+    if (videoWithCols) videoWithCols.collections = vidCols;
 
     this.state = {
       paneID: 'editor-pane',
-      video: _.cloneDeep(props.video),
-      collections: _.cloneDeep(props.collections),
+      video: _.cloneDeep(videoWithCols), // add collections to video object during editing, so we can use the validation machinery (and the hash, to see if the user has made a change)
+      collections: collections,
       placeholderImage: "../images/qmark.png",
       valid: {},
-      saveHash: hashObject(props.video)
+      saveHash: hashObject(videoWithCols)
     }
 
     this.render = this.render.bind(this);
@@ -2302,25 +2307,31 @@ class MynEditor extends MynOpenablePane {
     this._isMounted && this.setState({video : update});
 
     // in addition to updating the video object, in the special case that the collections were changed,
-    // we need to update the master collections object in library.settings
+    // we need to update the master collections object in the library
     if (args[0] == "collections" || args[0].collections) { // collections was updated
       // console.log("args[0] == " + JSON.stringify(args[0]));
       const collectionUpdate = args[1] || args[0].collections;
       // console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
       // console.log("original collections == " + JSON.stringify(this.state.video.collections));
 
-      let collectionsCopy = _.cloneDeep(this.state.collections);
+      let collectionsCopy = new Collections(this.state.collections.getAll(true)); // pass 'true' to get a deep copy
 
       // add video to any new collections
       const addedIDs = Object.keys(collectionUpdate).filter((key) => !Object.keys(this.state.video.collections).includes(key));
       // console.log(`addedIDs == ${addedIDs}`);
       for (const id of addedIDs) {
-        let collection = getCollectionObject(id, collectionsCopy, false);
+        // let collection = getCollectionObject(id, collectionsCopy, false);
+        // if (collection) {
+        //   collection.videos.push({
+        //     id: this.state.video.id,
+        //     order: collectionUpdate[id]
+        //   });
+        // } else {
+        //   console.error(`Unable to add ${this.state.video.title} to collection ${id}. Unable to retrieve collection object from that id.`);
+        // }
+        let collection = collectionsCopy.get(id);
         if (collection) {
-          collection.videos.push({
-            id: this.state.video.id,
-            order: collectionUpdate[id]
-          });
+          collection.addVideo(this.state.video.id,collectionUpdate[id]);
         } else {
           console.error(`Unable to add ${this.state.video.title} to collection ${id}. Unable to retrieve collection object from that id.`);
         }
@@ -2329,9 +2340,11 @@ class MynEditor extends MynOpenablePane {
       // delete video from any deleted collections
       Object.keys(this.state.video.collections).forEach((id) => {
         if (!Object.keys(collectionUpdate).includes(id)) {
-          let collection = getCollectionObject(id, collectionsCopy, false);
+          // let collection = getCollectionObject(id, collectionsCopy, false);
+          let collection = collectionsCopy.get(id);
           if (collection) {
-            collection.videos = collection.videos.filter(video => video.id !== this.state.video.id);
+            collection.removeVideo(this.state.video.id);
+            // collection.videos = collection.videos.filter(video => video.id !== this.state.video.id);
           } else {
             console.error(`Unable to remove ${this.state.video.title} from collection ${id}. Unable to retrieve collection object from that id.`);
           }
@@ -2341,11 +2354,12 @@ class MynEditor extends MynOpenablePane {
       // update any changes to the order number of this video in its collections
       const ids = Object.keys(collectionUpdate);
       for (const id of ids) {
-        let collection = getCollectionObject(id, collectionsCopy, false);
+        let collection = collectionsCopy.get(id);//getCollectionObject(id, collectionsCopy, false);
         if (collection) {
           try {
-            let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
-            collection.videos[index].order = collectionUpdate[id];
+            // let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
+            // collection.videos[index].order = collectionUpdate[id];
+            collection.updateOrder(id, collectionUpdate[id]);
           } catch(err) {
             console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Video not found in that collection.`);
           }
@@ -2363,12 +2377,14 @@ class MynEditor extends MynOpenablePane {
   revertChanges() {
     // console.log('reverting...');
     // event.preventDefault();
-    this._isMounted && this.setState(
-      {
-        video : _.cloneDeep(this.props.video),
-        collections : _.cloneDeep(this.props.collections)
-      }
-    );
+    // this._isMounted && this.setState(
+    //   {
+    //     video : _.cloneDeep(this.props.video),
+    //     collections : _.cloneDeep(this.props.collections)
+    //   }
+    // );
+    this.componentDidUpdate({video:null});
+
   }
 
   saveChanges(event) {
@@ -2422,12 +2438,16 @@ class MynEditor extends MynOpenablePane {
     // console.log('saving...');
 
     // first, save the video data in library.media
+    // (delete the temporary collections information from the video,
+    // we don't want to save this)
+    let temp = _.cloneDeep(this.state.video);
+    // delete temp.collections;
     let index = library.media.findIndex((video) => video.id === this.props.video.id);
-    library.replace("media." + index, this.state.video);
+    library.replace("media." + index, temp);
 
     // then, if any collections were changed, save the collections object in library.collections
-    if (!_.isEqual(this.props.collections,this.state.collections)) {
-      library.replace("collections", this.state.collections);
+    if (!_.isEqual(this.props.collections,this.state.collections.getAll())) {
+      library.replace("collections", this.state.collections.getAll());
     }
 
     // then, add any new tags to the library.settings.used.tags list so they'll be available
@@ -2445,19 +2465,30 @@ class MynEditor extends MynOpenablePane {
       library.replace("settings.used.genres",genres);
     }
 
+    // save hash so that later we can check if the video has changed,
+    // in order to ask the user if they want to save before exiting
     this.setState({saveHash: hashObject(this.state.video) });
+
   }
 
   componentDidUpdate(oldProps) {
     if (!_.isEqual(oldProps.video,this.props.video)) {
       // console.log('MynEditor props.video has changed!!!');
+
+      let collections = this.props.collections ? new Collections(_.cloneDeep(this.props.collections)) : null;
+      let vidCols = this.props.video && collections ? collections.getVideoCollections(this.props.video.id) : {};
+      // let videoWithCols = {...this.props.video, ...vidCols};
+      let videoWithCols = this.props.video;
+      if (videoWithCols) videoWithCols.collections = vidCols;
+
       this.setState({
-        video: _.cloneDeep(this.props.video),
-        collections : _.cloneDeep(this.props.collections)
+        video: _.cloneDeep(videoWithCols),
+        collections : collections
       });
+
       // when a new movie is loaded, update the saveHash
       // (which is used for testing whether or not anything has changed since last save)
-      this.setState({saveHash: hashObject(this.props.video)});
+      this.setState({saveHash: hashObject(videoWithCols)});
     }
   }
 
@@ -2486,7 +2517,7 @@ class MynEditor extends MynOpenablePane {
         <MynEditorEdit
           show={this.props.show}
           video={this.state.video}
-          collections={this.state.collections}
+          collections={this.state.collections ? this.state.collections.c : []}
           settings={this.props.settings}
           handleChange={this.handleChange}
           revertChanges={this.revertChanges}

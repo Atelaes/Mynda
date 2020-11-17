@@ -4,10 +4,11 @@ const electron = require('electron');
 // const fs = require('fs');
 const _ = require('lodash');
 // const { ipcRenderer } = require('electron');
+// alert(JSON.stringify(Collection));
 
 class Collections {
   constructor(collections) {
-    this.c = collections
+    this.c = collections;
   }
 
   getAll(copy) {
@@ -44,6 +45,26 @@ class Collections {
 
     // return the collection
     return new Collection(result);
+  }
+
+  // get all collections that the video (of id 'id') is a member of;
+  // returns an object of key/value pairs where the key is the id of a collection
+  // that the given video participates in, and the value is the order of that video
+  // in that collection
+  getVideoCollections(id) {
+    let vidCollections = {};
+    this.c.map(c => {
+      let col = new Collection(c);
+      if (!col.isTerminal) {
+        let children = new Collections(col.getChildren());
+        let positiveChildren = children ? children.getVideoCollections(id) : {};
+
+        vidCollections = {...vidCollections, ...positiveChildren};
+      } else if (col.containsVideo(id)) {
+        vidCollections[col.id] = col.getVidOrder(id);
+      }
+    });
+    return vidCollections;
   }
 
 

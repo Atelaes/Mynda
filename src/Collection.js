@@ -8,9 +8,10 @@ const _ = require('lodash');
 class Collection {
   constructor(collection) {
     this.c = collection;
-    this.videos = collection.videos
-    this.name = collection.name
-    this.id = collection.id
+    this.videos = collection.videos;
+    this.collections = collection.collections;// ? new Collections(collection.collections) : undefined;
+    this.name = collection.name;
+    this.id = collection.id;
     this.isTerminal = this.videos ? true : false;
 
     this._sortVidsByOrder();
@@ -19,7 +20,11 @@ class Collection {
   getChildren() {
     if (this.isTerminal) return;
 
-    return new Collections(this.c.collections);
+    if (this.collections) {
+      return this.collections;
+    } else {
+      return null;
+    }
   }
 
   containsVideo(id) {
@@ -27,6 +32,33 @@ class Collection {
 
     return this.videos.filter(v => v.id === id).length > 0;
   }
+
+  getVidOrder(id) {
+    if (!this.isTerminal) return;
+
+    try {
+      return this.videos.filter(v => v.id === id)[0].order;
+    } catch(err) {
+      console.log(`Collections.getVidOrder failed on ${id}: ${err}`);
+      return;
+    }
+  }
+
+  // id is the video id
+  updateOrder(id, order) {
+    if (!this.isTerminal) return;
+
+    try {
+      // this.videos.filter(v => v.id === id)[0].order = order;
+      if (this.removeVideo(id)) {
+        return this.addVideo(id, order);
+      }
+    } catch(err) {
+      console.log(`Collections.updateOrder failed on ${id}: ${err}`);
+      return;
+    }
+  }
+
 
   // index being optional;
   // in the case of a user drag-n-drop action, we want to respect the index that
@@ -73,6 +105,7 @@ class Collection {
       }
     }
 
+    return true;
   }
 
   removeVideo(id) {
