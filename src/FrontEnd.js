@@ -473,12 +473,14 @@ class MynLibrary extends React.Component {
       movies: _.cloneDeep(props.movies),
       collections: _.cloneDeep(props.collections),
       hierarchy : null,
-      vidsInHierarchy : []
+      vidsInHierarchy : [],
+      sortReport : {}
     }
 
     this.render = this.render.bind(this);
     this.createCollectionsMap = this.createCollectionsMap.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
+    this.reportSort = this.reportSort.bind(this);
     // this.findCollections = this.findCollections.bind(this);
   }
 
@@ -599,8 +601,9 @@ class MynLibrary extends React.Component {
                     columns={this.props.columns}
                     displayColumnName={this.props.displayColumnName}
                     calcAvgRatings={this.props.calcAvgRatings}
-                    collection={object.id}
+                    collectionID={object.id}
                     showDetails={this.props.showDetails}
+                    reportSort={this.reportSort}
                     provided={provided}
                   />
                 )}
@@ -624,12 +627,35 @@ class MynLibrary extends React.Component {
     element.parentNode.classList.toggle("collapsed");
   }
 
+  // when an instance of MynTable is sorted, it reports back here
+  // so that we can keep track. The only reason we need to do that
+  // is because we only allow drag-n-drop to work if a table is sorted by order
+  reportSort(id,key,ascending) {
+    this.state.sortReport[id] = {key:key,ascending:ascending};
+    // console.log(JSON.stringify(this.state.sortReport));
+  }
+
   onDragEnd(result) {
     console.log(JSON.stringify(result));
     const { destination, source, draggableId } = result;
 
     // if anything moved at all
     if (destination) {
+      // first, if the destination table isn't sorted by order,
+      // do nothing, and inform the user
+      try {
+        // console.log('Table ' + destination.droppableId + ' sort report----------');
+        // console.log('key: ' + this.state.sortReport[destination.droppableId].key);
+        // console.log('asc: ' + this.state.sortReport[destination.droppableId].ascending);
+        if (this.state.sortReport[destination.droppableId].key !== 'order') {
+          // ultimately of course we'll want something less invasive than an alert here
+          alert('Sort by Order to drag n\' drop');
+          return;
+        }
+      } catch(err) {
+        console.error('Error getting sort report for table ' + destination.droppableId);
+      }
+
 
       // get video id
       let videoID = draggableId.split('_')[0];
@@ -896,7 +922,7 @@ class MynLibTable extends React.Component {
       // this will ensure that we have a unique id for the row
       // even if we're in a hierarchical playlist in which a video can appear
       // in more than one table (in different collections)
-      let rowID = movie.id + (this.props.collection ? `_${this.props.collection}` : '');
+      let rowID = movie.id + (this.props.collectionID ? `_${this.props.collectionID}` : '');
 
       let displaydate = (date) => {
         let result;
@@ -971,7 +997,13 @@ class MynLibTable extends React.Component {
       }
     });
 
+    // set the sort state in state
     this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
+
+    // report the sort state to MynLibrary
+    if (this.props.reportSort) {
+      this.props.reportSort(this.props.collectionID,key,ascending);
+    }
   }
 
   onChange() {
@@ -1067,8 +1099,8 @@ class MynLibTable extends React.Component {
     // if this table is part of a hierarchical playlist,
     // we'll give it an id corresponding to the collection it is within
     let tableID = '';
-    if (this.props.view === 'hierarchical' && this.props.collection) {
-      tableID = 'table-' + this.props.collection;
+    if (this.props.view === 'hierarchical' && this.props.collectionID) {
+      tableID = 'table-' + this.props.collectionID;
     }
 
     // if this table is part of a hierarchical playlist,

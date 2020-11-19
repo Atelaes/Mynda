@@ -25,6 +25,7 @@ class Library {
         this.alter(message)
       });
       ipcRenderer.on('lib-confirm', (event, message) => {
+        console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
         this.getConfirm(message)
       });
       ipcRenderer.send('lib-beacon');
@@ -160,7 +161,8 @@ class Library {
     if (this.waitConfirm) {
       console.log("Trying to create confirm, but something already at waitConfirm.");
     } else {
-      this.waitConfirm = argObj;
+      this.waitConfirm = _.cloneDeep(argObj);
+      console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     }
     if (this.env === 'server') {
       console.log('Sending a mirror request to browser');
@@ -169,6 +171,7 @@ class Library {
       console.log('Sending a mirror request to server');
       ipcRenderer.send('lib-sync-op', argObj);
     }
+    console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
   }
 
   // Takes an operation type, a string address in dot format, and optionally an item.
@@ -185,6 +188,7 @@ class Library {
   }
 
   getConfirm(argObj) {
+    console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     if (_.isEqual(argObj, this.waitConfirm)) {
       console.log("Got a valid confirmation back!")
       this.waitConfirm = null;
