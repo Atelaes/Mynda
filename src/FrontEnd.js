@@ -486,11 +486,11 @@ class MynLibrary extends React.Component {
 
   componentDidUpdate(oldProps) {
     if (!_.isEqual(oldProps.movies,this.props.movies)) {
-      // console.log('movies was changed!');
+      console.log('MynLibrary movies was changed!');
       this.setState({movies:_.cloneDeep(this.props.movies)});
     }
     if (!_.isEqual(oldProps.collections,this.props.collections)) {
-      // console.log('collections was changed!');
+      console.log('MynLibrary collections was changed!');
       this.setState({collections:_.cloneDeep(this.props.collections)});
     }
   }
@@ -597,7 +597,8 @@ class MynLibrary extends React.Component {
                   <MynLibTable
                     movies={movies}
                     view={this.props.view}
-                    initialSort="order"
+                    initialSort={this.state.sortReport[object.id] ? this.state.sortReport[object.id].key : "order"}
+                    initialSortAscending={this.state.sortReport[object.id] ? this.state.sortReport[object.id].ascending : true}
                     columns={this.props.columns}
                     displayColumnName={this.props.displayColumnName}
                     calcAvgRatings={this.props.calcAvgRatings}
@@ -723,6 +724,7 @@ class MynLibrary extends React.Component {
   }
 
   render() {
+    console.log('----MynLibrary RENDER----');
     let content = null;
 
     // if the playlist view is hierarchical, create multiple tables
@@ -857,14 +859,16 @@ class MynLibTable extends React.Component {
     // }
   }
 
-  requestSort(key) {
-    // the default direction of a sort is ascending
-    let ascending = true;
+  requestSort(key, ascending) {
+    if (ascending === undefined) {
+      // the default direction of a sort is ascending
+      ascending = true;
 
-    // except for the following fields, which should have a default sort direction of descending
-    let descendingFields = ['ratings_user','ratings_imdb','ratings_rt','ratings_mc','ratings_avg','dateadded','lastseen'];
-    if (descendingFields.includes(key)) {
-      ascending = false;
+      // except for the following fields, which should have a default sort direction of descending
+      let descendingFields = ['ratings_user','ratings_imdb','ratings_rt','ratings_mc','ratings_avg','dateadded','lastseen'];
+      if (descendingFields.includes(key)) {
+        ascending = false;
+      }
     }
 
     // if the user clicked on the same column that was previously sorted by,
@@ -1025,7 +1029,7 @@ class MynLibTable extends React.Component {
     // set initial sort
     this.state.sortKey = null;
     try {
-      this.requestSort(this.props.initialSort);
+      this.requestSort(this.props.initialSort, this.props.initialSortAscending);
     } catch(e) {
       // console.log('No initial sort parameter, sorting by title');
       this.requestSort('title');
@@ -1095,6 +1099,7 @@ class MynLibTable extends React.Component {
   }
 
   render() {
+    console.log('----MynLibTable RENDER----');
 
     // if this table is part of a hierarchical playlist,
     // we'll give it an id corresponding to the collection it is within
