@@ -680,7 +680,7 @@ class MynLibrary extends React.Component {
         (destination.droppableId !== source.droppableId && !destCol.containsVideo(videoID))
         ||
         // or the video was moved to a different position within the same collection
-        (destination.index !== source.index)
+        (destination.index !== source.index && destination.droppableId === source.droppableId)
       ) {
 
         // remove video from original position
@@ -724,7 +724,7 @@ class MynLibrary extends React.Component {
   }
 
   render() {
-    console.log('----MynLibrary RENDER----');
+    // console.log('----MynLibrary RENDER----');
     let content = null;
 
     // if the playlist view is hierarchical, create multiple tables
@@ -1099,7 +1099,7 @@ class MynLibTable extends React.Component {
   }
 
   render() {
-    console.log('----MynLibTable RENDER----');
+    // console.log('----MynLibTable RENDER----');
 
     // if this table is part of a hierarchical playlist,
     // we'll give it an id corresponding to the collection it is within
