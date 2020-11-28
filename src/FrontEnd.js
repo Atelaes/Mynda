@@ -895,15 +895,15 @@ class MynLibTable extends React.Component {
       };
 
     let sortFunctions = {
-     title: (a, b) => this.removeArticle(a.title) > this.removeArticle(b.title),
+     title: (a, b) => this.removeArticle(a.title).toLowerCase() > this.removeArticle(b.title).toLowerCase(),
      year: (a, b) => a.year > b.year,
-     director: (a, b) => a.directorsort > b.directorsort,
-     genre: (a, b) => a.genre > b.genre,
+     director: (a, b) => {let a_ds = a.directorsort === '' ? a.director : a.directorsort; let b_ds = b.directorsort === '' ? b.director : b.directorsort; return a_ds.toLowerCase() > b_ds.toLowerCase()},
+     genre: (a, b) => a.genre.toLowerCase() > b.genre.toLowerCase(),
      seen: (a, b) => a.seen > b.seen,
      ratings_user: (a, b) => a.ratings.user > b.ratings.user,
      dateadded: (a, b) => {let a_added = isNaN(parseInt(a.dateadded)) ? -1 : parseInt(a.dateadded); let b_added = isNaN(parseInt(b.dateadded)) ? -1 : parseInt(b.dateadded); return a_added > b_added;},
      order: (a, b) => a.order > b.order,
-     kind: (a, b) => a.kind > b.kind,
+     kind: (a, b) => a.kind.toLowerCase() > b.kind.toLowerCase(),
      lastseen: (a, b) => {let a_ls = isNaN(parseInt(a.lastseen)) ? -1 : parseInt(a.lastseen); let b_ls = isNaN(parseInt(b.lastseen)) ? -1 : parseInt(b.lastseen); return a_ls > b_ls;},
      ratings_rt: (a, b) => {let a_r = a.ratings.rt ? a.ratings.rt : -1; let b_r = b.ratings.rt ? b.ratings.rt : -1; return a_r > b_r},
      ratings_imdb: (a, b) => {let a_r = a.ratings.imdb ? a.ratings.imdb : -1; let b_r = b.ratings.imdb ? b.ratings.imdb : -1; return a_r > b_r},
@@ -911,8 +911,8 @@ class MynLibTable extends React.Component {
      ratings_avg: (a, b) => this.props.calcAvgRatings(a.ratings,'sort') > this.props.calcAvgRatings(b.ratings,'sort'),
      boxoffice: (a, b) => a.boxoffice > b.boxoffice,
      rated: (a, b) => ratedOrder[a.rated.toUpperCase()] > ratedOrder[b.rated.toUpperCase()],
-     country: (a, b) => a.country > b.country,
-     languages: (a, b) => a.languages[0] > b.languages[0],
+     country: (a, b) => a.country.toLowerCase() > b.country.toLowerCase(),
+     languages: (a, b) => a.languages[0].toLowerCase() > b.languages[0].toLowerCase(),
      duration: (a, b) => parseInt(a.duration) > parseInt(b.duration)
     }
 
