@@ -198,7 +198,8 @@
   --textinput-border-color: initial;
   --textinput-border: var(--textinput-border-width) solid var(--textinput-border-color);
   --textinput-borderradius: calc(var(--textinput-height) / 2);/*999px;*/
-  --textinput-padding: 0em 1.4em 0em .5em;
+  --textinput-padding: 0em 1.4em 0em .5em; /* leaves room for a little 'x' on the right side to clear the field */
+  --textinput-padding-noclear: 0em .5em 0em .5em; /* does not leave room for the little 'x' */
   --textinput-text-placeholder: var(--dimmer-text); /*var(--textinput-border-color);*/
   --textinput-text-placeholder-opacity: 1;
 

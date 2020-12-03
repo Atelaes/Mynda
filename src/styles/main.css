@@ -50,6 +50,9 @@ input[type=text], select, textarea {
   border-radius: var(--textinput-borderradius);
   padding: var(--textinput-padding);
 }
+input[type=text].no-clear {
+  padding: var(--textinput-padding-noclear);
+}
 
 input[type=text]::placeholder {
   color:var(--textinput-text-placeholder);
@@ -452,6 +455,13 @@ th, tr, td {
 
 .movie-row .centered {
   text-align: center;
+}
+
+.movie-row .order > div {
+  position:relative; /* necessary so the clear button sits inside the input element */
+}
+.movie-row .order input {
+  width:2.7em;
 }
 
 #collections-container {

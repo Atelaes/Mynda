@@ -278,10 +278,7 @@
       "lastseen" : "946692300",
       "kind" : "movie",
       "artwork" : "../artwork/thematrix.jpg",
-      "filename" : "~/Movies/thematrix.mp4",
-      "collections" : {
-        "2" : 1
-      }
+      "filename" : "~/Movies/thematrix.mp4"
     },
     {
       "id" : "1",
@@ -317,8 +314,7 @@
       "lastseen" : "1056692300",
       "kind" : "movie",
       "artwork" : "../artwork/MV5BM2I1ZWU4YjMtYzU0My00YmMzLWFmNTAtZDJhZGYwMmI3YWQ5XkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SY1000_CR0,0,666,1000_AL_.jpg",
-      "filename" : "~/Movies/seventhseal.mkv",
-      "collections" : {}
+      "filename" : "~/Movies/seventhseal.mkv"
     },
     {
       "id" : "2",
@@ -358,11 +354,7 @@
       "lastseen" : "1456692300",
       "kind" : "movie",
       "filename" : "~/Movies/TheAvengers.divx",
-      "artwork" : "../artwork/The_Avengers.jpg",
-      "collections" : {
-        "0-0" : 1,
-        "0-1-0" : 6
-      }
+      "artwork" : "../artwork/The_Avengers.jpg"
     },
     {
       "id" : "3",
@@ -391,11 +383,7 @@
       "lastseen" : null,
       "kind" : "movie",
       "artwork" : "../artwork/Iron_Man.jpg",
-      "filename" : "~/Movies/Iron Man.mp4",
-      "collections" : {
-        "0-2-0" : 1,
-        "0-1-0" : 1
-      }
+      "filename" : "~/Movies/Iron Man.mp4"
     },
     {
       "id" : "4",
@@ -427,10 +415,7 @@
       "lastseen" : "856692300",
       "kind" : "show",
       "artwork" : "../artwork/theinnerlight.jpg",
-      "filename" : "~/TV Shows/Star Trek TNG/Season 5/25 - The Inner Light.mpeg",
-      "collections" : {
-        "1-0" : 25
-      }
+      "filename" : "~/TV Shows/Star Trek TNG/Season 5/25 - The Inner Light.mpeg"
     },
     {
       "id" : "5",
@@ -463,8 +448,7 @@
       "lastseen" : "756092300",
       "kind" : "movie",
       "artwork" : "../artwork/MV5BMmE1OWZjYjctYzZlNi00YmEyLTg4YWYtZDc4NTE2ODZlYzhhXkEyXkFqcGdeQXVyNzc5MjA3OA@@._V1_SY1000_CR0,0,651,1000_AL_.jpg",
-      "filename" : "~/Movies/Buckaroo.mp4",
-      "collections" : {}
+      "filename" : "~/Movies/Buckaroo.mp4"
     },
     {
       "id" : "6",
@@ -497,10 +481,7 @@
       "lastseen" : "956692300",
       "kind" : "show",
       "artwork" : "../artwork/MV5BNjU1N2VjNGEtYWQ1Yi00ZjYxLTlhMjMtZDM3OGNhMjI1ZjljXkEyXkFqcGdeQXVyMjQ3MjU3NTU@._V1_SY1000_CR0,0,1329,1000_AL_.jpg",
-      "filename" : "~/TV Shows/Star Trek TNG/Season 5/26 - Times Arrow Part 1.mpeg",
-      "collections" : {
-        "1-0" : 26
-      }
+      "filename" : "~/TV Shows/Star Trek TNG/Season 5/26 - Times Arrow Part 1.mpeg"
     },
     {
       "id" : "7",
@@ -534,10 +515,7 @@
       "lastseen" : null,
       "kind" : "show",
       "artwork" : "../artwork/MV5BNDY0OTY1YjAtYzQxOS00YjFhLTliNjctOTYzNWU4YmRhZjhmXkEyXkFqcGdeQXVyMjQ3MjU3NTU@._V1_UY268_CR87,0,182,268_AL_.jpg",
-      "filename" : "~/TV Shows/Star Trek TNG/Season 6/01 - Times Arrow Part 2.mpeg",
-      "collections" : {
-        "1-1" : 1
-      }
+      "filename" : "~/TV Shows/Star Trek TNG/Season 6/01 - Times Arrow Part 2.mpeg"
     }
   ]
 }

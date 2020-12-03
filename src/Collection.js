@@ -57,6 +57,7 @@ class Collection {
       console.log(`Collections.updateOrder failed on ${id}: ${err}`);
       return;
     }
+    return false;
   }
 
 
@@ -67,12 +68,16 @@ class Collection {
   addVideo(id, order, index) {
     if (!this.isTerminal) return;
 
+    if (order) {
+      order = Math.round(Number(order) * 10) / 10;
+    }
+
     let video = {
       id:id,
       order:order
     };
 
-    // if we don't have an order, make it 1 greater than the highest ordered video
+    // if we don't have an order, make it (an integer) 1 greater than the highest ordered video
     if (order === undefined) {
       let highest = 0;
       this.videos.map(v => {
@@ -80,7 +85,7 @@ class Collection {
           highest = v.order;
         }
       });
-      order = highest + 1;
+      order = Math.floor(highest + 1);
     }
 
     // if we don't have an index, find one based on order
@@ -100,8 +105,38 @@ class Collection {
     // now loop through all the *subsequent* videos and adjust their order property
     // if necessary
     for (let i=index+1; i<this.videos.length; i++) {
-      if (this.videos[i].order <= this.videos[i-1].order) {
-        this.videos[i].order = this.videos[i-1].order + 1;
+      while (this.videos[i].order <= this.videos[i-1].order) {
+        // if the order of the latter video is an integer
+        if (this.videos[i].order === Math.floor(this.videos[i].order)) {
+          console.log("integer: " + this.videos[i].order);
+          // we want to keep it as an integer,
+          // so set it to the next greatest integer after the previous video
+          // e.g.  #1: 5.4      #1: 5.4
+          //       #2: 2    =>  #2: 6
+          this.videos[i].order = Math.floor(this.videos[i-1].order) + 1;
+        }
+        // if the order of the latter video is NOT an integer, we want to preserve
+        // the decimal part of the order (or increment it if necessary)
+        else {
+          console.log("decimal: " + this.videos[i].order)
+          // if the integer part of the latter is less than the former, set the
+          // integer part to 1 greater than the former, preserving the decimal part
+          // e.g.  #1: 3          #1: 3
+          //       #2: 2.1  =>    #2: 4.1
+          if (Math.floor(this.videos[i].order) < Math.floor(this.videos[i-1].order)) {
+            console.log("integer part is smaller");
+            this.videos[i].order += Math.floor(this.videos[i-1].order) - Math.floor(this.videos[i].order) + 1;
+          }
+          // if the integer part of the latter is the same as the former, set the
+          // increment the decimal part
+          // e.g.  #1: 2.5        #1: 2.5
+          //       #2: 2.1  =>    #2: 2.2 (eventually reaching 2.6)
+          else if (Math.floor(this.videos[i].order) === Math.floor(this.videos[i-1].order)) {
+            console.log("integer part is equal");
+            this.videos[i].order += .1;
+          }
+        }
+        console.log('new value: ' + this.videos[i].order);
       }
     }
 
@@ -111,6 +146,7 @@ class Collection {
   removeVideo(id) {
     if (!this.isTerminal) return;
     let index = this._getVidIndex(id);
+    console.log("index: " + index);
     if (index === -1) return false;
 
     // let order = this.videos[index].order;
@@ -122,6 +158,8 @@ class Collection {
 
   _getVidIndex(id) {
     if (!this.isTerminal) return;
+    console.log('id: ' + id);
+    console.log('videos: ' + JSON.stringify(this.videos));
 
     for (let i=0; i<this.videos.length; i++) {
       if (this.videos[i].id === id) {

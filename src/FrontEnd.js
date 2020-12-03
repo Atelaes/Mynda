@@ -693,14 +693,19 @@ class MynLibrary extends React.Component {
 
           // first we must find the proper index where the video was dropped
           newIndex = destination.index;
-          if (destination.droppableId === source.droppableId && source.index < destination.index) {
-            // for the special case that we're dropping the video later in the same collection, the index must be adjusted
-            newIndex = destination.index + 1;
-          }
+          // if (destination.droppableId === source.droppableId && source.index < destination.index) {
+          //   // for the special case that we're dropping the video later in the same collection, the index must be adjusted
+          //   newIndex = destination.index + 1;
+          // }
+          // apparently not anymore???
 
           // and then create an order based on the order of the previous video
           if (newIndex > 0) {
-            newOrder = destCol.videos[newIndex - 1].order + 1;
+            if (destCol.videos[newIndex + 1] && Math.floor(destCol.videos[newIndex - 1].order) === Math.floor(destCol.videos[newIndex + 1].order)) {
+              newOrder = destCol.videos[newIndex - 1].order + 0.1;
+            } else {
+              newOrder = Math.floor(destCol.videos[newIndex - 1].order) + 1;
+            }
           } else {
             newOrder = 1;
           }
@@ -767,18 +772,28 @@ class MynLibrary extends React.Component {
 class MynLibTable extends React.Component {
   constructor(props) {
     super(props)
-    this.render = this.render.bind(this);
 
     this.state = {
       sortKey: null,
       sortAscending: true,
       sortedRows: [],
       displayOrderColumn: "table-cell",
-      lockedRow: null
+      lockedRow: null,
+      vidOrderDisplay: {},
+      vidOrderDisplayTemplate: (video,order) => {
+          let rowID = this.state.rowID(video.id);
+          return (
+            <div style={{cursor:'text'}} onClick={(e) => this.orderClick(video, rowID, e)}>
+              {order}
+            </div>
+          );
+        },
+      rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : '')
+
     }
 
     this.requestSort = this.requestSort.bind(this);
-    this.onChange = this.onChange.bind(this);
+    this.reset = this.reset.bind(this);
     this.render = this.render.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentDidUpdate = this.componentDidUpdate.bind(this);
@@ -835,6 +850,63 @@ class MynLibTable extends React.Component {
     }
   }
 
+  // called when the user clicks on the 'order' cell of a row
+  // brings up an inline editor to change the order
+  orderClick(video, rowID, e) {
+    // don't trigger a click on the whole row
+    e.stopPropagation();
+
+    // add listener for the Enter key, to save the value
+    const cell = findNearestOfClass(e.target,'order');
+    cell.addEventListener('keyup', (e) => { if (e.keyCode === 13) this.orderSave(e,order,video)}, {once:false});
+
+    // replace the contents of the cell with the editor
+    let valid = false;
+    let order = video.order;
+    let vidOrderDisplay = _.cloneDeep(this.state.vidOrderDisplay);
+    vidOrderDisplay[video.id] = (
+      <div onClick={(e) => {e.stopPropagation()}}>
+        <MynEditText
+          object={video}
+          property='order'
+          update={(prop,value) => { console.log(value); /*if (valid)*/ order = value}}
+          options={null}
+          storeTransform={v => {v = v.replace(/\s+/g,''); if (v === '') {return v} else {return Math.round(Number(v) * 10) / 10}}}
+          validator={{test:v => !isNaN(Number(v))}}
+          validatorTip={'#'}
+          allowedEmpty={true}
+          reportValid={(prop,value) => {/*valid = value;*/}}
+          noClear={true}
+          setFocus={true}
+        />
+      </div>
+    );
+    this.setState({vidOrderDisplay:vidOrderDisplay},() => {
+      console.log(JSON.stringify(this.state.vidOrderDisplay));
+      this.reset(false);
+    });
+  }
+
+  // called when the user hits enter in the inline 'order' editor
+  orderSave(e,order,video) {
+    e.preventDefault();
+    e.stopPropagation();
+    // e.target.removeEventListener()
+    // console.log(e.target);
+
+    // update the order
+    //this.props.collectionID
+
+    // replace the contents of the cell with the new order value
+    // (and a click event listener to enable another edit)
+    console.log('Saving order as ' + order);
+    let vidOrderDisplay = _.cloneDeep(this.state.vidOrderDisplay);
+    vidOrderDisplay[video.id] = this.state.vidOrderDisplayTemplate(video,order);
+    this.setState({vidOrderDisplay:vidOrderDisplay},() => {
+      this.reset(false); // force the table to re-render
+    });
+  }
+
   titleHovered(e) {
     // console.log("enter");
     e.stopPropagation();
@@ -860,6 +932,18 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
+    // console.log(key);
+    if (key === undefined) {
+      throw "Error: key was undefined; must supply a key to sort by";
+    }
+
+    // if the user clicked on the same column that was previously sorted by,
+    // then we override the defaults and just reverse the sort direction of the previous sort
+    // (unless we're explicitly told which direction to sort by)
+    if (this.state.sortKey === key && ascending === undefined) {
+     ascending = !this.state.sortAscending;
+    }
+
     if (ascending === undefined) {
       // the default direction of a sort is ascending
       ascending = true;
@@ -869,12 +953,6 @@ class MynLibTable extends React.Component {
       if (descendingFields.includes(key)) {
         ascending = false;
       }
-    }
-
-    // if the user clicked on the same column that was previously sorted by,
-    // then we override the defaults and just reverse the sort direction of the previous sort
-    if (this.state.sortKey === key) {
-     ascending = !this.state.sortAscending;
     }
 
     let ratedOrder = {
@@ -926,7 +1004,8 @@ class MynLibTable extends React.Component {
       // this will ensure that we have a unique id for the row
       // even if we're in a hierarchical playlist in which a video can appear
       // in more than one table (in different collections)
-      let rowID = movie.id + (this.props.collectionID ? `_${this.props.collectionID}` : '');
+      // let rowID = movie.id + (this.props.collectionID ? `_${this.props.collectionID}` : '');
+      let rowID = this.state.rowID(movie.id);
 
       let displaydate = (date) => {
         let result;
@@ -949,7 +1028,7 @@ class MynLibTable extends React.Component {
       // }
 
       let cellJSX = {
-        order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{movie.order}</td>),
+        order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{this.state.vidOrderDisplay[movie.id]}</td>),
         title: (<td key="title" className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>),
         year: (<td key="year" className="year centered mono">{movie.year}</td>),
         director: (<td key="director" className="director">{movie.director}</td>),
@@ -1010,8 +1089,16 @@ class MynLibTable extends React.Component {
     }
   }
 
-  onChange() {
-
+  // re-render the table by requesting a new sort (if initial === true, sort by initial values,
+  // rather than the current values)
+  reset(initial) {
+    this.props.movies.map(movie => {
+      // we display the order property through a state variable
+      // because when the user wants to edit the order, we use the state variable
+      // to display an editor; we must initially populate that variable with the order itself
+      // inside a div with a click event that calls up the editor
+      this.state.vidOrderDisplay[movie.id] = this.state.vidOrderDisplayTemplate(movie,movie.order);
+    });
 
     // decide whether to show the 'order' column
     // if (this.props.movies.filter(movie => (movie.order === undefined || movie.order === null)).length == this.props.movies.length) {
@@ -1026,13 +1113,25 @@ class MynLibTable extends React.Component {
       this.state.displayOrderColumn = "table-cell";
     }
 
-    // set initial sort
-    this.state.sortKey = null;
-    try {
-      this.requestSort(this.props.initialSort, this.props.initialSortAscending);
-    } catch(e) {
-      // console.log('No initial sort parameter, sorting by title');
-      this.requestSort('title');
+    // if we're told to set to initial values (or if there is no current value)
+    if (initial || this.state.sortKey === null) {
+      // console.log("initial: " + initial);
+      // console.log("this.state.sortKey: " + this.state.sortKey);
+      // console.log("this.props.initialSort: " + this.props.initialSort);
+      // console.log("this.props.initialSortAscending: " + this.props.initialSortAscending);
+
+      // sort by initial (default) values
+      this.state.sortKey = null;
+      try {
+        this.requestSort(this.props.initialSort, this.props.initialSortAscending);
+      } catch(e) {
+        // console.log('No initial sort parameter, sorting by title');
+        this.requestSort('title');
+      }
+    } else {
+      // if initial is false, sort by the current value
+      // console.log("Sort key is not null?: " + this.state.sortKey);
+      this.requestSort(this.state.sortKey, this.state.sortAscending);
     }
   }
 
@@ -1059,14 +1158,16 @@ class MynLibTable extends React.Component {
 
   componentDidMount(props) {
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
-    this.onChange();
+    // populate and sort the table (by initial values)
+    this.reset(true);
   }
 
   componentDidUpdate(oldProps) {
     // console.log('UPDATING MynTable');
     if (!_.isEqual(oldProps.movies,this.props.movies)) {
       // console.log('MynTable props changed!!!');
-      this.onChange();
+      // re-render the table (sorting by the current values)
+      this.reset(false);
 
     }
 
@@ -2348,8 +2449,8 @@ class MynEditor extends MynOpenablePane {
     if (args[0] == "collections" || args[0].collections) { // collections was updated
       // console.log("args[0] == " + JSON.stringify(args[0]));
       const collectionUpdate = args[1] || args[0].collections;
-      // console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
-      // console.log("original collections == " + JSON.stringify(this.state.video.collections));
+      console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
+      console.log("original collections == " + JSON.stringify(this.state.video.collections));
 
       let collectionsCopy = new Collections(this.state.collections.getAll(true)); // pass 'true' to get a deep copy
 
@@ -2394,9 +2495,11 @@ class MynEditor extends MynOpenablePane {
         let collection = collectionsCopy.get(id);//getCollectionObject(id, collectionsCopy, false);
         if (collection) {
           try {
+            console.log("Updating order of collection " + id + " to " + collectionUpdate[id]);
             // let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
             // collection.videos[index].order = collectionUpdate[id];
-            collection.updateOrder(id, collectionUpdate[id]);
+            let success = collection.updateOrder(this.state.video.id, collectionUpdate[id]);
+            console.log("success? " + success);
           } catch(err) {
             console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Video not found in that collection.`);
           }
@@ -2430,7 +2533,7 @@ class MynEditor extends MynOpenablePane {
     }
 
     /* make sure all the fields are valid before submitting */
-    // console.log(JSON.stringify(this.state.valid));
+    console.log("VALID: " + JSON.stringify(this.state.valid));
     let valid = true;
     let invalidFields = [];
     for (var i=0, keys=Object.keys(this.state.valid); i<keys.length; i++) {
@@ -2478,7 +2581,7 @@ class MynEditor extends MynOpenablePane {
     // (delete the temporary collections information from the video,
     // we don't want to save this)
     let temp = _.cloneDeep(this.state.video);
-    // delete temp.collections;
+    delete temp.collections;
     let index = library.media.findIndex((video) => video.id === this.props.video.id);
     library.replace("media." + index, temp);
 
@@ -2512,6 +2615,8 @@ class MynEditor extends MynOpenablePane {
     if (!_.isEqual(oldProps.video,this.props.video)) {
       // console.log('MynEditor props.video has changed!!!');
 
+      // attach a temporary collections object to each video,
+      // containing information on all the collections the video is a part of
       let collections = this.props.collections ? new Collections(_.cloneDeep(this.props.collections)) : null;
       let vidCols = this.props.video && collections ? collections.getVideoCollections(this.props.video.id) : {};
       // let videoWithCols = {...this.props.video, ...vidCols};
@@ -2896,6 +3001,10 @@ class MynEditorEdit extends React.Component {
           exp: { test: value => Number.isInteger(Number(value)) && Number(value)>0 },
           tip: "Positive integer"
         },
+        number: {
+          exp: { test: value => !isNaN(Number(value)) },
+          tip: "Number"
+        },
         numrange: {
           exp: { test: (value,min,max) => !isNaN(Number(value)) && Number(value)>=min && Number(value)<=max },
           tip: (min,max) => `${min}-${max}`
@@ -3243,10 +3352,11 @@ class MynEditorEdit extends React.Component {
         <div className="edit-field-editor">
           <MynEditCollections
             video={this.props.video}
+            property="collections"
             collections={this.props.collections}
             update={this.props.handleChange}
-            validator={this.state.validators.posint.exp}
-            validatorTip={this.state.validators.posint.tip}
+            validator={this.state.validators.number.exp}
+            validatorTip={this.state.validators.number.tip}
             reportValid={this.props.reportValid}
           />
         </div>
@@ -3637,8 +3747,8 @@ class MynEditCollections extends MynEdit {
       } else if (collection.videos) {
         console.log('adding this video to ' + collection.name + '!!!');
 
-        // initially, set the order to the smallest unused order number in this collection;
-        // the user can edit it to whatever they want afterwards
+        // initially, set the order to the smallest (positive) unused (integer) order number
+        // in this collection; the user can edit it to whatever they want afterwards
         let order = 0;
         let used = true;
         while (used) {
@@ -3947,10 +4057,13 @@ class MynEditCollections extends MynEdit {
   updateOrder(order, target, collection) {
     // let target = event.target;
     // let order = event.target.value;
-    order = !isNaN(Number(order)) && Number(order) !== 0 ? Number(order) : !isNaN(parseInt(order)) ? parseInt(order) : '';
+    // order = !isNaN(Number(order)) && Number(order) !== 0 ? Number(order) : !isNaN(parseInt(order)) ? parseInt(order) : '';
+    // order = !isNaN(Number(order)) ? Math.round(Number(order) * 10)/10 : '';
     console.log(order);
     let updated = _.cloneDeep(this.props.video.collections);
+    console.log("Before: " + JSON.stringify(updated));
     updated[collection.id] = order;
+    console.log("After: " + JSON.stringify(updated));
     this.update({collections: updated});
 
     if (this.props.validator.test(order)) {
@@ -4077,6 +4190,10 @@ class MynEditText extends MynEdit {
 
   componentDidMount() {
     this.setStateValuesFromProps();
+
+    if (this.props.setFocus) {
+      this.input.current.focus();
+    }
   }
 
   render() {
@@ -4090,7 +4207,7 @@ class MynEditText extends MynEdit {
           {this.props.options.map((option) => (<option key={option} value={option} />))}
         </datalist>
       );
-    } else {
+    } else if (!this.props.noClear) {
       // only create a clear button if there's no dropdown
       clearBtn = (<div className="input-clear-button hover" onClick={this.clearInput}></div>);
     }
@@ -4099,7 +4216,7 @@ class MynEditText extends MynEdit {
       <div>
         <input
           ref={this.input}
-          className={this.props.className || ''}
+          className={(this.props.className || '') + (this.props.noClear ? ' no-clear' : '')}
           list={listName}
           type="text"
           name="text"
@@ -4113,65 +4230,6 @@ class MynEditText extends MynEdit {
     );
   }
 }
-
-
-// class MynEditTextOld extends React.Component {
-//   constructor(props) {
-//     super(props)
-//
-//     this.input = React.createRef();
-//   }
-//
-//   handleInput() {
-//     let target = this.input.current;
-//     let value = target.value;
-//     if (value === "") {
-//       this.props.handleValidity(true,this.props.property,target);
-//     } else if (this.props.validator.test(value)) {
-//       this.props.handleValidity(true,this.props.property,target);
-//     } else {
-//       this.props.handleValidity(false,this.props.property,target,this.props.validatorTip);
-//       // console.log('validation error!');
-//       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
-//     }
-//     this.props.update(this.props.property,value);
-//   }
-//
-//   componentDidUpdate(oldProps) {
-//     if (oldProps.movie[this.props.property] !== this.props.movie[this.props.property]) {
-//       this.handleInput();
-//     }
-//   }
-//
-//   render() {
-//     let options = null;
-//     let listName = null;
-//     if (this.props.options) {
-//       listName = "used-" + this.props.property;
-//       options = (
-//         <datalist id={listName}>
-//           {this.props.options.map((option) => (<option key={option} value={option} />))}
-//         </datalist>
-//       );
-//     }
-//
-//     return (
-//       <div>
-//         <input
-//           ref={this.input}
-//           id={"edit-field-" + this.props.property}
-//           list={listName}
-//           type="text"
-//           name="text"
-//           value={this.props.movie[this.props.property]}
-//           placeholder={'[' + this.props.property + ']'}
-//           onChange={(e) => this.handleInput(e)}
-//         />
-//         {options}
-//       </div>
-//     );
-//   }
-// }
 
 class MynEditArtwork extends MynEdit {
   constructor(props) {
