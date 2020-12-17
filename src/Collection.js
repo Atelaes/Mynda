@@ -138,6 +138,8 @@ class Collection {
         }
         console.log('new value: ' + this.videos[i].order);
       }
+      // round to fix any goofy floating point issues
+      this.videos[i].order = Math.round(this.videos[i].order * 10) / 10;
     }
 
     return true;

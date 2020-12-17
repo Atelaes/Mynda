@@ -665,6 +665,9 @@ class MynLibrary extends React.Component {
       // make a deep copy of the whole collections object for modification, which we'll save when we're done
       let colsCopy = new Collections(_.cloneDeep(this.state.collections));
 
+      let oldOrder = colsCopy.get(source.droppableId).videos.filter(v => v.id === videoID)[0].order;
+      // console.log('old order: ' + oldOrder);
+
       // get source collection and destination collection
       let srcCol, destCol;
       if (destination.droppableId !== 'uncategorized') {
@@ -701,10 +704,20 @@ class MynLibrary extends React.Component {
 
           // and then create an order based on the order of the previous video
           if (newIndex > 0) {
-            if (destCol.videos[newIndex + 1] && Math.floor(destCol.videos[newIndex - 1].order) === Math.floor(destCol.videos[newIndex + 1].order)) {
-              newOrder = destCol.videos[newIndex - 1].order + 0.1;
+            let prevOrder = destCol.videos[newIndex - 1].order;
+            // if the video is being dropped between two decimal orders of the same integer value
+            if (destCol.videos[newIndex + 1] && Math.floor(prevOrder) === Math.floor(destCol.videos[newIndex + 1].order)) {
+              // set the new order to 0.1 higher than the previous video
+              newOrder = prevOrder + 0.1;
+
+              // otherwise if the old order is not an integer, we want to try to preserve its decimal value
+            } else if (!Number.isInteger(oldOrder)) {
+              // set the new order either to the integer part of the previous video plus the decimal part of the old order of this video,
+              // or to 0.1 higher than the previous video, whichever is higher
+              newOrder = Math.max(prevOrder + 0.1,oldOrder - Math.floor(oldOrder) + Math.floor(prevOrder));
             } else {
-              newOrder = Math.floor(destCol.videos[newIndex - 1].order) + 1;
+                // set the video to 1 higher than the previous video
+                newOrder = Math.floor(destCol.videos[newIndex - 1].order) + 1;
             }
           } else {
             newOrder = 1;
@@ -883,7 +896,7 @@ class MynLibTable extends React.Component {
     );
     this.setState({vidOrderDisplay:vidOrderDisplay},() => {
       console.log(JSON.stringify(this.state.vidOrderDisplay));
-      this.reset(false);
+      this.reset(false); // force the table to rerender, preserving vidOrderDisplay
     });
   }
 
@@ -903,7 +916,7 @@ class MynLibTable extends React.Component {
     let vidOrderDisplay = _.cloneDeep(this.state.vidOrderDisplay);
     vidOrderDisplay[video.id] = this.state.vidOrderDisplayTemplate(video,order);
     this.setState({vidOrderDisplay:vidOrderDisplay},() => {
-      this.reset(false); // force the table to re-render
+      this.reset(false,true); // force the table to re-render
     });
   }
 
@@ -1089,16 +1102,18 @@ class MynLibTable extends React.Component {
     }
   }
 
-  // re-render the table by requesting a new sort (if initial === true, sort by initial values,
+  // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
   // rather than the current values)
-  reset(initial) {
-    this.props.movies.map(movie => {
-      // we display the order property through a state variable
-      // because when the user wants to edit the order, we use the state variable
-      // to display an editor; we must initially populate that variable with the order itself
-      // inside a div with a click event that calls up the editor
-      this.state.vidOrderDisplay[movie.id] = this.state.vidOrderDisplayTemplate(movie,movie.order);
-    });
+  reset(initialSort,resetOrder) {
+    if (initialSort || resetOrder) {
+      this.props.movies.map(movie => {
+        // we display the order property through a state variable
+        // because when the user wants to edit the order, we use the state variable
+        // to display an editor; we must initially populate that variable with the order itself
+        // inside a div with a click event that calls up the editor
+        this.state.vidOrderDisplay[movie.id] = this.state.vidOrderDisplayTemplate(movie,movie.order);
+      });
+    }
 
     // decide whether to show the 'order' column
     // if (this.props.movies.filter(movie => (movie.order === undefined || movie.order === null)).length == this.props.movies.length) {
@@ -1114,7 +1129,7 @@ class MynLibTable extends React.Component {
     }
 
     // if we're told to set to initial values (or if there is no current value)
-    if (initial || this.state.sortKey === null) {
+    if (initialSort || this.state.sortKey === null) {
       // console.log("initial: " + initial);
       // console.log("this.state.sortKey: " + this.state.sortKey);
       // console.log("this.props.initialSort: " + this.props.initialSort);
@@ -2449,8 +2464,8 @@ class MynEditor extends MynOpenablePane {
     if (args[0] == "collections" || args[0].collections) { // collections was updated
       // console.log("args[0] == " + JSON.stringify(args[0]));
       const collectionUpdate = args[1] || args[0].collections;
-      console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
-      console.log("original collections == " + JSON.stringify(this.state.video.collections));
+      // console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
+      // console.log("original collections == " + JSON.stringify(this.state.video.collections));
 
       let collectionsCopy = new Collections(this.state.collections.getAll(true)); // pass 'true' to get a deep copy
 
@@ -2495,11 +2510,11 @@ class MynEditor extends MynOpenablePane {
         let collection = collectionsCopy.get(id);//getCollectionObject(id, collectionsCopy, false);
         if (collection) {
           try {
-            console.log("Updating order of collection " + id + " to " + collectionUpdate[id]);
+            // console.log("Updating order of collection " + id + " to " + collectionUpdate[id]);
             // let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
             // collection.videos[index].order = collectionUpdate[id];
             let success = collection.updateOrder(this.state.video.id, collectionUpdate[id]);
-            console.log("success? " + success);
+            // console.log("success? " + success);
           } catch(err) {
             console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Video not found in that collection.`);
           }
@@ -2533,7 +2548,7 @@ class MynEditor extends MynOpenablePane {
     }
 
     /* make sure all the fields are valid before submitting */
-    console.log("VALID: " + JSON.stringify(this.state.valid));
+    // console.log("VALID: " + JSON.stringify(this.state.valid));
     let valid = true;
     let invalidFields = [];
     for (var i=0, keys=Object.keys(this.state.valid); i<keys.length; i++) {
@@ -4061,9 +4076,9 @@ class MynEditCollections extends MynEdit {
     // order = !isNaN(Number(order)) ? Math.round(Number(order) * 10)/10 : '';
     console.log(order);
     let updated = _.cloneDeep(this.props.video.collections);
-    console.log("Before: " + JSON.stringify(updated));
+    // console.log("Before: " + JSON.stringify(updated));
     updated[collection.id] = order;
-    console.log("After: " + JSON.stringify(updated));
+    // console.log("After: " + JSON.stringify(updated));
     this.update({collections: updated});
 
     if (this.props.validator.test(order)) {
