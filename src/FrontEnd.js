@@ -665,22 +665,22 @@ class MynLibrary extends React.Component {
       // make a deep copy of the whole collections object for modification, which we'll save when we're done
       let colsCopy = new Collections(_.cloneDeep(this.state.collections));
 
-      let oldOrder = colsCopy.get(source.droppableId).videos.filter(v => v.id === videoID)[0].order;
-      // console.log('old order: ' + oldOrder);
-
       // get source collection and destination collection
       let srcCol, destCol;
+      let oldOrder = 0;
       if (destination.droppableId !== 'uncategorized') {
         destCol = colsCopy.get(destination.droppableId);
       }
       if (source.droppableId !== 'uncategorized') {
         srcCol = colsCopy.get(source.droppableId);
+        oldOrder = colsCopy.get(source.droppableId).videos.filter(v => v.id === videoID)[0].order;
       }
+      // console.log('old order: ' + oldOrder);
 
       // only do anything if
       if (
-        // the video was moved to a different collection that doesn't already contain it
-        (destination.droppableId !== source.droppableId && !destCol.containsVideo(videoID))
+        // the video was moved to a different collection that doesn't already contain it (or destCol doesn't exist, i.e. the video was moved to 'uncategorized')
+        (destination.droppableId !== source.droppableId && (!destCol || !destCol.containsVideo(videoID)))
         ||
         // or the video was moved to a different position within the same collection
         (destination.index !== source.index && destination.droppableId === source.droppableId)
