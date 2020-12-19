@@ -108,7 +108,8 @@ class Collection {
       while (this.videos[i].order <= this.videos[i-1].order) {
         // if the order of the latter video is an integer
         if (this.videos[i].order === Math.floor(this.videos[i].order)) {
-          console.log("integer: " + this.videos[i].order);
+          console.log("this vid (integer): " + this.videos[i].order);
+          console.log("prev vid: " + this.videos[i-1].order);
           // we want to keep it as an integer,
           // so set it to the next greatest integer after the previous video
           // e.g.  #1: 5.4      #1: 5.4
@@ -118,7 +119,8 @@ class Collection {
         // if the order of the latter video is NOT an integer, we want to preserve
         // the decimal part of the order (or increment it if necessary)
         else {
-          console.log("decimal: " + this.videos[i].order)
+          console.log("this vid (decimal): " + this.videos[i].order);
+          console.log("prev vid: " + this.videos[i-1].order);
           // if the integer part of the latter is less than the former, set the
           // integer part to 1 greater than the former, preserving the decimal part
           // e.g.  #1: 3          #1: 3

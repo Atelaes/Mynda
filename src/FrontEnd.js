@@ -706,7 +706,7 @@ class MynLibrary extends React.Component {
           if (newIndex > 0) {
             let prevOrder = destCol.videos[newIndex - 1].order;
             // if the video is being dropped between two decimal orders of the same integer value
-            if (destCol.videos[newIndex + 1] && Math.floor(prevOrder) === Math.floor(destCol.videos[newIndex + 1].order)) {
+            if (destCol.videos[newIndex] && Math.floor(prevOrder) === Math.floor(destCol.videos[newIndex].order)) {
               // set the new order to 0.1 higher than the previous video
               newOrder = prevOrder + 0.1;
 
@@ -1182,7 +1182,7 @@ class MynLibTable extends React.Component {
     if (!_.isEqual(oldProps.movies,this.props.movies)) {
       // console.log('MynTable props changed!!!');
       // re-render the table (sorting by the current values)
-      this.reset(false);
+      this.reset(false,true);
 
     }
 
