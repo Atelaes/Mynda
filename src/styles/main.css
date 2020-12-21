@@ -472,14 +472,18 @@ th, tr, td {
 }
 .collection {
   margin-left: var(--collection-marginleft);
+  position: relative;
 }
-.collection h1 {
+.collection h1,
+.collection .add-collection,
+.collection .delete-collection {
   display:block;
   background-color: var(--collectionheader-bg);
   color: var(--collectionheader-text);
   margin: var(--collectionheader-margin);
   padding: var(--collectionheader-padding);
   font-size: var(--collectionheader-font-size);
+  line-height: calc(var(--collectionheader-font-size) * 1.2);
   text-transform: uppercase;
   font-weight: var(--collectionheader-font-weight);
   font-family: var(--collectionheader-font);
@@ -489,6 +493,51 @@ th, tr, td {
   background-color: var(--collectionheader-bg-hover);
   color: var(--collectionheader-text-hover);
 }
+.collection.collapsed.drag-over h1 {
+  background-color: var(--collectionheader-bg-drag);
+  color: var(--collectionheader-text-drag);
+}
+
+.collection .add-collection {
+  visibility: hidden;
+  position:absolute;
+  top:0;
+  right:0;
+  padding: var(--collectionheader-padding-padding);
+  text-align: center;
+  background-color: var(--settings-addcollection-bg-trans);
+  color: var(--settings-addcollection-text);
+}
+.collection .add-collection:hover {
+  background-color: var(--settings-addcollection-bg-hover);
+  color: var(--settings-addcollection-text-hover);
+}
+/* .collection:hover > .add-collection, */
+.collection.dragging .add-collection {
+  visibility: visible;
+}
+
+.collection .delete-collection {
+  display:none;
+  position:absolute;
+  top:0;
+  right:0;
+  padding: var(--collectionheader-padding-padding);
+  background-color: initial;
+  text-align: center;
+  opacity:0.5;
+}
+.collection:hover > .delete-collection {
+  display: block;
+}
+.collection > .delete-collection:hover {
+  color: var(--settings-addcollection-text-hover);
+  opacity:1;
+}
+.collection.dragging > .delete-collection {
+  display:none;
+}
+
 
 /*************************************/
 /*########## DETAILS PANE ###########*/

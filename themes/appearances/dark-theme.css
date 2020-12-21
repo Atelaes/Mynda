@@ -342,20 +342,24 @@
 
   --collectionheader-bg: var(--lighter-bg);
   --collectionheader-bg-hover: var(--lighter-bg);
+  --collectionheader-bg-drag: var(--med-bg);
   --collectionheader-text: var(--library-bg);
   --collectionheader-text-hover: var(--library-bg);
+  --collectionheader-text-drag: var(--dim-text);
   --collectionheader-margin-bottom: 3px; /* one of the few times we use pixels instead of em's, because in this case, consistency is more important than scalability */
   --collectionheader-margin: 0em 0em var(--collectionheader-margin-bottom) 0em;
-  --collectionheader-padding: .5em 0em .5em .5em;
+  --collectionheader-padding-padding: .5em;
+  --collectionheader-padding: var(--collectionheader-padding-padding) 0em var(--collectionheader-padding-padding) var(--collectionheader-padding-padding);
 
   --settings-collectionheader-padding: .3em 0em .3em .3em;
 
   --settings-addcollection-width: 2em;
   --settings-addcollection-bg: var(--light-bg);
+  --settings-addcollection-bg-trans: rgba(36,39,46,0.5);
   /* --settings-addcollection-bg: linear-gradient(30deg, var(--lighter-bg) .5em, var(--medlight-bg) 4em, var(--medlight-bg) 60%, var(--medlight-bg-rgba0) 100%); */
-  --settings-addcollection-bg-hover: var(--lightest-bg);
+  --settings-addcollection-bg-hover: var(--med-bg);
   --settings-addcollection-text: var(--library-bg);
-  --settings-addcollection-text-hover: var(--library-bg);
+  --settings-addcollection-text-hover: var(--dim-text);
   --settings-addcollection-padding: .3em 0em .3em 0em; /*.3em 0em .3em .3em;*/
 
   --dropdownarrow-color: var(--collectionheader-text);

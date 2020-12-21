@@ -9,7 +9,6 @@ class Collection {
   constructor(collection) {
     this.c = collection;
     this.videos = collection.videos;
-    this.collections = collection.collections;// ? new Collections(collection.collections) : undefined;
     this.name = collection.name;
     this.id = collection.id;
     this.isTerminal = this.videos ? true : false;
@@ -17,15 +16,50 @@ class Collection {
     this._sortVidsByOrder();
   }
 
+  // ---------------------------------- //
+  // ---------- METHODS FOR ----------- //
+  // ---- NON-TERMINAL COLLECTIONS ---- //
+  // ---------------------------------- //
+
+
   getChildren() {
     if (this.isTerminal) return;
 
-    if (this.collections) {
-      return this.collections;
+    if (this.c.collections) {
+      return this.c.collections;
     } else {
       return null;
     }
   }
+
+  addChild(name) {
+    if (this.isTerminal) return;
+
+    if (!this.c.collections) {
+      this.c.collections = [];
+    }
+
+    this.c.collections.push({
+      id : `${this.id}-${this.c.collections.length}`,
+      name : name || ''
+    });
+
+    return new Collection(this.c.collections[this.c.collections.length-1]);
+  }
+
+  // only removes an immediate child
+  // (though that obviously includes all the descendents of that child)
+  removeChild(id) {
+    if (this.isTerminal) return;
+
+    this.c.collections = this.c.collections.filter(c => c.id !== id);
+  }
+
+  // -------------------------------- //
+  // --------- METHODS FOR ---------- //
+  // ----- TERMINAL COLLECTIONS ----- //
+  // -------------------------------- //
+
 
   containsVideo(id) {
     if (!this.isTerminal) return false;
@@ -66,16 +100,23 @@ class Collection {
   // the user dropped the video at, and adjust the order accordingly
   // (of both the video added and the subsequent videos in the array)
   addVideo(id, order, index) {
-    if (!this.isTerminal) return;
+    if (!this.isTerminal) {
+      // if this has child collections, then it cannot become a terminal collection
+      // and so we cannot add a video
+      if (this.c.collections) {
+        return;
+      } else {
+        // if it does not have child collections, then we can convert it to a terminal collection
+        // creating a videos array, and marking it as terminal
+        this.c.videos = [];
+        this.videos = this.c.videos;
+        this.isTerminal = true;
+      }
+    }
 
     if (order) {
       order = Math.round(Number(order) * 10) / 10;
     }
-
-    let video = {
-      id:id,
-      order:order
-    };
 
     // if we don't have an order, make it (an integer) 1 greater than the highest ordered video
     if (order === undefined) {
@@ -87,6 +128,11 @@ class Collection {
       });
       order = Math.floor(highest + 1);
     }
+
+    let video = {
+      id:id,
+      order:order
+    };
 
     // if we don't have an index, find one based on order
     if (index === undefined) {
@@ -161,9 +207,9 @@ class Collection {
   }
 
   _getVidIndex(id) {
-    if (!this.isTerminal) return;
-    console.log('id: ' + id);
-    console.log('videos: ' + JSON.stringify(this.videos));
+    if (!this.isTerminal) return -1;
+    // console.log('id: ' + id);
+    // console.log('videos: ' + JSON.stringify(this.videos));
 
     for (let i=0; i<this.videos.length; i++) {
       if (this.videos[i].id === id) {

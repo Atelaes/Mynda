@@ -474,14 +474,45 @@ class MynLibrary extends React.Component {
       collections: _.cloneDeep(props.collections),
       hierarchy : null,
       vidsInHierarchy : [],
-      sortReport : {}
+      sortReport : {},
+      dragging : false
     }
+
+    this.deleteBtn = object => (
+      <div className="delete-collection clickable" onClick={(e) => this.deleteCollection(e,object)}>{'\u2715'}</div>
+    );
 
     this.render = this.render.bind(this);
     this.createCollectionsMap = this.createCollectionsMap.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
+    this.onDragStart = this.onDragStart.bind(this);
     this.reportSort = this.reportSort.bind(this);
     // this.findCollections = this.findCollections.bind(this);
+
+    ipcRenderer.on('delete-collection-confirm', (event, response, collectionID) => {
+      console.log(response);
+      console.log('collectionID == ' + collectionID);
+
+      const collections = new Collections(this.state.collections);
+      const collection = collections.get(collectionID);
+
+      if (response === 0) { // remove videos
+        console.log('Removing videos')
+        this.state.movies.map(v => {
+          collection.removeVideo(v.id);
+        });
+        console.log(JSON.stringify(collection));
+        library.replace("collections", collections.getAll());
+
+      } else if (response === 1) { // delete collection
+        console.log('Deleting collection');
+        collections.deleteCollection(collectionID);
+        library.replace("collections", collections.getAll());
+
+      } else { // cancel, do nothing
+        console.log('Deletion cancelled by user')
+      }
+    });
   }
 
   componentDidUpdate(oldProps) {
@@ -537,7 +568,26 @@ class MynLibrary extends React.Component {
       // if there were any videos returned from the level below,
       // wrap them in a div and return them upward to the next level
       if (results.length > 0) {
-        return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden">{results}</div></div>);
+        return (
+          <div className="collection collapsed" key={object.name}>
+            <h1
+              onClick={(e) => this.toggleExpansion(e)}
+              onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.parentNode.classList.add('drag-over')}}
+              onMouseOut={(e) => {e.target.parentNode.classList.remove('drag-over')}}
+            >
+              {object.name}
+            </h1>
+            {this.deleteBtn(object)}
+            <Droppable droppableId={object.id + '-'}>
+              {(provided) => (
+                <div className="add-collection clickable" ref={provided.innerRef} {...provided.droppableProps}>
+                  {'\uFF0B'}
+                </div>
+              )}
+            </Droppable>
+            <div className="container hidden">{results}</div>
+          </div>
+        );
       } else {
         return null;
       }
@@ -590,7 +640,14 @@ class MynLibrary extends React.Component {
         // then hand them off to MynLibTable with an initial sort by 'order'
         return (
           <div className="collection collapsed" key={object.name}>
-            <h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1>
+          <h1
+            onClick={(e) => this.toggleExpansion(e)}
+            onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.classList.add('drag-over')}}
+            onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
+          >
+            {object.name}
+          </h1>
+            {this.deleteBtn(object)}
             <div className="container hidden">
               <Droppable droppableId={object.id}>
                 {(provided) => (
@@ -619,13 +676,39 @@ class MynLibrary extends React.Component {
   }
 
   toggleExpansion(e) {
-    let element = e.target;
+    console.log('TOGGLING!');
+    // 'e' may either be an event or an element
+    let element;
+    if (e.target) {
+      element = e.target;
+    } else {
+      element = e;
+    }
     // let siblings = Array.from(element.parentNode.childNodes).filter(node => (node !== e.target));
     // siblings.map(node => (node.classList.toggle("hidden")));
     let childrenContainer = element.parentNode.getElementsByClassName("container")[0]
     childrenContainer.classList.toggle("hidden");
     element.parentNode.classList.toggle("expanded");
     element.parentNode.classList.toggle("collapsed");
+  }
+
+  expandOnDragOver(e) {
+    // console.log('OVER!');
+    // console.log('this.state.dragging == ' + this.state.dragging);
+
+    let btn = e.target;
+
+    // only do anything if we're dragging something
+    if (this.state.dragging) {
+      // if the button we're dragging over is for a collapsed collection,
+      // we wait a second and then expand it
+      let collection = findNearestOfClass(e.target,'collection');
+      console.log(collection.className);
+      if (collection.classList.contains('collapsed')) {
+        console.log('COLLAPSED!');
+        setTimeout(() => this.toggleExpansion(btn),1000);
+      }
+    }
   }
 
   // when an instance of MynTable is sorted, it reports back here
@@ -636,12 +719,34 @@ class MynLibrary extends React.Component {
     // console.log(JSON.stringify(this.state.sortReport));
   }
 
+  onDragStart() {
+    this.setState({dragging:true});
+    let cols = Array.from(document.getElementById('library-pane').getElementsByClassName('collection'));
+    cols.map(el => {
+      el.classList.add('dragging');
+    });
+  }
+
   onDragEnd(result) {
+    this.setState({dragging:false});
+    let cols = Array.from(document.getElementById('library-pane').getElementsByClassName('collection'));
+    cols.map(el => {
+      el.classList.remove('dragging');
+    });
+
     console.log(JSON.stringify(result));
     const { destination, source, draggableId } = result;
 
     // if anything moved at all
     if (destination) {
+      // check if we have dropped the movie onto a '+' button,
+      // and if we did, we want to create a new collection as a child of
+      // the collection whose '+' button it was
+      if (destination.droppableId[destination.droppableId.length-1] === '-') {
+        this.addCollection(result);
+        return;
+      }
+
       // first, if the destination table isn't sorted by order,
       // do nothing, and inform the user
       try {
@@ -741,6 +846,39 @@ class MynLibrary extends React.Component {
     }
   }
 
+  // when a video is dragged to the plus button on the right side of a non-terminal collection,
+  // this function is called; it creates a new child collection and adds the dragged video to it
+  addCollection(result) {
+    const { destination, source, draggableId } = result;
+    // console.log('ADDING COLLECTION AS CHILD OF ' + destination.droppableId);
+    // console.log('AND ADDING VIDEO ' + draggableId + ' TO IT.');
+
+    // get parent collection
+    let videoID = draggableId.split('_')[0];
+    let cols = new Collections(this.state.collections);
+    const parent = cols.get(destination.droppableId.slice(0,-1));
+
+    // create new collection and add video to it
+    const newCol = parent.addChild('New');
+    newCol.addVideo(videoID);
+
+    // delete video from old collection
+    if (source.droppableId !== 'uncategorized') {
+      const srcCol = cols.get(source.droppableId);
+      srcCol.removeVideo(videoID);
+    }
+
+    // save changes
+    library.replace("collections", cols.getAll());
+  }
+
+  deleteCollection(e,object) {
+    console.log("DELETING COLLECTION");
+    console.log(JSON.stringify(object));
+
+    ipcRenderer.send('delete-collection-confirm', object);
+  }
+
   render() {
     // console.log('----MynLibrary RENDER----');
     let content = null;
@@ -752,7 +890,7 @@ class MynLibrary extends React.Component {
       this.createCollectionsMap();
 
       content = (
-        <DragDropContext onDragEnd={this.onDragEnd}>
+        <DragDropContext onDragEnd={this.onDragEnd} onDragStart={this.onDragStart}>
           <div id="collections-container">
             {this.state.hierarchy}
           </div>
@@ -1083,9 +1221,18 @@ class MynLibTable extends React.Component {
         // row.props = {...row.props, ...this.props.provided.draggableProps}
         return (
           <Draggable key={rowID} draggableId={rowID} index={index}>
-            {(provided) => (
-              React.cloneElement(row, { ref: provided.innerRef, ...provided.draggableProps, ...provided.dragHandleProps })
-            )}
+            {(provided, snapshot) => {
+              // adjust style of row while it's being dragged
+              let draggableProps = _.cloneDeep(provided.draggableProps);
+              draggableProps.style.opacity = snapshot.isDragging ? 0.5 : 1;
+
+              return React.cloneElement(row,
+                {
+                  ref: provided.innerRef,
+                  ...draggableProps,
+                  ...provided.dragHandleProps,
+                });
+            }}
           </Draggable>
         );
       } else {

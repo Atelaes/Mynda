@@ -282,3 +282,21 @@ ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
 }).catch(err => {
   console.log(err)
 })})
+
+ipcMain.on('delete-collection-confirm', (event, collection) => {
+  console.log('delete-collection-confirm!!!');
+
+  const id = collection.id;
+
+  let options = {
+    type : 'question',
+    buttons : ['Remove Videos','Delete Collection(s)','Cancel'],
+    message : 'Do you want to delete this entire collection and all its child collections (bearing in mind, it may contain videos that are not in this playlist)?\n\n' +
+              'Or would you like to just remove the videos in this playlist from the collection?'
+  };
+
+  dialog.showMessageBox(options).then(result => {
+  event.sender.send('delete-collection-confirm', result.response, id);
+}).catch(err => {
+  console.log(err)
+})})

@@ -67,6 +67,25 @@ class Collections {
     return vidCollections;
   }
 
+  deleteCollection(id) {
+    // if the id contains a dash, it's not a top-level collection
+    if (/-/.test(id)) {
+      try {
+        // so we delete it by finding its parent and calling the removeChild method
+        const parentID = id.match(/[\d-]+(?=-\d+$)/)[0];
+        const parent = this.get(parentID);
+        console.log('PARENT:\n' + JSON.stringify(parent));
+        if (parent) parent.removeChild(id);
+        console.log('PARENT AFTER DELETE:\n' + JSON.stringify(parent));
+      } catch(err) {
+        console.error(err);
+      }
+    // otherwise, it is a top-level collection,
+    // so we delete it directly
+    } else {
+      this.c = this.c.filter(c => c.id !== id);
+    }
+  }
 
 }
 
