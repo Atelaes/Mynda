@@ -805,7 +805,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 }
 
 /* add a little inset shadow over the first child collection of an open collection header element */
-.collection.expanded .collection:first-of-type h1 {
+.collection.expanded .collection:first-of-type > h1 {
   box-shadow: inset -.5em .2em .3em .0em rgba(0,0,0,.5);
   width: calc(100% + .5em); /* so we can't see the shadow on the right vertical side */
 }

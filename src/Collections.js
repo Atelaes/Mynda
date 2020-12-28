@@ -34,7 +34,7 @@ class Collections {
             collections = collections[nodeIndex].collections;
           }
         } catch (err) {
-          throw `Could not find collection object: failed at element ${index} of ${map}. ${err}`;
+          throw `Could not find collection object: failed at element (depth) ${index} of [${map}]. ${err}`;
         }
       });
     } catch(err) {

@@ -419,7 +419,7 @@ class Mynda extends React.Component {
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
-        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
+        <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
@@ -482,6 +482,16 @@ class MynLibrary extends React.Component {
       <div className="delete-collection clickable" onClick={(e) => this.deleteCollection(e,object)}>{'\u2715'}</div>
     );
 
+    this.addBtn = object => (
+      <Droppable droppableId={object.id + '-'} direction="horizontal">
+        {(provided) => (
+          <div className="add-collection clickable" ref={provided.innerRef} {...provided.droppableProps}>
+            {'\uFF0B'}
+          </div>
+        )}
+      </Droppable>
+    );
+
     this.render = this.render.bind(this);
     this.createCollectionsMap = this.createCollectionsMap.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
@@ -511,6 +521,29 @@ class MynLibrary extends React.Component {
 
       } else { // cancel, do nothing
         console.log('Deletion cancelled by user')
+      }
+    });
+
+    ipcRenderer.on('MynLibrary-confirm-convertTerminalCol', (event, response, dragData, checked) => {
+      // console.log('CONFIRMATION OF ADDING A CHILD COLLECTION TO A TERMINAL COLLECTION HAS FIRED')
+      // console.log(event);
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (checked) {
+        console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.overridedialogs) {
+          prefs.overridedialogs = {};
+        }
+        prefs.overridedialogs['MynLibrary-confirm-convertTerminalCol'] = true;
+        library.replace("settings.preferences",prefs);
+      }
+
+      if (response === 0) { // yes
+        // add the collection
+        this.addCollection(dragData);
+      } else {
+        console.log('Creation of collection cancelled by user');
       }
     });
   }
@@ -578,13 +611,7 @@ class MynLibrary extends React.Component {
               {object.name}
             </h1>
             {this.deleteBtn(object)}
-            <Droppable droppableId={object.id + '-'}>
-              {(provided) => (
-                <div className="add-collection clickable" ref={provided.innerRef} {...provided.droppableProps}>
-                  {'\uFF0B'}
-                </div>
-              )}
-            </Droppable>
+            {this.addBtn(object)}
             <div className="container hidden">{results}</div>
           </div>
         );
@@ -648,6 +675,7 @@ class MynLibrary extends React.Component {
             {object.name}
           </h1>
             {this.deleteBtn(object)}
+            {this.addBtn(object)}
             <div className="container hidden">
               <Droppable droppableId={object.id}>
                 {(provided) => (
@@ -675,6 +703,7 @@ class MynLibrary extends React.Component {
     }
   }
 
+  // expand or collapse a collection
   toggleExpansion(e) {
     console.log('TOGGLING!');
     // 'e' may either be an event or an element
@@ -692,6 +721,7 @@ class MynLibrary extends React.Component {
     element.parentNode.classList.toggle("collapsed");
   }
 
+  // when dragging a video row over a collapsed collection header, expand that collection (after a delay)
   expandOnDragOver(e) {
     // console.log('OVER!');
     // console.log('this.state.dragging == ' + this.state.dragging);
@@ -743,7 +773,7 @@ class MynLibrary extends React.Component {
       // and if we did, we want to create a new collection as a child of
       // the collection whose '+' button it was
       if (destination.droppableId[destination.droppableId.length-1] === '-') {
-        this.addCollection(result);
+        this.addCollectionConfirm(result);
         return;
       }
 
@@ -846,17 +876,59 @@ class MynLibrary extends React.Component {
     }
   }
 
-  // when a video is dragged to the plus button on the right side of a non-terminal collection,
+  // when a video is dragged to the plus button on the right side of a collection,
   // this function is called; it creates a new child collection and adds the dragged video to it
-  addCollection(result) {
+  addCollectionConfirm(result) {
     const { destination, source, draggableId } = result;
     // console.log('ADDING COLLECTION AS CHILD OF ' + destination.droppableId);
     // console.log('AND ADDING VIDEO ' + draggableId + ' TO IT.');
 
     // get parent collection
-    let videoID = draggableId.split('_')[0];
     let cols = new Collections(this.state.collections);
     const parent = cols.get(destination.droppableId.slice(0,-1));
+    console.log('destination.droppableId == ' + destination.droppableId);
+    console.log('Adding child collection to ' + parent.name);
+
+    // if the user is trying to add a child collection to a terminal collection
+    // i.e. one that contains videos,
+    // the only way that is allowed is to make the collection non-terminal,
+    // which means removing all the videos from it.
+    // so we have to give the user a confirmation dialog before doing that.
+    if (parent.isTerminal) {
+      // if the user hasn't previously selected the preference to override this confirmation dialog
+      if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynLibrary-confirm-convertTerminalCol']) {
+        ipcRenderer.send(
+          'generic-confirm',
+          'MynLibrary-confirm-convertTerminalCol',
+          {
+            message: `Are you sure you want to add a child collection to ${parent.name}? Doing this will remove all videos from this collection, including any videos in it that don't appear in this playlist.`,
+            checkboxLabel: `Don't show this dialog again`
+          },
+          result
+        );
+      } else {
+        // the user had checked the box to override the confirmation dialog
+        this.addCollection(result);
+      }
+    } else {
+      // if the collection is not terminal, we don't need a confirmation dialog, just add a child collection to it
+      this.addCollection(result);
+    }
+  }
+
+  addCollection(result) {
+    const { destination, source, draggableId } = result;
+    const videoID = draggableId.split('_')[0];
+    const cols = new Collections(this.state.collections);
+    const parent = cols.get(destination.droppableId.slice(0,-1));
+
+    // if the parent is a terminal collection,
+    // convert it to a non-terminal collection;
+    // (at this point we've already gotten confirmation from the user)
+    if (parent.isTerminal) {
+      delete parent.c.videos;
+      parent.isTerminal = false;
+    }
 
     // create new collection and add video to it
     const newCol = parent.addChild('New');
@@ -2514,7 +2586,7 @@ class MynSettingsCollections extends React.Component {
       return (
         <div key={collection.id} id={'settings-col_' + collection.id} className='collection'>
           <header>
-            <h1>{collection.name}</h1>
+            <h1>{collection.name} ({collection.id})</h1>
             {addButton}
           </header>
           {children}
@@ -4079,7 +4151,7 @@ class MynEditCollections extends MynEdit {
 
     // if this object contains sub-collections, then it's a non-terminal node,
     // so we recurse on its children
-    if (collection.collections) {
+    if (collection.collections && collection.collections.length > 0) {
       // loop through the subcollections and call ourselves recursively on each one
       for (let i=0; i<collection.collections.length; i++) {
         let child = this.findCollections(collection.collections[i]);
@@ -4087,22 +4159,33 @@ class MynEditCollections extends MynEdit {
         // if this child isn't being shown (i.e. our video isn't in its branch)
         // add it to the beginning of the results array, so that if the user adds it, it appears at the top;
         // also add it to the list of options to display to the user for adding the video to its branch
-        if (child.show === false) {
-          results.unshift(child)
-          childrenOpts.push(collection.collections[i].name);
-        } else {
-          // if the child IS being shown, add it to the end of the results array,
-          // so that it appears after any hidden collections that the user might add
-          results.push(child);
+        try {
+          if (child.show === false) {
+            results.unshift(child)
+            childrenOpts.push(collection.collections[i].name);
+          } else {
+            // if the child IS being shown, add it to the end of the results array,
+            // so that it appears after any hidden collections that the user might add
+            results.push(child);
+          }
+        } catch(err) {
+          console.error(err);
+          console.log(`i==${i}, collection.collections[i]==${JSON.stringify(collection.collections[i])}`);
         }
       }
-      // if there are no sub-collections within this collection
-      // there should be videos (if not, something went wrong)
-      // if there are videos, add the terminal node JSX to the results array
+      // if there are no child collections within this collection;
+      // add the terminal node JSX to the results array
       // test whether one of the videos is this video
       // and if it is, show the terminal node; otherwise, hide it
-    } else if (collection.videos) {
+    } else if (collection.videos || collection.collections.length === 0) {
       // we're at a bottom-level collection
+
+      // if there is no videos array, create one
+      if (!collection.videos) {
+        collection.videos = [];
+        delete collection.collections;
+      }
+
       try {
         let index = collection.videos.findIndex(video => video.id == this.props.video.id);
         if (index !== -1) {
@@ -4127,14 +4210,15 @@ class MynEditCollections extends MynEdit {
         }
         results.push({jsx: contents});
       } catch(err) {
-        console.error("Error, no videos found in this terminal collection node. That should not happen (malformed collections object in library settings?): " + e.toString());
+        console.error("Error, no videos found in this terminal collection node. That should not happen (malformed collections object in library settings?): " + err);
       }
     }
 
     // if there were any collections returned from the level below,
     // or any videos found at this level, they will be in the results array;
     // place them within this collection and return them upward to the next level;
-    if (results.length > 0) {
+    // if (results.length > 0) {
+    // if (true) {
       // if any results have their 'show' as positive
       // set show here to true
       for (const result of results) {
@@ -4166,11 +4250,11 @@ class MynEditCollections extends MynEdit {
           </div>
       )};
       // return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden">{results}</div></div>);
-    } else {
+    // } else {
       // if there were no sub-collections found, or in the case of a terminal node,
-      // if there none of the videos was this video, return null
-      return null;
-    }
+      // if none of the videos was this video, return null
+      // return null;
+    // }
     // let vidsWereFound = false;
     // let videos = []
     // try {

@@ -16,6 +16,30 @@ class Collection {
     this._sortVidsByOrder();
   }
 
+  // change the id of this collection;
+  // id's are descriptive of the collections structure, e.g. the second child
+  // of the first child of the 3rd top-level collection will have the id '2-0-1'
+  // when we delete or add a new collection, we may need to alter the ids of other
+  // collections to preserve this descriptive property;
+  // the 'depth' parameter is like an index of which depth to alter in the id;
+  // for instance, a value of 1 would indicate that we should change the second
+  // number in the id (in our example, the 0); the 'value' parameter is what to change it to;
+  // in addition to that, we need to do the same alteration to all of this collections
+  // children, grandchildren, etc., so we simply call the same function recursively
+  changeID(depth,value) {
+    let arrayID = this.c.id.split('-');
+    arrayID[depth] = value;
+    this.c.id = arrayID.join('-');
+
+    if (this.c.collections) {
+      this.c.collections.map(c => {
+        let col = new Collection(c);
+        col.changeID(depth,value);
+      });
+    }
+  }
+
+
   // ---------------------------------- //
   // ---------- METHODS FOR ----------- //
   // ---- NON-TERMINAL COLLECTIONS ---- //
@@ -48,11 +72,35 @@ class Collection {
   }
 
   // only removes an immediate child
-  // (though that obviously includes all the descendents of that child)
+  // (though that obviously includes all the descendants of that child)
+  // decrements the ID's of all the collections following the deleted child
   removeChild(id) {
     if (this.isTerminal) return;
 
-    this.c.collections = this.c.collections.filter(c => c.id !== id);
+    // this.c.collections = this.c.collections.filter(c => c.id !== id);
+    let temp = [];
+    let afterFlag = false;
+    for (let i=0; i < this.c.collections.length; i++) {
+      let col = new Collection(_.cloneDeep(this.c.collections[i]));
+      if (col.id !== id) {
+        if (afterFlag) {
+          let idArray = col.id.split('-');
+          let depth = idArray.length - 1;
+          console.log('idArray: ' + idArray)
+          console.log('depth: ' + depth);
+          console.log('value: ' + (idArray[depth] - 1));
+          col.changeID(depth,idArray[depth] - 1);
+        }
+        temp.push(col.c);
+      } else {
+        afterFlag = true;
+      }
+    }
+    if (temp.length > 0) {
+      this.c.collections = temp;
+    } else {
+      delete this.c.collections;
+    }
   }
 
   // -------------------------------- //
@@ -202,6 +250,12 @@ class Collection {
     // let order = this.videos[index].order;
 
     this.videos.splice(index,1);
+
+    if (this.videos.length === 0) {
+      delete this.c.videos;
+      delete this.videos;
+      this.isTerminal = false;
+    }
 
     return true;
   }
