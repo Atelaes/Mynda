@@ -361,6 +361,14 @@ class Mynda extends React.Component {
           // if the collections were edited, a video was edited too with
           // the corresponding change to the video object;
           // and that will cause the playlist to re-render
+
+          // ^^ THE ABOVE IS NO LONGER TRUE; we've since removed the redundant
+          // collections information from the video objects; it remains to be
+          // seen whether we need to update the playlist explicitly here or not
+
+          // update video in details pane (we don't know if this video was affected, but just in case)
+          // this.setState({detailMovie : this.state.videos.filter(video => video.id === this.state.detailMovie.id)[0]});
+          this.setState({detailMovie : null}); // for some reason this appears to work, and the above (commented) line does not. Not sure why.
         });
       }
 
@@ -681,6 +689,7 @@ class MynLibrary extends React.Component {
                 {(provided) => (
                   <MynLibTable
                     movies={movies}
+                    collections={_.cloneDeep(this.state.collections)}
                     view={this.props.view}
                     initialSort={this.state.sortReport[object.id] ? this.state.sortReport[object.id].key : "order"}
                     initialSortAscending={this.state.sortReport[object.id] ? this.state.sortReport[object.id].ascending : true}
@@ -1116,13 +1125,19 @@ class MynLibTable extends React.Component {
     e.stopPropagation();
     // e.target.removeEventListener()
     // console.log(e.target);
+    console.log('Saving order as ' + order);
 
-    // update the order
-    //this.props.collectionID
+    // update the order and save to library
+    if (this.props.collections) {
+      let cols = new Collections(this.props.collections);
+      let col = cols.get(this.props.collectionID);
+      col.removeVideo(video.id);
+      col.addVideo(video.id,order);
+      library.replace("collections", cols.getAll());
+    }
 
     // replace the contents of the cell with the new order value
     // (and a click event listener to enable another edit)
-    console.log('Saving order as ' + order);
     let vidOrderDisplay = _.cloneDeep(this.state.vidOrderDisplay);
     vidOrderDisplay[video.id] = this.state.vidOrderDisplayTemplate(video,order);
     this.setState({vidOrderDisplay:vidOrderDisplay},() => {
@@ -1324,7 +1339,9 @@ class MynLibTable extends React.Component {
   // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
   // rather than the current values)
   reset(initialSort,resetOrder) {
+    console.log('RESETTING');
     if (initialSort || resetOrder) {
+      console.log("RESETTING ORDER");
       this.props.movies.map(movie => {
         // we display the order property through a state variable
         // because when the user wants to edit the order, we use the state variable
@@ -1391,6 +1408,7 @@ class MynLibTable extends React.Component {
   }
 
   componentDidMount(props) {
+    console.log("--MOUNTED--");
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
     // populate and sort the table (by initial values)
     this.reset(true);
@@ -1398,11 +1416,21 @@ class MynLibTable extends React.Component {
 
   componentDidUpdate(oldProps) {
     // console.log('UPDATING MynTable');
-    if (!_.isEqual(oldProps.movies,this.props.movies)) {
-      // console.log('MynTable props changed!!!');
+    
+    // we have to sort the movies array before comparing it,
+    // otherwise the conditional fires when the elements change order,
+    // whereas we want them to change only when a movie is changed, added, or removed
+    let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
+    let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
+    if (!_.isEqual(tempOld,tempNew)) {
+      // console.log("----props.movies updated----");
+      // let diff = getObjectDiff(tempOld,tempNew);
+      // diff.map(key => {
+      //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
+      // });
+
       // re-render the table (sorting by the current values)
       this.reset(false,true);
-
     }
 
     // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
@@ -5362,6 +5390,21 @@ function getCollectionObject(id, collectionsRoot, copy) {
 
   // return the collection
   return copy ? _.cloneDeep(result) : result;
+}
+
+// https://stackoverflow.com/a/40610459
+function getObjectDiff(obj1, obj2) {
+    const diff = Object.keys(obj1).reduce((result, key) => {
+        if (!obj2.hasOwnProperty(key)) {
+            result.push(key);
+        } else if (_.isEqual(obj1[key], obj2[key])) {
+            const resultKeyIndex = result.indexOf(key);
+            result.splice(resultKeyIndex, 1);
+        }
+        return result;
+    }, Object.keys(obj2));
+
+    return diff;
 }
 
 const library = new Library;
