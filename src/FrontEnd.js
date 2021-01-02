@@ -979,7 +979,7 @@ class MynLibrary extends React.Component {
     }
 
     // create new collection and add video to it
-    const newCol = parent.addChild('New');
+    const newCol = parent.addChild('');
     newCol.addVideo(videoID);
 
     // delete video from old collection
@@ -4453,6 +4453,7 @@ class MynClickToEditText extends React.Component {
 
   endEdit(e) {
     e.preventDefault();
+    e.stopPropagation();
 
     if (e.keyCode === 13) {
       // if the key hit was 'enter'
@@ -4476,7 +4477,10 @@ class MynClickToEditText extends React.Component {
   }
 
   render() {
-    if (this.state.editing) {
+    // if the user has clicked, display the editor;
+    // also always display the editor if the value is empty/only white space
+    if (this.state.editing || /^\s*$/.test(this.props.object[this.props.property])) {
+      this.state.editing = true;
       return (
         <div onClick={(e) => {e.stopPropagation()}} onKeyUp={(e) => {this.endEdit(e)}}>
           <MynEditText {...this.props} />
