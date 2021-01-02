@@ -613,6 +613,7 @@ class MynLibrary extends React.Component {
         return (
           <div className="collection collapsed" key={object.name}>
             <h1
+              className="collection-header"
               onClick={(e) => this.toggleExpansion(e)}
               onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.parentNode.classList.add('drag-over')}}
               onMouseOut={(e) => {e.target.parentNode.classList.remove('drag-over')}}
@@ -629,6 +630,7 @@ class MynLibrary extends React.Component {
                 reportValid={(prop,valid) => { editColNameValid = valid }}
                 noClear={true}
                 setFocus={true}
+                doubleClick={true}
               />
             </h1>
             {this.deleteBtn(object)}
@@ -684,7 +686,7 @@ class MynLibrary extends React.Component {
 
         let editColNameValid; // used in MynClickToEditText props below
         let name;
-        if (object.name === '[Uncategorized]') {
+        if (object.id === 'uncategorized') {
           name = object.name;
         } else {
           name = (
@@ -700,6 +702,7 @@ class MynLibrary extends React.Component {
              reportValid={(prop,valid) => { editColNameValid = valid }}
              noClear={true}
              setFocus={true}
+             doubleClick={true}
            />
          );
         }
@@ -711,6 +714,7 @@ class MynLibrary extends React.Component {
         return (
           <div className="collection collapsed" key={object.name}>
           <h1
+            className="collection-header"
             onClick={(e) => this.toggleExpansion(e)}
             onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.classList.add('drag-over')}}
             onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
@@ -753,7 +757,7 @@ class MynLibrary extends React.Component {
     // 'e' may either be an event or an element
     let element;
     if (e.target) {
-      element = e.target;
+      element = findNearestOfClass(e.target,'collection-header');
     } else {
       element = e;
     }
@@ -4443,7 +4447,7 @@ class MynClickToEditText extends React.Component {
   }
 
   edit(e) {
-    e.stopPropagation();
+    // e.stopPropagation();
     this.setState({editing:true});
   }
 
@@ -4467,26 +4471,8 @@ class MynClickToEditText extends React.Component {
   }
 
   componentDidMount() {
+    // store the initial value in case the user wants to stop editing without saving
     this.state.initialValue = this.props.object[this.props.property];
-    // // default values for the props we'll pass to MynEditText;
-    // // but at the very very least, an update function must be supplied by the calling class,
-    // // otherwise nothing will happen
-    // this.state.editProps = {
-    //   object:{},
-    //   property:'property',
-    //   update: (prop,value) => { /*console.log(value)*/ },
-    //   options: null,
-    //   storeTransform: null,
-    //   validator: {test:() => true},
-    //   validatorTip: '',
-    //   allowedEmpty: true,
-    //   reportValid: (prop,value) => { /*console.log(value)*/ },
-    //   noClear: false,
-    //   setFocus: false
-    // };
-    //
-    // // override defaults with anything passed to us through props
-    // if (this.props.editProps) this.state.editProps = {...this.state.editProps, ...this.props.editProps};
   }
 
   render() {
@@ -4499,13 +4485,30 @@ class MynClickToEditText extends React.Component {
     } else {
       if (this.props.doubleClick) {
         return (
-          <div onDoubleClick={(e) => this.edit(e)} style={{cursor:'text'}}>
+          <div
+            onDoubleClick={(e) => this.edit(e)}
+            onClick={(e) => {
+              // we must essentially pause the propagation of the (single) click event
+              // to check if it was a double click (by checking the 'editing' state var),
+              // and if it wasn't, register a click on the parent element to continue
+              // the propagation upwards to be caught by any event handlers there may be
+              e.stopPropagation();
+              let parent = e.target.parentNode;
+              setTimeout(() => {
+                if (!this.state.editing) {
+                    // console.log("SINGLE CLICK");
+                    parent.click();
+                }
+              },150)
+            }}
+            style={{cursor:'text'}}
+          >
             {this.props.object[this.props.property]}
           </div>
         );
       } else {
         return (
-          <div onClick={(e) => this.edit(e)} style={{cursor:'text'}}>
+          <div onClick={(e) => {e.stopPropagation(); this.edit(e)}} style={{cursor:'text'}}>
             {this.props.object[this.props.property]}
           </div>
         );
