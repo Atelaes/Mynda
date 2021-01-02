@@ -501,6 +501,14 @@ th, tr, td {
   background-color: var(--collectionheader-bg-drag);
   color: var(--collectionheader-text-drag);
 }
+/* the container div for a collections title */
+.collection h1 > div {
+  display: inline-block;
+}
+/* the input for when a collections title is clicked on to edit */
+.collection h1 input {
+  width:20em;
+}
 
 .collection .add-collection {
   position:absolute;
@@ -1467,6 +1475,7 @@ th, tr, td {
 .tip {
   position:absolute;
   font-size: var(--tip-fontsize);
+  line-height:normal;
   opacity:.7;
   margin: var(--editfield-name-margin);
 }

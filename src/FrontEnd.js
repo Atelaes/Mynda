@@ -471,7 +471,6 @@ class MynNav extends React.Component {
 }
 
 
-
 // ###### Library Pane: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
 class MynLibrary extends React.Component {
   constructor(props) {
@@ -609,6 +608,8 @@ class MynLibrary extends React.Component {
       // if there were any videos returned from the level below,
       // wrap them in a div and return them upward to the next level
       if (results.length > 0) {
+        let editColNameValid;
+
         return (
           <div className="collection collapsed" key={object.name}>
             <h1
@@ -616,7 +617,19 @@ class MynLibrary extends React.Component {
               onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.parentNode.classList.add('drag-over')}}
               onMouseOut={(e) => {e.target.parentNode.classList.remove('drag-over')}}
             >
-              {object.name}
+              <MynClickToEditText
+                object={object}
+                property='name'
+                update={(prop,value) => { object.name = value }}
+                save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+                options={null}
+                validator={/^[^=;{}]+$/}
+                validatorTip={'Not allowed: = ; { }'}
+                allowedEmpty={true}
+                reportValid={(prop,valid) => { editColNameValid = valid }}
+                noClear={true}
+                setFocus={true}
+              />
             </h1>
             {this.deleteBtn(object)}
             {this.addBtn(object)}
@@ -669,6 +682,28 @@ class MynLibrary extends React.Component {
           console.log('Error assigning order to videos in collection ' + object.name + ': ' + e.toString());
         }
 
+        let editColNameValid; // used in MynClickToEditText props below
+        let name;
+        if (object.name === '[Uncategorized]') {
+          name = object.name;
+        } else {
+          name = (
+           <MynClickToEditText
+             object={object}
+             property='name'
+             update={(prop,value) => { object.name = value }}
+             save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+             options={null}
+             validator={/^[^=;{}]+$/}
+             validatorTip={'Not allowed: = ; { }'}
+             allowedEmpty={true}
+             reportValid={(prop,valid) => { editColNameValid = valid }}
+             noClear={true}
+             setFocus={true}
+           />
+         );
+        }
+
         // console.log('Creating table for collection: ' + JSON.stringify(object));
         // console.log(JSON.stringify(movies));
         // wrap the movies in the last collection div,
@@ -680,7 +715,7 @@ class MynLibrary extends React.Component {
             onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.classList.add('drag-over')}}
             onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
           >
-            {object.name}
+            {name}
           </h1>
             {this.deleteBtn(object)}
             {this.addBtn(object)}
@@ -1472,7 +1507,7 @@ class MynLibTable extends React.Component {
     }
 
     // if this table is part of a hierarchical playlist,
-    // then the rows are meant to be drag-n-droppable (using reacr-beautiful-dnd)
+    // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
     // in which case MynLibrary will have given us the 'provided' prop,
     // so if it has, we add the appropriate bits to make the table body droppable
     let tBody = null;
@@ -3358,6 +3393,11 @@ class MynEditorEdit extends React.Component {
       return null;
     }
 
+    if (!this.props.video) {
+      console.error('Error: no video object provided to MynEditorEdit');
+      return null;
+    }
+
     const video = this.props.video;
     // validateVideo(video);
 
@@ -4387,6 +4427,90 @@ class MynEditCollections extends MynEdit {
       </div>
       </div>
     );
+  }
+}
+
+// a wrapper for MynEditText that only shows the edit field when clicked
+// (otherwise just shows the value), and takes a save function that's
+// triggered when the user hits 'enter'
+class MynClickToEditText extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      editing : false
+    }
+  }
+
+  edit(e) {
+    e.stopPropagation();
+    this.setState({editing:true});
+  }
+
+  endEdit(e) {
+    e.preventDefault();
+
+    if (e.keyCode === 13) {
+      // if the key hit was 'enter'
+      // save the value and exit the editor
+      this.setState({editing:false});
+      this.props.save();
+    } else if (e.keyCode === 27) {
+      // if the key hit was 'esc'
+      // exit the editor without saving
+      // (also revert to the initial value)
+      this.setState({editing:false});
+      if (this.props.update) {
+        this.props.update(this.props.property, this.state.initialValue);
+      }
+   }
+  }
+
+  componentDidMount() {
+    this.state.initialValue = this.props.object[this.props.property];
+    // // default values for the props we'll pass to MynEditText;
+    // // but at the very very least, an update function must be supplied by the calling class,
+    // // otherwise nothing will happen
+    // this.state.editProps = {
+    //   object:{},
+    //   property:'property',
+    //   update: (prop,value) => { /*console.log(value)*/ },
+    //   options: null,
+    //   storeTransform: null,
+    //   validator: {test:() => true},
+    //   validatorTip: '',
+    //   allowedEmpty: true,
+    //   reportValid: (prop,value) => { /*console.log(value)*/ },
+    //   noClear: false,
+    //   setFocus: false
+    // };
+    //
+    // // override defaults with anything passed to us through props
+    // if (this.props.editProps) this.state.editProps = {...this.state.editProps, ...this.props.editProps};
+  }
+
+  render() {
+    if (this.state.editing) {
+      return (
+        <div onClick={(e) => {e.stopPropagation()}} onKeyUp={(e) => {this.endEdit(e)}}>
+          <MynEditText {...this.props} />
+        </div>
+      );
+    } else {
+      if (this.props.doubleClick) {
+        return (
+          <div onDoubleClick={(e) => this.edit(e)} style={{cursor:'text'}}>
+            {this.props.object[this.props.property]}
+          </div>
+        );
+      } else {
+        return (
+          <div onClick={(e) => this.edit(e)} style={{cursor:'text'}}>
+            {this.props.object[this.props.property]}
+          </div>
+        );
+      }
+    }
   }
 }
 
