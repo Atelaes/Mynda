@@ -193,6 +193,7 @@ img.ratings-icon {
   grid-area: library;
   background-color: var(--library-bg);
   overflow-y: scroll;
+  overflow-x: hidden;
   scrollbar-width: none;
 }
 #library-pane ::-webkit-scrollbar {
@@ -295,6 +296,9 @@ img.ratings-icon {
 /*########## LIBRARY PANE ###########*/
 /*************************************/
 
+.movie-table-container {
+  overflow-x: scroll;
+}
 th, tr, td {
   border-width:0px;
 }

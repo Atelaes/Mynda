@@ -1416,7 +1416,7 @@ class MynLibTable extends React.Component {
 
   componentDidUpdate(oldProps) {
     // console.log('UPDATING MynTable');
-    
+
     // we have to sort the movies array before comparing it,
     // otherwise the conditional fires when the elements change order,
     // whereas we want them to change only when a movie is changed, added, or removed
@@ -1491,17 +1491,21 @@ class MynLibTable extends React.Component {
       );
     }
 
-    return  (<table className="movie-table" id={tableID}>
-              <thead>
-                <tr id="main-table-header-row">
-                  <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
-                  {this.props.columns.map(col => (
-                    <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
-                  ))}
-                </tr>
-              </thead>
-              {tBody}
-            </table>)
+    return  (
+      <div className="movie-table-container">
+        <table className="movie-table" id={tableID}>
+          <thead>
+            <tr id="main-table-header-row">
+              <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
+              {this.props.columns.map(col => (
+                <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
+              ))}
+            </tr>
+          </thead>
+          {tBody}
+        </table>
+      </div>
+    )
   }
 }
 
