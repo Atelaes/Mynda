@@ -252,13 +252,19 @@ class Collection {
     this.videos.splice(index,1);
 
     if (this.videos.length === 0) {
-      delete this.c.videos;
-      delete this.videos;
-      this.isTerminal = false;
+      this.convertToNonTerminal();
     }
 
     return true;
   }
+
+  convertToNonTerminal() {
+    delete this.c.videos;
+    delete this.videos;
+    this.isTerminal = false;
+  }
+
+  // ------------------------------
 
   _getVidIndex(id) {
     if (!this.isTerminal) return -1;

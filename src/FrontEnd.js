@@ -1378,9 +1378,9 @@ class MynLibTable extends React.Component {
   // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
   // rather than the current values)
   reset(initialSort,resetOrder) {
-    console.log('RESETTING');
+    // console.log('RESETTING');
     if (initialSort || resetOrder) {
-      console.log("RESETTING ORDER");
+      // console.log("RESETTING ORDER");
       this.props.movies.map(movie => {
         // we display the order property through a state variable
         // because when the user wants to edit the order, we use the state variable
@@ -1447,7 +1447,7 @@ class MynLibTable extends React.Component {
   }
 
   componentDidMount(props) {
-    console.log("--MOUNTED--");
+    // console.log("--MOUNTED--");
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
     // populate and sort the table (by initial values)
     this.reset(true);
@@ -2560,76 +2560,77 @@ class MynSettingsCollections extends React.Component {
     }
   }
 
-  addCollection(e) {
+  addCollection(e,parentID, isTerminal) {
     e.stopPropagation();
 
-    // DOM element of parent collection
-    const parentEl = findNearestOfClass(e.target,'collection');
+    if (isTerminal) {
+      // go to user confirmation dialog here
+    }
 
-    // if we found a parent collection element
-    let parentCol, parentChildren;
-    if (parentEl) {
+    let collections = new Collections(this.state.collections);
+    let newCol;
+
+    // if we got a parent collection
+    if (parentID) {
       // get the actual collection object of the parent
-      parentCol = getCollectionObject(parentEl.id.split('_')[1], this.state.collections, false);
-
-      // then get the parent's array of child collections, creating one if it doesn't already exist
-      if (!parentCol.collections) {
-        parentCol.collections = [];
-      }
-      parentChildren = parentCol.collections;
+      let parentCol = collections.get(parentID);
+      parentCol.convertToNonTerminal();
+      newCol = parentCol.addChild();
     } else {
-      // if we did not, we're adding a top-level collection,
-      // so set parentChildren to the top-level array itself
-      parentChildren = this.state.collections;
+      // if we weren't given a parentID we assume we're adding a child to the
+      // top-level collections object
+      newCol = collections.addCollection({name:''},true);
     }
 
-    try {
-      console.log('Parent collection: ' + parentCol.name);
-    } catch(err) {
-      console.log('Parent collection: top level (none)');
-    }
-
-    parentChildren.push({
-      "id" : "1-1",
-      "name" : "Example",
-      "videos" : [
-        { "id" : 7, "order" : 1}
-      ]
-    });
+    // try {
+    //   console.log('Parent collection: ' + parentCol.name);
+    // } catch(err) {
+    //   console.log('Parent collection: top level (none)');
+    // }
+    // console.log('New collection: ' + JSON.stringify(newCol));
 
     // this.state.collections is actually altered in place
     // but we need to explicitly set it in order to get a re-render
-    this.setState({collections: this.state.collections});
+    this.setState({collections: collections.getAll()});
   }
 
-  createAddCollectionBtn() {
+  createAddCollectionBtn(id, isTerminal) {
     return (
-      <div key='add' className='add-collection clickable' onClick={(e) => this.addCollection(e)}>
+      <div key='add' className={'add-collection clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.addCollection(e,id,isTerminal)}>
         <h1>{'\uFF0B'}</h1>
       </div>
     );
   }
 
   findCollections(collections) {
+    // if collections is a class object, unwrap it
+    if (collections.c) collections = collections.c;
+
     let collectionsJSX = collections.map(collection => {
       let children = null;
       let addButton = null;
+
 
       // if this collection has child collections
       if (collection.collections) {
         // attach those collections as children
         children = this.findCollections(collection.collections);
 
-        // and create an add button so the user can create more child collections;
-        // since this is not a bottom-level collection containing videos,
-        // it is allowed to have child collections
-        addButton = this.createAddCollectionBtn();
+        // create add collection button
+        addButton = this.createAddCollectionBtn(collection.id);
 
       // if the collection does not have child collections,
       // it is a bottom-level collection, probably containing videos
       // (though it may not contain videos)
       // so if it contains videos, attach those videos as children
-      } else if (collection.videos) {
+    } else if (collection.videos && collection.videos.length > 0) {
+        // and create an add button so the user can create more child collections;
+        // in the case of a terminal collection containing videos,
+        // the user will get a confirmation dialog, because adding a child
+        // collection will convert it to a non-terminal collection,
+        // deleting all the videos in it
+        addButton = this.createAddCollectionBtn(collection.id, true);
+
         children = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
           let video = null;
           try {
@@ -2651,13 +2652,32 @@ class MynSettingsCollections extends React.Component {
       // (making it no longer a bottom-level collection)
       // so we create an add button
       } else {
-        addButton = this.createAddCollectionBtn();
+        addButton = this.createAddCollectionBtn(collection.id);
       }
+
+      let editColNameValid;
 
       return (
         <div key={collection.id} id={'settings-col_' + collection.id} className='collection'>
           <header>
-            <h1>{collection.name} ({collection.id})</h1>
+            <h1>
+              <MynClickToEditText
+                object={collection}
+                property='name'
+                update={(prop,value) => { collection.name = value }}
+                save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+                options={null}
+                validator={/^[^=;{}]+$/}
+                validatorTip={'Not allowed: = ; { }'}
+                allowedEmpty={true}
+                reportValid={(prop,valid) => { editColNameValid = valid }}
+                noClear={true}
+                setFocus={true}
+                doubleClick={true}
+              />
+
+              ({collection.id})
+            </h1>
             {addButton}
           </header>
           {children}
@@ -4253,7 +4273,7 @@ class MynEditCollections extends MynEdit {
       // add the terminal node JSX to the results array
       // test whether one of the videos is this video
       // and if it is, show the terminal node; otherwise, hide it
-    } else if (collection.videos || collection.collections.length === 0) {
+    } else if (collection.videos || !collection.collections || collection.collections.length === 0) {
       // we're at a bottom-level collection
 
       // if there is no videos array, create one

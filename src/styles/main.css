@@ -493,7 +493,7 @@ th, tr, td {
   font-family: var(--collectionheader-font);
   font-style: var(--collectionheader-font-style);
 }
-.collection h1:hover {
+#library-pane .collection h1:hover {
   background-color: var(--collectionheader-bg-hover);
   color: var(--collectionheader-text-hover);
 }
@@ -1077,7 +1077,7 @@ th, tr, td {
   display: inline-block;
 }
 
-#settings-collections .collection h1 {
+#settings-collections .collection header > h1 {
   cursor: default;
   font-size: var(--settings-collectionheader-font-size);
   padding: var(--settings-collectionheader-padding);
@@ -1101,6 +1101,11 @@ th, tr, td {
 
 #settings-collections .add-collection:hover h1 {
   background: var(--settings-addcollection-bg-hover);
+  color: var(--settings-addcollection-text-hover);
+}
+
+#settings-collections .add-collection.terminal {
+  opacity: .6;
 }
 
 
