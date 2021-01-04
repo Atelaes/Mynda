@@ -480,7 +480,7 @@ th, tr, td {
 }
 .collection h1,
 .collection h1 input[type=text],
-.collection .add-collection,
+.collection .collection-btn,
 .collection .delete-collection {
   display:block;
   background-color: var(--collectionheader-bg);
@@ -521,24 +521,26 @@ th, tr, td {
   width:20em;
 }
 
-.collection .add-collection {
+.collection .collection-btn-container {
   position:absolute;
   top:0;
   right:0;
+}
+.collection .collection-btn {
   padding: var(--collectionheader-padding-padding);
   text-align: center;
-  background-color: var(--settings-addcollection-bg-trans);
+  /* background-color: var(--settings-addcollection-bg-trans); */
   color: var(--settings-addcollection-text);
 }
-.collection .add-collection:hover {
+.collection .collection-btn:hover {
   background-color: var(--settings-addcollection-bg-hover);
   color: var(--settings-addcollection-text-hover);
 }
-#library-pane .collection .add-collection {
+#library-pane .collection .collection-btn {
   visibility: hidden;
 }
-/* .collection:hover > .add-collection, */
-#library-pane .collection.dragging .add-collection {
+/* .collection:hover > .collection-btn, */
+#library-pane .collection.dragging .collection-btn {
   visibility: visible;
 }
 
@@ -1083,7 +1085,7 @@ th, tr, td {
   margin-left: var(--collection-marginleft);
 }
 
-#settings-collections .add-collection {
+#settings-collections .collection-btn {
   margin-left: var(--collection-marginleft);
   display: inline-block;
 }
@@ -1107,28 +1109,36 @@ th, tr, td {
   font-size: calc(var(--tip-fontsize) * .7);
   margin-top: -.1em;
 }
-#settings-collections .add-collection h1 {
+#settings-collections .collection-btn h1 {
   font-size: var(--settings-collectionheader-font-size);
   padding: var(--settings-addcollection-padding);
   width: var(--settings-addcollection-width);
   text-align: center;
 
   display:block;
-  background: var(--settings-addcollection-bg);
   color: var(--settings-addcollection-text);
-  margin: var(--collectionheader-margin);
+  background-color: var(--settings-addcollection-bg);
+  /* margin: var(--collectionheader-margin); */
+  margin:0;
   text-transform: uppercase;
   font-weight: var(--collectionheader-font-weight);
   font-family: var(--collectionheader-font);
   font-style: var(--collectionheader-font-style);
 }
-
-#settings-collections .add-collection:hover h1 {
+#settings-collections .collection-btn.add h1 {
+  /* background-color: var(--settings-addcollection-bg); */
+}
+#settings-collections .collection-btn.delete h1 {
+  background-color: var(--settings-addcollection-bg-delete);
+}
+#settings-collections .collection-btn:hover h1 {
   background: var(--settings-addcollection-bg-hover);
   color: var(--settings-addcollection-text-hover);
 }
-
-#settings-collections .add-collection.terminal {
+#settings-collections .collection-btn.delete:hover h1 {
+  background-color: rgba(200,70,70,.4);
+}
+#settings-collections .collection-btn.terminal {
   opacity: .6;
 }
 

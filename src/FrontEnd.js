@@ -485,19 +485,29 @@ class MynLibrary extends React.Component {
       dragging : false
     }
 
-    this.deleteBtn = object => (
-      <div className="delete-collection clickable" onClick={(e) => this.deleteCollection(e,object)}>{'\u2715'}</div>
-    );
+    this.deleteBtn = object => {
+      if (object.id === 'uncategorized') { return null }
+      else {
+        return (
+          <div className="delete-collection clickable" onClick={(e) => this.deleteCollection(e,object)}>{'\u2715'}</div>
+        );
+      }
+    };
 
-    this.addBtn = object => (
-      <Droppable droppableId={object.id + '-'} direction="horizontal">
-        {(provided) => (
-          <div className="add-collection clickable" ref={provided.innerRef} {...provided.droppableProps}>
-            {'\uFF0B'}
-          </div>
-        )}
-      </Droppable>
-    );
+    this.addBtn = object => {
+      if (object.id === 'uncategorized') { return null }
+      else {
+        return (
+          <Droppable droppableId={object.id + '-'} direction="horizontal">
+            {(provided) => (
+              <div className="collection-btn-container add collection-btn clickable" ref={provided.innerRef} {...provided.droppableProps}>
+                {'\uFF0B'}
+              </div>
+            )}
+          </Droppable>
+        );
+      }
+    };
 
     this.render = this.render.bind(this);
     this.createCollectionsMap = this.createCollectionsMap.bind(this);
@@ -2594,13 +2604,27 @@ class MynSettingsCollections extends React.Component {
     this.setState({collections: collections.getAll()});
   }
 
+  deleteCollection(e, id, isTerminal) {
+    e.stopPropagation();
+    console.log('Deleting ' + id);
+  }
+
   createAddCollectionBtn(id, isTerminal) {
     return (
-      <div key='add' className={'add-collection clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.addCollection(e,id,isTerminal)}>
+      <div key='add' className={'add collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.addCollection(e,id,isTerminal)}>
         <h1>{'\uFF0B'}</h1>
       </div>
     );
   }
+
+  createDeleteCollectionBtn(id, isTerminal) {
+    return (
+      <div key='delete' className={'delete collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.deleteCollection(e,id,isTerminal)}>
+        <h1><div style={{transform: 'rotate(45deg)'}}>{'\uFF0B'}</div></h1>
+      </div>
+    );
+  }
+
 
   findCollections(collections) {
     // if collections is a class object, unwrap it
@@ -2608,28 +2632,22 @@ class MynSettingsCollections extends React.Component {
 
     let collectionsJSX = collections.map(collection => {
       let children = null;
-      let addButton = null;
-
+      let isTerminal = false;
 
       // if this collection has child collections
       if (collection.collections) {
         // attach those collections as children
         children = this.findCollections(collection.collections);
 
-        // create add collection button
-        addButton = this.createAddCollectionBtn(collection.id);
-
       // if the collection does not have child collections,
       // it is a bottom-level collection, probably containing videos
       // (though it may not contain videos)
       // so if it contains videos, attach those videos as children
-    } else if (collection.videos && collection.videos.length > 0) {
-        // and create an add button so the user can create more child collections;
-        // in the case of a terminal collection containing videos,
-        // the user will get a confirmation dialog, because adding a child
-        // collection will convert it to a non-terminal collection,
-        // deleting all the videos in it
-        addButton = this.createAddCollectionBtn(collection.id, true);
+      } else if (collection.videos && collection.videos.length > 0) {
+        // set isTerminal to true in order to tell the addButton
+        // (which we create later) to give the user a confirmation dialog
+        // before adding a child (because doing so will delete its videos)
+        isTerminal = true;
 
         children = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
           let video = null;
@@ -2650,10 +2668,18 @@ class MynSettingsCollections extends React.Component {
       // it is an empty bottom-level collection, in which case the user
       // is still allowed to create a child collection for it
       // (making it no longer a bottom-level collection)
-      // so we create an add button
+      // so we leave isTerminal false
       } else {
-        addButton = this.createAddCollectionBtn(collection.id);
       }
+
+      // create an add button so the user can create more child collections;
+      // in the case of a terminal collection containing videos, isTerminal
+      // will tell the button to use a confirmation dialog, because adding a child
+      // collection will convert it to a non-terminal collection,
+      // deleting all the videos in it
+      let addButton = this.createAddCollectionBtn(collection.id, isTerminal);
+
+      let deleteButton = this.createDeleteCollectionBtn(collection.id, isTerminal);
 
       let editColNameValid;
 
@@ -2678,7 +2704,10 @@ class MynSettingsCollections extends React.Component {
 
               ({collection.id})
             </h1>
-            {addButton}
+            <div className='collection-btn-container'>
+              {deleteButton}
+              {addButton}
+            </div>
           </header>
           {children}
         </div>

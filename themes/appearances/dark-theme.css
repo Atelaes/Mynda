@@ -355,7 +355,9 @@
 
   --settings-addcollection-width: 2em;
   --settings-addcollection-bg: var(--light-bg);
+  --settings-addcollection-bg-delete: rgba(54,59,69,.75);
   --settings-addcollection-bg-trans: rgba(36,39,46,0.5);
+  --settings-addcollection-bg-moretrans: rgba(36,39,46,0.3);
   /* --settings-addcollection-bg: linear-gradient(30deg, var(--lighter-bg) .5em, var(--medlight-bg) 4em, var(--medlight-bg) 60%, var(--medlight-bg-rgba0) 100%); */
   --settings-addcollection-bg-hover: var(--med-bg);
   --settings-addcollection-text: var(--library-bg);
@@ -1324,11 +1326,11 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /* overflow:hidden; */
 }
 
-#settings-collections header .add-collection {
+#settings-collections header .collection-btn {
     margin-left: 0;
-    position:absolute;
+    /* position:absolute;
     right:0;
-    top:0;
+    top:0; */
     /* height:100%;*/
     line-height:100%;
     padding:0;
