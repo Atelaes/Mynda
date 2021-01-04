@@ -455,6 +455,7 @@
 
   /* editor pane */
   --tip-fontsize: .5rem;
+  --tip-opacity: .7;
 
   --editorpane-padding: 1em;
 

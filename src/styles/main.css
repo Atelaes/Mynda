@@ -479,6 +479,7 @@ th, tr, td {
   position: relative;
 }
 .collection h1,
+.collection h1 input[type=text],
 .collection .add-collection,
 .collection .delete-collection {
   display:block;
@@ -492,6 +493,16 @@ th, tr, td {
   font-weight: var(--collectionheader-font-weight);
   font-family: var(--collectionheader-font);
   font-style: var(--collectionheader-font-style);
+}
+.collection h1 input[type=text] {
+  background-color: rgba(0,0,0,.15);
+  line-height:calc(var(--collectionheader-font-size) * 1);
+  height:calc(var(--collectionheader-font-size) * 1.2);
+  margin:0;
+}
+.collection h1 .tip {
+  font-size: calc(var(--tip-fontsize) * .8);
+  opacity: calc(var(--tip-opacity) * 1.2);
 }
 #library-pane .collection h1:hover {
   background-color: var(--collectionheader-bg-hover);
@@ -1078,11 +1089,24 @@ th, tr, td {
 }
 
 #settings-collections .collection header > h1 {
+/* #settings-collections .collection header > h1 input[type=text] { */
   cursor: default;
   font-size: var(--settings-collectionheader-font-size);
   padding: var(--settings-collectionheader-padding);
 }
 
+#settings-collections .collection header > h1 input[type=text] {
+  /* text-transform: uppercase;
+  font-weight: var(--collectionheader-font-weight);
+  font-family: var(--collectionheader-font);
+  font-style: var(--collectionheader-font-style); */
+  font-size: var(--settings-collectionheader-font-size);
+  height:calc(var(--settings-collectionheader-font-size) * 1.2);
+}
+#settings-collections .collection header > h1 .tip {
+  font-size: calc(var(--tip-fontsize) * .7);
+  margin-top: -.1em;
+}
 #settings-collections .add-collection h1 {
   font-size: var(--settings-collectionheader-font-size);
   padding: var(--settings-addcollection-padding);
@@ -1481,7 +1505,7 @@ th, tr, td {
   position:absolute;
   font-size: var(--tip-fontsize);
   line-height:normal;
-  opacity:.7;
+  opacity:var(--tip-opacity);
   margin: var(--editfield-name-margin);
 }
 
