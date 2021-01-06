@@ -59,6 +59,8 @@ class Collection {
   addChild(name) {
     if (this.isTerminal) return;
 
+    console.log(`Adding child to '${this.name}'`);
+
     if (!this.c.collections) {
       this.c.collections = [];
     }
@@ -259,6 +261,7 @@ class Collection {
   }
 
   convertToNonTerminal() {
+    console.log(`Converting '${this.name}' to non-terminal`)
     delete this.c.videos;
     delete this.videos;
     this.isTerminal = false;

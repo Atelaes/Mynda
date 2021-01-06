@@ -1827,7 +1827,7 @@ class MynSettings extends MynOpenablePane {
     let views = {
       folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
-      collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} />),
+      collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} settings={this.props.settings} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
     }
@@ -2345,7 +2345,10 @@ class MynSettingsPrefs extends React.Component {
     const dialogDescriptions = {
       'MynEditorSearch-confirm-select' : 'Confirm selection of search result in video editor',
       'MynEditor-confirm-exit' : 'Confirm on exiting video editor without saving',
-      'MynEditorEdit-confirm-revert' : 'Confirm on reverting to saved values in video editor'
+      'MynEditorEdit-confirm-revert' : 'Confirm on reverting to saved values in video editor',
+      'MynLibrary-confirm-convertTerminalCol' : (<span>{'Confirm on dragging a video to a collection in the library pane'}<br/>{'when it would mean deleting its child collections'}</span>),
+      'MynSettingsCollections-confirm-convertToNonTerminal' : (<span>{'Confirm adding a child collection in the settings pane'}<br/>{'when it would mean removing the videos from the parent collection'}</span>),
+      'MynSettingsCollections-confirm-delete' : 'Confirm deletion of collections in the settings pane'
     }
 
     return (
@@ -2389,13 +2392,13 @@ class MynSettingsPrefs extends React.Component {
           <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.overridedialogs && Object.keys(this.props.settings.preferences.overridedialogs).length > 0 ? 'block' : 'none'}}>
             <h2>Show Dialogs:</h2>
             {this.state.overridedialogs ? Object.keys(this.state.overridedialogs).map(dialogName => (
-              <div key={dialogName}>
+              <div key={dialogName} style={{display:'flex'}}>
                 <input
                   type='checkbox'
                   checked={!this.state.overridedialogs[dialogName]}
                   onChange={(e) => this.update('override-dialogs',!e.target.checked,dialogName)}
                 />
-                {dialogDescriptions[dialogName] || dialogName}
+                <div>{dialogDescriptions[dialogName] || dialogName}</div>
               </div>
             )) : null}
           </li>
@@ -2568,22 +2571,95 @@ class MynSettingsCollections extends React.Component {
     this.state = {
       collections : _.cloneDeep(props.collections)
     }
+
+
+    ipcRenderer.on('MynSettingsCollections-confirm-delete', (event, response, id, checked) => {
+      if (response === 0) { // yes
+        // delete the collection
+        // we were passed the id, but we need to pass the actual collection to deleteCollection
+        // (the dialog can't pass the whole collection through ipcRenderer because it seems
+        // to break the reference to the actual object, so we just pass the id and pick it back up on the other side)
+        let collections = new Collections(this.state.collections);
+        let c = collections.get(id);
+        this.deleteCollection(null, c, null, true);
+
+        // if the user checked the option to override this dialog next time
+        if (checked) {
+          console.log('option to override dialog was checked!');
+          let prefs = _.cloneDeep(this.props.settings.preferences);
+          if (!prefs.overridedialogs) {
+            prefs.overridedialogs = {};
+          }
+          prefs.overridedialogs['MynSettingsCollections-confirm-delete'] = true;
+          library.replace("settings.preferences",prefs);
+        }
+      } else {
+        console.log('Deletion cancelled by user')
+      }
+    });
+
+    ipcRenderer.on('MynSettingsCollections-confirm-convertToNonTerminal', (event, response, parentID, checked) => {
+      if (response === 0) { // yes
+        // add the collection
+        console.log("Yes Add Collection!!! Hurray!!");
+
+        // we were passed the id, but we need to pass the actual collection to addCollection
+        // (the dialog can't pass the whole collection through ipcRenderer because it seems
+        // to break the reference to the actual object, so we just pass the id and pick it back up on the other side)
+        let collections = new Collections(this.state.collections);
+        let c = collections.get(parentID);
+        this.addCollection(null, c, false);
+
+        // if the user checked the option to override this dialog next time
+        if (checked) {
+          console.log('option to override dialog was checked!');
+          let prefs = _.cloneDeep(this.props.settings.preferences);
+          if (!prefs.overridedialogs) {
+            prefs.overridedialogs = {};
+          }
+          prefs.overridedialogs['MynSettingsCollections-confirm-convertToNonTerminal'] = true;
+          library.replace("settings.preferences",prefs);
+        }
+      } else {
+        console.log('Add collection cancelled by user')
+      }
+    });
+
   }
 
-  addCollection(e,parentID, isTerminal) {
-    e.stopPropagation();
+  addCollection(e, parentCol, isTerminal) {
+    if (e) e.stopPropagation();
 
-    if (isTerminal) {
-      // go to user confirmation dialog here
+    let parentID;
+    if (parentCol) parentID = parentCol.id;
+
+    console.log(JSON.stringify(parentCol))
+
+    // if this is a terminal collection, and
+    // if the user hasn't previously checked the option to override it,
+    // show the user a confirmation dialog before adding a collection,
+    // (because that will necessitate deleting any videos it has)
+    if (isTerminal && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs[`MynSettingsCollections-confirm-convertToNonTerminal`])) {
+      ipcRenderer.send(
+        'generic-confirm',
+        'MynSettingsCollections-confirm-convertToNonTerminal',
+        {
+          message: `Are you sure you want to add a child collection to '${parentCol.name}'? This will remove all the videos from this collection (though the videos themselves will remain in the library).`,
+          checkboxLabel: `Don't show this dialog again`
+        },
+        parentID
+      );
+      return;
     }
 
     let collections = new Collections(this.state.collections);
     let newCol;
 
     // if we got a parent collection
-    if (parentID) {
-      // get the actual collection object of the parent
-      let parentCol = collections.get(parentID);
+    if (parentCol) {
+      // convert it to non-terminal if needed (removing any videos it has)
+      // and add the new child
+      if (!parentCol.c) parentCol = new Collection(parentCol); // wrap it in a class if it isn't already
       parentCol.convertToNonTerminal();
       newCol = parentCol.addChild();
     } else {
@@ -2592,34 +2668,61 @@ class MynSettingsCollections extends React.Component {
       newCol = collections.addCollection({name:''},true);
     }
 
-    // try {
-    //   console.log('Parent collection: ' + parentCol.name);
-    // } catch(err) {
-    //   console.log('Parent collection: top level (none)');
-    // }
-    // console.log('New collection: ' + JSON.stringify(newCol));
+    console.log('NEW COLLECTION: ' + JSON.stringify(newCol));
+    console.log('NEW COLLECTION from master: ' + JSON.stringify(collections.get(newCol.id)));
 
     // this.state.collections is actually altered in place
     // but we need to explicitly set it in order to get a re-render
-    this.setState({collections: collections.getAll()});
+    // after which we save to the library
+    this.setState({collections: collections.getAll()}, () => {
+      this.props.save({'collections':this.state.collections});
+    });
   }
 
-  deleteCollection(e, id, isTerminal) {
-    e.stopPropagation();
-    console.log('Deleting ' + id);
+  deleteCollection(e, c, isTerminal, dialogConfirmed) {
+    if (e) e.stopPropagation();
+
+    // if the user hasn't previously checked the option to override it,
+    // show the user a confirmation dialog before deleting the collection
+    if (!dialogConfirmed && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs[`MynSettingsCollections-confirm-delete`])) {
+      ipcRenderer.send(
+        'generic-confirm',
+        'MynSettingsCollections-confirm-delete',
+        {
+          message: `Are you sure you want to delete '${c.name}'? (${ !isTerminal ? 'this will delete all of its child collections as well, though ' : '' }the videos themselves will remain in the library)`,
+          checkboxLabel: `Don't show this dialog again`
+        },
+        c.id
+      );
+      return;
+    }
+
+    // if we're here, the user has either confirmed the dialog or
+    // they have opted to skip the dialog,
+    // so delete the collection
+    console.log('Deleting ' + c.name);
+    let collections = new Collections(this.state.collections);
+    collections.deleteCollection(c.id);
+
+    // this.state.collections is actually altered in place
+    // but we need to explicitly set it in order to get a re-render
+    // after which we save to the library
+    this.setState({collections: collections.getAll()}, () => {
+      this.props.save({'collections':this.state.collections});
+    });
   }
 
-  createAddCollectionBtn(id, isTerminal) {
+  createAddCollectionBtn(c, isTerminal) {
     return (
-      <div key='add' className={'add collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.addCollection(e,id,isTerminal)}>
+      <div key='add' className={'add collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.addCollection(e,c,isTerminal)}>
         <h1>{'\uFF0B'}</h1>
       </div>
     );
   }
 
-  createDeleteCollectionBtn(id, isTerminal) {
+  createDeleteCollectionBtn(c, isTerminal) {
     return (
-      <div key='delete' className={'delete collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.deleteCollection(e,id,isTerminal)}>
+      <div key='delete' className={'delete collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.deleteCollection(e,c,isTerminal)}>
         <h1><div style={{transform: 'rotate(45deg)'}}>{'\uFF0B'}</div></h1>
       </div>
     );
@@ -2677,9 +2780,9 @@ class MynSettingsCollections extends React.Component {
       // will tell the button to use a confirmation dialog, because adding a child
       // collection will convert it to a non-terminal collection,
       // deleting all the videos in it
-      let addButton = this.createAddCollectionBtn(collection.id, isTerminal);
+      let addButton = this.createAddCollectionBtn(collection, isTerminal);
 
-      let deleteButton = this.createDeleteCollectionBtn(collection.id, isTerminal);
+      let deleteButton = this.createDeleteCollectionBtn(collection, isTerminal);
 
       let editColNameValid;
 
