@@ -2601,7 +2601,7 @@ class MynSettingsCollections extends React.Component {
     ipcRenderer.on('MynSettingsCollections-confirm-convertToNonTerminal', (event, response, parentID, checked) => {
       if (response === 0) { // yes
         // add the collection
-        console.log("Yes Add Collection!!! Hurray!!");
+        // console.log("Yes Add Collection!!! Hurray!!");
 
         // we were passed the id, but we need to pass the actual collection to addCollection
         // (the dialog can't pass the whole collection through ipcRenderer because it seems
@@ -2668,8 +2668,8 @@ class MynSettingsCollections extends React.Component {
       newCol = collections.addCollection({name:''},true);
     }
 
-    console.log('NEW COLLECTION: ' + JSON.stringify(newCol));
-    console.log('NEW COLLECTION from master: ' + JSON.stringify(collections.get(newCol.id)));
+    // console.log('NEW COLLECTION: ' + JSON.stringify(newCol));
+    // console.log('NEW COLLECTION from master: ' + JSON.stringify(collections.get(newCol.id)));
 
     // this.state.collections is actually altered in place
     // but we need to explicitly set it in order to get a re-render
@@ -2728,6 +2728,21 @@ class MynSettingsCollections extends React.Component {
     );
   }
 
+  onDragEnd(result) {
+    const { destination, source, draggableId } = result;
+    // if the user actually moved an item
+    if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
+      console.log(`
+        dragged ID: ${draggableId}\n
+        src ID:     ${source.droppableId}\n
+        dst ID:     ${destination.droppableId}\n
+        src index:  ${source.index}\n
+        dst index:  ${destination.index}
+      `);
+    } else {
+      console.log('Drag did not result in a move');
+    }
+  }
 
   findCollections(collections) {
     // if collections is a class object, unwrap it
@@ -2763,7 +2778,7 @@ class MynSettingsCollections extends React.Component {
               </div>
             );
           } catch(err) {
-            console.error(`Error: could not find video (id: ${vidToken.id}) from collection "${collection.name}" in library`);
+            console.error(`MynSettingsCollections Error: could not find video (id: ${vidToken.id}) from collection "${collection.name}" in library`);
           }
           return null;
         });
@@ -2785,42 +2800,70 @@ class MynSettingsCollections extends React.Component {
       let deleteButton = this.createDeleteCollectionBtn(collection, isTerminal);
 
       let editColNameValid;
+      let index = parseInt(collection.id.match(/\d+$/)[0]);
+      // console.log("INDEX for " + collection.id + " : " + index);
 
       return (
-        <div key={collection.id} id={'settings-col_' + collection.id} className='collection'>
-          <header>
-            <h1>
-              <MynClickToEditText
-                object={collection}
-                property='name'
-                update={(prop,value) => { collection.name = value }}
-                save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
-                options={null}
-                validator={/^[^=;{}]+$/}
-                validatorTip={'Not allowed: = ; { }'}
-                allowedEmpty={true}
-                reportValid={(prop,valid) => { editColNameValid = valid }}
-                noClear={true}
-                setFocus={true}
-                doubleClick={true}
-              />
+        <Draggable key={collection.id} draggableId={collection.id} index={index}>
+          {(provided) => (
+            <div
+              key={collection.id}
+              id={'settings-col_' + collection.id}
+              className='collection'
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+            >
+              <header>
+                <h1 {...provided.dragHandleProps} style={{cursor:'grab'}}>
+                  <MynClickToEditText
+                    object={collection}
+                    property='name'
+                    update={(prop,value) => { collection.name = value }}
+                    save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+                    options={null}
+                    validator={/^[^=;{}]+$/}
+                    validatorTip={'Not allowed: = ; { }'}
+                    allowedEmpty={true}
+                    reportValid={(prop,valid) => { editColNameValid = valid }}
+                    noClear={true}
+                    setFocus={true}
+                    doubleClick={true}
+                  />
 
-              ({collection.id})
-            </h1>
-            <div className='collection-btn-container'>
-              {deleteButton}
-              {addButton}
+                  ({collection.id})
+                </h1>
+                <div className='collection-btn-container'>
+                  {deleteButton}
+                  {addButton}
+                </div>
+              </header>
+              {children}
             </div>
-          </header>
-          {children}
-        </div>
+          )}
+        </Draggable>
       );
     });
 
+    // create a droppableId for this collections level
+    // by recreating the parent collection's id from its 1st member
+    let droppableId = '-';
+    if (collections.length > 0) {
+      let match = collections[0].id.match(/.+(?=-\d+$)/);
+      if (match !== null && match.length > 0) {
+        droppableId = match[0];
+      }
+      // console.log('DROPPABLE ID matches == ' + JSON.stringify(id));
+    }
+
     return (
-        <div className='collections'>
-          {collectionsJSX}
-        </div>
+      <Droppable droppableId={droppableId}>
+        {(provided) => (
+          <div className='collections' ref={provided.innerRef} {...provided.droppableProps}>
+            {collectionsJSX}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
     );
   }
 
@@ -2828,7 +2871,9 @@ class MynSettingsCollections extends React.Component {
     return (
       <div id='settings-collections'>
         {this.createAddCollectionBtn()}
-        {this.findCollections(this.state.collections)}
+        <DragDropContext onDragEnd={this.onDragEnd}>
+          {this.findCollections(this.state.collections)}
+        </DragDropContext>
       </div>
     );
   }
