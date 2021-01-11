@@ -482,7 +482,8 @@ class MynLibrary extends React.Component {
       hierarchy : null,
       vidsInHierarchy : [],
       sortReport : {},
-      dragging : false
+      dragging : false,
+      addToExistingColID : ''
     }
 
     this.deleteBtn = object => {
@@ -734,6 +735,19 @@ class MynLibrary extends React.Component {
             {this.deleteBtn(object)}
             {this.addBtn(object)}
             <div className="container hidden">
+              {object.id === 'uncategorized' ? (
+                <Droppable droppableId={this.state.addToExistingColID}>
+                  {(provided, snapshot) => (
+                    <MynLibAddExistingCollection
+                      collections={this.state.collections}
+                      choose={(id) => { this.setState({addToExistingColID:id}) }}
+                      provided={provided}
+                      snapshot={snapshot}
+                      selected={this.state.addToExistingColID !== ''}
+                    />
+                  )}
+                </Droppable>
+              ) : null }
               <Droppable droppableId={object.id}>
                 {(provided) => (
                   <MynLibTable
@@ -1555,6 +1569,73 @@ class MynLibTable extends React.Component {
         </table>
       </div>
     )
+  }
+}
+
+// A dropdown list of terminal collections,
+// meant to be displayed at the top of the 'Uncategorized' collection
+// and used as a drop-zone for a video row, to add that video to the chosen collection;
+// this allows the user to add a video in the playlist to an existing collection
+// that doesn't already appear in the playlist
+class MynLibAddExistingCollection extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.options = this.getOptions();
+    this.render = this.render.bind(this);
+    this.handleChange = this.handleChange.bind(this);
+  }
+
+  getOptions() {
+    let options = {};
+    let cols = new Collections(this.props.collections);
+    // get all terminal collections as a flat list (pass 'true' to include barren collections that aren't technically designated terminal)
+    cols.getAllTerminal(true).map((c) => {
+      let idArr = c.id.split('-');
+      let ancestry = idArr.map((el,i) => {
+        let id = idArr.slice(0,i+1).join('-');
+        return cols.get(id).name;
+      });
+      let displayStr = ancestry.join(' \u27A5 ');
+
+      options[displayStr] = c.id;
+    });
+
+    console.log(JSON.stringify(options))
+
+    return options;
+  }
+
+  handleChange(e) {
+    console.log("CHANGE")
+    let container = document.getElementById('library-addToExistingCollection');
+     if (container) {
+       console.log("adding class")
+       container.classList.add('changing');
+       setTimeout(() => {container.classList.remove('changing')},1000);
+
+       container.classList.add('selected');
+     }
+     this.props.choose(e.target.value);
+  }
+
+  render() {
+    return (
+      <div id="library-addToExistingCollection" ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
+        {/*<label className="edit-field-name" htmlFor="collections">Drop to Add: </label>*/}
+        <div className="select-container select-alwaysicon">
+          <select name="collections" defaultValue="" onChange={this.handleChange}>
+            <option value="" disabled hidden>[Choose a collection and drop a video here to add]</option>
+            {Object.keys(this.options).map((opt,i) => (
+              <option key={i} value={this.options[opt]}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{height:'0'}}>
+          {this.props.provided.placeholder}
+        </div>
+      </div>
+    );
   }
 }
 
@@ -2625,6 +2706,8 @@ class MynSettingsCollections extends React.Component {
       }
     });
 
+    this.onDragEnd = this.onDragEnd.bind(this);
+    this.onDragStart = this.onDragStart.bind(this);
   }
 
   addCollection(e, parentCol, isTerminal) {
@@ -2728,7 +2811,13 @@ class MynSettingsCollections extends React.Component {
     );
   }
 
+  onDragStart() {
+    this.setState({dragging:true});
+  }
+
   onDragEnd(result) {
+    this.setState({dragging:false});
+
     const { destination, source, draggableId } = result;
     // if the user actually moved an item
     if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
@@ -2767,7 +2856,7 @@ class MynSettingsCollections extends React.Component {
         // before adding a child (because doing so will delete its videos)
         isTerminal = true;
 
-        children = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
+        let childrenEls = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
           let video = null;
           try {
             video = this.props.videos.filter(video => video.id === vidToken.id)[0];
@@ -2782,6 +2871,13 @@ class MynSettingsCollections extends React.Component {
           }
           return null;
         });
+
+        children = (
+          <div style={{ display : (this.state.dragging ? 'none' : 'block') }}>
+            {childrenEls}
+          </div>
+        );
+
       // if the collection contains neither collections nor videos
       // it is an empty bottom-level collection, in which case the user
       // is still allowed to create a child collection for it
@@ -2805,41 +2901,50 @@ class MynSettingsCollections extends React.Component {
 
       return (
         <Draggable key={collection.id} draggableId={collection.id} index={index}>
-          {(provided) => (
-            <div
-              key={collection.id}
-              id={'settings-col_' + collection.id}
-              className='collection'
-              ref={provided.innerRef}
-              {...provided.draggableProps}
-            >
-              <header>
-                <h1 {...provided.dragHandleProps} style={{cursor:'grab'}}>
-                  <MynClickToEditText
-                    object={collection}
-                    property='name'
-                    update={(prop,value) => { collection.name = value }}
-                    save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
-                    options={null}
-                    validator={/^[^=;{}]+$/}
-                    validatorTip={'Not allowed: = ; { }'}
-                    allowedEmpty={true}
-                    reportValid={(prop,valid) => { editColNameValid = valid }}
-                    noClear={true}
-                    setFocus={true}
-                    doubleClick={true}
-                  />
+          {(provided, snapshot) => {
 
-                  ({collection.id})
-                </h1>
-                <div className='collection-btn-container'>
-                  {deleteButton}
-                  {addButton}
+            // let draggableProps = _.cloneDeep(provided.draggableProps);
+            // draggableProps.style.opacity = snapshot.isDragging ? 0.5 : 1;
+            // console.log(JSON.stringify(snapshot));
+
+            return (
+              <div
+                key={collection.id}
+                id={'settings-col_' + collection.id}
+                className='collection'
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+              >
+                <header>
+                  <h1 {...provided.dragHandleProps} style={{cursor:'grab'}}>
+                    <MynClickToEditText
+                      object={collection}
+                      property='name'
+                      update={(prop,value) => { collection.name = value }}
+                      save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+                      options={null}
+                      validator={/^[^=;{}]+$/}
+                      validatorTip={'Not allowed: = ; { }'}
+                      allowedEmpty={true}
+                      reportValid={(prop,valid) => { editColNameValid = valid }}
+                      noClear={true}
+                      setFocus={true}
+                      doubleClick={true}
+                    />
+
+                    ({collection.id})
+                  </h1>
+                  <div className='collection-btn-container'>
+                    {deleteButton}
+                    {addButton}
+                  </div>
+                </header>
+                <div style={{display: (snapshot.isDragging ? 'none' : 'block') }}>
+                  {children}
                 </div>
-              </header>
-              {children}
-            </div>
-          )}
+              </div>
+            )
+          }}
         </Draggable>
       );
     });
@@ -2857,12 +2962,17 @@ class MynSettingsCollections extends React.Component {
 
     return (
       <Droppable droppableId={droppableId}>
-        {(provided) => (
-          <div className='collections' ref={provided.innerRef} {...provided.droppableProps}>
-            {collectionsJSX}
-            {provided.placeholder}
-          </div>
-        )}
+        {(provided, snapshot) => {
+          // console.log(JSON.stringify(snapshot));
+          return (
+            <div className='collections' ref={provided.innerRef} {...provided.droppableProps}>
+              {collectionsJSX}
+              <div style={{}/*{ maxHeight: '45px', border: '1px solid red', overflow : 'hidden', backgroundColor : (snapshot.isUsingPlaceholder ? 'red' : 'initial') }*/}>
+                {provided.placeholder}
+              </div>
+            </div>
+          )
+        }}
       </Droppable>
     );
   }
@@ -2871,7 +2981,7 @@ class MynSettingsCollections extends React.Component {
     return (
       <div id='settings-collections'>
         {this.createAddCollectionBtn()}
-        <DragDropContext onDragEnd={this.onDragEnd}>
+        <DragDropContext onDragStart={this.onDragStart} onDragEnd={this.onDragEnd}>
           {this.findCollections(this.state.collections)}
         </DragDropContext>
       </div>

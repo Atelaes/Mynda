@@ -47,6 +47,31 @@ class Collections {
     return new Collection(result);
   }
 
+  // return a flat array of every terminal collection;
+  // if includeBarren is true, we also include collections
+  // that have no child collections (even if they're not designated terminal)
+  getAllTerminal(includeBarren) {
+    // console.log('GET ALL TERMINAL')
+    let results = [];
+
+    this.c.map(c => {
+      c = new Collection(c);
+      // console.log(c.id + ' t==' + c.isTerminal);
+      if (c.isTerminal || (includeBarren ? (!c.c.collections || c.c.collections.length===0) : false)) {
+        // console.log('push!');
+        results.push(c);
+      } else if (c.c.collections) {
+        // console.log('recurse on children')
+        let children = new Collections(c.c.collections);
+        results = [...results, ...children.getAllTerminal(includeBarren)];
+      }
+    });
+
+    // console.log(results.map(c => c.name));
+
+    return results;
+  }
+
   // get all collections that the video (of id 'id') is a member of;
   // returns an object of key/value pairs where the key is the id of a collection
   // that the given video participates in, and the value is the order of that video
