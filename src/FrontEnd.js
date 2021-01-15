@@ -1153,7 +1153,7 @@ class MynLibTable extends React.Component {
 
     // add listener for the Enter key, to save the value
     const cell = findNearestOfClass(e.target,'order');
-    cell.addEventListener('keyup', (e) => { if (e.keyCode === 13) this.orderSave(e,order,video)}, {once:false});
+    cell.addEventListener('keyup', (e) => { /* 13 is Enter */ if (e.keyCode === 13) this.orderSave(e,order,video); /* 27 is Esc */ if (e.keyCode === 27) this.orderSave(e,null,video);}, {once:false});
 
     // replace the contents of the cell with the editor
     let valid = false;
@@ -1191,12 +1191,16 @@ class MynLibTable extends React.Component {
     console.log('Saving order as ' + order);
 
     // update the order and save to library
-    if (this.props.collections) {
+    if (order && this.props.collections) {
       let cols = new Collections(this.props.collections);
       let col = cols.get(this.props.collectionID);
       col.removeVideo(video.id);
       col.addVideo(video.id,order);
       library.replace("collections", cols.getAll());
+    } else {
+      // if 'order' is falsy (e.g. null will be passed if the user hits escape)
+      // then we just keep the old order
+      order = video.order;
     }
 
     // replace the contents of the cell with the new order value
