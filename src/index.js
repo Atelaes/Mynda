@@ -224,7 +224,7 @@ ipcMain.on('download', (event, url, destination) => {
   });
 })
 
-ipcMain.on('save-video-confirm', (event, changes, video) => {
+ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
   console.log('save-video-confirm!!!');
   // create message
   let message = 'Are you sure you want to ';
@@ -252,8 +252,12 @@ ipcMain.on('save-video-confirm', (event, changes, video) => {
     message : message
   };
 
+  if (showSkipDialog) {
+    options.checkboxLabel = `Don't show this dialog again`;
+  }
+
   dialog.showMessageBox(options).then(result => {
-  event.sender.send('save-video-confirm', result.response, changes, video);
+  event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
 }).catch(err => {
   console.log(err)
 })})

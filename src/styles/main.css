@@ -222,6 +222,7 @@ img.ratings-icon {
 #nav-playlists li {
   font-family: var(--playlist-tab-font);
   font-size: var(--playlist-tab-font-size);
+  line-height: 1.2;
   font-weight: var(--playlist-tab-font-weight);
   list-style-type: none;
   background-color:var(--playlisttab-bg);
@@ -248,6 +249,11 @@ img.ratings-icon {
   border-style: var(--playlisttab-borderstyle-selected);
   border-color: var(--playlisttab-bordercolor-selected);
   box-shadow: var(--playlisttab-boxshadow-selected);
+}
+#nav-playlists li#add-playlist {
+  /* for the '+' tab, make the side padding (roughly) the same as the top and bottom padding */
+  padding-left: calc(var(--playlisttab-padding-y) * 1.5 + .7em) !important;
+  padding-right: calc(var(--playlisttab-padding-y) * 1.5);
 }
 
 #nav-controls {

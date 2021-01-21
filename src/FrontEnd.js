@@ -40,8 +40,10 @@ class Mynda extends React.Component {
       show : {
         settingsPane : false,
         editorPane : false
-      }
+      },
+      defaultSettingsView : 'folders',
     }
+    this.state.settingsView = this.state.defaultSettingsView;
 
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
@@ -300,7 +302,12 @@ class Mynda extends React.Component {
     });
   }
 
-  showOpenablePane(name) {
+  showOpenablePane(name,view) {
+    // the view parameter may be passed to us to tell us which tab to display in panes with tabs (only 'settings' for now)
+    if (view && name === 'settingsPane') {
+      this.setState({settingsView:view});
+    }
+
     // apply 'blurred' class to all other panes
     Array.from(document.getElementsByClassName('pane')).map((pane) => {
       pane.classList.add('blurred');
@@ -333,6 +340,11 @@ class Mynda extends React.Component {
     Array.from(document.getElementsByClassName('pane')).map((pane) => {
       pane.classList.remove('blurred');
     });
+
+    if (name === 'settingsPane') {
+      // reset the view of the settings tab so that next time it will open to the default tab
+      this.setState({settingsView:this.state.defaultSettingsView});
+    }
   }
 
   // set the initial playlist
@@ -426,10 +438,10 @@ class Mynda extends React.Component {
 
     return (
       <div id='grid-container'>
-        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={() => {this.showOpenablePane("settingsPane")}}/>
+        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
         <MynDetails movie={this.state.detailMovie} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
-        <MynSettings show={this.state.show.settingsPane} view='folders' settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
+        <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
     );
@@ -461,6 +473,7 @@ class MynNav extends React.Component {
               // eventually we'll add the others to a dropdown/flyout menu
             }
           })}
+          <li key="add" id="add-playlist" onClick={(e) => this.props.showSettings('playlists')}>{'\uFF0B'}</li>
         </ul>
         <div id="nav-controls">
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
@@ -673,7 +686,7 @@ class MynLibrary extends React.Component {
           }
         }
       } catch(e) {
-        console.log("Error, no videos found in this collection: " + e.toString());
+        // console.log("Error, no videos found in this collection: " + e.toString());
       }
       // if the flag is true, that means there were videos from our playlist
       // in this collection, so wrap them in JSX and return them upward
@@ -753,6 +766,7 @@ class MynLibrary extends React.Component {
                   <MynLibTable
                     movies={movies}
                     collections={_.cloneDeep(this.state.collections)}
+                    settings={this.props.settings}
                     view={this.props.view}
                     initialSort={this.state.sortReport[object.id] ? this.state.sortReport[object.id].key : "order"}
                     initialSortAscending={this.state.sortReport[object.id] ? this.state.sortReport[object.id].ascending : true}
@@ -1047,6 +1061,7 @@ class MynLibrary extends React.Component {
       content = (
         <MynLibTable
           movies={this.state.movies}
+          settings={this.props.settings}
           view={this.props.view}
           columns={this.props.columns}
           displayColumnName={this.props.displayColumnName}
@@ -1093,7 +1108,7 @@ class MynLibTable extends React.Component {
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentDidUpdate = this.componentDidUpdate.bind(this);
 
-    ipcRenderer.on('save-video-confirm', (event, response, changes, originalVid) => {
+    ipcRenderer.on('save-video-confirm', (event, response, changes, originalVid, skipDialog) => {
       if (response === 0) { // yes
         // save video to library
         let updated = { ...originalVid, ...changes };
@@ -1101,6 +1116,18 @@ class MynLibTable extends React.Component {
         library.replace("media." + index, updated);
       } else {
         console.log('Edit cancelled by user')
+      }
+
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (skipDialog) {
+        // console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.overridedialogs) {
+          prefs.overridedialogs = {};
+        }
+        prefs.overridedialogs[`MynLibTable-confirm-inlineEdit`] = true;
+        library.replace("settings.preferences",prefs);
       }
     });
   }
@@ -1470,8 +1497,14 @@ class MynLibTable extends React.Component {
     // console.log('changes == ' + JSON.stringify(changes));
 
     // user confirmation dialog
-    ipcRenderer.send('save-video-confirm', changes, originalVid);
-
+    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynLibTable-confirm-inlineEdit']) {
+      ipcRenderer.send('save-video-confirm', changes, originalVid, true); // pass 'true' to show the skip dialog checkbox
+    } else {
+      // save changes without the confirmation dialog
+      let updated = { ...originalVid, ...changes };
+      let index = library.media.findIndex((video) => video.id === updated.id);
+      library.replace("media." + index, updated);
+    }
   }
 
   componentDidMount(props) {
@@ -1629,7 +1662,7 @@ class MynLibAddExistingCollection extends React.Component {
         {/*<label className="edit-field-name" htmlFor="collections">Drop to Add: </label>*/}
         <div className="select-container select-alwaysicon">
           <select name="collections" defaultValue="" onChange={this.handleChange}>
-            <option value="" disabled hidden>[Choose a collection and drop a video here to add]</option>
+            <option value="" disabled hidden>[Choose a collection and drop a video here to add to it]</option>
             {Object.keys(this.options).map((opt,i) => (
               <option key={i} value={this.options[opt]}>{opt}</option>
             ))}
@@ -2432,6 +2465,7 @@ class MynSettingsPrefs extends React.Component {
       'MynEditor-confirm-exit' : 'Confirm on exiting video editor without saving',
       'MynEditorEdit-confirm-revert' : 'Confirm on reverting to saved values in video editor',
       'MynLibrary-confirm-convertTerminalCol' : (<span>{'Confirm on dragging a video to a collection in the library pane'}<br/>{'when it would mean deleting its child collections'}</span>),
+      'MynLibTable-confirm-inlineEdit' : (<span>{'Confirm when editing a video directly from a widget'}<br/>{'in a table row (e.g. the rating stars)'}</span>),
       'MynSettingsCollections-confirm-convertToNonTerminal' : (<span>{'Confirm adding a child collection in the settings pane'}<br/>{'when it would mean removing the videos from the parent collection'}</span>),
       'MynSettingsCollections-confirm-delete' : 'Confirm deletion of collections in the settings pane'
     }

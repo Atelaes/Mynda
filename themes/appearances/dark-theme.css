@@ -334,7 +334,9 @@
   --playlisttab-borderradius-radius: .5em;
   --playlisttab-boxshadow: .2em -.2em .15em .05em rgba(24,26,30,.2);
   --playlisttab-boxshadow-selected: var(--playlisttab-boxshadow), -.2em -.2em .15em .05em rgba(24,26,30,.2);
-  --playlisttab-padding: .2em .7em .2em .7em;
+  --playlisttab-padding-x: .7em;
+  --playlisttab-padding-y: .2em;
+  --playlisttab-padding: var(--playlisttab-padding-y) var(--playlisttab-padding-x) var(--playlisttab-padding-y) var(--playlisttab-padding-x);
 /* } */
 
 /* #library-pane { */

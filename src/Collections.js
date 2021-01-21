@@ -83,7 +83,7 @@ class Collections {
         let col = new Collection(c);
         if (!col.isTerminal) {
           let children = new Collections(col.getChildren());
-          let positiveChildren = children ? children.getVideoCollections(id) : {};
+          let positiveChildren = children.c ? children.getVideoCollections(id) : {};
 
           vidCollections = {...vidCollections, ...positiveChildren};
         } else if (col.containsVideo(id)) {
