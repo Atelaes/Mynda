@@ -10,7 +10,7 @@ const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const Collections = require('./Collections.js');
-const Collection = require('./Collection.js');
+// const { Collection } = require('./Collection.js');
 const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
@@ -540,7 +540,7 @@ class MynLibrary extends React.Component {
       if (response === 0) { // remove videos
         console.log('Removing videos')
         this.state.movies.map(v => {
-          collection.removeVideo(v.id);
+          collections.removeVideo(collection,v.id);
         });
         console.log(JSON.stringify(collection));
         library.replace("collections", collections.getAll());
@@ -686,7 +686,7 @@ class MynLibrary extends React.Component {
           }
         }
       } catch(e) {
-        // console.log("Error, no videos found in this collection: " + e.toString());
+        // console.log("No videos found in this collection: " + e.toString());
       }
       // if the flag is true, that means there were videos from our playlist
       // in this collection, so wrap them in JSX and return them upward
@@ -901,7 +901,7 @@ class MynLibrary extends React.Component {
       // only do anything if
       if (
         // the video was moved to a different collection that doesn't already contain it (or destCol doesn't exist, i.e. the video was moved to 'uncategorized')
-        (destination.droppableId !== source.droppableId && (!destCol || !destCol.containsVideo(videoID)))
+        (destination.droppableId !== source.droppableId && (!destCol || !colsCopy.containsVideo(destCol,videoID)))
         ||
         // or the video was moved to a different position within the same collection
         (destination.index !== source.index && destination.droppableId === source.droppableId)
@@ -909,7 +909,7 @@ class MynLibrary extends React.Component {
 
         // remove video from original position
         if (srcCol) {
-          srcCol.removeVideo(videoID);
+          colsCopy.removeVideo(srcCol,videoID);
         }
 
         // add video to new position
@@ -945,7 +945,7 @@ class MynLibrary extends React.Component {
           }
 
           // add the video
-          destCol.addVideo(videoID, newOrder, newIndex);
+          colsCopy.addVideo(destCol, videoID, newOrder, newIndex);
         }
 
 
@@ -980,7 +980,7 @@ class MynLibrary extends React.Component {
     // the only way that is allowed is to make the collection non-terminal,
     // which means removing all the videos from it.
     // so we have to give the user a confirmation dialog before doing that.
-    if (parent.isTerminal) {
+    if (parent.videos) {
       // if the user hasn't previously selected the preference to override this confirmation dialog
       if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynLibrary-confirm-convertTerminalCol']) {
         ipcRenderer.send(
@@ -1011,19 +1011,18 @@ class MynLibrary extends React.Component {
     // if the parent is a terminal collection,
     // convert it to a non-terminal collection;
     // (at this point we've already gotten confirmation from the user)
-    if (parent.isTerminal) {
-      delete parent.c.videos;
-      parent.isTerminal = false;
+    if (parent.videos) {
+      delete parent.videos;
     }
 
     // create new collection and add video to it
-    const newCol = parent.addChild('');
-    newCol.addVideo(videoID);
+    const newCol = cols.addChild(parent,'');
+    cols.addVideo(newCol,videoID);
 
     // delete video from old collection
     if (source.droppableId !== 'uncategorized') {
       const srcCol = cols.get(source.droppableId);
-      srcCol.removeVideo(videoID);
+      cols.removeVideo(srcCol,videoID);
     }
 
     // save changes
@@ -1221,8 +1220,8 @@ class MynLibTable extends React.Component {
     if (order && this.props.collections) {
       let cols = new Collections(this.props.collections);
       let col = cols.get(this.props.collectionID);
-      col.removeVideo(video.id);
-      col.addVideo(video.id,order);
+      cols.removeVideo(col,video.id);
+      cols.addVideo(col,video.id,order);
       library.replace("collections", cols.getAll());
     } else {
       // if 'order' is falsy (e.g. null will be passed if the user hits escape)
@@ -2780,9 +2779,9 @@ class MynSettingsCollections extends React.Component {
     if (parentCol) {
       // convert it to non-terminal if needed (removing any videos it has)
       // and add the new child
-      if (!parentCol.c) parentCol = new Collection(parentCol); // wrap it in a class if it isn't already
-      parentCol.convertToNonTerminal();
-      newCol = parentCol.addChild();
+      // if (!parentCol.c) parentCol = new Collection(parentCol); // wrap it in a class if it isn't already
+      collections.convertToNonTerminal(parentCol);
+      newCol = collections.addChild(parentCol);
     } else {
       // if we weren't given a parentID we assume we're adding a child to the
       // top-level collections object
@@ -3119,7 +3118,7 @@ class MynEditor extends MynOpenablePane {
         // }
         let collection = collectionsCopy.get(id);
         if (collection) {
-          collection.addVideo(this.state.video.id,collectionUpdate[id]);
+          collectionsCopy.addVideo(collection,this.state.video.id,collectionUpdate[id]);
         } else {
           console.error(`Unable to add ${this.state.video.title} to collection ${id}. Unable to retrieve collection object from that id.`);
         }
@@ -3131,7 +3130,7 @@ class MynEditor extends MynOpenablePane {
           // let collection = getCollectionObject(id, collectionsCopy, false);
           let collection = collectionsCopy.get(id);
           if (collection) {
-            collection.removeVideo(this.state.video.id);
+            collectionsCopy.removeVideo(collection,this.state.video.id);
             // collection.videos = collection.videos.filter(video => video.id !== this.state.video.id);
           } else {
             console.error(`Unable to remove ${this.state.video.title} from collection ${id}. Unable to retrieve collection object from that id.`);
@@ -3148,7 +3147,7 @@ class MynEditor extends MynOpenablePane {
             // console.log("Updating order of collection " + id + " to " + collectionUpdate[id]);
             // let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
             // collection.videos[index].order = collectionUpdate[id];
-            let success = collection.updateOrder(this.state.video.id, collectionUpdate[id]);
+            let success = collectionsCopy.updateOrder(collection,this.state.video.id,collectionUpdate[id]);
             // console.log("success? " + success);
           } catch(err) {
             console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Video not found in that collection.`);

@@ -254,6 +254,10 @@ img.ratings-icon {
   /* for the '+' tab, make the side padding (roughly) the same as the top and bottom padding */
   padding-left: calc(var(--playlisttab-padding-y) * 1.5 + .7em) !important;
   padding-right: calc(var(--playlisttab-padding-y) * 1.5);
+  color: var(--dimmer-text);
+}
+#nav-playlists li#add-playlist:hover {
+  color:var(--playlisttab-text-hover);
 }
 
 #nav-controls {
