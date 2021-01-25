@@ -646,7 +646,13 @@ class MynLibrary extends React.Component {
                 object={object}
                 property='name'
                 update={(prop,value) => { object.name = value }}
-                save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+                save={() => {
+                  if (editColNameValid) {
+                    let cols = new Collections(this.state.collections);
+                    cols.sortAll();
+                    library.replace("collections", cols.getAll());
+                  }
+                }}
                 options={null}
                 validator={/^[^=;{}]+$/}
                 validatorTip={'Not allowed: = ; { }'}
@@ -718,7 +724,13 @@ class MynLibrary extends React.Component {
              object={object}
              property='name'
              update={(prop,value) => { object.name = value }}
-             save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+             save={() => {
+               if (editColNameValid) {
+                 let cols = new Collections(this.state.collections);
+                 cols.sortAll();
+                 library.replace("collections", cols.getAll());
+               }
+             }}
              options={null}
              validator={/^[^=;{}]+$/}
              validatorTip={'Not allowed: = ; { }'}
@@ -2958,7 +2970,13 @@ class MynSettingsCollections extends React.Component {
                       object={collection}
                       property='name'
                       update={(prop,value) => { collection.name = value }}
-                      save={() => { if (editColNameValid) library.replace("collections", this.state.collections) }}
+                      save={() => {
+                        if (editColNameValid) {
+                          let cols = new Collections(this.state.collections);
+                          cols.sortAll();
+                          library.replace("collections", cols.getAll());
+                        }
+                      }}
                       options={null}
                       validator={/^[^=;{}]+$/}
                       validatorTip={'Not allowed: = ; { }'}

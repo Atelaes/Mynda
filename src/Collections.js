@@ -9,6 +9,7 @@ const _ = require('lodash');
 class Collections {
   constructor(collections) {
     this.c = collections;
+    // this.sortAll();
   }
 
   getAll(copy) {
@@ -160,6 +161,7 @@ class Collections {
   }
 
   sort() {
+    console.log('Sorting: ' + this.c.map(col => '\n' + col.name))
     // sort the collections array alphabetically (ignoring leading articles)
     this.c.sort((a,b) => {
       const a_sort = a.name.toLowerCase().replace(/^the\s|^a\s/,'');
@@ -173,6 +175,19 @@ class Collections {
       const depth = c.id.split('-').length - 1;
       // let col = new Collection(c);
       this.changeID(c,depth,i);
+    });
+
+    console.log('Sorted!!!: ' + this.c.map(col => '\n' + col.name))
+  }
+
+  // sorts recursively
+  sortAll() {
+    this.sort();
+    this.c.map(col => {
+      if (col.collections) {
+        let children = new Collections(col.collections);
+        children.sortAll();
+      }
     });
   }
 
