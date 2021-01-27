@@ -1158,8 +1158,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 /* Create vertical gradient border to show hierarchical level,
    but only when there's another collection below your parent, i.e. an aunt */
-/* #editor-pane .collection .children.nieces::after { */
-#editor-pane .collection .children::after {
+#editor-pane .collection.older-sister > .children::after {
+/* #editor-pane .collection .children::after { */
   content:'';
   position: absolute;
   top: 0;

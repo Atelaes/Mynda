@@ -4577,7 +4577,18 @@ class MynEditCollections extends MynEdit {
         results.unshift(result.jsx);
       }
     });
-    return results;
+
+    // return results, adding the 'older-sister' class
+    // to all but the last one
+    return results.map((jsx,i) =>{
+      if (i < results.length-1) {
+        return React.cloneElement(jsx,
+          {
+            className : 'collection older-sister'
+          });
+      }
+      return jsx;
+    });
   }
 
   // recursive function that walks down the collections and returns each branch as JSX
@@ -4677,10 +4688,25 @@ class MynEditCollections extends MynEdit {
             {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,collection) : null}
             <div className="children">
               {results.map((result,i) => {
-                if (i < results.length - 1 && results[i+1].show == true) {
+                // console.log('child show ? ' + result.show);
+                // figure out if this child is an older sister to any
+                // other collections that are visible
+                // (just so we can add a class for display purposes)
+                let olderSister = false;
+                for (let j=i+1; j<results.length; j++) {
+                  if (results[j].show === true) {
+                    olderSister = true;
+                    break;
+                  }
+                }
+                if (olderSister) {
+                  console.log("OLDER SISTER")
                   // then we're an older sister, and we want to display a vertical gradient border
-                  // below ourselves, for which we have to add class 'niece' to the 'children' div
-                  // within result.jsx ...somehow
+                  // below ourselves, for which we have to add class 'older-sister' to the jsx
+                  return React.cloneElement(result.jsx,
+                    {
+                      className : 'collection older-sister'
+                    });
                 }
                 return result.jsx;
               })}
