@@ -4020,7 +4020,7 @@ class MynEditorEdit extends React.Component {
     let collections = (
       <div className='edit-field collections'>
         <label className="edit-field-name" htmlFor="collections">Collections: </label>
-        <div className="edit-field-description">Add and subtract the video to and from existing collections. In order to create new collections or edit the existing structure, go to the settings pane.</div>
+        <MynParagraphFolder className="edit-field-description" lede="Add and subtract the video to and from existing collections here." paragraph="In order to create new collections or edit the existing structure, go to the settings pane. Deleting and adding collections can also be done directly in the library pane (when viewing a playlist hierarchically)." />
         <div className="edit-field-editor">
           <MynEditCollections
             video={this.props.video}
@@ -5744,6 +5744,56 @@ class MynEditDateWidget extends MynEditWidget {
     return (
       <div className={"date-widget " + this.props.property}>
         <input ref={this.input} type="text" value={this.state.inputValue} placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
+      </div>
+    );
+  }
+}
+
+// accepts a 'lede' prop and a 'paragraph' prop;
+// displays only the lede
+// until the user clicks the icon to unfold the whole paragraph
+// additional props:
+// 'hideLede' : whether to hide the lede when the paragraph is expanded
+// 'className' and 'id' pass the class and id to the main div of the component
+class MynParagraphFolder extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      expanded : false
+    }
+
+    // this.input = React.createRef();
+    this.render = this.render.bind(this);
+    this.toggle = this.toggle.bind(this);
+  }
+
+  toggle(e) {
+    this.setState({ expanded : !this.state.expanded });
+  }
+
+  render() {
+    return (
+      <div id={this.props.id} className={'paragraph-fold ' + this.props.className} style={{display:'flex'}}>
+
+        <div onClick={this.toggle} style={{ cursor : 'pointer', fontStyle : 'normal', opacity: '.6'/*, transform : (this.state.expanded ? 'rotate(90deg)' : 'rotate(0deg)') */}}>
+          { this.state.expanded ? '\u25BC ' : '\u25B6 ' }
+        </div>
+
+        <div>
+
+          <span  style={{display: this.props.hideLede ? (!this.state.expanded ? 'inline' : 'none') : 'inline'}}>
+            {' ' + (this.state.expanded ? this.props.lede : this.props.lede.replace(/[.,;]\s*$/,''))}
+          </span>
+
+          {this.state.expanded ? ' ' : '\u2026'}
+
+          <span style={{display: this.state.expanded ? 'inline' : 'none'}}>
+            {this.props.paragraph}
+          </span>
+
+        </div>
+
       </div>
     );
   }
