@@ -2,6 +2,7 @@ const React = require('react');
 const ReactDOM = require('react-dom');
 const electron = require('electron');
 const { ipcRenderer } = require('electron');
+const os = require('os');
 const _ = require('lodash');
 const DateJS = require('datejs');
 const URL = require("url").URL;
@@ -645,7 +646,7 @@ class MynLibrary extends React.Component {
               <MynClickToEditText
                 object={object}
                 property='name'
-                update={(prop,value) => { object.name = value }}
+                update={(prop,value) => { if (editColNameValid) object.name = value }}
                 save={() => {
                   if (editColNameValid) {
                     let cols = new Collections(this.state.collections);
@@ -723,7 +724,7 @@ class MynLibrary extends React.Component {
            <MynClickToEditText
              object={object}
              property='name'
-             update={(prop,value) => { object.name = value }}
+             update={(prop,value) => { if (editColNameValid) object.name = value }}
              save={() => {
                if (editColNameValid) {
                  let cols = new Collections(this.state.collections);
@@ -1094,6 +1095,8 @@ class MynLibTable extends React.Component {
   constructor(props) {
     super(props)
 
+    this._isMounted = false;
+
     this.state = {
       sortKey: null,
       sortAscending: true,
@@ -1109,10 +1112,13 @@ class MynLibTable extends React.Component {
             </div>
           );
         },
-      rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : '')
-
+      rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : ''),
+      shiftDown: false,
+      ctrlDown: false
     }
 
+    // this.keyDown = this.keyDown.bind(this);
+    // this.keyUp = this.keyUp.bind(this);
     this.requestSort = this.requestSort.bind(this);
     this.reset = this.reset.bind(this);
     this.render = this.render.bind(this);
@@ -1143,6 +1149,32 @@ class MynLibTable extends React.Component {
     });
   }
 
+  keyDown(e) {
+    if (!this._isMounted) return;
+
+    // SHIFT
+    if (e.keyCode === 16) {
+      this.setState({shiftDown : true});
+    }
+    // CTRL if not MacOS, CMD if MacOS
+    if ((os.platform() !== 'darwin' && e.keyCode === 17) || (os.platform() === 'darwin' && e.metaKey)) {
+      this.setState({ctrlDown : true});
+    }
+  }
+
+  keyUp(e) {
+    if (!this._isMounted) return;
+
+    // SHIFT
+    if (e.keyCode === 16) {
+      this.setState({shiftDown : false});
+    }
+    // CTRL if not MacOS, CMD if MacOS
+    if ((os.platform() !== 'darwin' && e.keyCode === 17) || (os.platform() === 'darwin' && !e.metaKey)) {
+      this.setState({ctrlDown : false});
+    }
+  }
+
   rowHovered(id, rowID, e) {
     // show details in details pane
     if (!this.state.lockedRow) {
@@ -1155,6 +1187,9 @@ class MynLibTable extends React.Component {
     // this.props.showDetails(null, e);
   }
 
+  // when a row is clicked on, 'lock' it;
+  // meaning the details pane stays on that video
+  // until the row is unlocked
   rowClick(id, rowID, e) {
     const row = findNearestOfClass(e.target,'movie-row');
 
@@ -1173,10 +1208,17 @@ class MynLibTable extends React.Component {
           row.classList.remove('unlocking');
         },1000);
       },50);
-      setTimeout(() => {row.classList.remove('unlocking');},1000);
+      // setTimeout(() => {row.classList.remove('unlocking');},1000);
+    } else if (this.state.lockedRow !== null && (this.state.shiftDown || this.state.ctrlDown)) {
+      // if a different row is locked and the user was holding either shift or cmd/ctrl,
+      // then we want to highlight multiple rows, so the user can perform batch actions
+      if (this.state.shiftDown) console.log(`SHIFT CLICKED FROM (ID) ${this.state.lockedRow} TO ${rowID}`);
+      if (this.state.ctrlDown) console.log(`SHIFT CLICKED FROM (ID) ${this.state.lockedRow} TO ${rowID}`);
+
     } else {
-      // if a different row, or no row, was locked,
-      // lock this row
+      // if we're here, either a different row or no row was locked,
+      // and neither 'shift' nor 'cmd/ctrl' was being pressed,
+      // so all we need to do is lock this row
       this.setState({lockedRow : rowID});
       row.classList.add('locked');
       this.props.showDetails(id, rowID, e); // this is necessary in case we go from one locked row to another without unlocking in between
@@ -1223,7 +1265,7 @@ class MynLibTable extends React.Component {
   // called when the user hits enter in the inline 'order' editor
   orderSave(e,order,video) {
     e.preventDefault();
-    e.stopPropagation();
+    // e.stopPropagation();
     // e.target.removeEventListener()
     // console.log(e.target);
     console.log('Saving order as ' + order);
@@ -1518,13 +1560,6 @@ class MynLibTable extends React.Component {
     }
   }
 
-  componentDidMount(props) {
-    // console.log("--MOUNTED--");
-    // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
-    // populate and sort the table (by initial values)
-    this.reset(true);
-  }
-
   componentDidUpdate(oldProps) {
     // console.log('UPDATING MynTable');
 
@@ -1572,6 +1607,26 @@ class MynLibTable extends React.Component {
 
   }
 
+  componentDidMount(props) {
+    this._isMounted = true;
+    // console.log("--MOUNTED--");
+    // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
+    // populate and sort the table (by initial values)
+    this.reset(true);
+  }
+
+  componentWillMount() {
+    // set key listeners to be used for batch highlighting of videos
+    document.addEventListener("keydown", this.keyDown.bind(this));
+    document.addEventListener("keyup", this.keyUp.bind(this));
+  }
+
+  componentWillUnmount() {
+    this._isMounted = false;
+    document.removeEventListener("keydown", this.keyDown.bind(this));
+    document.removeEventListener("keyup", this.keyUp.bind(this));
+  }
+
   render() {
     // console.log('----MynLibTable RENDER----');
 
@@ -1604,6 +1659,10 @@ class MynLibTable extends React.Component {
 
     return  (
       <div className="movie-table-container">
+        <div style={{position:'absolute'}}>
+          {this.state.shiftDown ? 'SHIFT ' : ''}
+          {this.state.ctrlDown ? 'CTRL' : ''}
+        </div>
         <table className="movie-table" id={tableID}>
           <thead>
             <tr id="main-table-header-row">
@@ -2969,7 +3028,7 @@ class MynSettingsCollections extends React.Component {
                     <MynClickToEditText
                       object={collection}
                       property='name'
-                      update={(prop,value) => { collection.name = value }}
+                      update={(prop,value) => { if (editColNameValid) collection.name = value }}
                       save={() => {
                         if (editColNameValid) {
                           let cols = new Collections(this.state.collections);
@@ -3022,7 +3081,7 @@ class MynSettingsCollections extends React.Component {
           return (
             <div className='collections' ref={provided.innerRef} {...provided.droppableProps}>
               {collectionsJSX}
-              <div style={{}/*{ maxHeight: '45px', border: '1px solid red', overflow : 'hidden', backgroundColor : (snapshot.isUsingPlaceholder ? 'red' : 'initial') }*/}>
+              <div style={{display:'none'}/*{ maxHeight: '45px', border: '1px solid red', overflow : 'hidden', backgroundColor : (snapshot.isUsingPlaceholder ? 'red' : 'initial') }*/}>
                 {provided.placeholder}
               </div>
             </div>
