@@ -365,6 +365,7 @@ th, tr, td {
   background-color: var(--movie-row-bg-hover);
   color: var(--movie-row-text-hover);
 }
+.movie-row.batch,
 .movie-row.locked {
   /* box-shadow: var(--movie-row-boxshadow-locked); */
   background: var(--movie-row-bg-locked);
@@ -454,6 +455,8 @@ th, tr, td {
 .movie-row:hover .title::after {
   background: var(--tablecell-ellipsis-grad-hover);
 }
+.movie-row.batch .title::after,
+.movie-row.batch:hover .title::after,
 .movie-row.locked .title::after,
 .movie-row.locked:hover .title::after {
   background: var(--tablecell-ellipsis-grad-locked);

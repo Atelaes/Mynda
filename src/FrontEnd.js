@@ -33,7 +33,7 @@ class Mynda extends React.Component {
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
-      detailMovie : null,
+      detailVideo : null,
       currentPlaylistID : null,
       prevQuery : '',
 
@@ -121,14 +121,33 @@ class Mynda extends React.Component {
     });
   }
 
-  showDetails(id, rowID, e) {
-    let detailMovie = null;
+  showDetails(id, rowID) {
+    // boobs
+    if (Array.isArray(id)) {
+      console.log('SHOWING BATCH DETAILS PANE')
+      let titles = [];
+      this.state.filteredVideos.map(v => {
+        if (id.includes(v.id)) titles.push(v.title);
+      });
+      let batchObject = {
+        id:'',
+        title:'BATCH',
+        description: titles.join(', ')
+      }
+      validateVideo(batchObject);
+      console.log(JSON.stringify(batchObject));
+
+      this.setState({detailRowID: rowID, detailVideo: batchObject});
+      return;
+    }
+
+    let detailVideo = null;
     try {
-      detailMovie = this.state.filteredVideos.filter(video => video.id === id)[0]
+      detailVideo = this.state.filteredVideos.filter(video => video.id === id)[0]
     } catch(error) {
       console.log("Error: could not find video " + id)
     }
-    this.setState({detailRowID: rowID, detailMovie: detailMovie});
+    this.setState({detailRowID: rowID, detailVideo: detailVideo});
   }
 
   scrollToVideo(rowID) {
@@ -325,7 +344,7 @@ class Mynda extends React.Component {
     //     paneJSX = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane(name)}}/>
     //     break;
     //   case "editorPane":
-    //     paneJSX = <MynEditor video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
+    //     paneJSX = <MynEditor video={this.state.detailVideo} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
     //     break;
     // };
     // this.setState({openablePane:paneJSX});
@@ -380,8 +399,8 @@ class Mynda extends React.Component {
           // seen whether we need to update the playlist explicitly here or not
 
           // update video in details pane (we don't know if this video was affected, but just in case)
-          // this.setState({detailMovie : this.state.videos.filter(video => video.id === this.state.detailMovie.id)[0]});
-          this.setState({detailMovie : null}); // for some reason this appears to work, and the above (commented) line does not. Not sure why.
+          // this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
+          this.setState({detailVideo : null}); // for some reason this appears to work, and the above (commented) line does not. Not sure why.
         });
       }
 
@@ -391,7 +410,7 @@ class Mynda extends React.Component {
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
-        this.setState({detailMovie : this.state.videos.filter(video => video.id === this.state.detailMovie.id)[0]});
+        this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
       }
 
       // if a playlist was changed
@@ -441,9 +460,9 @@ class Mynda extends React.Component {
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}/>
         <MynLibrary movies={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} />
-        <MynDetails movie={this.state.detailMovie} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
+        <MynDetails video={this.state.detailVideo} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
-        <MynEditor show={this.state.show.editorPane} video={this.state.detailMovie} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
+        <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
     );
   }
@@ -1103,6 +1122,7 @@ class MynLibTable extends React.Component {
       sortedRows: [],
       displayOrderColumn: "table-cell",
       lockedRow: null,
+      batchSelected: [],
       vidOrderDisplay: {},
       vidOrderDisplayTemplate: (video,order) => {
           let rowID = this.state.rowID(video.id);
@@ -1113,6 +1133,7 @@ class MynLibTable extends React.Component {
           );
         },
       rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : ''),
+      idFromRowID: (rowID) => (this.props.collectionID ? rowID.replace(new RegExp('_' + this.props.collectionID + '$'),'') : rowID),
       shiftDown: false,
       ctrlDown: false
     }
@@ -1176,8 +1197,12 @@ class MynLibTable extends React.Component {
   }
 
   rowHovered(id, rowID, e) {
-    // show details in details pane
-    if (!this.state.lockedRow) {
+    // show details in details pane on hovering a row
+    // except if a row has been locked (because then we want that video's details
+    // to persist in the details pane until it's unlocked), or if multiple
+    // videos have been selected (in which case we will show a special batch-edit
+    // screen in the details pane)
+    if (!this.state.lockedRow && this.state.batchSelected.length <= 1) {
       this.props.showDetails(id, rowID, e);
     }
   }
@@ -1190,38 +1215,192 @@ class MynLibTable extends React.Component {
   // when a row is clicked on, 'lock' it;
   // meaning the details pane stays on that video
   // until the row is unlocked
-  rowClick(id, rowID, e) {
+  rowClick(id, rowID, index, e) {
     const row = findNearestOfClass(e.target,'movie-row');
 
     // first remove the 'locked' class from any currently locked row
     if (this.state.lockedRow !== null) {
-      document.getElementById(this.state.lockedRow).classList.remove('locked');
+      try {
+        document.getElementById(this.state.lockedRow).classList.remove('locked');
+      } catch(err) {
+        console.error(`Could not find and unlock previous locked row (${this.state.lockedRow}): ${err}`);
+      }
     }
 
-    // if this row is already locked, unlock it
-    if (this.state.lockedRow === rowID) {
-      this.setState({lockedRow : null});
-      row.classList.remove('locked');
-      setTimeout(() => {
-        row.classList.add('unlocking');
-        setTimeout(() => {
-          row.classList.remove('unlocking');
-        },1000);
-      },50);
-      // setTimeout(() => {row.classList.remove('unlocking');},1000);
-    } else if (this.state.lockedRow !== null && (this.state.shiftDown || this.state.ctrlDown)) {
-      // if a different row is locked and the user was holding either shift or cmd/ctrl,
-      // then we want to highlight multiple rows, so the user can perform batch actions
-      if (this.state.shiftDown) console.log(`SHIFT CLICKED FROM (ID) ${this.state.lockedRow} TO ${rowID}`);
-      if (this.state.ctrlDown) console.log(`SHIFT CLICKED FROM (ID) ${this.state.lockedRow} TO ${rowID}`);
+    // then remove the 'batch' class from all the rows
+    // (we'll re-add it to any that are still selected at the end of the function)
+    Array.from(document.getElementsByClassName('movie-row')).map(row => {
+      row.classList.remove('batch');
+    });
 
+      // if the user clicks on a row with a modifier key pressed
+      // (either shift or ctrl/cmd), we create/modify the selection of multiple videos
+    if (this.state.shiftDown || this.state.ctrlDown) {
+
+      // if shift is pressed, then we want to select all the videos between
+      // the two rows that were clicked (including the clicked ones);
+      // we do this by using the locked row as an anchor (i.e. the first click)
+      // and the new click as the second click, highlighting all the videos in between;
+      //
+      // as of now, if the user shift clicks and there is no locked row,
+      // we find the nearest selected row and use that as the anchor,
+      // and if there is no other selected row, we just select the row
+      // that was clicked on by itself
+      if (this.state.shiftDown) {
+        // find the index of the clicked row and the anchor (locked) row
+        let end = index;
+        let start;
+        let selectedIndices = [];
+        for (let i=0; i<this.state.sortedRows.length; i++) {
+          if (this.state.sortedRows[i].rowID === this.state.lockedRow) {
+            start = i;
+            break;
+          }
+          // this will be used below if no 'start' was found
+          if (this.state.batchSelected.includes(this.state.sortedRows[i].vidID)) {
+            selectedIndices.push(i);
+          }
+        }
+        // if there was no locked row, start will be undefined,
+        // and we need to decide where to start from;
+        // we will use the selectedIndices array to pick the closest video
+        // that's already selected and use that as the start point
+        if (start === undefined) {
+          let minDiff = Number.MAX_SAFE_INTEGER;
+          let minDiffIndex;
+          for (let i of selectedIndices) {
+            let diff = Math.abs(end - i);
+            if (diff < minDiff) {
+              minDiff = diff;
+              minDiffIndex = i;
+            }
+          }
+          if (minDiffIndex) {
+            start = minDiffIndex;
+          } else {
+            // if we're here, there were no previously selected videos,
+            // so we set 'start' to the same as 'end', which will just
+            // select only the video that was clicked on
+            start = end;
+          }
+        }
+
+        // if (this.state.shiftDown) console.log(`SHIFT CLICKED FROM (INDEX) ${start} TO ${end}`);
+        // if (this.state.ctrlDown) console.log(`CTRL CLICKED FROM (INDEX) ${start} TO ${end}`);
+
+        // get a list of the actual videos being selected
+        let selectedVids = []
+        let low = start < end ? start : end;
+        let high = start < end ? end : start;
+        for (let i = low; i <= high; i++) {
+          selectedVids.push(this.state.sortedRows[i].vidID);
+          try {
+            // document.getElementById(this.state.sortedRows[i].rowID).classList.add('batch');
+          } catch(err) {
+            console.error(`Could not add 'batch' class to row ${this.state.sortedRows[i].rowID}\n${err}`);
+          }
+        }
+        this.setState({batchSelected:selectedVids},this.handleBatch);
+        console.log(`SELECTED VIDEOS: ${selectedVids}`);
+
+      }
+
+      // if ctrl/cmd was pressed, but NOT shift,
+      // then we add or subtract the individual row clicked on
+      // from any previously selected videos
+      else if (this.state.ctrlDown) {
+        let selectedVids = _.cloneDeep(this.state.batchSelected);
+        if (this.state.batchSelected.includes(id)) {
+          selectedVids = selectedVids.filter(vID => vID !== id);
+          // if we're unselecting the locked (anchor) row, unlock it
+          if (this.state.lockedRow === rowID) {
+            this.state.lockedRow = null;
+          }
+        } else {
+          console.log("ADDING " + id)
+          if (!this.state.lockedRow && selectedVids.length === 0) this.lockRow(rowID);
+          selectedVids.push(id);
+        }
+        this.setState({batchSelected:selectedVids},this.handleBatch);
+      }
+
+
+      // no modifier keys were pressed
     } else {
-      // if we're here, either a different row or no row was locked,
-      // and neither 'shift' nor 'cmd/ctrl' was being pressed,
-      // so all we need to do is lock this row
-      this.setState({lockedRow : rowID});
-      row.classList.add('locked');
-      this.props.showDetails(id, rowID, e); // this is necessary in case we go from one locked row to another without unlocking in between
+      // if the user clicked on the currently locked row, unlock it
+      // and erase all batch selections
+      if (this.state.lockedRow === rowID) {
+        this.setState({lockedRow : null});
+        row.classList.remove('locked');
+        setTimeout(() => {
+          row.classList.add('unlocking');
+          setTimeout(() => {
+            row.classList.remove('unlocking');
+          },1000);
+        },50);
+
+        // and erase any previous batch selection
+        this.setState({batchSelected:[]},this.handleBatch);
+
+      } else {
+        // if we're here, either a different row or no row was locked,
+        // and neither 'shift' nor 'cmd/ctrl' was being pressed,
+        // so we need to lock this row
+        this.lockRow(rowID);
+
+        // also erase any previous batch selection
+        // and include the locked video in a new batch selection
+        let selectedVids = [];
+        selectedVids.push(id)
+        this.setState({batchSelected:selectedVids},this.handleBatch);
+      }
+    }
+
+  }
+
+  lockRow(rowID, id) {
+    let row = document.getElementById(rowID);
+    if (!id) id = this.state.idFromRowID(rowID);
+    this.setState({lockedRow : rowID});
+    row.classList.add('locked');
+    this.props.showDetails(id, rowID); // this is necessary in case we go from one locked row to another without unlocking in between
+  }
+
+  handleBatch() {
+    // first, add the 'batch' class to all the selected rows
+    Array.from(document.getElementsByClassName('movie-row')).map(row => {
+      // console.log(row.getAttribute('vid_id'));
+      if (this.state.batchSelected.includes(row.getAttribute('vid_id'))) {
+        row.classList.add('batch');
+      } else {
+        row.classList.remove('batch');
+      }
+    });
+
+    // if multiple rows are selected, we want to tell the main
+    // Mynda component to display a special batch edit screen
+    // in the details pane;
+    if (this.state.batchSelected.length > 1) {
+      console.log("Multiple Videos Selected")
+      // first we find the highest selected vid in the table
+      // (i.e. the video with the lowest index); this is simply to
+      // supply showDetails with a rowID so it can display a link
+      // for the user to scroll to in the Library
+      let firstVid;
+      let lowestIndex = this.state.sortedRows.length;
+      for (let id of this.state.batchSelected) {
+        for (let i=0; i<lowestIndex; i++) {
+          if (this.state.sortedRows[i].vidID === id) {
+            lowestIndex = i;
+            firstVid = id;
+            break;
+          }
+        }
+      }
+      let firstRow = this.state.rowID(firstVid);
+
+      // then we simply call showDetails with the list of selected videos
+      this.props.showDetails(_.cloneDeep(this.state.batchSelected),firstRow);
     }
   }
 
@@ -1436,14 +1615,22 @@ class MynLibTable extends React.Component {
 
       let cells = this.props.columns.map(column => cellJSX[column]);
 
-      let row = (
+      let row = {
+        index:index,
+        rowID:rowID,
+        vidID:movie.id,
+        vidTitle:movie.title
+      };
+
+      let rowJSX = (
         <tr
           className={"movie-row " + rowID}
           id={rowID}
+          vid_id={movie.id}
           key={movie.id}
           onMouseOver={(e) => this.rowHovered(movie.id, rowID, e)}
           onMouseOut={(e) => this.rowOut(movie.id, rowID, e)}
-          onClick={(e) => this.rowClick(movie.id, rowID, e)}
+          onClick={(e) => this.rowClick(movie.id, rowID, index, e)}
         >
           {cellJSX.order}
           {cells}
@@ -1453,14 +1640,14 @@ class MynLibTable extends React.Component {
       if (this.props.provided) {
         // row.props.ref = this.props.provided.innerRef;
         // row.props = {...row.props, ...this.props.provided.draggableProps}
-        return (
+        row.jsx = (
           <Draggable key={rowID} draggableId={rowID} index={index}>
             {(provided, snapshot) => {
               // adjust style of row while it's being dragged
               let draggableProps = _.cloneDeep(provided.draggableProps);
               draggableProps.style.opacity = snapshot.isDragging ? 0.5 : 1;
 
-              return React.cloneElement(row,
+              return React.cloneElement(rowJSX,
                 {
                   ref: provided.innerRef,
                   ...draggableProps,
@@ -1470,8 +1657,10 @@ class MynLibTable extends React.Component {
           </Draggable>
         );
       } else {
-        return row;
+        row.jsx = rowJSX;
       }
+
+      return row;
     });
 
     // set the sort state in state
@@ -1645,24 +1834,25 @@ class MynLibTable extends React.Component {
     if (this.props.provided) {
       tBody = (
         <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
-          {this.state.sortedRows}
+          {this.state.sortedRows.map(row => row.jsx)}
           {this.props.provided.placeholder}
         </tbody>
       );
     } else {
       tBody = (
         <tbody>
-          {this.state.sortedRows}
+          {this.state.sortedRows.map(row => row.jsx)}
         </tbody>
       );
     }
 
     return  (
       <div className="movie-table-container">
-        <div style={{position:'absolute'}}>
+        {/*<div style={{position:'absolute'}}>
           {this.state.shiftDown ? 'SHIFT ' : ''}
           {this.state.ctrlDown ? 'CTRL' : ''}
-        </div>
+          {this.state.batchSelected}
+        </div>*/}
         <table className="movie-table" id={tableID}>
           <thead>
             <tr id="main-table-header-row">
@@ -1813,7 +2003,7 @@ class MynDetails extends React.Component {
   }
 
   displayRatings() {
-    let ratings = this.props.movie.ratings;
+    let ratings = this.props.video.ratings;
     // console.log(JSON.stringify(ratings));
     return Object.keys(ratings).map(source => {
       // console.log(source);
@@ -1843,7 +2033,7 @@ class MynDetails extends React.Component {
 
   componentDidUpdate(oldProps) {
     this.setTitleMarquee();
-    if (!_.isEqual(oldProps.movie, this.props.movie)) {
+    if (!_.isEqual(oldProps.video, this.props.video)) {
       // this.setTitleMarquee();
       if (this.props.settings.preferences.hidedescription === "hide") {
         try {
@@ -1855,10 +2045,10 @@ class MynDetails extends React.Component {
     }
 
     // if the user has scrolled, we want to show or not show the scroll button
-    // depending on whether the row of the details movie is still in view
+    // depending on whether the row of the details video is still in view
     if (oldProps.libraryScroll !== this.props.libraryScroll) {
       if (this.scrollBtn.current && !this.props.isRowVisible(rowID)) {
-        console.log(movie.title + ' is NOT visible!');
+        console.log(video.title + ' is NOT visible!');
         this.scrollBtn.current.style.display = 'block';
       } else {
         this.scrollBtn.current.style.display = 'none';
@@ -1875,23 +2065,23 @@ class MynDetails extends React.Component {
     let scrollBtn = null;
 
     try {
-      const movie = this.props.movie
+      const video = this.props.video
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img src={movie.artwork || '../images/qmark.png'} /></li>
-          <li className="detail" id="detail-title"><div className="detail-title-text">{movie.title}</div></li>
-          <li className="detail" id="detail-position"><MynEditPositionWidget movie={movie} /></li>
-          <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{movie.description}</div></li>
+          <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark.png'} /></li>
+          <li className="detail" id="detail-title"><div className="detail-title-text">{video.title}</div></li>
+          <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} /></li>
+          <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
           <li className="detail" id="detail-ratings">{this.displayRatings()}</li>
-          <li className="detail" id="detail-director"><span className="label">Director:</span> {movie.director}</li>
-          <li className="detail" id="detail-cast"><span className="label">Cast:</span> {movie.cast.join(", ")}</li>
-          <li className="detail" id="detail-tags"><span className="label">Tags:</span> {movie.tags.map((tag) => <span key={tag}>{tag} </span>)}</li>
-          <li className="detail" id="detail-rated"><span className="label">Rated:</span> {movie.rated}</li>
-          <li className="detail" id="detail-country"><span className="label">Country:</span> {movie.country}</li>
-          <li className="detail" id="detail-languages"><span className="label">Languages:</span> {movie.languages.join(", ")}</li>
-          {movie.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(movie.boxoffice,'$',0) || ''}</li>) : null}
-          <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(movie.dateadded)}</li>
-          <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(movie.lastseen)}</li>
+          <li className="detail" id="detail-director"><span className="label">Director:</span> {video.director}</li>
+          <li className="detail" id="detail-cast"><span className="label">Cast:</span> {video.cast.join(", ")}</li>
+          <li className="detail" id="detail-tags"><span className="label">Tags:</span> {video.tags.map((tag) => <span key={tag}>{tag} </span>)}</li>
+          <li className="detail" id="detail-rated"><span className="label">Rated:</span> {video.rated}</li>
+          <li className="detail" id="detail-country"><span className="label">Country:</span> {video.country}</li>
+          <li className="detail" id="detail-languages"><span className="label">Languages:</span> {video.languages.join(", ")}</li>
+          {video.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(video.boxoffice,'$',0) || ''}</li>) : null}
+          <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(video.dateadded)}</li>
+          <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(video.lastseen)}</li>
 
         </ul>
       );
@@ -1905,12 +2095,12 @@ class MynDetails extends React.Component {
     } catch (error) {
       // eventually we'll put some kind of better placeholder here
       details = <div>No Details</div>
-      editBtn = null; // in the case of no movie, we don't want an edit button
+      editBtn = null; // in the case of no video, we don't want an edit button
       scrollBtn = null; // same with this
 
-      // console.error(error.toString());
+      console.error(error.toString());
 
-      // validateVideo(this.props.movie);
+      // validateVideo(this.props.video);
     }
 
     return  (
@@ -5897,13 +6087,13 @@ function validateVideo(video) {
 
   let vidProps = Object.keys(video);
   let propKeys = Object.keys(properties);
-  for(const property of propKeys){
-    if (vidProps.includes(property)) {
+  for (const property of propKeys) {
+    // if (vidProps.includes(property)) {
       // repair any malformed properties
       switch(properties[property]) {
         // ratings, collections
         case 'object' :
-          if (typeof video[property] !=='object' || typeof video[property] === null) {
+          if (typeof video[property] === 'undefined' || typeof video[property] !=='object' || typeof video[property] === null) {
             repaired[property] = {};
           }
           break;
@@ -5938,10 +6128,10 @@ function validateVideo(video) {
             repaired[property] = '';
           }
       }
-    } else {
-      // the property doesn't exist, so create it
-      repaired[property] = '';
-    }
+    // } else {
+    //   // the property doesn't exist, so create it
+    //   repaired[property] = '';
+    // }
   }
 
   // if no id, create one
