@@ -132,24 +132,34 @@ class Mynda extends React.Component {
   }
 
   handleSelectedRows(selectedVids, highestRow, tableID, overwrite) {
+    // console.log("Overwrite ? " + overwrite);
     // overwrite is a boolean telling us whether to deselect all previously
     // selected rows in all tables before adding the new selections
     if (overwrite) this.state.selectedRows = {};
 
+    // if any videos were selected in this table, add them to the object;
+    // we don't want to add an empty list of rows to the object, because that may
+    // cause an infinite loop when the table updates its own state variable
+    // based on this object
+    if (selectedVids && selectedVids.length > 0) {
+      this.state.selectedRows[tableID] = {
+        rows: selectedVids,
+        highestRow: highestRow
+      };
+    } else {
+      // if no videos in this table were selected, delete this table from the object
+      delete this.state.selectedRows[tableID]
+    }
 
-    this.state.selectedRows[tableID] = {
-      rows: selectedVids,
-      highestRow: highestRow
-    };
-
-    // get flat array of all selected videos
+    // get object containing all selected videos
     let allSelected = this.getAllSelected();
+    // console.log(`ALL SELECTED: ${JSON.stringify(allSelected)}`);
 
     if (allSelected.rows.length === 0) {
       // if no rows are selected, empty the state object so that
       // this.handleHoveredRow can take over and display whatever row the
       // user is hovering on
-      this.setState({selectedRows:{}});
+      this.setState({selectedRows:{}} /*, ()=>console.log('SELECTED ROWS OBJECT: ' + JSON.stringify(this.state.selectedRows))*/);
     } else if (allSelected.rows.length === 1) {
       // if only one row is selected, show that video in the details pane
       this.showDetails(allSelected.rows[0],allSelected.highestRow);
@@ -157,10 +167,11 @@ class Mynda extends React.Component {
       // if multiple rows are selected, pass the whole array into showDetails
       this.showDetails(allSelected.rows,allSelected.highestRow);
     }
+    // console.log('SELECTED ROWS OBJECT: ' + JSON.stringify(this.state.selectedRows));
   }
 
   getAllSelected() {
-    let highestRow = '9999999999999999999999999999999999999999'; // after the transformation below, this will become 1
+    let highestRow = '9999999999999999999999999999999999999999'; // after the transformation below, this will become 1, which will be higher than any of the actual rows, which are all between 0 and 1
     let selected = [];
     Object.keys(this.state.selectedRows).map(tableID => {
       // add the selected videos from this table
@@ -188,6 +199,10 @@ class Mynda extends React.Component {
       }
     });
 
+    if (selected.length === 0) {
+      highestRow = null;
+    }
+
     let results = {
       rows: selected,
       highestRow: highestRow
@@ -197,7 +212,6 @@ class Mynda extends React.Component {
   }
 
   showDetails(id, rowID) {
-    // boobs
     if (Array.isArray(id)) {
       console.log('SHOWING BATCH DETAILS PANE')
       let titles = [];
@@ -309,12 +323,16 @@ class Mynda extends React.Component {
       element.classList.add('selected');
     }
 
-    // set the playlist
+    // set the playlist, and erase any row selection from the previous playlist
     let videos = this.playlistFilter(id);
     let playlist = this.state.playlists.filter(playlist => playlist.id == id)[0];
     let view = playlist ? playlist.view : null;
-    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id})
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, selectedRows : {}});
     // this.setState({}); // filteredVideos is what is actually displayed
+
+    // reset the details pane
+    // this line causes an error I don't understand yet
+    // this.showDetails('hi','hihi');
   }
 
   // called when the search input is changed
@@ -534,7 +552,7 @@ class Mynda extends React.Component {
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}/>
-        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} />
+        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
         <MynDetails video={this.state.detailVideo} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
@@ -884,6 +902,7 @@ class MynLibrary extends React.Component {
                     showDetails={this.props.showDetails}
                     handleSelectedRows={this.props.handleSelectedRows}
                     handleHoveredRow={this.props.handleHoveredRow}
+                    selectedRows={this.props.selectedRows}
                     reportSort={this.reportSort}
                     provided={provided}
                   />
@@ -1177,6 +1196,7 @@ class MynLibrary extends React.Component {
           showDetails={this.props.showDetails}
           handleSelectedRows={this.props.handleSelectedRows}
           handleHoveredRow={this.props.handleHoveredRow}
+          selectedRows={this.props.selectedRows}
         />
       )
 
@@ -1290,9 +1310,9 @@ class MynLibTable extends React.Component {
     // to persist in the details pane until it's unlocked), or if multiple
     // videos have been selected (in which case we will show a special batch-edit
     // screen in the details pane)
-    if (!this.state.batchSelected || this.state.batchSelected.length === 0) {
+    // if (!this.state.batchSelected || this.state.batchSelected.length === 0) {
       this.props.handleHoveredRow(id, rowID, e);
-    }
+    // }
   }
 
   rowOut(id, rowID, e) {
@@ -1304,6 +1324,7 @@ class MynLibTable extends React.Component {
   // when selected, the user can batch edit videos;
   // eventually, we'd like to enable batch drag n' drop as well
   rowClick(id, rowID, index, e) {
+    // console.log(`TABLE ${this.tableID} REGISTERED A CLICK`);
     const row = findNearestOfClass(e.target,'movie-row');
 
     // (THERE IS NO LONGER SUCH A THING AS A 'LOCKED' ROW, ONLY A SELECTED ROW (clicked) OR A HOVERED ROW)
@@ -1318,9 +1339,9 @@ class MynLibTable extends React.Component {
 
     // then remove the 'batch' class from all the rows
     // (we'll re-add it to any that are still selected at the end of the function)
-    Array.from(document.getElementsByClassName('movie-row')).map(row => {
-      row.classList.remove('selected');
-    });
+    // Array.from(document.getElementsByClassName('movie-row')).map(row => {
+    //   row.classList.remove('selected');
+    // });
 
       // if the user clicks on a row with a modifier key pressed
       // (either shift or ctrl/cmd), we create/modify the selection of multiple videos
@@ -1417,7 +1438,7 @@ class MynLibTable extends React.Component {
         this.setState({batchSelected:[]},() => this.handleBatch(true));
 
       } else {
-        // if we're here, either multiple rows, a different row, or no row was selected,
+        // if we're here, either multiple rows, a different row, or no row was already selected,
         // and neither 'shift' nor 'cmd/ctrl' was being pressed,
         // so we want to erase any previous batch selection,
         // selecting only the row that was clicked on
@@ -1442,13 +1463,14 @@ class MynLibTable extends React.Component {
   // to overwrite any rows previously selected by other tables;
   // otherwise, we simply want to add this batch to any existing batches
   // (which would have been selected from other collections in the same playlist)
-  handleBatch(newSelection) {
-    // first, add the 'batch' class to all the selected rows
-    Array.from(document.getElementsByClassName('movie-row')).map(row => {
+  handleBatch(overwrite) {
+    // first, add the 'selected' class to all the selected rows
+    Array.from(document.getElementById(this.tableID).getElementsByClassName('movie-row')).map(row => {
       // console.log(row.getAttribute('vid_id'));
       if (this.state.batchSelected.includes(row.getAttribute('vid_id'))) {
         row.classList.add('selected');
       } else {
+        // console.log(`REMOVING SELECTED CLASS FROM ${row.id}`)
         row.classList.remove('selected');
       }
     });
@@ -1468,10 +1490,10 @@ class MynLibTable extends React.Component {
         }
       }
     }
-    let firstRow = this.state.rowID(firstVid);
+    let firstRow = firstVid ? this.state.rowID(firstVid) : null;
 
     // then we pass upwards the list of selected videos
-    this.props.handleSelectedRows(_.cloneDeep(this.state.batchSelected),firstRow);
+    this.props.handleSelectedRows(_.cloneDeep(this.state.batchSelected),firstRow,this.tableID,overwrite);
   }
 
   // called when the user clicks on the 'order' cell of a row
@@ -1692,9 +1714,14 @@ class MynLibTable extends React.Component {
         vidTitle:movie.title
       };
 
+      // THE BELOW MAY NOT BE NECESSARY
+      // include the 'selected' class if this row is selected
+      let selected = ''//(this.props.selectedRows[this.tableID] && this.props.selectedRows[this.tableID].rows && this.props.selectedRows[this.tableID].rows.includes(movie.id.toString())) ? ' selected' : '';
+      // console.log(`Row for movie ${movie.id} in table ${this.tableID} class: ${selected}`);
+
       let rowJSX = (
         <tr
-          className={"movie-row " + rowID}
+          className={"movie-row " + rowID + selected}
           id={rowID}
           vid_id={movie.id}
           key={movie.id}
@@ -1821,6 +1848,20 @@ class MynLibTable extends React.Component {
 
   componentDidUpdate(oldProps) {
     // console.log('UPDATING MynTable');
+
+    // if another table unselected this table's rows, update the state variable
+    if (!this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID]) {
+      // console.log('SCENARIO 1')
+      this.setState({batchSelected:[]},this.handleBatch);
+    }
+    // if the selection of rows in this table was otherwise changed from the outside
+    // (though I don't know when that would happen besides a simple unselection)
+    // update the state variable
+    if (this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID] && !_.isEqual(this.props.selectedRows[this.tableID],oldProps.selectedRows[this.tableID]) && this.props.selectedRows[this.tableID].rows) {
+      // console.log('SCENARIO 2')
+      this.setState({batchSelected:this.props.selectedRows[this.tableID].rows},this.handleBatch);
+    }
+
 
     // we have to sort the movies array before comparing it,
     // otherwise the conditional fires when the elements change order,
