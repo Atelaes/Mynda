@@ -212,18 +212,53 @@ class Mynda extends React.Component {
   }
 
   showDetails(id, rowID) {
+    // boobs
+    // if the first parameter is an array of ids, we want to display
+    // a special screen indicating that multiple videos are selected,
+    // and also create a batchObject, which is basically a video object
+    // which contains only the attributes every selected video has in common;
+    // this object will be used to perform the batch edit
     if (Array.isArray(id)) {
+      const vidIDs = id;
       console.log('SHOWING BATCH DETAILS PANE')
+
+      // get a list of titles to display to the user
       let titles = [];
       this.state.filteredVideos.map(v => {
         if (id.includes(v.id)) titles.push(v.title);
       });
-      let batchObject = {
-        id:'',
-        title:'BATCH',
-        description: titles.join(', ')
-      }
-      validateVideo(batchObject);
+
+      // get an array of the videos themselves
+      let videos = this.state.videos.filter(v => vidIDs.includes(v.id));
+
+      // create the batch object
+      let batchObject = {}
+      validateVideo(batchObject); // this populates the object with all the right keys
+      Object.keys(batchObject).map(key => {
+        // set value for this key to the that of the first video
+        let testValue = videos[0][key];
+        // loop through and test all the videos against that value
+        for (let i=1; i<videos.length; i++) {
+          const value = videos[i][key];
+          // if any one of them is different, return;
+          // different keys require different equality tests;
+          // also, eventually we'll need to be more sophisticated here,
+          // in that if value is an array, for instance,
+          // maybe we want to compare individual elements of the array
+          // and keep only the ones that are in common,
+          // even if the whole array isn't identical
+          if (typeof value === 'object' && value !== null) {
+            if (!_.isEqual(value,testValue)) return;
+          } else if (typeof value === 'array') {
+            if (!_.isEqual(value,testValue)) return;
+          } else {
+            if (value !== testValue) return;
+          }
+        }
+        // if we're here, the values for this key were the same in every video,
+        // so assign this value to the batch object
+        batchObject[key] = testValue;
+      });
       console.log(JSON.stringify(batchObject));
 
       this.setState({detailRowID: rowID, detailVideo: batchObject});
@@ -249,18 +284,25 @@ class Mynda extends React.Component {
   }
 
   isElementOffScreen(el) {
-    let rect = el.getBoundingClientRect();
-    return (
-         (rect.x + rect.width) < 0
-      || (rect.y + rect.height) < 0
-      || (rect.x > window.innerWidth || rect.y > window.innerHeight)
-    );
+    try {
+      let rect = el.getBoundingClientRect();
+      return (
+           (rect.x + rect.width) < 0
+        || (rect.y + rect.height) < 0
+        || (rect.x > window.innerWidth || rect.y > window.innerHeight)
+      );
+    } catch(err) {
+      console.error(err);
+      return true;
+    }
   }
 
   // tells if the table row for a given video id
   // is visible: i.e. it is within the viewport (not scrolled offscreen)
   // and its collections hierarchy is expanded (if applicable)
   isRowVisible(rowID) {
+    return false; // just until we get the rest of the infrastructure written
+
     // first find the row
     let row = null;
     try {
@@ -271,19 +313,23 @@ class Mynda extends React.Component {
     }
 
     // then test if it is scrolled out of view
-    let boundary = document.getElementById('library-pane').getBoundingClientRect();
-    let rect = row.getBoundingClientRect();
     let inViewport = false;
-    if (rect.top < window.innerHeight || rect.bottom > boundary.top) {
-      inViewport = true;
+    try {
+      let boundary = document.getElementById('library-pane').getBoundingClientRect();
+      let rect = row.getBoundingClientRect();
+      if (rect.top < window.innerHeight || rect.bottom > boundary.top) {
+        inViewport = true;
+      }
+    } catch(err) {
+      console.error(err);
+      inViewport = true; // if there was an error, set this to true, so the link doesn't appear
     }
 
     // then test if it or any of its parents is set to display:none
     let isNotHidden = row.offsetParent !== null;
 
     // return if it its scroll position is onscreen and it is not hidden
-    // return inViewport && isNotHidden;
-    return false; // just until we get the rest of the infrastructure written
+    return inViewport && isNotHidden;
   }
 
   // filter the movies we'll hand off to the table component
@@ -2203,7 +2249,7 @@ class MynDetails extends React.Component {
       scrollBtn = null; // same with this
 
       console.error(error.toString());
-
+      console.trace();
       // validateVideo(this.props.video);
     }
 
@@ -5753,12 +5799,18 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   }
 
   getPositionFromMouse(event) {
-    let target = findNearestOfClass(event.target,'position-outer');
-    let widgetX = window.scrollX + target.getBoundingClientRect().left;
-    let widgetWidth = target.clientWidth;
-    let mouseX = event.clientX;
+    let position = 0;
 
-    let position = (mouseX - widgetX) / widgetWidth * this.props.movie.duration;
+    try {
+      let target = findNearestOfClass(event.target,'position-outer');
+      let widgetX = window.scrollX + target.getBoundingClientRect().left;
+      let widgetWidth = target.clientWidth;
+      let mouseX = event.clientX;
+
+      position = (mouseX - widgetX) / widgetWidth * this.props.movie.duration;
+    } catch(err) {
+      console.error('Error in MynEditPositionWidget: ' + err);
+    }
 
     // console.log(
     //   'mouseX: ' + mouseX + '\n' +
