@@ -3478,7 +3478,8 @@ class MynEditor extends MynOpenablePane {
       collections: collections,
       placeholderImage: "../images/qmark.png",
       valid: {},
-      saveHash: hashObject(videoWithCols)
+      saveHash: hashObject(videoWithCols),
+      changed: new Set()
     }
 
     this.render = this.render.bind(this);
@@ -3508,8 +3509,10 @@ class MynEditor extends MynOpenablePane {
     if (args.length == 2 && typeof args[0] === "string") {
       update = this.state.video;
       update[args[0]] = args[1];
+      this.state.changed.add(args[0]); // to keep track of which fields have been changed
     } else if (args.length == 1 && typeof args[0] === "object") {
       update = { ...this.state.video, ...args[0] };
+      Object.keys(args[0]).map(field => this.state.changed.add(field)); // to keep track of which fields have been changed
     } else {
       throw 'Incorrect parameters passed to handleChange in MynEditor';
     }
@@ -3580,10 +3583,13 @@ class MynEditor extends MynOpenablePane {
         }
       }
 
-
       // console.log("collections after change: " + JSON.stringify(collectionsCopy));
       this._isMounted && this.setState({collections : collectionsCopy});
     }
+
+    let changedFields = []
+    this.state.changed.forEach(field => {changedFields.push(field)});
+    console.log('Changed Fields: ' + changedFields.join(', '));
   }
 
   revertChanges() {
@@ -3649,13 +3655,22 @@ class MynEditor extends MynOpenablePane {
     /* Submit */
     // console.log('saving...');
 
-    // first, save the video data in library.media
-    // (delete the temporary collections information from the video,
-    // we don't want to save this)
-    let temp = _.cloneDeep(this.state.video);
-    delete temp.collections;
-    let index = library.media.findIndex((video) => video.id === this.props.video.id);
-    library.replace("media." + index, temp);
+    // if we're editing multiple videos
+    // find the edited fields, and apply only those changes to
+    // the videos in the batch
+    if (this.state.video.id === 'batch') {
+      console.log('SAVING BATCH')
+      console.log('Changed Fields: ' + JSON.stringify(this.state.changed))
+    } else {
+      // SINGLE VIDEO
+      // save the video data in library.media
+      // (delete the temporary collections information from the video,
+      // we don't want to save this)
+      let temp = _.cloneDeep(this.state.video);
+      delete temp.collections;
+      let index = library.media.findIndex((video) => video.id === this.props.video.id);
+      library.replace("media." + index, temp);
+    }
 
     // then, if any collections were changed, save the collections object in library.collections
     if (!_.isEqual(this.props.collections,this.state.collections.getAll())) {
@@ -3677,10 +3692,14 @@ class MynEditor extends MynOpenablePane {
       library.replace("settings.used.genres",genres);
     }
 
-    // save hash so that later we can check if the video has changed,
-    // in order to ask the user if they want to save before exiting
-    this.setState({saveHash: hashObject(this.state.video) });
-
+    // save hash so that later we can check if the video has changed
+    // (in order to ask the user if they want to save before exiting)
+    // and reset the 'changed' set (which keeps track of which fields
+    // are changed before saving)
+    this.setState({
+      saveHash: hashObject(this.state.video),
+      changed: new Set()
+    });
   }
 
   componentDidUpdate(oldProps) {
@@ -3696,8 +3715,9 @@ class MynEditor extends MynOpenablePane {
       if (videoWithCols) videoWithCols.collections = vidCols;
 
       this.setState({
-        video: _.cloneDeep(videoWithCols),
-        collections : collections
+        video : _.cloneDeep(videoWithCols),
+        collections : collections,
+        changed : new Set()
       });
 
       // when a new movie is loaded, update the saveHash
@@ -4610,7 +4630,7 @@ class MynEditorEdit extends React.Component {
           {position}
           {dateadded}
           {artwork}
-          {collections}
+          {!this.props.batch ? collections : null}
           {ratings}
           {boxoffice}
           {rated}
@@ -5955,7 +5975,7 @@ class MynEditListWidget extends MynEditWidget {
   }
 
   componentDidMount(props) {
-    this.updateList(this.props.object[this.props.property]);
+    this.setState({list:this.props.object[this.props.property]});
   }
 
   componentDidUpdate(oldProps) {
