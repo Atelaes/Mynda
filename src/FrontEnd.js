@@ -5980,7 +5980,7 @@ class MynEditListWidget extends MynEditWidget {
 
   componentDidUpdate(oldProps) {
     if (oldProps.object[this.props.property] !== this.props.object[this.props.property]) {
-      this.updateList(this.props.object[this.props.property]);
+      this.setState({list:this.props.object[this.props.property]});
     }
   }
 
