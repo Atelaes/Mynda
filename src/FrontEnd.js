@@ -212,6 +212,7 @@ class Mynda extends React.Component {
   }
 
   showDetails(id, rowID) {
+    this.state.batchVids = null;
     // boobs
     // if the first parameter is an array of ids, we want to display
     // a special screen indicating that multiple videos are selected,
@@ -222,10 +223,13 @@ class Mynda extends React.Component {
       const vidIDs = id;
       console.log('SHOWING BATCH DETAILS PANE')
 
-      // get a list of titles to display to the user
-      let titles = [];
+      // store a list of videos to display to the user
+      // in the details pane and the editor
+      let batchVids = [];
       this.state.filteredVideos.map(v => {
-        if (id.includes(v.id)) titles.push(v.title);
+        if (id.includes(v.id)) {
+          batchVids.push(_.cloneDeep(v));
+        }
       });
 
       // get an array of the videos themselves
@@ -234,7 +238,9 @@ class Mynda extends React.Component {
       // create the batch object
       let batchObject = {}
       validateVideo(batchObject); // this populates the object with all the right keys
+      batchObject.id = 'batch'; // but set the id to 'batch' so that the editor knows what we're doing
       Object.keys(batchObject).map(key => {
+        if (key === 'id') return;
         // set value for this key to the that of the first video
         let testValue = videos[0][key];
         // loop through and test all the videos against that value
@@ -261,7 +267,7 @@ class Mynda extends React.Component {
       });
       console.log(JSON.stringify(batchObject));
 
-      this.setState({detailRowID: rowID, detailVideo: batchObject});
+      this.setState({detailRowID: rowID, detailVideo: batchObject, batchVids: batchVids});
       return;
     }
 
@@ -601,7 +607,7 @@ class Mynda extends React.Component {
         <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
         <MynDetails video={this.state.detailVideo} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
-        <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
+        <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} batch={this.state.batchVids} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
       </div>
     );
   }
@@ -3725,6 +3731,7 @@ class MynEditor extends MynOpenablePane {
         <MynEditorEdit
           show={this.props.show}
           video={this.state.video}
+          batch={this.props.batch}
           collections={this.state.collections ? this.state.collections.c : []}
           settings={this.props.settings}
           handleChange={this.handleChange}
@@ -4181,6 +4188,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="title"
+            placeholder={'[Title]'}
             className="edit-field-title"
             update={this.props.handleChange}
             options={null}
@@ -4544,8 +4552,48 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    // in the case that we're editing multiple videos, display a banner warning the user
+    let batchNotification = null;
+    //boobs
+    let videoTable = null;
+    if (this.props.video.id === 'batch') {
+      // create a list of the videos we're editing
+      if (this.props.batch) {
+        videoTable = (
+          <table id='batch-videos-table'>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Year</th>
+                <th>Filename</th>
+              </tr>
+            </thead>
+            <tbody>
+             {this.props.batch.map(v => (
+                 <tr key={v.id}>
+                  <td className='title'>{v.title}</td>
+                  <td className='year'>{v.year}</td>
+                  <td className='filename'>{v.filename}</td>
+                 </tr>
+             ))}
+            </tbody>
+          </table>
+       );
+      }
+
+      batchNotification = (
+        <MynParagraphFolder
+          id="edit-batch-notification"
+          lede="Editing Multiple Videos"
+          paragraph={videoTable}
+          keepEllipsis={true}
+        />
+      );
+    }
+
     return (
       <div id="edit-container">
+        {batchNotification}
         <form onSubmit={this.props.saveChanges}>
           {title}
           {description}
@@ -6160,6 +6208,7 @@ class MynEditDateWidget extends MynEditWidget {
 // additional props:
 // 'hideLede' : whether to hide the lede when the paragraph is expanded
 // 'className' and 'id' pass the class and id to the main div of the component
+// 'keepEllipsis' : whether to keep the ellipsis when the paragraph is expanded
 class MynParagraphFolder extends React.Component {
   constructor(props) {
     super(props)
@@ -6179,21 +6228,20 @@ class MynParagraphFolder extends React.Component {
 
   render() {
     return (
-      <div id={this.props.id} className={'paragraph-fold ' + this.props.className} style={{display:'flex'}}>
+      <div onClick={this.toggle} id={this.props.id} className={'paragraph-fold ' + this.props.className} style={{display:'flex'/*, alignItems: (this.state.expanded ? 'flex-start' : 'center')*/}}>
 
-        <div onClick={this.toggle} style={{ cursor : 'pointer', fontStyle : 'normal', opacity: '.6'/*, transform : (this.state.expanded ? 'rotate(90deg)' : 'rotate(0deg)') */}}>
+        <div className='twirl-icon' style={{ cursor : 'pointer', fontStyle : 'normal', opacity: '.6'/*, lineHeight: '0px'/*, transform : (this.state.expanded ? 'rotate(90deg)' : 'rotate(0deg)') */}}>
           { this.state.expanded ? '\u25BC ' : '\u25B6 ' }
         </div>
 
-        <div>
+        <div className='text-container'>
 
-          <span  style={{display: this.props.hideLede ? (!this.state.expanded ? 'inline' : 'none') : 'inline'}}>
+          <span className='lede' style={{cursor: 'pointer', display: this.props.hideLede ? (!this.state.expanded ? '' : 'none') : ''}}>
             {' ' + (this.state.expanded ? this.props.lede : this.props.lede.replace(/[.,;]\s*$/,''))}
+            {this.props.keepEllipsis ? '\u2026' : (this.state.expanded ? ' ' : '\u2026')}
           </span>
 
-          {this.state.expanded ? ' ' : '\u2026'}
-
-          <span style={{display: this.state.expanded ? 'inline' : 'none'}}>
+          <span className='paragraph' style={{display: this.state.expanded ? '' : 'none'}}>
             {this.props.paragraph}
           </span>
 

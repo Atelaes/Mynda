@@ -1584,6 +1584,46 @@ th, tr, td {
   margin: var(--editfield-name-margin);
 }
 
+/* message displayed to user at the top of the edit pane
+   when multiple videos are being edited at once */
+#editor-pane #edit-batch-notification {
+  justify-content: center;
+  margin:.3em;
+  overflow-x:hidden;
+}
+#editor-pane #edit-batch-notification .twirl-icon {
+  font-size:.6em;
+  line-height:2.2em; /* <-- I don't know why 2.2, but I'm tired of trying to fix this */
+  vertical-align: middle;
+}
+#editor-pane #edit-batch-notification .text-container {
+  
+}
+#editor-pane #edit-batch-notification .lede {
+  text-transform:uppercase;
+  color:rgba(255,80,80,.7);
+}
+#editor-pane #edit-batch-notification .paragraph {
+  display:block;
+  font-size:.8em;
+}
+#editor-pane #batch-videos-table {
+  /* max-width:100%; */
+}
+#editor-pane #batch-videos-table th {
+  border: 0px dotted var(--dimmer-text);
+  border-bottom-width: .1em;
+}
+#editor-pane #batch-videos-table td {
+  padding:.2em;
+  white-space: nowrap;
+  overflow-x:scroll;
+}
+#editor-pane #batch-videos-table .filename {
+  font-size:.8em;
+  opacity:.8;
+}
+
 #edit-field-artwork-dl-msg {
   position: absolute;
   left: 0em;
