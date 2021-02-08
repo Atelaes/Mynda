@@ -1068,6 +1068,17 @@ th, tr, td {
   flex-direction: column;
 }
 
+#settings-prefs-showdialogs .dialog {
+  --lineheight: 1em;
+  line-height: var(--lineheight);
+  height: calc(var(--lineheight) * 2);
+  margin-bottom: .2em;
+}
+
+#settings-prefs-showdialogs .showdialog-descrip {
+  font-size: .9em;
+}
+
 .settings-prefs-restore-btn {
   width: 13em;
 }
@@ -1597,7 +1608,7 @@ th, tr, td {
   vertical-align: middle;
 }
 #editor-pane #edit-batch-notification .text-container {
-  
+
 }
 #editor-pane #edit-batch-notification .lede {
   text-transform:uppercase;

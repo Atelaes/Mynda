@@ -53,7 +53,7 @@ class Library {
       //Start with some basic validation
       if (!['add', 'replace', 'remove'].includes(opType)) {
         throw 'Unrecognized operation type.';
-      } else if (['add', 'replace'].includes(opType) && !entry) {
+      } else if (['add', 'replace'].includes(opType) && typeof entry === "undefined") {
         throw 'Add or replace operations require entry';
       } else if (opType === 'remove' && entry) {
         throw 'Remove operations should not contain an entry';
@@ -101,7 +101,7 @@ class Library {
             }
             break;
           case 'replace':
-            if (dest[addEnd]) {
+            if (typeof dest[addEnd] !== "undefined") {
               dest[addEnd] = entry;
             } else {
               throw 'Nothing to replace, use add.';

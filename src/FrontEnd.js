@@ -51,6 +51,7 @@ class Mynda extends React.Component {
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
     this.search = this.search.bind(this);
+    this.calcAvgRatings = this.calcAvgRatings.bind(this);
     this.showDetails = this.showDetails.bind(this);
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
@@ -98,6 +99,12 @@ class Mynda extends React.Component {
     // get list of sources, but
     // ignore sources with a value of empty string
     let keys = Object.keys(ratings).filter(key => ratings[key] !== '');
+
+    // if the preferences option to include the user rating in the average is NOT checked,
+    // delete the user rating key from the array
+    if (!this.state.settings.preferences.includeUserRatingInAvg) {
+      keys = keys.filter(key => key !== 'user');
+    }
 
     if (keys.length === 0) return purpose === 'sort' ? -1 : '';
 
@@ -247,20 +254,20 @@ class Mynda extends React.Component {
           const value = videos[i][key];
           // if any one of them is different, return;
           // different keys require different equality tests;
-          // also, eventually we'll need to be more sophisticated here,
-          // in that if value is an array, for instance,
-          // maybe we want to compare individual elements of the array
+          // if 'value' is an array, for instance,
+          // we want to compare individual elements of the array
           // and keep only the ones that are in common,
           // even if the whole array isn't identical
-          if (typeof value === 'object' && value !== null) {
-            if (!_.isEqual(value,testValue)) return;
-          } else if (typeof value === 'array') {
+          if (Array.isArray(value)) {
+            testValue = testValue.filter(el => value.includes(el));
+          } else if (typeof value === 'object' && value !== null) {
             if (!_.isEqual(value,testValue)) return;
           } else {
             if (value !== testValue) return;
           }
         }
         // if we're here, the values for this key were the same in every video,
+        // (or in the case of an array, testValue only contains elements all videos had in common)
         // so assign this value to the batch object
         batchObject[key] = testValue;
       });
@@ -570,10 +577,23 @@ class Mynda extends React.Component {
       if (address.includes('settings')) {
         console.log('settings was edited');
         this.setState({settings : this.props.library.settings}, () => {
+          // if (address === 'settings.preferences.defaultcolumns') {
+          //
+          // }
+
+          // if the user changed the pref for including the user rating in the average rating calculation
+          if (address === 'settings.preferences.includeUserRatingInAvg') {
+            // first test if the current playlist displays the average;
+            // if it doesn't, we don't need to do anything
+            let currentPlaylist = this.state.playlists.filter(p => p.id === this.state.currentPlaylistID)[0];
+            console.log('current playlist: ' + JSON.stringify(currentPlaylist));
+            if (currentPlaylist && currentPlaylist.columns.includes('ratings_avg')) {
+              console.log('resetting playlist!')
+              // if it does, reload the playlist
+              this.setPlaylist(this.state.currentPlaylistID);
+            }
+          }
         });
-        // if (address === 'settings.preferences.defaultcolumns') {
-        //
-        // }
       }
 
 
@@ -2838,6 +2858,7 @@ class MynSettingsPrefs extends React.Component {
         unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
       },
       hidedescription : props.settings.preferences.hidedescription,
+      includeUserRatingInAvg : props.settings.preferences.includeUserRatingInAvg,
       kinds : props.settings.used.kinds,
       overridedialogs : props.settings.preferences.overridedialogs
     }
@@ -2855,6 +2876,10 @@ class MynSettingsPrefs extends React.Component {
       case "hide-description" :
         address = "settings.preferences.hidedescription";
         this.setState({hidedescription:value});
+        break;
+      case "user-rating-avg" :
+        address = "settings.preferences.includeUserRatingInAvg";
+        this.setState({includeUserRatingInAvg:value});
         break;
       case "kinds" :
         address = "settings.used.kinds";
@@ -2923,16 +2948,25 @@ class MynSettingsPrefs extends React.Component {
             />
             Hide plot summaries
           </li>
+          <li id='settings-prefs-userratingavg' className='subsection'>
+            <h2>Average Rating:</h2>
+            <input
+              type='checkbox'
+              checked={this.state.includeUserRatingInAvg ? true : false}
+              onChange={(e) => this.update('user-rating-avg',e.target.checked)}
+            />
+            Include user rating in avg rating
+          </li>
           <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.overridedialogs && Object.keys(this.props.settings.preferences.overridedialogs).length > 0 ? 'block' : 'none'}}>
             <h2>Show Dialogs:</h2>
             {this.state.overridedialogs ? Object.keys(this.state.overridedialogs).map(dialogName => (
-              <div key={dialogName} style={{display:'flex'}}>
+              <div className='dialog' key={dialogName} style={{display:'flex'}}>
                 <input
                   type='checkbox'
                   checked={!this.state.overridedialogs[dialogName]}
                   onChange={(e) => this.update('override-dialogs',!e.target.checked,dialogName)}
                 />
-                <div>{dialogDescriptions[dialogName] || dialogName}</div>
+                <div className='showdialog-descrip'>{dialogDescriptions[dialogName] || dialogName}</div>
               </div>
             )) : null}
           </li>
@@ -3511,7 +3545,7 @@ class MynEditor extends MynOpenablePane {
       update[args[0]] = args[1];
 
       // keep track of which fields have been changed
-      if (args[1] === '' || (Array.isArray(args[1]) && args[1].length === 0)) {
+      if (args[1] === '')/* || (Array.isArray(args[1]) && args[1].length === 0))*/ {
         // if the updated value is empty, do NOT save this property
         this.state.changed.delete(args[0]);
       } else {
@@ -3526,7 +3560,7 @@ class MynEditor extends MynOpenablePane {
 
       // keep track of which fields have been changed
       Object.keys(args[0]).map(field => {
-        if (args[0][field] === '' || (Array.isArray(args[0][field]) && args[0][field].length === 0)) {
+        if (args[0][field] === '')/* || (Array.isArray(args[0][field]) && args[0][field].length === 0))*/ {
           // if the updated value is empty, do NOT save this property
           this.state.changed.delete(field);
         } else {
@@ -3680,9 +3714,48 @@ class MynEditor extends MynOpenablePane {
     // find the edited fields, and apply only those changes to
     // the videos in the batch
     if (this.state.video.id === 'batch') {
+      // Reminder: this.state.video is the edited 'batch object',
+      // initially containing the values of the elements all the videos have in common,
+      // and now also containing any changes the user made in the editor,
+      // which we will now apply to the videos and then save them
+
       console.log('SAVING BATCH')
       console.log('Changed Fields: ' + JSON.stringify(this.state.changed))
+      if (this.props.batch) { // <-- this should always be true if this.state.video.id === 'batch', this is just for safety
+        // loop through the videos we're editing
+        this.props.batch.map(video => {
+          // loop through each property of this video
+          Object.keys(video).map(prop => {
+            // if this property was changed
+            if (this.state.changed.has(prop)) {
+              if (Array.isArray(this.state.video[prop])) {
+                // if this property is an array, we need to compare individual array elements
 
+                // deleted any of the common elements that the user deleted
+                let deleted = this.state.batchObjectUnedited[prop].filter(el => !this.state.video[prop].includes(el));
+                video[prop] = video[prop].filter(el => !deleted.includes(el));
+
+                // add any new elements the user added
+                let added = this.state.video[prop].filter(el => !this.state.batchObjectUnedited[prop].includes(el)).filter(el => !video[prop].includes(el));
+                video[prop] = [...video[prop], ...added];
+
+              } else if (typeof this.state.video[prop] === 'object' && this.state.video[prop] !== null) {
+                // if this property is an object, we need to compare individual object properties
+              } else {
+                // this property is not an array or an object,
+                // so we simply replace the old value with the edited value
+                video[prop] = this.state.video[prop];
+              }
+            }
+          });
+          console.log('EDITED: ' + JSON.stringify(video));
+        });
+
+        // here we will save the videos, but we need to add a confirmation dialog first
+
+      } else {
+        console.error('The video objects were not supplied to MynEditor when editing multiple videos');
+      }
     } else {
       // SINGLE VIDEO
       // save the video data in library.media
@@ -3735,6 +3808,16 @@ class MynEditor extends MynOpenablePane {
       // let videoWithCols = {...this.props.video, ...vidCols};
       let videoWithCols = this.props.video;
       if (videoWithCols) videoWithCols.collections = vidCols;
+
+      // if we're dealing with a 'batch object', which is to say,
+      // we're editing multiple videos (for which the batch object
+      // contains only the values all the videos have in common),
+      // save an unedited copy of this batch object for comparison
+      // when it's time to save the changes
+      if (videoWithCols && videoWithCols.id === 'batch') {
+        this.state.batchObjectUnedited = _.cloneDeep(videoWithCols);
+      }
+
 
       this.setState({
         video : _.cloneDeep(videoWithCols),
