@@ -2451,7 +2451,7 @@ class MynSettings extends MynOpenablePane {
       try {
         element = document.getElementById('settings-tab-' + view);
       } catch(e) {
-        console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
+        //console.log('Unable to add "selected" class to tab in settings component: ' + e.toString());
       }
     }
     try {
