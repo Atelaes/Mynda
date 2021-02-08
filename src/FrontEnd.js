@@ -213,7 +213,6 @@ class Mynda extends React.Component {
 
   showDetails(id, rowID) {
     this.state.batchVids = null;
-    // boobs
     // if the first parameter is an array of ids, we want to display
     // a special screen indicating that multiple videos are selected,
     // and also create a batchObject, which is basically a video object
@@ -241,7 +240,7 @@ class Mynda extends React.Component {
       batchObject.id = 'batch'; // but set the id to 'batch' so that the editor knows what we're doing
       Object.keys(batchObject).map(key => {
         if (key === 'id') return;
-        // set value for this key to the that of the first video
+        // test each video's value for this key against that of the first video
         let testValue = videos[0][key];
         // loop through and test all the videos against that value
         for (let i=1; i<videos.length; i++) {
@@ -3506,13 +3505,35 @@ class MynEditor extends MynOpenablePane {
     // console.log("UPDATING");
 
     let update;
+    // if we were passed two arguments, treat them as prop,value
     if (args.length == 2 && typeof args[0] === "string") {
       update = this.state.video;
       update[args[0]] = args[1];
-      this.state.changed.add(args[0]); // to keep track of which fields have been changed
-    } else if (args.length == 1 && typeof args[0] === "object") {
+
+      // keep track of which fields have been changed
+      if (args[1] === '' || (Array.isArray(args[1]) && args[1].length === 0)) {
+        // if the updated value is empty, do NOT save this property
+        this.state.changed.delete(args[0]);
+      } else {
+        // otherwise, mark it as changed
+        this.state.changed.add(args[0]);
+      }
+    }
+    // if we were passed one argument, it should be an object, where
+    // the keys are video props, and the values are those props' values
+    else if (args.length == 1 && typeof args[0] === "object") {
       update = { ...this.state.video, ...args[0] };
-      Object.keys(args[0]).map(field => this.state.changed.add(field)); // to keep track of which fields have been changed
+
+      // keep track of which fields have been changed
+      Object.keys(args[0]).map(field => {
+        if (args[0][field] === '' || (Array.isArray(args[0][field]) && args[0][field].length === 0)) {
+          // if the updated value is empty, do NOT save this property
+          this.state.changed.delete(field);
+        } else {
+          // otherwise, mark it as changed
+          this.state.changed.add(field);
+        }
+      });
     } else {
       throw 'Incorrect parameters passed to handleChange in MynEditor';
     }
@@ -3661,6 +3682,7 @@ class MynEditor extends MynOpenablePane {
     if (this.state.video.id === 'batch') {
       console.log('SAVING BATCH')
       console.log('Changed Fields: ' + JSON.stringify(this.state.changed))
+
     } else {
       // SINGLE VIDEO
       // save the video data in library.media
@@ -4372,6 +4394,7 @@ class MynEditorEdit extends React.Component {
     let options = this.props.settings.used.kinds.map(kind => (
       <option key={kind} value={kind}>{kind}</option>
     ));
+    options.unshift(<option key='none' disabled hidden value=''></option>);
     let kind = (
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
@@ -4491,8 +4514,8 @@ class MynEditorEdit extends React.Component {
             className="edit-field-boxoffice"
             update={this.props.handleChange}
             options={null}
-            storeTransform={value => Math.round(accounting.unformat(value))}
-            displayTransform={value => accounting.formatMoney(value,'$',0)}
+            storeTransform={value => value !== '' ? Math.round(accounting.unformat(value)) : ''}
+            displayTransform={value => value !== '' ? accounting.formatMoney(value,'$',0) : ''}
             validator={this.state.validators.money.exp}
             validatorTip={this.state.validators.money.tip}
             reportValid={this.props.reportValid}
@@ -4524,6 +4547,7 @@ class MynEditorEdit extends React.Component {
         return (<option key={i} disabled>{'\u2501'}{'\u2501'}{'\u2501'}{'\u2501'}</option>)
       }
     });
+    options.unshift(<option key={options.length} disabled hidden value=''></option>);
     let rated = (
       <div className='edit-field rated'>
         <label className="edit-field-name" htmlFor="rated">Rated: </label>
@@ -4574,7 +4598,6 @@ class MynEditorEdit extends React.Component {
 
     // in the case that we're editing multiple videos, display a banner warning the user
     let batchNotification = null;
-    //boobs
     let videoTable = null;
     if (this.props.video.id === 'batch') {
       // create a list of the videos we're editing
@@ -5167,7 +5190,7 @@ class MynEditCollections extends MynEdit {
                   }
                 }
                 if (olderSister) {
-                  console.log("OLDER SISTER")
+                  // console.log("OLDER SISTER")
                   // then we're an older sister, and we want to display a vertical gradient border
                   // below ourselves, for which we have to add class 'older-sister' to the jsx
                   return React.cloneElement(result.jsx,
@@ -6337,7 +6360,8 @@ function validateVideo(video) {
         // boxoffice
         case 'number' :
           if (isNaN(video[property])) {
-            repaired[property] = 0;
+            // repaired[property] = 0;
+            repaired[property] = ''; // we want to go with an empty string here, because the editor is set up to treat the empty string as, effectively, an unset value
           }
           break;
         // seen
