@@ -121,8 +121,9 @@ class Library {
       }
 
       // let React know that we've done a save, so that it can perform whatever re-rendering it needs to
-      savedPing.saved(address);
-
+      if (this.env === 'browser') {
+        savedPing.saved(address);
+      }
     } catch(e) {
       console.log(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
@@ -162,7 +163,7 @@ class Library {
       console.log("Trying to create confirm, but something already at waitConfirm.");
     } else {
       this.waitConfirm = _.cloneDeep(argObj);
-      console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
+      // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     }
     if (this.env === 'server') {
       console.log('Sending a mirror request to browser');
@@ -171,7 +172,7 @@ class Library {
       console.log('Sending a mirror request to server');
       ipcRenderer.send('lib-sync-op', argObj);
     }
-    console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
+    // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
   }
 
   // Takes an operation type, a string address in dot format, and optionally an item.
@@ -188,7 +189,7 @@ class Library {
   }
 
   getConfirm(argObj) {
-    console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
+    // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     if (_.isEqual(argObj, this.waitConfirm)) {
       console.log("Got a valid confirmation back!")
       this.waitConfirm = null;

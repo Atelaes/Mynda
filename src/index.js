@@ -38,7 +38,7 @@ function checkWatchFolders() {
 
 //Takes a full folder address and looks for videos in it,
 //adding any it finds to the library
-function findVideosFromFolder(folder, type) {
+function findVideosFromFolder(folder, kind) {
   const videoExtensions = [
     '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'drc',  'f4a',  'f4b', 'f4p',
     'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
@@ -46,7 +46,7 @@ function findVideosFromFolder(folder, type) {
     'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv',  'yuv'
   ]
   if (isDVDRip(folder)) {
-    addDVDRip(folder, type);
+    addDVDRip(folder, kind);
   } else {
     fs.readdir(folder, {withFileTypes : true}, function (err, components) {
       //handling error
@@ -57,11 +57,11 @@ function findVideosFromFolder(folder, type) {
         let component = components[i];
         let compAddress = path.join(folder, component.name);
         if (component.isDirectory()) {
-          findVideosFromFolder(compAddress, type);
+          findVideosFromFolder(compAddress, kind);
         } else {
           let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
           if (videoExtensions.includes(fileExt)) {
-            addVideoFile(compAddress);
+            addVideoFile(compAddress, kind);
           }
         }
       }
@@ -116,19 +116,18 @@ let videoTemplate =   {
     "lastseen" : '',
     "kind" : '',
     "artwork" : '',
-    "filename" : '',
-    "collections" : {}
+    "filename" : ''
   }
 
 //Takes a full directory address and adds it to library
-function addDVDRip(folder, type) {
+function addDVDRip(folder, kind) {
   if (isAlreadyInLibrary(folder)) {
     return;
   } else {
     addObj = _.cloneDeep(videoTemplate);
     addObj.filename = folder;
     addObj.title = path.basename(folder);
-    addObj.kind = type;
+    addObj.kind = kind;
     addObj.id = uuidv4();
     addObj.dateadded = Math.floor(Date.now() / 1000);
     library.add('media.push', addObj);
@@ -137,7 +136,7 @@ function addDVDRip(folder, type) {
 }
 
 //Takes a full file address and adds it to library
-function addVideoFile(file, type) {
+function addVideoFile(file, kind) {
   if (isAlreadyInLibrary(file)) {
     return;
   } else {
@@ -145,11 +144,11 @@ function addVideoFile(file, type) {
     addObj.filename = file;
     let fileExt = path.extname(file)
     addObj.title = path.basename(file, fileExt);
-    addObj.kind = type;
+    addObj.kind = kind;
     addObj.id = uuidv4();
     addObj.dateadded = Math.floor(Date.now() / 1000);
+    console.log('Added Movie: ' + JSON.stringify(addObj));
     library.add('media.push', addObj);
-    console.log('Added Movie: ' + addObj.title);
 
   }
 }
@@ -184,7 +183,7 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
     // if path exists and is a folder
     if(!err && stats.isDirectory()) {
       // add to library
-      library.add('settings.watchfolders', {"path" : path, "kind" : kind});
+      library.add('settings.watchfolders.push', {"path" : path, "kind" : kind});
       findVideosFromFolder(path, kind);
     } else {
       // if not, display an error dialog

@@ -561,7 +561,9 @@ class Mynda extends React.Component {
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
-        this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
+        if (this.state.detailVideo) {
+          this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
+        }
       }
 
       // if a playlist was changed
@@ -2273,8 +2275,8 @@ class MynDetails extends React.Component {
       editBtn = null; // in the case of no video, we don't want an edit button
       scrollBtn = null; // same with this
 
-      console.error(error.toString());
-      console.trace();
+      // console.error(error.toString());
+      // console.trace();
       // validateVideo(this.props.video);
     }
 
@@ -2596,7 +2598,7 @@ class MynSettingsFolders extends React.Component {
           <td className='path'>{folder.path}</td>
           <td>
             <span className='select-container select-alwaysicon'>
-              <select value={folder.defaults.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
+              <select value={folder.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
             </span>
           </td>
           <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>

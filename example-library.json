@@ -85,8 +85,13 @@
         ]
       },
       "hidedescription" : "hide",
-      "overridedialogs" : {
-
+      "includeUserRatingInAvg": true,
+      "overridedialogs": {
+        "MynLibrary-confirm-convertTerminalCol": false,
+        "MynEditor-confirm-exit": false,
+        "MynSettingsCollections-confirm-delete": false,
+        "MynSettingsCollections-confirm-convertToNonTerminal": false,
+        "MynLibTable-confirm-inlineEdit": false
       }
     },
     "used" : {
