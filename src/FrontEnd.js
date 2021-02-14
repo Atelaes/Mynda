@@ -33,6 +33,7 @@ class Mynda extends React.Component {
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       view : "flat", // whether to display a flat table or a hierarchical view
+      columns : [], // the list of columns to display for the current playlist
       detailVideo : null,
       currentPlaylistID : null,
       prevQuery : '',
@@ -386,10 +387,11 @@ class Mynda extends React.Component {
       element.classList.add('selected');
     }
 
-    // set the playlist, and erase any row selection from the previous playlist (if we actually switched playlists)
+    // set the playlist, and erase any row selection from the previous playlist (only if we actually switched playlists)
     let videos = this.playlistFilter(id);
     let playlist = this.state.playlists.filter(playlist => playlist.id == id)[0];
-    let view = playlist ? playlist.view : null;
+    let view = playlist ? playlist.view : null; // set the view state variable to this playlist's view
+    let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
     if (id !== this.state.currentPlaylistID) {
       // only erase the selection if we've switched playlists;
       // if we haven't, we're just trying to refresh this playlist,
@@ -399,9 +401,8 @@ class Mynda extends React.Component {
       // continue to display the batch editor for those selected videos
       this.setState({selectedRows : {}});
     }
-    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id});
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, columns : columns});
 
-    // this.setState({}); // filteredVideos is what is actually displayed
 
     // reset the details pane
     // this line causes an error I don't understand yet
@@ -645,19 +646,10 @@ class Mynda extends React.Component {
   }
 
   render () {
-    let columns;
-    try {
-      let playlist = this.state.playlists.filter(playlist => playlist.id == this.state.currentPlaylistID)[0];
-      columns = playlist.columns;
-    } catch(err) {
-      // no current playlist yet, set columns to an empty array
-      columns = [];
-    }
-
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}/>
-        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
+        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={this.state.columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
         <MynDetails video={this.state.detailVideo} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} batch={this.state.batchVids} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
@@ -805,6 +797,10 @@ class MynLibrary extends React.Component {
     if (!_.isEqual(oldProps.collections,this.props.collections)) {
       console.log('MynLibrary collections was changed!');
       this.setState({collections:_.cloneDeep(this.props.collections)});
+    }
+    if (!_.isEqual(oldProps.columns,this.props.columns)) {
+      console.log('MynLibrary columns was changed!');
+      this.setState({videos:_.cloneDeep(this.props.videos)});
     }
   }
 
