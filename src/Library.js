@@ -25,7 +25,7 @@ class Library {
         this.alter(message)
       });
       ipcRenderer.on('lib-confirm', (event, message) => {
-        console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
+        // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
         this.getConfirm(message)
       });
       ipcRenderer.send('lib-beacon');

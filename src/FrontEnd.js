@@ -160,7 +160,7 @@ class Mynda extends React.Component {
 
     // get object containing all selected videos
     let allSelected = this.getAllSelected();
-    // console.log(`ALL SELECTED: ${JSON.stringify(allSelected)}`);
+    console.log(`ALL SELECTED: ${JSON.stringify(allSelected)}`);
 
     if (allSelected.rows.length === 0) {
       // if no rows are selected, empty the state object so that
@@ -232,7 +232,7 @@ class Mynda extends React.Component {
       // store a list of videos to display to the user
       // in the details pane and the editor
       let batchVids = [];
-      this.state.filteredVideos.map(v => {
+      this.state.videos.map(v => {
         if (id.includes(v.id)) {
           batchVids.push(_.cloneDeep(v));
         }
@@ -258,16 +258,21 @@ class Mynda extends React.Component {
           // we want to compare individual elements of the array
           // and keep only the ones that are in common,
           // even if the whole array isn't identical
-          if (Array.isArray(value)) {
+          if (Array.isArray(testValue)) {
             testValue = testValue.filter(el => value.includes(el));
-          } else if (typeof value === 'object' && value !== null) {
-            if (!_.isEqual(value,testValue)) return;
+          } else if (typeof testValue === 'object' && testValue !== null) {
+            // if (!_.isEqual(value,testValue)) return;
+            Object.keys(testValue).map(subProp => {
+              if (value[subProp] !== testValue[subProp]) {
+                testValue[subProp] = ''; // set to empty string instead of deleting, because the editor uses an empty string for an empty value
+              }
+            });
           } else {
             if (value !== testValue) return;
           }
         }
         // if we're here, the values for this key were the same in every video,
-        // (or in the case of an array, testValue only contains elements all videos had in common)
+        // (or in the case of an array/object, testValue only contains elements all videos had in common)
         // so assign this value to the batch object
         batchObject[key] = testValue;
       });
@@ -340,7 +345,7 @@ class Mynda extends React.Component {
     // then test if it or any of its parents is set to display:none
     let isNotHidden = row.offsetParent !== null;
 
-    // return if it its scroll position is onscreen and it is not hidden
+    // return whether its scroll position is onscreen and it is not hidden
     return inViewport && isNotHidden;
   }
 
@@ -381,11 +386,21 @@ class Mynda extends React.Component {
       element.classList.add('selected');
     }
 
-    // set the playlist, and erase any row selection from the previous playlist
+    // set the playlist, and erase any row selection from the previous playlist (if we actually switched playlists)
     let videos = this.playlistFilter(id);
     let playlist = this.state.playlists.filter(playlist => playlist.id == id)[0];
     let view = playlist ? playlist.view : null;
-    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, selectedRows : {}});
+    if (id !== this.state.currentPlaylistID) {
+      // only erase the selection if we've switched playlists;
+      // if we haven't, we're just trying to refresh this playlist,
+      // probably because some changes occurred in some of its videos,
+      // e.g. the user edited a video/videos; if the user edited more than
+      // one at a time, we want to preserve the selection so that we can
+      // continue to display the batch editor for those selected videos
+      this.setState({selectedRows : {}});
+    }
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id});
+
     // this.setState({}); // filteredVideos is what is actually displayed
 
     // reset the details pane
@@ -530,6 +545,10 @@ class Mynda extends React.Component {
       console.log("Error displaying first playlist: no playlists found? " + e.toString());
     }
 
+    // used as a delay timer in savedPing the case of multiple saves,
+    // where we want to wait until they're all done before doing something
+    let timeout;
+
     // this callback function will be executed by Library.js every time
     // something is saved. So here we must take any actions necessary to update
     // the view in real time whenever that happens
@@ -550,8 +569,9 @@ class Mynda extends React.Component {
           // seen whether we need to update the playlist explicitly here or not
 
           // update video in details pane (we don't know if this video was affected, but just in case)
+          this.refreshDetails(timeout);
           // this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
-          this.setState({detailVideo : null}); // for some reason this appears to work, and the above (commented) line does not. Not sure why.
+          // this.setState({detailVideo : null}); // for some reason this appears to work, and the above (commented) line does not. Not sure why.
         });
       }
 
@@ -561,9 +581,7 @@ class Mynda extends React.Component {
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
-        if (this.state.detailVideo) {
-          this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
-        }
+        this.refreshDetails(timeout);
       }
 
       // if a playlist was changed
@@ -597,9 +615,23 @@ class Mynda extends React.Component {
           }
         });
       }
-
-
     };
+  }
+
+  // REFRESH DETAILS PANE
+  refreshDetails(timeout) {
+    console.log('Refreshing Details');
+    if (this.state.detailVideo) {
+      if (this.state.detailVideo.id !== 'batch') {
+        this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
+      } else {
+        // if the detailVideo id is 'batch', that means multiple rows are selected;
+        // calling handleSelectedRows with no parameters will reset the details pane and the editor
+        // to correspond appropriately to the selected rows (without adding any new rows)
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {console.log('TIMEOUT FIRED, UPDATING BATCH VID');this.handleSelectedRows()},500);
+      }
+    }
   }
 
   componentDidUpdate(oldProps) {
@@ -3743,6 +3775,25 @@ class MynEditor extends MynOpenablePane {
 
               } else if (typeof this.state.video[prop] === 'object' && this.state.video[prop] !== null) {
                 // if this property is an object, we need to compare individual object properties
+
+                let original = this.state.batchObjectUnedited[prop];
+                let altered = this.state.video[prop];
+
+                // any props that were in the original batch object (common to all videos)
+                // and were changed, add the change to this video
+                Object.keys(original).map(subProp => {
+                  if (altered[subProp] !== original[subProp]) {
+                    video[prop][subProp] = altered[subProp];
+                  }
+                });
+                // any props that were not in the original batch object but were added,
+                // add the change to this video
+                Object.keys(altered).map(subProp => {
+                  if (typeof original[subProp] === "undefined") {
+                    video[prop][subProp] = altered[subProp];
+                  }
+                });
+
               } else {
                 // this property is not an array or an object,
                 // so we simply replace the old value with the edited value
@@ -3751,9 +3802,13 @@ class MynEditor extends MynOpenablePane {
             }
           });
           console.log('EDITED: ' + JSON.stringify(video));
-        });
 
-        // here we will save the videos, but we need to add a confirmation dialog first
+          // save this video to the library
+          let temp = _.cloneDeep(video);
+          delete temp.collections;
+          let index = library.media.findIndex(v => v.id === video.id);
+          library.replace("media." + index, temp);
+        });
 
       } else {
         console.error('The video objects were not supplied to MynEditor when editing multiple videos');
@@ -3800,14 +3855,18 @@ class MynEditor extends MynOpenablePane {
   }
 
   componentDidUpdate(oldProps) {
-    if (!_.isEqual(oldProps.video,this.props.video)) {
-      // console.log('MynEditor props.video has changed!!!');
+    let collections = this.props.collections ? new Collections(_.cloneDeep(this.props.collections)) : null;
+    let vidCols = this.props.video && collections ? collections.getVideoCollections(this.props.video.id) : {};
+    let oldVidCols = oldProps.video ? oldProps.video.collections : {};
+
+
+    // if the video has changed (and we have to check whether its collections have changed independently,
+    // since the collections information is no longer contained in the video object itself)
+    if (!_.isEqual(oldProps.video,this.props.video) || !_.isEqual(oldVidCols,vidCols)) {
+      console.log('MynEditor props.video has changed!!!\n' + JSON.stringify(this.props.video));
 
       // attach a temporary collections object to each video,
       // containing information on all the collections the video is a part of
-      let collections = this.props.collections ? new Collections(_.cloneDeep(this.props.collections)) : null;
-      let vidCols = this.props.video && collections ? collections.getVideoCollections(this.props.video.id) : {};
-      // let videoWithCols = {...this.props.video, ...vidCols};
       let videoWithCols = this.props.video;
       if (videoWithCols) videoWithCols.collections = vidCols;
 
@@ -3827,9 +3886,11 @@ class MynEditor extends MynOpenablePane {
         changed : new Set()
       });
 
-      // when a new movie is loaded, update the saveHash
+      // when a new video is loaded, update the saveHash
       // (which is used for testing whether or not anything has changed since last save)
-      this.setState({saveHash: hashObject(videoWithCols)});
+      if (videoWithCols) {
+        this.setState({saveHash: hashObject(videoWithCols)});
+      }
     }
   }
 
