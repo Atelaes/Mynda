@@ -2273,7 +2273,7 @@ class MynDetails extends React.Component {
       const video = this.props.video
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark.png'} /></li>
+          <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><div className="detail-title-text">{video.title}</div></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} /></li>
           <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
@@ -2298,8 +2298,17 @@ class MynDetails extends React.Component {
       );
 
     } catch (error) {
-      // eventually we'll put some kind of better placeholder here
-      details = <div>No Details</div>
+      // dummy details as a visual placeholder when no video is hovered/selected
+      details = (
+        <ul>
+          <li className="detail" id="detail-artwork"><img src={'../images/qmark-details.png'} /></li>
+          <li className="detail dummy" id="detail-title"><div className="detail-title-text">A Movie Title</div></li>
+          <li className="detail dummy first"><div className="dummy-field"></div></li>
+          <li className="detail dummy second"><div className="dummy-field"></div></li>
+          <li className="detail dummy third"><div className="dummy-field"></div></li>
+          <li className="detail dummy fourth"><div className="dummy-field"></div></li>
+        </ul>
+      );
       editBtn = null; // in the case of no video, we don't want an edit button
       scrollBtn = null; // same with this
 

@@ -794,6 +794,36 @@ th, tr, td {
   border: var(--editbutton-border-hover);
 }
 
+#details-pane .detail.dummy .dummy-field {
+  background-color: var(--dark-bg);
+  border-radius: .5em;
+  height: 1.5em;
+  margin-bottom: .6em;
+}
+#details-pane .detail.dummy .dummy-field,
+#details-pane #detail-title.dummy .detail-title-text {
+  user-select: none;
+  opacity:.5;
+  color: var(--dark-bg);
+  word-spacing: .1em;
+  -webkit-text-stroke:.2em var(--dark-bg);
+  filter: blur(.05rem);
+}
+#details-pane .detail.dummy.first .dummy-field {
+  height: 4.5em;
+}
+#details-pane .detail.dummy.second .dummy-field,
+#details-pane .detail.dummy.third .dummy-field {
+  /* height:1.5em; */
+}
+#details-pane .detail.dummy.fourth .dummy-field {
+  height: 3em;
+}
+#details-pane #detail-title.dummy {
+  padding-bottom:.1em;
+}
+
+
 /*************************************/
 /*######### OPENABLE PANES ##########*/
 /*************************************/
