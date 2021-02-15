@@ -3672,6 +3672,7 @@ class MynEditor extends MynOpenablePane {
       this._isMounted && this.setState({collections : collectionsCopy});
     }
 
+    // just for debugging:
     let changedFields = []
     this.state.changed.forEach(field => {changedFields.push(field)});
     console.log('Changed Fields: ' + changedFields.join(', '));
@@ -3724,17 +3725,24 @@ class MynEditor extends MynOpenablePane {
       }
 
       const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
-      const newArtworkPath = path.join(artworkFolder, uuidv4() + fileExt);
       const oldArtworkPath = path.resolve(__dirname, this.state.video.artwork); // create the correct absolute path, in case it was a relative one
-      fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
-        if (err) {
-          console.error(err);
-        } else {
-          console.log('artwork was copied successfully: ' + newArtworkPath);
-        }
-      });
-      this.handleChange({'artwork':newArtworkPath});
-      // console.log("updated state var: " + this.state.video.artwork);
+      // if the file is not already in the Artwork folder,
+      // copy it there and update the reference to it in the video object
+      if (path.resolve(path.dirname(oldArtworkPath)) !== path.resolve(artworkFolder)) {
+        const newArtworkPath = path.join(artworkFolder, uuidv4() + fileExt);
+        fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
+          if (err) {
+            console.error(err);
+          } else {
+            console.log('artwork was copied successfully: ' + newArtworkPath);
+          }
+        });
+        // this.handleChange({'artwork':newArtworkPath}); // <-- I think this was happening too slowly (part of the function is async), so the new path was not being saved
+        this.state.video.artwork = newArtworkPath;
+        console.log("updated state var: " + this.state.video.artwork);
+      } else {
+        console.log('Not copying image, as it is already in the artwork folder');
+      }
     }
 
     /* Submit */

@@ -12,7 +12,39 @@ let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 
-app.whenReady().then(createWindow);
+app.whenReady().then(start);
+
+function start() {
+  eraseTempImages();
+  createWindow();
+}
+
+function eraseTempImages() {
+  let folderPath = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+
+  fs.readdir(folderPath, (err, files) => {
+    if (err) {
+      return console.error('Can\'t delete temp images. Unable to scan directory: ' + err);
+    }
+
+    // loop over all the files in the temp folder and delete them
+    files.forEach(file => {
+      // Do whatever you want to do with the file
+      console.log(`trying to delete ${file}`);
+      try {
+        fs.unlink(path.join(folderPath, file), (err) => {
+          if (err) {
+            console.error(`An error ocurred deleting the temp file ${file}\n${err.message}`);
+            return;
+          }
+          console.log(`...successfully deleted ${file}`);
+        });
+      } catch(err) {
+        console.error(err);
+      }
+    });
+  });
+}
 
 function createWindow() {
   const win = new BrowserWindow({
