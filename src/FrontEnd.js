@@ -399,7 +399,7 @@ class Mynda extends React.Component {
       // e.g. the user edited a video/videos; if the user edited more than
       // one at a time, we want to preserve the selection so that we can
       // continue to display the batch editor for those selected videos
-      this.setState({selectedRows : {}});
+      this.setState({selectedRows : {}, detailVideo: null});
     }
     this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, columns : columns});
 
@@ -1560,10 +1560,11 @@ class MynLibTable extends React.Component {
   // }
 
   // called when the selection is changed;
-  // if newSelection is true, then we tell the Mynda component
+  // if 'overwrite' is true, then we tell the Mynda component
   // to overwrite any rows previously selected by other tables;
   // otherwise, we simply want to add this batch to any existing batches
-  // (which would have been selected from other collections in the same playlist)
+  // (which would have been selected from other collections in the same playlist,
+  // i.e. in other instances of MynLibTable)
   handleBatch(overwrite) {
     // first, add the 'selected' class to all the selected rows
     Array.from(document.getElementById(this.tableID).getElementsByClassName('movie-row')).map(row => {
@@ -1735,7 +1736,7 @@ class MynLibTable extends React.Component {
      director: (a, b) => {let a_ds = a.directorsort === '' ? a.director : a.directorsort; let b_ds = b.directorsort === '' ? b.director : b.directorsort; return a_ds.toLowerCase() > b_ds.toLowerCase()},
      genre: (a, b) => a.genre.toLowerCase() > b.genre.toLowerCase(),
      seen: (a, b) => a.seen > b.seen,
-     ratings_user: (a, b) => a.ratings.user > b.ratings.user,
+     ratings_user: (a, b) => {let a_r = a.ratings.user || -1; let b_r = b.ratings.user || -1; return a_r > b_r;},
      dateadded: (a, b) => {let a_added = isNaN(parseInt(a.dateadded)) ? -1 : parseInt(a.dateadded); let b_added = isNaN(parseInt(b.dateadded)) ? -1 : parseInt(b.dateadded); return a_added > b_added;},
      order: (a, b) => a.order > b.order,
      kind: (a, b) => a.kind.toLowerCase() > b.kind.toLowerCase(),
@@ -4600,7 +4601,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field seen'>
         <label className='edit-field-name' htmlFor="seen">Seen: </label>
         <div className="edit-field-editor">
-          <MynEditSeenWidget movie={this.props.video} />
+          <MynEditSeenWidget movie={this.props.video} update={this.props.handleChange} />
         </div>
       </div>
     );
@@ -4610,7 +4611,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field position'>
         <label className="edit-field-name" htmlFor="position">Position: </label>
         <div className="edit-field-editor">
-          <MynEditPositionWidget movie={this.props.video} />
+          <MynEditPositionWidget movie={this.props.video} update={this.props.handleChange} />
         </div>
       </div>
     );
@@ -4620,7 +4621,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field rating'>
         <label className="edit-field-name" htmlFor="rating">Rating: </label>
         <div className="edit-field-editor">
-          <MynEditRatingWidget movie={this.props.video} />
+          <MynEditRatingWidget movie={this.props.video} update={this.props.handleChange} />
         </div>
       </div>
     );
