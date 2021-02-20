@@ -761,7 +761,7 @@ class MynLibrary extends React.Component {
         library.replace("collections", collections.getAll());
 
       } else { // cancel, do nothing
-        console.log('Deletion cancelled by user')
+        console.log('Deletion canceled by user')
       }
     });
 
@@ -784,7 +784,7 @@ class MynLibrary extends React.Component {
         // add the collection
         this.addCollection(dragData);
       } else {
-        console.log('Creation of collection cancelled by user');
+        console.log('Creation of collection canceled by user');
       }
     });
   }
@@ -1362,7 +1362,7 @@ class MynLibTable extends React.Component {
         let index = library.media.findIndex((video) => video.id === updated.id);
         library.replace("media." + index, updated);
       } else {
-        console.log('Edit cancelled by user')
+        console.log('Edit canceled by user')
       }
 
       // if the user checked the checkbox to override the confirmation dialog,
@@ -2355,7 +2355,7 @@ class MynOpenablePane extends React.Component {
         // close pane
         this.props.hideFunction(id);
       } else {
-        console.log('Exit pane cancelled by user')
+        console.log('Exit pane canceled by user')
       }
     });
   }
@@ -2581,6 +2581,17 @@ class MynSettingsFolders extends React.Component {
     ipcRenderer.on('settings-watchfolder-add-error', (event, args) => {
 
     });
+
+    ipcRenderer.on('settings-watchfolder-remove', (event, path, removed) => {
+      if (removed) {
+        console.log('REMOVED FOLDER: ' + path);
+        // let folders = this.state.existingFolders.filter(folder => folder.path !== path);
+        // this.setState({existingFolders : folders})
+      } else {
+        console.log('DID NOT REMOVE FOLDER: ' + path);
+      }
+    });
+
   }
 
   // create JSX for an options dropdown of the possible media kinds
@@ -2600,10 +2611,24 @@ class MynSettingsFolders extends React.Component {
 
   editRemove(path, index) {
     console.log("user wants to remove " + path + " which is at index " + index);
+
+    ipcRenderer.send('settings-watchfolder-remove', path);
+    //boobs
   }
 
+  // edit the default kind of an existing watchfolder
   editKind(event, index) {
     console.log("user wants to change 'kind' to " + event.target.value + " for folder at index " + index);
+
+    try {
+      let temp = _.cloneDeep(this.state.existingFolders[index]);
+      temp.kind = event.target.value;
+
+      library.replace(`settings.watchfolders.${index}`,temp);
+
+    } catch(err) {
+      console.error(`Could not edit the kind for folder at index ${index}: ${err}`);
+    }
   }
 
   changeTargetFolder(folder) {
@@ -2719,7 +2744,7 @@ class MynSettingsPlaylists extends React.Component {
           this.updateValue(); // force a save to the library
         });
       } else {
-        console.log('Deletion cancelled by user')
+        console.log('Deletion canceled by user')
       }
     });
 
@@ -2974,8 +2999,8 @@ class MynSettingsPrefs extends React.Component {
               deleteDialog={'Videos of this kind will not be affected until edited.'}
               storeTransform={value => value.toLowerCase()}
               displayTransform={value => value.replace(/\b\w/g,(letter) => letter.toUpperCase())}
-              validator={/^[a-zA-Z0-9_\-\.&]+$/}
-              validatorTip={"Allowed: a-z A-Z 0-9 _ - . &"}
+              validator={/^[a-zA-Z0-9_\-\.&\s]+$/}
+              validatorTip={"Allowed: a-z A-Z 0-9 _ - . & [space]"}
               reportValid={() => {}}
             />
           </li>
@@ -3202,7 +3227,7 @@ class MynSettingsCollections extends React.Component {
           library.replace("settings.preferences",prefs);
         }
       } else {
-        console.log('Deletion cancelled by user')
+        console.log('Deletion canceled by user')
       }
     });
 
@@ -3229,7 +3254,7 @@ class MynSettingsCollections extends React.Component {
           library.replace("settings.preferences",prefs);
         }
       } else {
-        console.log('Add collection cancelled by user')
+        console.log('Add collection canceled by user')
       }
     });
 
@@ -3996,7 +4021,7 @@ class MynEditorSearch extends React.Component {
         // choose search result and fill in the fields with it
         this.retrieveResult(video);
       } else {
-        console.log('Selection cancelled by user')
+        console.log('Selection canceled by user')
       }
     });
   }
@@ -4314,7 +4339,7 @@ class MynEditorEdit extends React.Component {
         // choose search result and fill in the fields with it
         this.props.revertChanges();
       } else {
-        console.log('Reversion cancelled by user');
+        console.log('Reversion canceled by user');
       }
     });
   }
@@ -4554,6 +4579,11 @@ class MynEditorEdit extends React.Component {
     let options = this.props.settings.used.kinds.map(kind => (
       <option key={kind} value={kind}>{kind}</option>
     ));
+    // if this video's kind is no longer among the list of allowed kinds (probably because the user deleted that kind from the preferences pane)
+    // we want to display it as the kind of the video, but not allow the user to select it as an option
+    if (this.props.video.kind && this.props.video.kind !== '' && !this.props.settings.used.kinds.includes(this.props.video.kind)) {
+      options.unshift(<option key='invalid' disabled hidden value={this.props.video.kind}>{this.props.video.kind}</option>);
+    }
     options.unshift(<option key='none' disabled hidden value=''></option>);
     let kind = (
       <div className='edit-field kind'>
@@ -6120,7 +6150,7 @@ class MynEditListWidget extends MynEditWidget {
         // delete item (pass 'true' so as not to prompt another dialog)
         this.deleteItem(index, true);
       } else {
-        console.log('Deletion cancelled by user')
+        console.log('Deletion canceled by user')
       }
     });
 

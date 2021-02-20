@@ -101,6 +101,10 @@ function findVideosFromFolder(folder, kind) {
   }
 }
 
+function removeVideosFromLibrary(path) {
+  console.log('REMOVING videos from library in ' + path);
+}
+
 //Takes a complete file address of a directory.
 // Returns a boolean on whether it thinks this is a DVD rip folder.
 function isDVDRip(folder) {
@@ -228,6 +232,52 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
   });
 })
 
+ipcMain.on('settings-watchfolder-remove', (event, path) => {
+
+  // first, show the user a confirmation dialog
+  const options = {
+    type : 'warning',
+    buttons : ['Cancel','Remove Folder'],
+    message : 'Are you sure you want to remove following folder from the library?\n\n' +
+              path + '\n\n' +
+              'This will remove all videos in this folder from the library (but will save the metadata in case you decide to add the folder again)'
+  };
+  dialog.showMessageBox(options).then(result => {
+    let removed = false;
+
+    // if the user said okay
+    if (result.response === 1) {
+      try {
+        let index;
+        library.settings.watchfolders.map((folder,i) => {
+          if (folder.path === path) {
+            index = i;
+          }
+        });
+        library.remove(`settings.watchfolders.${index}`);
+        removeVideosFromLibrary(path);
+        removed = true;
+      } catch(err) {
+        console.log(err);
+      }
+    } else {
+      // if the user canceled
+      console.log('User canceled the folder removal');
+    }
+
+    // tell the client side what happened
+    event.sender.send('settings-watchfolder-remove', path, removed);
+  }).catch(err => {
+    console.log(err)
+  });
+
+
+
+
+})
+
+
+
 ipcMain.on('editor-artwork-select', (event) => {
   let options = {
     filters: [{name: 'Images', extensions: ['jpg', 'png', 'gif']}],
@@ -243,7 +293,6 @@ ipcMain.on('download', (event, url, destination) => {
   let response = {success:false, message:''};
   // event.sender.send('cancel-download', dl.canceller, "hi");
   dl.download(url,destination, (args) => {
-    console.log("CALLBACK!!!");
     try {
       // if successful, we'll receive an object with the path at "path"
       if (args.hasOwnProperty('path')) {
