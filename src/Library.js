@@ -116,6 +116,9 @@ class Library {
         //If this was requested by other library, let them know we did it
         this.confirm({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       } else {
+        // Start by saving to file.
+        this.save();
+
         //If this was a local operation, request other library mirror it
         this.sync({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       }
@@ -127,10 +130,13 @@ class Library {
     } catch(e) {
       console.log(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
+
+
   }
 
   // Takes a string address in dot format, and adds "addition" to that location.
   add(address, addition) {
+    console.log('adding...')
     this.addToQueue({opType: 'add', address: address, entry: addition, sync: false, origin: null});
   }
 
@@ -146,8 +152,10 @@ class Library {
 
   addToQueue(argObj) {
     if (this.waitConfirm) {
+      console.log('Something already in pipeline, adding to queue...')
       this.Queue.push(argObj);
     } else {
+      console.log('Nothing in pipeline, performing operation now...')
       this.alter(argObj);
     }
   }
@@ -155,9 +163,7 @@ class Library {
   // Takes an operation type, a string address in dot format, and optionally an item.
   // Communicates to counterpart library that a change has been made that should be mirrored.
   sync(argObj) {
-    //Start by saving to file.
-    this.save();
-    //Next tell partner to replicate the action.
+    // tell partner to replicate the action.
     argObj.sync = true;
     if (this.waitConfirm) {
       console.log("Trying to create confirm, but something already at waitConfirm.");
@@ -166,8 +172,13 @@ class Library {
       // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     }
     if (this.env === 'server') {
-      console.log('Sending a mirror request to browser');
-      this.browser.send('lib-sync-op', argObj);
+      try {
+        console.log('Sending a mirror request to browser');
+        this.browser.send('lib-sync-op', argObj);
+      } catch(err) {
+        console.log('Browser does not exist yet or did not send beacon. Continuing server operation without sending sync operation.');
+        this.getConfirm(); // manually call getConfirm to proceed to the next item in queue
+      }
     } else {
       console.log('Sending a mirror request to server');
       ipcRenderer.send('lib-sync-op', argObj);
@@ -191,16 +202,20 @@ class Library {
   getConfirm(argObj) {
     // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     if (_.isEqual(argObj, this.waitConfirm)) {
-      console.log("Got a valid confirmation back!")
-      this.waitConfirm = null;
-      if (this.Queue.length > 0) {
-        let nextOp = this.Queue.shift();
-        this.alter(nextOp);
-      }
+      console.log("Got a valid confirmation back, sync operation successful!")
+    } else if (typeof argObj === "undefined") {
+      // sync op was aborted, getConfirm was called manually by the server (from the sync() function) to move to the next queue item
     } else {
       console.log("Got a confirmation that didn't match what was expected.")
       console.log(argObj);
       console.log(this.waitConfirm);
+    }
+
+    this.waitConfirm = null;
+    if (this.Queue.length > 0) {
+      console.log(`${this.Queue.length} items left in queue, moving to next item...`);
+      let nextOp = this.Queue.shift();
+      this.alter(nextOp);
     }
   }
 
@@ -314,7 +329,8 @@ let defaultLibrary = {
         ]
       },
       "hidedescription" : "show",
-      "overridedialogs" : {}
+      "overridedialogs" : {},
+      "include_user_rating_in_avg": false
     },
     "used" : {
       "kinds" : [

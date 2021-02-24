@@ -103,7 +103,7 @@ class Mynda extends React.Component {
 
     // if the preferences option to include the user rating in the average is NOT checked,
     // delete the user rating key from the array
-    if (!this.state.settings.preferences.includeUserRatingInAvg) {
+    if (!this.state.settings.preferences.include_user_rating_in_avg) {
       keys = keys.filter(key => key !== 'user');
     }
 
@@ -603,7 +603,7 @@ class Mynda extends React.Component {
           // }
 
           // if the user changed the pref for including the user rating in the average rating calculation
-          if (address === 'settings.preferences.includeUserRatingInAvg') {
+          if (address === 'settings.preferences.include_user_rating_in_avg') {
             // first test if the current playlist displays the average;
             // if it doesn't, we don't need to do anything
             let currentPlaylist = this.state.playlists.filter(p => p.id === this.state.currentPlaylistID)[0];
@@ -800,6 +800,10 @@ class MynLibrary extends React.Component {
     }
     if (!_.isEqual(oldProps.columns,this.props.columns)) {
       console.log('MynLibrary columns was changed!');
+      this.setState({videos:_.cloneDeep(this.props.videos)});
+    }
+    if (oldProps.settings.preferences.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
+      console.log('MynLibrary include_user_rating_in_avg was changed!');
       this.setState({videos:_.cloneDeep(this.props.videos)});
     }
   }
@@ -1749,7 +1753,7 @@ class MynLibTable extends React.Component {
      rated: (a, b) => ratedOrder[a.rated.toUpperCase()] > ratedOrder[b.rated.toUpperCase()],
      country: (a, b) => a.country.toLowerCase() > b.country.toLowerCase(),
      languages: (a, b) => a.languages[0].toLowerCase() > b.languages[0].toLowerCase(),
-     duration: (a, b) => parseInt(a.duration) > parseInt(b.duration)
+     duration: (a, b) => parseInt(a.metadata.duration) > parseInt(b.metadata.duration)
     }
 
     let rows = this.props.movies.sort((a, b) => {
@@ -1804,7 +1808,7 @@ class MynLibTable extends React.Component {
         rated: (<td key="rated" className="rated">{movie.rated}</td>),
         country: (<td key="country" className="country">{movie.country}</td>),
         languages: (<td key="languages" className="languages">{movie.languages[0]}</td>),
-        duration: (<td key="duration" className="duration">{Math.round(Number(movie.duration)/60)}min</td>)
+        duration: (<td key="duration" className="duration">{Math.round(Number(movie.metadata.duration)/60)}min</td>)
       };
 
       let cells = this.props.columns.map(column => cellJSX[column]);
@@ -2923,7 +2927,7 @@ class MynSettingsPrefs extends React.Component {
         unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
       },
       hidedescription : props.settings.preferences.hidedescription,
-      includeUserRatingInAvg : props.settings.preferences.includeUserRatingInAvg,
+      include_user_rating_in_avg : props.settings.preferences.include_user_rating_in_avg,
       kinds : props.settings.used.kinds,
       overridedialogs : props.settings.preferences.overridedialogs
     }
@@ -2943,8 +2947,8 @@ class MynSettingsPrefs extends React.Component {
         this.setState({hidedescription:value});
         break;
       case "user-rating-avg" :
-        address = "settings.preferences.includeUserRatingInAvg";
-        this.setState({includeUserRatingInAvg:value});
+        address = "settings.preferences.include_user_rating_in_avg";
+        this.setState({include_user_rating_in_avg:value});
         break;
       case "kinds" :
         address = "settings.used.kinds";
@@ -3017,7 +3021,7 @@ class MynSettingsPrefs extends React.Component {
             <h2>Average Rating:</h2>
             <input
               type='checkbox'
-              checked={this.state.includeUserRatingInAvg ? true : false}
+              checked={this.state.include_user_rating_in_avg ? true : false}
               onChange={(e) => this.update('user-rating-avg',e.target.checked)}
             />
             Include user rating in avg rating
@@ -6088,7 +6092,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
       let widgetWidth = target.clientWidth;
       let mouseX = event.clientX;
 
-      position = (mouseX - widgetX) / widgetWidth * this.props.movie.duration;
+      position = (mouseX - widgetX) / widgetWidth * this.props.movie.metadata.duration;
     } catch(err) {
       console.error('Error in MynEditPositionWidget: ' + err);
     }
@@ -6098,7 +6102,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
     //   'widgetX: ' + widgetX + '\n' +
     //   // 'offsetLeft: ' + event.target.offsetLeft + '\n' +
     //   'widgetWidth: ' + widgetWidth + '\n' +
-    //   '(mouseX - widgetX) / widgetWidth == ' + position / this.props.movie.duration
+    //   '(mouseX - widgetX) / widgetWidth == ' + position / this.props.movie.metadata.duration
     // );
 
     return position;
@@ -6109,13 +6113,13 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   }
 
   updateGraphic(position) {
-    position = Math.min(Math.max(position,0),this.props.movie.duration);
+    position = Math.min(Math.max(position,0),this.props.movie.metadata.duration);
     let graphic = (
       <div className="position-outer"
         onMouseMove={(e) => this.updatePosition(e)}
         onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
         onClick={(e) => this.updateValue(position,e)} >
-          <div className="position-inner" style={{width:(position / this.props.movie.duration * 100) + "%"}} />
+          <div className="position-inner" style={{width:(position / this.props.movie.metadata.duration * 100) + "%"}} />
       </div>
     );
 
@@ -6128,7 +6132,8 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   // }
 
   render() {
-    if (this.props.movie.duration === 0 || this.props.movie.duration === '') {
+    // if the duration is 0, '', or does not exist, return nothing
+    if (!this.props.movie.metadata.duration) {
       return null;
     } else {
       return super.render();
@@ -6508,7 +6513,7 @@ function validateVideo(video) {
     'tags':'array',
     'seen':'boolean',
     'position':'integer',
-    'duration':'integer',
+    // 'duration':'integer',
     'ratings':'object',
     'dateadded':'integer',
     'lastseen':'integer',
@@ -6519,7 +6524,8 @@ function validateVideo(video) {
     'boxoffice':'number',
     'rated':'string',
     'languages':'array',
-    'country':'string'
+    'country':'string',
+    'metadata':'object'
   };
 
   let vidProps = Object.keys(video);
@@ -6528,10 +6534,24 @@ function validateVideo(video) {
     // if (vidProps.includes(property)) {
       // repair any malformed properties
       switch(properties[property]) {
-        // ratings, collections
+        // ratings, collections, metadata
         case 'object' :
-          if (typeof video[property] === 'undefined' || typeof video[property] !=='object' || typeof video[property] === null) {
-            repaired[property] = {};
+          if (typeof video[property] === 'undefined' || typeof video[property] !== 'object' || typeof video[property] === null) {
+            if (property === 'metadata') {
+              repaired[property] = {
+                "codec" : "",
+                "duration" : 0,
+                "width" : 0,
+                "height" : 0,
+                "aspect_ratio" : "",
+                "framerate" : 0,
+                "audio_codec" : "",
+                "audio_layout" : "",
+                "audio_channels" : 0
+              }
+            } else {
+              repaired[property] = {};
+            }
           }
           break;
         // tags, cast, languages
@@ -6540,7 +6560,7 @@ function validateVideo(video) {
             repaired[property] = [];
           }
           break;
-        // id, year, position, duration, dateadded, lastseen
+        // id, year, position, dateadded, lastseen
         case 'integer' :
           repaired[property] = parseInt(video[property]);
           if (!Number.isInteger(repaired[property])) {

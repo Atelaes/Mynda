@@ -18,6 +18,8 @@
     "accounting": "^0.4.1",
     "axios": "^0.20.0",
     "datejs": "^1.0.0-rc3",
+    "ffprobe": "^1.1.2",
+    "ffprobe-static": "^3.0.0",
     "lodash": "^4.17.20",
     "object-hash": "^2.0.3",
     "react": "^16.13.1",

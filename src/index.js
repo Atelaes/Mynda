@@ -7,6 +7,8 @@ const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const dl = require('./download');
 const _ = require('lodash');
+const ffprobe = require('ffprobe');
+const ffprobeStatic = require('ffprobe-static');
 
 let library = new Library;
 const app = electron.app;
@@ -16,6 +18,7 @@ app.whenReady().then(start);
 
 function start() {
   eraseTempImages();
+  checkWatchFolders();
   createWindow();
 }
 
@@ -64,7 +67,7 @@ function checkWatchFolders() {
   let folders = library.settings.watchfolders;
   for (let i=0; i<folders.length; i++) {
     let thisFolder = folders[i];
-    findVideosFromFolder(thisFolder.path, thisFolder.type);
+    findVideosFromFolder(thisFolder.path, thisFolder.kind);
   }
 }
 
@@ -72,10 +75,10 @@ function checkWatchFolders() {
 //adding any it finds to the library
 function findVideosFromFolder(folder, kind) {
   const videoExtensions = [
-    '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'drc',  'f4a',  'f4b', 'f4p',
+    '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
     'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
     'mpe', 'mpeg', 'mpg',  'mpv', 'mts', 'mxf', 'nsv',  'ogg',  'ogv', 'qt',
-    'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv',  'yuv'
+    'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
   ]
   if (isDVDRip(folder)) {
     addDVDRip(folder, kind);
@@ -142,7 +145,6 @@ let videoTemplate =   {
     "tags" : [],
     "seen" : false,
     "position" : 0,
-    "duration" : 0,
     "country" : '',
     "languages" : [],
     "boxoffice" : 0,
@@ -152,7 +154,18 @@ let videoTemplate =   {
     "lastseen" : '',
     "kind" : '',
     "artwork" : '',
-    "filename" : ''
+    "filename" : '',
+    "metadata" : {
+      "codec" : "",
+      "duration" : 0,
+      "width" : 0,
+      "height" : 0,
+      "aspect_ratio" : "",
+      "framerate" : 0,
+      "audio_codec" : "",
+      "audio_layout" : "",
+      "audio_channels" : 0
+    }
   }
 
 //Takes a full directory address and adds it to library
@@ -160,7 +173,7 @@ function addDVDRip(folder, kind) {
   if (isAlreadyInLibrary(folder)) {
     return;
   } else {
-    addObj = _.cloneDeep(videoTemplate);
+    let addObj = _.cloneDeep(videoTemplate);
     addObj.filename = folder;
     addObj.title = path.basename(folder);
     addObj.kind = kind;
@@ -173,20 +186,46 @@ function addDVDRip(folder, kind) {
 
 //Takes a full file address and adds it to library
 function addVideoFile(file, kind) {
-  if (isAlreadyInLibrary(file)) {
-    return;
-  } else {
-    addObj = _.cloneDeep(videoTemplate);
-    addObj.filename = file;
-    let fileExt = path.extname(file)
-    addObj.title = path.basename(file, fileExt);
-    addObj.kind = kind;
-    addObj.id = uuidv4();
-    addObj.dateadded = Math.floor(Date.now() / 1000);
-    console.log('Added Movie: ' + JSON.stringify(addObj));
+  if (isAlreadyInLibrary(file)) return;
+
+  let addObj = _.cloneDeep(videoTemplate);
+  addObj.filename = file;
+  let fileExt = path.extname(file)
+  addObj.title = path.basename(file, fileExt);
+  addObj.kind = kind;
+  addObj.id = uuidv4();
+  addObj.dateadded = Math.floor(Date.now() / 1000);
+
+  // get data from the file itself (duration, codec, dimensions, whatever)
+  ffprobe(file, { path: ffprobeStatic.path }).then(data => {
+    console.log(data);
+    for (const stream of data.streams) {
+      try {
+        if (stream.codec_type === 'video') {
+          addObj.metadata.codec = stream.codec_name;
+          addObj.metadata.duration = Number(stream.duration);
+          addObj.metadata.width = stream.width;
+          addObj.metadata.height = stream.height;
+          addObj.metadata.aspect_ratio = stream.display_aspect_ratio;
+          let f = stream.avg_frame_rate.split('/');
+          addObj.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
+        }
+        if (stream.codec_type === 'audio') {
+          addObj.metadata.audio_codec = stream.codec_name;
+          addObj.metadata.audio_layout = stream.channel_layout;
+          addObj.metadata.audio_channels = stream.channels;
+        }
+      } catch(err) {
+        console.log(`Error storing metadata for ${file}: ${err}`);
+      }
+    }
+
+    console.log('Adding Movie: ' + JSON.stringify(addObj));
     library.add('media.push', addObj);
 
-  }
+  }).catch(err => {
+    console.log(`Error retrieving metadata from ${file} : ${err}`);
+  });
 }
 
 //Takes a full address for a file/folder and checks to see if
