@@ -392,6 +392,7 @@ class Mynda extends React.Component {
     let playlist = this.state.playlists.filter(playlist => playlist.id == id)[0];
     let view = playlist ? playlist.view : null; // set the view state variable to this playlist's view
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
+    let flatDefaultSort = playlist.flatDefaultSort; // default sort column for this playlist, but only applies when viewed in flat view
     if (id !== this.state.currentPlaylistID) {
       // only erase the selection if we've switched playlists;
       // if we haven't, we're just trying to refresh this playlist,
@@ -401,7 +402,7 @@ class Mynda extends React.Component {
       // continue to display the batch editor for those selected videos
       this.setState({selectedRows : {}, detailVideo: null});
     }
-    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, columns : columns});
+    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, flatDefaultSort : flatDefaultSort, columns : columns});
 
 
     // reset the details pane
@@ -649,7 +650,7 @@ class Mynda extends React.Component {
     return (
       <div id='grid-container'>
         <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}/>
-        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} view={this.state.view} columns={this.state.columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
+        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} playlistID={this.state.currentPlaylistID} view={this.state.view} flatDefaultSort={this.state.flatDefaultSort} columns={this.state.columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
         <MynDetails video={this.state.detailVideo} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
         <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
         <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} batch={this.state.batchVids} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
@@ -997,6 +998,7 @@ class MynLibrary extends React.Component {
                     movies={colVidsInPlaylist}
                     collections={_.cloneDeep(this.state.collections)}
                     settings={this.props.settings}
+                    playlistID={this.props.playlistID}
                     view={this.props.view}
                     initialSort={this.state.sortReport[object.id] ? this.state.sortReport[object.id].key : "order"}
                     initialSortAscending={this.state.sortReport[object.id] ? this.state.sortReport[object.id].ascending : true}
@@ -1294,7 +1296,9 @@ class MynLibrary extends React.Component {
         <MynLibTable
           movies={this.state.videos}
           settings={this.props.settings}
+          playlistID={this.props.playlistID}
           view={this.props.view}
+          flatDefaultSort={this.props.flatDefaultSort}
           columns={this.props.columns}
           displayColumnName={this.props.displayColumnName}
           calcAvgRatings={this.props.calcAvgRatings}
@@ -1915,8 +1919,18 @@ class MynLibTable extends React.Component {
       try {
         this.requestSort(this.props.initialSort, this.props.initialSortAscending);
       } catch(e) {
-        // console.log('No initial sort parameter, sorting by title');
-        this.requestSort('title');
+        console.log("No initial sort parameter")
+        console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
+                   \ncolumns: ${this.props.columns}`);
+        // no initial sort parameter, so if the playlist has a default sort column, use that
+        if (this.props.flatDefaultSort && this.props.columns.includes(this.props.flatDefaultSort)) {
+          console.log("Sorting by flatDefaultSort: " + this.props.flatDefaultSort);
+          this.requestSort(this.props.flatDefaultSort);
+        } else {
+          console.log("Also, no flatDefaultSort, so sorting by [Title]");
+          // if not, sort by title
+          this.requestSort('title');
+        }
       }
     } else {
       // if initial is false, sort by the current value
@@ -1968,21 +1982,37 @@ class MynLibTable extends React.Component {
       this.setState({batchSelected:this.props.selectedRows[this.tableID].rows},this.handleBatch);
     }
 
+    // // in the special case that we now have some videos when before there were none at all
+    // // (this will happen when the first playlist is displayed on load)
+    // // sort the table by initial values
+    // if (this.props.movies && this.props.movies.length > 0 && (!oldProps.movies || oldProps.movies.length === 0)) {
+    //   this.reset(true,true);
+    // }
 
-    // we have to sort the movies array before comparing it,
-    // otherwise the conditional fires when the elements change order,
-    // whereas we want them to change only when a movie is changed, added, or removed
-    let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
-    let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
-    if (!_.isEqual(tempOld,tempNew)) {
-      // console.log("----props.movies updated----");
-      // let diff = getObjectDiff(tempOld,tempNew);
-      // diff.map(key => {
-      //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
-      // });
+    // if the playlist was changed, reset the playlist,
+    // sorting by the table by initial values (props.initialSort if it exists, or flatDefaultSort)
+    if (oldProps.playlistID !== this.props.playlistID) {
+      console.log("============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
+      this.reset(true,true);
+    } else {
+      // if the playlist was NOT changed, but
+      // if any videos in the playlist were changed...
 
-      // re-render the table (sorting by the current values)
-      this.reset(false,true);
+      // we have to sort the movies array before comparing it,
+      // otherwise the conditional fires when the elements change order,
+      // whereas we want them to change only when a movie is changed, added, or removed
+      let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
+      let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
+      if (!_.isEqual(tempOld,tempNew)) {
+        // console.log("----props.movies updated----");
+        // let diff = getObjectDiff(tempOld,tempNew);
+        // diff.map(key => {
+        //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
+        // });
+
+        // re-render the table (sorting by the current values)
+        this.reset(false,true);
+      }
     }
 
     // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell

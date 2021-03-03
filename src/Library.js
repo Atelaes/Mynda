@@ -344,6 +344,20 @@ let defaultLibrary = {
   "playlists" : [
     {
       "id" : 0,
+      "name" : "New",
+      "filterFunction" : "video.new === true",
+      "view" : "flat",
+      "tab" : true,
+      "flatDefaultSort" : "dateadded",
+      "columns" : [
+        "title",
+        "dateadded",
+        "seen",
+        "ratings_user"
+      ]
+    },
+    {
+      "id" : 1,
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
       "view" : "flat",
@@ -359,7 +373,7 @@ let defaultLibrary = {
       ]
     },
     {
-      "id" : 1,
+      "id" : 2,
       "name" : "Shows",
       "filterFunction" : "video.kind === 'show'",
       "view" : "hierarchical",

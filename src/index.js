@@ -155,6 +155,7 @@ let videoTemplate =   {
     "kind" : '',
     "artwork" : '',
     "filename" : '',
+    "new" : true,
     "metadata" : {
       "codec" : "",
       "duration" : 0,
