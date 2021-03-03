@@ -1761,8 +1761,14 @@ class MynLibTable extends React.Component {
     }
 
     let rows = this.props.movies.sort((a, b) => {
+      let compare;
+      try {
+        compare = sortFunctions[key](a, b);
+      } catch(err) {
+        compare = a[key] > b[key];
+      }
 
-      let result = sortFunctions[key](a, b) ? 1 : -1;
+      let result = compare ? 1 : -1;
       result *= ascending ? 1 : -1;
 
       return result;
@@ -1815,7 +1821,15 @@ class MynLibTable extends React.Component {
         duration: (<td key="duration" className="duration">{Math.round(Number(movie.metadata.duration)/60)}min</td>)
       };
 
-      let cells = this.props.columns.map(column => cellJSX[column]);
+      let cells = this.props.columns.map(column => {
+        // bespoke row JSX
+        if (cellJSX.hasOwnProperty(column)) {
+          return cellJSX[column];
+        }
+
+        // generic row
+        return (<td key={column} className={column}>{String(movie[column])}</td>)
+      });
 
       let row = {
         index:index,
