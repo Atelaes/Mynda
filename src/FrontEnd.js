@@ -246,8 +246,9 @@ class Mynda extends React.Component {
       let batchObject = {}
       validateVideo(batchObject); // this populates the object with all the right keys
       batchObject.id = 'batch'; // but set the id to 'batch' so that the editor knows what we're doing
+      delete batchObject.metadata; // and delete metadata, since that is derived from the files themselves and is uneditable
       Object.keys(batchObject).map(key => {
-        if (key === 'id') return;
+        if (key === 'id' || key === 'metadata') return;
         // test each video's value for this key against that of the first video
         let testValue = videos[0][key];
         // loop through and test all the videos against that value
@@ -3849,6 +3850,8 @@ class MynEditor extends MynOpenablePane {
         this.props.batch.map(video => {
           // loop through each property of this video
           Object.keys(video).map(prop => {
+            if (prop === 'id' || prop === 'metadata') return;
+
             // if this property was changed
             if (this.state.changed.has(prop)) {
               if (Array.isArray(this.state.video[prop])) {
@@ -6152,6 +6155,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
 
   getPositionFromMouse(event) {
     let position = 0;
+    const duration = this.props.movie.metadata ? this.props.movie.metadata.duration : null;
 
     try {
       let target = findNearestOfClass(event.target,'position-outer');
@@ -6159,7 +6163,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
       let widgetWidth = target.clientWidth;
       let mouseX = event.clientX;
 
-      position = (mouseX - widgetX) / widgetWidth * this.props.movie.metadata.duration;
+      position = (mouseX - widgetX) / widgetWidth * duration;
     } catch(err) {
       console.error('Error in MynEditPositionWidget: ' + err);
     }
@@ -6180,13 +6184,15 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   }
 
   updateGraphic(position) {
-    position = Math.min(Math.max(position,0),this.props.movie.metadata.duration);
+    const duration = this.props.movie.metadata ? this.props.movie.metadata.duration : null;
+
+    position = Math.min(Math.max(position,0),duration);
     let graphic = (
       <div className="position-outer"
         onMouseMove={(e) => this.updatePosition(e)}
         onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
         onClick={(e) => this.updateValue(position,e)} >
-          <div className="position-inner" style={{width:(position / this.props.movie.metadata.duration * 100) + "%"}} />
+          <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
       </div>
     );
 
@@ -6200,7 +6206,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
 
   render() {
     // if the duration is 0, '', or does not exist, return nothing
-    if (!this.props.movie.metadata.duration) {
+    if (!this.props.movie.metadata || !this.props.movie.metadata.duration) {
       return null;
     } else {
       return super.render();
