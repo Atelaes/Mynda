@@ -2858,6 +2858,7 @@ class MynSettingsPlaylists extends React.Component {
     hiddenEls.push(document.getElementById('edit-columns-field-' + playlist.id));
 
     hiddenEls.map(el => {
+      if (!el || !el.style) return;
       if (el.style.display === 'none') {
         el.style.display = 'block';
       } else {
@@ -3194,68 +3195,117 @@ class MynSettingsPlaylistsTableRow extends React.Component {
   render() {
     let playlist = this.props.playlist;
 
-    return (
-      <div className="row" id={'settings-playlists-row-' + playlist.id} ref={this.props.innerRef} {...this.props.provided.draggableProps}>
-        <div className='cell drag-button' {...this.props.provided.dragHandleProps}>{'\u2630'}</div>
+    let dragButton = (
+      <div className='cell drag-button' {...this.props.provided.dragHandleProps}>
+        {'\u2630'}
+      </div>
+    );
 
-        <div className='cell tab'><input type='checkbox' checked={playlist.tab} onChange={(e) => this.props.updateValue(this.props.index,'tab',e.target.checked)} /></div>
+    let tabCheckbox = (
+      <div className='cell tab'>
+        <input
+          type='checkbox'
+          checked={playlist.tab}
+          onChange={(e) => this.props.updateValue(this.props.index,'tab',e.target.checked)}
+        />
+      </div>
+    );
 
-        <div className='cell name name-and-edit'>
-          <MynEditText
-            object={playlist}
-            property='name'
-            update={(...args) => this.props.updateValue(this.props.index,...args)}
-            options={null}
-            validator={/[^\s]/}
-            validatorTip={'At least 1 non-whitespace character'}
-            allowedEmpty={false}
-            reportValid={this.props.reportValid}
-          />
-        </div>
+    let uneditable = playlist.id === 'new';
+    let newToolTip = "The 'New' playlist is a special built-in playlist that only appears when there are 'new' videos. A video is new when it is first added to the library. This gives you a convenient place to edit/tag new videos. Once edited, a video is no longer new, and disappears from the New playlist (but this can be edited in the video editor). The 'New' playlist cannot be deleted, but you can hide it by unchecking the 'tab' property."
+    let name = (
+      <div className='cell name name-and-edit'>
+        <MynEditText
+          object={playlist}
+          property='name'
+          update={(...args) => this.props.updateValue(this.props.index,...args)}
+          options={null}
+          validator={/[^\s]/}
+          validatorTip={'At least 1 non-whitespace character'}
+          allowedEmpty={false}
+          reportValid={this.props.reportValid}
+          uneditable={uneditable}
+          tooltip={playlist.id === 'new' ? newToolTip : null}
+        />
+      </div>
+    );
 
-        <div className='header filter' id={'edit-filter-header-' + playlist.id} style={{display: 'none'}}>Filter</div>
+    let filterHeader = (
+      <div className='header filter' id={'edit-filter-header-' + playlist.id} style={{display: 'none'}}>
+        Filter
+      </div>
+    );
 
-        <div className="cell filter" id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
-          <textarea
-            className='edit-filter-field'
-            name="playlist filter"
-            value={playlist.filterFunction}
-            placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
-            onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
-          />
-        </div>
+    let filterEditor = (
+      <div className="cell filter" id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
+        <textarea
+          className='edit-filter-field'
+          name="playlist filter"
+          value={playlist.filterFunction}
+          placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
+          onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
+        />
+      </div>
+    );
 
-        <div className='header columns' id={'edit-columns-header-' + playlist.id} style={{display: 'none'}}>Columns</div>
+    let columnsHeader = (
+      <div className='header columns' id={'edit-columns-header-' + playlist.id} style={{display: 'none'}}>
+        Columns
+      </div>
+    );
 
-        <div className="cell columns" id={'edit-columns-field-' + playlist.id} style={{display: 'none'}}>
-          <MynSettingsColumns
-            used={playlist.columns}
-            defaultcolumns={this.props.defaultcolumns}
-            unused={this.props.allColumns.filter(col => !playlist.columns.includes(col))}
-            update={(prop, columns) => this.props.updateValue(this.props.index,prop,columns.used)}
-            displayTransform={this.props.displayColumnName}
-            storeTransform={(val) => this.props.displayColumnName(val,true)}
-          />
-        </div>
+    let columnsEditor = (
+      <div className="cell columns" id={'edit-columns-field-' + playlist.id} style={{display: 'none'}}>
+        <MynSettingsColumns
+          used={playlist.columns}
+          defaultcolumns={this.props.defaultcolumns}
+          unused={this.props.allColumns.filter(col => !playlist.columns.includes(col))}
+          update={(prop, columns) => this.props.updateValue(this.props.index,prop,columns.used)}
+          displayTransform={this.props.displayColumnName}
+          storeTransform={(val) => this.props.displayColumnName(val,true)}
+        />
+      </div>
+    );
 
-        <div className='cell view'>
-          <div className='select-container select-alwaysicon'>
-            <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
-              <option value='flat'>Flat</option>
-              <option value='hierarchical'>Hierarchical</option>
-            </select>
-          </div>
-        </div>
-
-        <div className='cell edit-btn'>
-          <button onClick={() => this.props.showEditPlaylist(playlist)}>Edit</button>
-        </div>
-
-        <div className='cell delete-btn'>
-          <button onClick={() => this.props.deletePlaylist(playlist)}>Delete</button>
+    let view = (
+      <div className='cell view'>
+        <div className='select-container select-alwaysicon'>
+          <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
+            <option value='flat'>Flat</option>
+            <option value='hierarchical'>Hierarchical</option>
+          </select>
         </div>
       </div>
     );
+
+    let editButton = (
+      <div className='cell edit-btn'>
+        <button onClick={() => this.props.showEditPlaylist(playlist)}>Edit</button>
+      </div>
+    );
+
+    let deleteButton = (
+      <div className='cell delete-btn'>
+        <button onClick={() => this.props.deletePlaylist(playlist)}>Delete</button>
+      </div>
+    );
+
+    // several things are not to be displayed for the 'new' playlist, because it's a special playlist
+    return (
+      <div className="row" id={'settings-playlists-row-' + playlist.id} ref={this.props.innerRef} {...this.props.provided.draggableProps}>
+        {dragButton}
+        {tabCheckbox}
+        {name}
+        {playlist.id === 'new' ? null : filterHeader}
+        {playlist.id === 'new' ? null : filterEditor}
+        {columnsHeader}
+        {columnsEditor}
+        {view}
+        {editButton}
+        {playlist.id === 'new' ? null : deleteButton}
+      </div>
+    );
+
   }
 }
 
@@ -5689,6 +5739,8 @@ class MynEditText extends MynEdit {
   }
 
   handleInput(value) {
+    if (this.props.uneditable) return;
+
     let target = this.input.current;
     if (value === undefined) {
       value = target.value;
@@ -5771,8 +5823,8 @@ class MynEditText extends MynEdit {
           {this.props.options.map((option) => (<option key={option} value={option} />))}
         </datalist>
       );
-    } else if (!this.props.noClear) {
-      // only create a clear button if there's no dropdown
+    } else if (!this.props.noClear && !this.props.uneditable) {
+      // only create a clear button if there's no dropdown and if the field is not uneditable
       clearBtn = (<div className="input-clear-button hover" onClick={this.clearInput}></div>);
     }
 
@@ -5780,13 +5832,15 @@ class MynEditText extends MynEdit {
       <div>
         <input
           ref={this.input}
-          className={(this.props.className || '') + (this.props.noClear ? ' no-clear' : '')}
+          className={(this.props.className || '') + (this.props.noClear ? ' no-clear' : '') + (this.props.uneditable ? ' uneditable' : '')}
+          title={this.props.tooltip || null}
           list={listName}
           type="text"
           name="text"
           value={this.state.value}
           placeholder={this.props.placeholder || ''}
           onChange={() => this.handleInput()}
+          readOnly={this.props.uneditable ? "readOnly" : ""}
         />
         {options}
         {clearBtn}

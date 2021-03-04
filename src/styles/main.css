@@ -56,6 +56,12 @@ input[type=text], select, textarea {
 input[type=text].no-clear {
   padding: var(--textinput-padding-noclear);
 }
+input[type=text].uneditable {
+  opacity: .6;
+  user-select: none !important;
+  cursor:default;
+}
+
 
 input[type=text]::placeholder {
   color:var(--textinput-text-placeholder);
