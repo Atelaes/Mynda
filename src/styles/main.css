@@ -1337,6 +1337,10 @@ th, tr, td {
   text-transform: capitalize;
 }
 
+/* .edit-field.new .edit-field-editor {
+  display:inline-block;
+} */
+
 #editor-pane input[type=text].edit-field-title {
   text-align:center;
   font-family: var(--editor-input-title-font);

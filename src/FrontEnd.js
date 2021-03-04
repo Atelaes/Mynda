@@ -3613,18 +3613,18 @@ class MynEditor extends MynOpenablePane {
 
     this._isMounted = false;
     let collections = props.collections ? new Collections(_.cloneDeep(props.collections)) : null;
-    let vidCols = props.video && collections ? collections.getVideoCollections(props.video.id) : {};
-    // let videoWithCols = {...props.video, ...vidCols};
-    let videoWithCols = props.video;
-    if (videoWithCols) videoWithCols.collections = vidCols;
+    // let vidCols = props.video && collections ? collections.getVideoCollections(props.video.id) : {};
+    // // let videoWithCols = {...props.video, ...vidCols};
+    // let videoWithCols = props.video;
+    // if (videoWithCols) videoWithCols.collections = vidCols;
 
     this.state = {
       paneID: 'editor-pane',
-      video: _.cloneDeep(videoWithCols), // add collections to video object during editing, so we can use the validation machinery (and the hash, to see if the user has made a change)
+      // video: /_.cloneDeep(videoWithCols), // add collections to video object during editing, so we can use the validation machinery (and the hash, to see if the user has made a change)
       collections: collections,
       placeholderImage: "../images/qmark.png",
       valid: {},
-      saveHash: hashObject(videoWithCols),
+      // saveHash: hashObject(videoWithCols),
       changed: new Set()
     }
 
@@ -3669,7 +3669,9 @@ class MynEditor extends MynOpenablePane {
     // if we were passed one argument, it should be an object, where
     // the keys are video props, and the values are those props' values
     else if (args.length == 1 && typeof args[0] === "object") {
+      console.log(JSON.stringify(args[0]));
       update = { ...this.state.video, ...args[0] };
+      console.log(JSON.stringify(update));
 
       // keep track of which fields have been changed
       Object.keys(args[0]).map(field => {
@@ -3952,31 +3954,35 @@ class MynEditor extends MynOpenablePane {
     if (!_.isEqual(oldProps.video,this.props.video) || !_.isEqual(oldVidCols,vidCols)) {
       console.log('MynEditor props.video has changed!!!\n' + JSON.stringify(this.props.video));
 
-      // attach a temporary collections object to each video,
-      // containing information on all the collections the video is a part of
-      let videoWithCols = this.props.video;
-      if (videoWithCols) videoWithCols.collections = vidCols;
+      this.props.video.collections = vidCols;
 
-      // if we're dealing with a 'batch object', which is to say,
-      // we're editing multiple videos (for which the batch object
-      // contains only the values all the videos have in common),
-      // save an unedited copy of this batch object for comparison
-      // when it's time to save the changes
-      if (videoWithCols && videoWithCols.id === 'batch') {
-        this.state.batchObjectUnedited = _.cloneDeep(videoWithCols);
-      }
+      // create a copy of the video for editing
+      let videoEditPrepped = _.cloneDeep(this.props.video);
 
+      if (videoEditPrepped) {
+        // attach a temporary collections object to each video,
+        // containing information on all the collections the video is a part of;
+        // videoEditPrepped.collections = vidCols;
 
-      this.setState({
-        video : _.cloneDeep(videoWithCols),
-        collections : collections,
-        changed : new Set()
-      });
+        // if we're dealing with a 'batch object', which is to say,
+        // we're editing multiple videos (for which the batch object
+        // contains only the values all the videos have in common),
+        // save an unedited copy of this batch object for comparison
+        // when it's time to save the changes
+        if (videoEditPrepped.id === 'batch') {
+          this.state.batchObjectUnedited = _.cloneDeep(videoEditPrepped);
+        }
 
-      // when a new video is loaded, update the saveHash
-      // (which is used for testing whether or not anything has changed since last save)
-      if (videoWithCols) {
-        this.setState({saveHash: hashObject(videoWithCols)});
+        // set the 'new' property to false, so that when the movie is saved,
+        // it will be removed from the 'New' playlist
+        videoEditPrepped.new = false;
+
+        this.setState({
+          video : videoEditPrepped,
+          collections : collections,
+          changed : new Set(),
+          saveHash: hashObject(videoEditPrepped) // when a new video is loaded, update the saveHash (which is used for testing whether or not anything has changed since last save)
+        });
       }
     }
   }
@@ -4028,7 +4034,9 @@ class MynEditor extends MynOpenablePane {
         // console.log('EXITING EDITOR PANE!!! isEqual: ' + _.isEqual(this.props.video,this.state.video));
         // console.log('props: ' + JSON.stringify(this.props.video));
         // console.log('state: ' + JSON.stringify(this.state.video));
-        return !_.isEqual(this.props.video,this.state.video);
+        // return !_.isEqual(this.props.video,this.state.video);
+        let newHash = this.state.video ? hashObject(this.state.video) : null;
+        return this.state.saveHash !== newHash;
       }, // boolean for whether or not to show confirmation dialog upon exiting the pane
       confirmMsg: 'Are you sure you want to exit without saving? Your changes will be lost'
     });
@@ -4834,6 +4842,20 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    let new_ = (
+      <div className='edit-field new'>
+        <label className="edit-field-name" htmlFor="new">New: </label>
+        <div className="edit-field-editor">
+          <input
+            type='checkbox'
+            checked={this.props.video.new}
+            onChange={(e) => this.props.handleChange({'new': !this.props.video.new})}
+          />
+        </div>
+        <div className='edit-field-description'>Check to re-add this video to the 'New' playlist</div>
+      </div>
+    );
+
     // in the case that we're editing multiple videos, display a banner warning the user
     let batchNotification = null;
     let videoTable = null;
@@ -4897,6 +4919,7 @@ class MynEditorEdit extends React.Component {
           {rated}
           {country}
           {languages}
+          {new_}
           <button className="edit-field revert-btn" onClick={(e) => this.requestRevert(e)}>Revert to Saved</button>
           <input className="edit-field save-btn" type="submit" value="Save" />
         </form>
