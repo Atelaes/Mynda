@@ -343,7 +343,7 @@ let defaultLibrary = {
   },
   "playlists" : [
     {
-      "id" : 0,
+      "id" : "new",
       "name" : "New",
       "filterFunction" : "video.new === true",
       "view" : "flat",
@@ -357,7 +357,7 @@ let defaultLibrary = {
       ]
     },
     {
-      "id" : 1,
+      "id" : "1",
       "name" : "Movies",
       "filterFunction" : "video.kind === 'movie'",
       "view" : "flat",
@@ -373,7 +373,7 @@ let defaultLibrary = {
       ]
     },
     {
-      "id" : 2,
+      "id" : "2",
       "name" : "Shows",
       "filterFunction" : "video.kind === 'show'",
       "view" : "hierarchical",

@@ -678,11 +678,24 @@ class MynNav extends React.Component {
     return (<div id="nav-pane" className="pane">
         <ul id="nav-playlists">
           {this.props.playlists.map((playlist, index) => {
+            // this bit is to NOT display the 'new' playlist
+            // unless there is at least one new video
+            if (playlist.id === 'new') {
+              let anyNew = false;
+              for (const v of library.media) {
+                if (v.new) {
+                  anyNew = true;
+                  break;
+                }
+              }
+              if (!anyNew) return;
+            }
+
             // if playlist is selected to be displayed in as a tab in the navbar
             if (playlist.tab) {
               return (<li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 100 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>);
             } else {
-              // eventually we'll add the others to a dropdown/flyout menu
+              // eventually we'll probably add the others to a dropdown/flyout menu
             }
           })}
           <li key="add" id="add-playlist" onClick={(e) => this.props.showSettings('playlists')}>{'\uFF0B'}</li>
@@ -3957,7 +3970,7 @@ class MynEditor extends MynOpenablePane {
     if (!_.isEqual(oldProps.video,this.props.video) || !_.isEqual(oldVidCols,vidCols)) {
       console.log('MynEditor props.video has changed!!!\n' + JSON.stringify(this.props.video));
 
-      this.props.video.collections = vidCols;
+      if (this.props.video) this.props.video.collections = vidCols;
 
       // create a copy of the video for editing
       let videoEditPrepped = _.cloneDeep(this.props.video);
