@@ -6255,11 +6255,17 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
 
     position = Math.min(Math.max(position,0),duration);
     let graphic = (
-      <div className="position-outer"
-        onMouseMove={(e) => this.updatePosition(e)}
-        onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
-        onClick={(e) => this.updateValue(position,e)} >
-          <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
+      <div className="position-widget">
+        <div className="position-outer"
+          onMouseMove={(e) => this.updatePosition(e)}
+          onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
+          onClick={(e) => this.updateValue(position,e)} >
+            <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
+        </div>
+        <div className="position-text">
+          {position > 20 ? `${Math.floor(Number(position) / 60)}:${(Number(position) % 60) < 10 ? '0' : ''}${Math.floor(Number(position) % 60)} \u2022 ` : null}
+          {duration ? `${Math.max(Math.round(Number(duration) / 60),1)} min` : null}
+        </div>
       </div>
     );
 

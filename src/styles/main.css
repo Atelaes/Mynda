@@ -699,11 +699,14 @@ th, tr, td {
   /* override the general edit-widget opacity if desired */
   opacity: var(--detailposition-opacity-hover);
 }
+#detail-position .position-widget {
+  margin-top:.2em;
+  margin-bottom:.8em;
+}
 #detail-position .position-outer {
   width:60%;
   height:.3em;
-  margin-top:.2em;
-  margin-bottom:.8em;
+  margin-bottom:.2em;
   /* override the general position edit-widget border if desired */
   border: var(--detailposition-outer-border);
 }
@@ -1394,6 +1397,10 @@ th, tr, td {
 .edit-widget .position-inner {
   height:100%;
   background-color: var(--positionwidgetinner-bg);
+}
+.edit-widget .position-text {
+  font-style:italic;
+  text-align:center;
 }
 
 /* <ul> containing cast list items */
