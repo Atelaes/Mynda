@@ -6736,7 +6736,7 @@ class MynTooltip extends React.Component {
 
   componentWillUnmount() {
     // const tipDiv = document.getElementById(this.state.id);
-    document.removeChild(this.tipDiv);
+    document.body.removeChild(this.tipDiv);
   }
 
   render() {
