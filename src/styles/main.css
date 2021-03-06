@@ -192,6 +192,36 @@ img.ratings-icon {
   height: var(--ratingsicon-size);
 }
 
+.tooltip {
+  font-size: .6rem;
+  color: var(--main-text);
+  background-color: var(--dark-bg);
+  position:absolute;
+  top:0;
+  left:0;
+  z-index: 999;
+  display:none;
+  padding:.5em;
+  white-space: nowrap; /* we have to set the white space to nowrap here and then set it to normal in the javascript, because the javascript needs it set to nowrap in order to know the scroll width, to see if the text is longer than the width of the container */
+  max-width:25em;
+  border: .05em solid var(--main-text);
+  border-radius:.5em;
+  box-shadow: -.2em .2em .5em rgba(0,0,0,.4);
+}
+
+.tooltip-icon {
+  display: inline-block;
+  opacity:.8;
+  margin-left: .2em;
+  width: .7em;
+  height: .7em;
+  background-image: url('../../images/tooltip-icon_white.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow:visible;
+}
+
 /*************************************/
 /*######## MAIN GRID LAYOUT #########*/
 /*************************************/

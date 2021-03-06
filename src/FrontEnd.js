@@ -367,8 +367,9 @@ class Mynda extends React.Component {
       }
     }
     let filteredVids = [];
+    let showNew = playlist.id === 'new' || this.state.settings.preferences.include_new_vids_in_playlists;
     try {
-      filteredVids = this.state.videos.filter(video => eval(playlist.filterFunction))
+      filteredVids = this.state.videos.filter(video => eval(playlist.filterFunction) && (video.new ? showNew : true));
     } catch(err) {
       let name = playlist ? playlist.name : 'nonexistent';
       console.error(`Unable to execute filter for ${name} playlist: ${err}`);
@@ -542,6 +543,8 @@ class Mynda extends React.Component {
     // let playlist = library.playlists[0];
     // this.setState({filteredVideos : this.playlistFilter(playlist.id), view : playlist.view})
     // this.setPlaylist(playlist.id, document.getElementById('nav-playlists').getElementsByTagName('li')[0]);
+
+    // programmatically click on the first playlist
     try {
       document.getElementById('nav-playlists').getElementsByTagName('li')[0].click();
     } catch(e) {
@@ -3066,6 +3069,16 @@ class MynSettingsPrefs extends React.Component {
               validatorTip={"Allowed: a-z A-Z 0-9 _ - . & [space]"}
               reportValid={() => {}}
             />
+          </li>
+          <li id='settings-prefs-includenew' className='subsection'>
+            <h2>Include New:</h2>
+            <input
+              type='checkbox'
+              checked={this.state.include_new_vids_in_playlists ? true : false}
+              onChange={(e) => this.update('include-new',e.target.checked)}
+            />
+            Include newly added videos in playlists
+            <MynTooltip tip="If unchecked, newly added videos will only appear in the 'New' playlist until edited/tagged" />
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
             <h2>Hide Descriptions:</h2>
@@ -6632,6 +6645,108 @@ class MynParagraphFolder extends React.Component {
         </div>
 
       </div>
+    );
+  }
+}
+
+class MynTooltip extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      id : uuidv4(),
+      timeout : null
+    }
+
+    this.tipDiv = null;
+    this.iconDiv = React.createRef();
+    this.render = this.render.bind(this);
+    this.showTip = this.showTip.bind(this);
+    this.hideTip = this.hideTip.bind(this);
+  }
+
+  showTip(e) {
+    // show the div
+    this.tipDiv.style.display = 'block';
+
+    // set the div position based on the mouse position
+    // let x = e.clientX;
+    // let y = e.clientY;
+
+    // set the div position based on the icon div's position
+    let x = this.iconDiv.current.getBoundingClientRect().left;
+    let y = this.iconDiv.current.getBoundingClientRect().top;
+
+    let fontSize = window.getComputedStyle(this.tipDiv, null).getPropertyValue('font-size');
+    let maxWidth = Math.min(parseFloat(fontSize) * 25,window.innerWidth);
+    let minWidthIfWrapping = Math.min(parseFloat(fontSize) * 20,window.innerWidth); // we'll set this as the minimum width, but only if the text is long enough to fill it
+    let width = this.tipDiv.offsetWidth;
+
+    // we have to set the white space to nowrap just long enough to get the scrollWidth
+    // in order to see if the text is wrapping
+    // this.tipDiv.style.whiteSpace = 'nowrap';
+    let scrollWidth = this.tipDiv.scrollWidth;
+    this.tipDiv.style.whiteSpace = 'normal';
+
+
+    if (scrollWidth > minWidthIfWrapping) {
+      console.log('wrapping...');
+      // if the text is long enough to fill the minimum width we've set, set the width to at least that;
+      width = Math.max(width,minWidthIfWrapping);
+      this.tipDiv.style.width = width + 'px';
+    }
+    // now test if the div will overflow off the right side of the window
+    // and if so, move it over to the left
+    let rightOverflow = x + width - window.innerWidth;
+    if (rightOverflow > 0) x -= rightOverflow;
+
+    this.tipDiv.style.left = x + 'px';
+    this.tipDiv.style.top = (y + parseFloat(fontSize)) + 'px';
+    this.tipDiv.style.maxWidth = maxWidth + 'px';
+
+
+    console.log('font size: ' + fontSize);
+    console.log('element width: ' + this.tipDiv.offsetWidth);
+    console.log('min width if wrapping: ' + minWidthIfWrapping);
+    console.log('scroll width: ' + scrollWidth);
+    console.log('window width: ' + window.innerWidth);
+    console.log('right overflow: ' + rightOverflow);
+    console.log(`x: ${x}, y: ${y}`);
+  }
+
+  hideTip() {
+    this.tipDiv.style.display = 'none';
+    clearTimeout(this.state.timeout);
+  }
+
+  componentDidMount() {
+    // const tipDiv = (
+    //   <div ref={this.tip} className='tip' id={this.state.id}>
+    //     {this.props.tip}
+    //   </div>
+    // );
+
+    this.tipDiv = document.createElement('div');
+    this.tipDiv.classList.add('tooltip');
+    this.tipDiv.id = this.state.id;
+    this.tipDiv.innerHTML = this.props.tip;
+
+    document.body.appendChild(this.tipDiv);
+  }
+
+  componentWillUnmount() {
+    // const tipDiv = document.getElementById(this.state.id);
+    document.removeChild(this.tipDiv);
+  }
+
+  render() {
+    return (
+      <div
+        ref={this.iconDiv}
+        className='tooltip-icon'
+        onMouseEnter={(e) => {this.state.timeout = setTimeout((e) => this.showTip(e),200)}}
+        onMouseLeave={this.hideTip}
+      />
     );
   }
 }

@@ -330,7 +330,8 @@ let defaultLibrary = {
       },
       "hidedescription" : "show",
       "overridedialogs" : {},
-      "include_user_rating_in_avg": false
+      "include_user_rating_in_avg": false,
+      "include_new_vids_in_playlists": true
     },
     "used" : {
       "kinds" : [
