@@ -195,37 +195,53 @@ function addVideoFile(file, kind) {
   addObj.title = path.basename(file, fileExt);
   addObj.kind = kind;
   addObj.id = uuidv4();
-  addObj.dateadded = Math.floor(Date.now() / 1000);
+  addObj.dateadded = Math.floor(Date.now() / 1000); // this will be overwritten by the date of the file's creation, if the OS gives it to us
 
-  // get data from the file itself (duration, codec, dimensions, whatever)
-  ffprobe(file, { path: ffprobeStatic.path }).then(data => {
-    console.log(data);
-    for (const stream of data.streams) {
+  // get the date the file was added, from the OS
+  fs.stat(file,(err, stats) => {
+    if (err) {
+      console.log(`Error. Could not retrieve stats for ${file}`);
+    } else {
+      console.log(`GOT STATS FOR ${file}`);
+      console.log(JSON.stringify(stats));
+
       try {
-        if (stream.codec_type === 'video') {
-          addObj.metadata.codec = stream.codec_name;
-          addObj.metadata.duration = Number(stream.duration);
-          addObj.metadata.width = stream.width;
-          addObj.metadata.height = stream.height;
-          addObj.metadata.aspect_ratio = stream.display_aspect_ratio;
-          let f = stream.avg_frame_rate.split('/');
-          addObj.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
-        }
-        if (stream.codec_type === 'audio') {
-          addObj.metadata.audio_codec = stream.codec_name;
-          addObj.metadata.audio_layout = stream.channel_layout;
-          addObj.metadata.audio_channels = stream.channels;
-        }
-      } catch(err) {
-        console.log(`Error storing metadata for ${file}: ${err}`);
+        addObj.dateadded = Math.floor(stats.birthtimeMs / 1000);
+      } catch(e) {
+        console.log(`Unable to add dateadded to file: ${e}`);
       }
     }
 
-    console.log('Adding Movie: ' + JSON.stringify(addObj));
-    library.add('media.push', addObj);
+    // get video data from the file itself (duration, codec, dimensions, whatever)
+    ffprobe(file, { path: ffprobeStatic.path }).then(data => {
+      console.log(data);
+      for (const stream of data.streams) {
+        try {
+          if (stream.codec_type === 'video') {
+            addObj.metadata.codec = stream.codec_name;
+            addObj.metadata.duration = Number(stream.duration);
+            addObj.metadata.width = stream.width;
+            addObj.metadata.height = stream.height;
+            addObj.metadata.aspect_ratio = stream.display_aspect_ratio;
+            let f = stream.avg_frame_rate.split('/');
+            addObj.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
+          }
+          if (stream.codec_type === 'audio') {
+            addObj.metadata.audio_codec = stream.codec_name;
+            addObj.metadata.audio_layout = stream.channel_layout;
+            addObj.metadata.audio_channels = stream.channels;
+          }
+        } catch(err) {
+          console.log(`Error storing metadata for ${file}: ${err}`);
+        }
+      }
 
-  }).catch(err => {
-    console.log(`Error retrieving metadata from ${file} : ${err}`);
+      console.log('Adding Movie: ' + JSON.stringify(addObj));
+      library.add('media.push', addObj);
+
+    }).catch(err => {
+      console.log(`Error retrieving metadata from ${file} : ${err}`);
+    });
   });
 }
 

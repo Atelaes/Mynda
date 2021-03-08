@@ -3012,6 +3012,10 @@ class MynSettingsPrefs extends React.Component {
         address = "settings.preferences.include_user_rating_in_avg";
         this.setState({include_user_rating_in_avg:value});
         break;
+      case "include-new" :
+        address = "settings.preferences.include_new_vids_in_playlists";
+        this.setState({include_new_vids_in_playlists:value});
+        break;
       case "kinds" :
         address = "settings.used.kinds";
         this.setState({kinds:value});
@@ -3025,9 +3029,13 @@ class MynSettingsPrefs extends React.Component {
         break;
     }
 
-    let saveObj = {};
-    saveObj[address] = value;
-    this.props.save(saveObj);
+    if (address !== '') {
+      let saveObj = {};
+      saveObj[address] = value;
+      this.props.save(saveObj);
+    } else {
+      console.error('Not address was provided to save.');
+    }
   }
 
   render() {
