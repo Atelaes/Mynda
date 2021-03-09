@@ -1831,11 +1831,11 @@ class MynLibTable extends React.Component {
         ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb ratings centered">{movie.ratings.imdb ? Number(movie.ratings.imdb).toFixed(1) : ''}</td>),
         ratings_mc: (<td key="ratings_mc" className="ratings_mc ratings centered">{movie.ratings.mc ? movie.ratings.mc : ''}</td>),
         ratings_avg: (<td key="ratings_avg" className="ratings_avg ratings centered">{this.props.calcAvgRatings(movie.ratings)}</td>),
-        boxoffice: (<td key="boxoffice" className="boxoffice">{movie.boxoffice === 0 ? '' : accounting.formatMoney(Number(movie.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/10)>0 ? `.${Math.round(grps[1]/10).toString().replace(/0$/,'')}B` : 'B')}</td>),
+        boxoffice: (<td key="boxoffice" className="boxoffice">{movie.boxoffice === 0 ? '' : accounting.formatMoney(Number(movie.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}B` : 'B')}</td>),
         rated: (<td key="rated" className="rated">{movie.rated}</td>),
         country: (<td key="country" className="country">{movie.country}</td>),
         languages: (<td key="languages" className="languages">{movie.languages[0]}</td>),
-        duration: (<td key="duration" className="duration">{Math.round(Number(movie.metadata.duration)/60)}min</td>)
+        duration: (<td key="duration" className="duration">{movie.metadata.duration !== 0 && movie.metadata.duration !== null ? `${Math.round(Number(movie.metadata.duration)/60)} min` : ''}</td>)
       };
 
       let cells = this.props.columns.map(column => {
@@ -2264,13 +2264,13 @@ class MynDetails extends React.Component {
   }
 
   clickDescrip(e) {
-    if (this.props.settings.preferences.hidedescription === "hide") {
+    // if (this.props.settings.preferences.hidedescription === "hide") {
       try {
         document.getElementById('detail-description').classList.toggle('hide');
       } catch(err) {
         console.log(err);
       }
-    }
+    // }
   }
 
   displayRatings() {
@@ -2773,7 +2773,7 @@ class MynSettingsFolders extends React.Component {
 
         <div id="settings-folders-folders" className='subsection'>
           <h2>Watchfolders</h2>
-          <table>
+          <table style={{visibility: this.state.existingFolders.length > 0 ? "visible" : "hidden"}}>
             <thead>
               <tr>
                 <th>Path</th>
@@ -4039,7 +4039,7 @@ class MynEditor extends MynOpenablePane {
     // if the video has changed (and we have to check whether its collections have changed independently,
     // since the collections information is no longer contained in the video object itself)
     if (!_.isEqual(oldProps.video,this.props.video) || !_.isEqual(oldVidCols,vidCols)) {
-      console.log('MynEditor props.video has changed!!!\n' + JSON.stringify(this.props.video));
+      // console.log('MynEditor props.video has changed!!!\n' + JSON.stringify(this.props.video));
 
       if (this.props.video) this.props.video.collections = vidCols;
 
@@ -6133,6 +6133,7 @@ class MynEditGraphicalWidget extends MynEditWidget {
   }
 
   componentDidUpdate(oldProps) {
+    // console.log('MynEditGraphicalWidget is updating ' + this.state.property + ' for ' + this.props.movie.title);
     if (!_.isEqual(oldProps.movie[this.state.property],this.props.movie[this.state.property])) {//(oldProps.movie[this.state.property] !== this.props.movie[this.state.property]) {
       this.updateGraphic(this.props.movie[this.state.property]);
     }
@@ -6297,6 +6298,22 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   //   // ReactDOM.findDOMNode(this.refs.outer)
   //   return super.componentDidMount(props);
   // }
+
+  // we have to override the super componentDidUpdate method
+  // because in the case of the position widget, we need to check for
+  // both a difference in position, but also a difference in duration
+  componentDidUpdate(oldProps) {
+    let duration;
+    let oldDuration;
+    if (this.props.movie.metadata) duration = this.props.movie.metadata.duration;
+    if (oldProps.movie.metadata) oldDuration = oldProps.movie.metadata.duration;
+
+    if (oldProps.movie.position !== this.props.movie.position || (!isNaN(duration) && oldDuration !== duration)) {
+      // console.log('MynEditPositionWidget is updating for ' + this.props.movie.title);
+      // console.log(`${oldProps.movie.position} !== ${this.props.movie.position} || ${oldDuration} !== ${duration}`);
+      this.updateGraphic(this.props.movie.position);
+    }
+  }
 
   render() {
     // if the duration is 0, '', or does not exist, return nothing

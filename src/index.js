@@ -67,13 +67,13 @@ function checkWatchFolders() {
   let folders = library.settings.watchfolders;
   for (let i=0; i<folders.length; i++) {
     let thisFolder = folders[i];
-    findVideosFromFolder(thisFolder.path, thisFolder.kind);
+    findVideosFromFolder(thisFolder.path, thisFolder.path, thisFolder.kind);
   }
 }
 
 //Takes a full folder address and looks for videos in it,
 //adding any it finds to the library
-function findVideosFromFolder(folder, kind) {
+function findVideosFromFolder(rootWatchFolder, folder, kind) {
   const videoExtensions = [
     '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
     'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
@@ -81,7 +81,10 @@ function findVideosFromFolder(folder, kind) {
     'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
   ]
   if (isDVDRip(folder)) {
-    addDVDRip(folder, kind);
+    // addDVDRip(rootWatchFolder, folder, kind);
+    // pass 'true' to tell the function that this is a DVD folder
+    console.log(`${folder} is a DVD rip`);
+    addVideoFile(rootWatchFolder, folder, kind, true);
   } else {
     fs.readdir(folder, {withFileTypes : true}, function (err, components) {
       //handling error
@@ -92,11 +95,12 @@ function findVideosFromFolder(folder, kind) {
         let component = components[i];
         let compAddress = path.join(folder, component.name);
         if (component.isDirectory()) {
-          findVideosFromFolder(compAddress, kind);
+          findVideosFromFolder(rootWatchFolder, compAddress, kind);
         } else {
           let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
           if (videoExtensions.includes(fileExt)) {
-            addVideoFile(compAddress, kind);
+            console.log(`${compAddress} is a regular video file`);
+            addVideoFile(rootWatchFolder, compAddress, kind);
           }
         }
       }
@@ -170,29 +174,30 @@ let videoTemplate =   {
   }
 
 //Takes a full directory address and adds it to library
-function addDVDRip(folder, kind) {
-  if (isAlreadyInLibrary(folder)) {
-    return;
-  } else {
-    let addObj = _.cloneDeep(videoTemplate);
-    addObj.filename = folder;
-    addObj.title = path.basename(folder);
-    addObj.kind = kind;
-    addObj.id = uuidv4();
-    addObj.dateadded = Math.floor(Date.now() / 1000);
-    library.add('media.push', addObj);
-    console.log('Added DVD rip: ' + addObj.title);
-  }
-}
+// function addDVDRip(rootWatchFolder, folder, kind) {
+//   if (isAlreadyInLibrary(folder)) {
+//     return;
+//   } else {
+//     let addObj = _.cloneDeep(videoTemplate);
+//     addObj.filename = folder;
+//     addObj.title = path.basename(folder);
+//     addObj.kind = kind;
+//     addObj.id = uuidv4();
+//     addObj.dateadded = Math.floor(Date.now() / 1000);
+//     library.add('media.push', addObj);
+//
+//     console.log('Added DVD rip: ' + addObj.title);
+//   }
+// }
 
 //Takes a full file address and adds it to library
-function addVideoFile(file, kind) {
+function addVideoFile(rootWatchFolder, file, kind, isDVD) {
   if (isAlreadyInLibrary(file)) return;
 
   let addObj = _.cloneDeep(videoTemplate);
   addObj.filename = file;
-  let fileExt = path.extname(file)
-  addObj.title = path.basename(file, fileExt);
+  let fileExt = path.extname(file);
+  addObj.title = isDVD ? path.basename(file) : path.basename(file, fileExt);
   addObj.kind = kind;
   addObj.id = uuidv4();
   addObj.dateadded = Math.floor(Date.now() / 1000); // this will be overwritten by the date of the file's creation, if the OS gives it to us
@@ -200,7 +205,7 @@ function addVideoFile(file, kind) {
   // get the date the file was added, from the OS
   fs.stat(file,(err, stats) => {
     if (err) {
-      console.log(`Error. Could not retrieve stats for ${file}`);
+      console.log(`Error. Could not retrieve file stats for ${file} : ${err}`);
     } else {
       console.log(`GOT STATS FOR ${file}`);
       console.log(JSON.stringify(stats));
@@ -236,11 +241,18 @@ function addVideoFile(file, kind) {
         }
       }
 
+    }).catch(err => {
+      console.log(`Error retrieving video metadata from ${file} : ${err}`);
+    }).finally(() => {
+      // add video to library, and add its ID to its watchfolder
       console.log('Adding Movie: ' + JSON.stringify(addObj));
       library.add('media.push', addObj);
-
-    }).catch(err => {
-      console.log(`Error retrieving metadata from ${file} : ${err}`);
+      library.settings.watchfolders.map((folder,index) => {
+        if (folder.path === rootWatchFolder) {
+          folder.videos.push(addObj.id);
+        }
+      });
+      library.replace('settings.watchfolders.' + index, library.settings.watchfolders[index]);
     });
   });
 }
@@ -275,8 +287,8 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
     // if path exists and is a folder
     if(!err && stats.isDirectory()) {
       // add to library
-      library.add('settings.watchfolders.push', {"path" : path, "kind" : kind});
-      findVideosFromFolder(path, kind);
+      library.add('settings.watchfolders.push', {"path" : path, "kind" : kind, "videos" : []});
+      findVideosFromFolder(path, path, kind);
     } else {
       // if not, display an error dialog
       dialog.showMessageBox({

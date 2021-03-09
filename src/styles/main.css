@@ -1197,6 +1197,10 @@ th, tr, td {
   margin-bottom:.5em
 }
 
+#settings-folders-choose .choose-section.kind {
+  width:10em;
+}
+
 #settings-folders-choose label {
   display:block;
   margin: var(--editfield-name-margin);
@@ -1223,6 +1227,19 @@ th, tr, td {
 #settings-folders-folders .path {
   font-weight: 300;
   font-size: .8em;
+}
+
+#settings-folders-folders td,
+#settings-folders-folders th {
+  padding-right: .5em;
+}
+
+#settings-folders-folders thead {
+  text-align: center;
+  color: var(--th-text);
+  font-family: var(--th-font);
+  font-size: calc(var(--th-font-size) * .8);
+  font-weight: bold;
 }
 
 #settings-collections .collection .video {
