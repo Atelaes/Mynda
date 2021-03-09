@@ -1224,14 +1224,48 @@ th, tr, td {
   width:100%;
 }
 
-#settings-folders-folders .path {
+#settings-folders-folders .watchfolders-table {
+  table-layout: fixed;
+  width:100%;
+  border-spacing: .5em 0;
+}
+
+#settings-folders-folders th.path { /* the path column of the table */
+}
+#settings-folders-folders td.path { /* the path column of the table */
   font-weight: 300;
   font-size: .8em;
+  white-space: nowrap;
+  overflow:hidden;
 }
+#settings-folders-folders td.path.overflow {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 1.0) 3em);
+  -webkit-mask-position: 0 0;
+  -webkit-mask-repeat: repeat-y;
+}
+#settings-folders-folders td.path.overflow span {
+  float:right;
+}
+
+#settings-folders-folders th.default-kind { /* the default kind column of the table */
+  width:6em;
+}
+#settings-folders-folders td.default-kind { /* the default kind column of the table */
+}
+
+
+#settings-folders-folders th.remove { /* the remove button column of the table */
+  width:2.6em;
+}
+#settings-folders-folders td.remove { /* the remove button column of the table */
+  text-align: center;
+}
+
 
 #settings-folders-folders td,
 #settings-folders-folders th {
-  padding-right: .5em;
+  /* padding-right: .5em; */
+  /* border: 1px solid red; */
 }
 
 #settings-folders-folders thead {

@@ -2723,13 +2723,13 @@ class MynSettingsFolders extends React.Component {
     try {
       folders = this.state.existingFolders.map((folder, index) => (
         <tr key={index}>
-          <td className='path'>{folder.path}</td>
-          <td>
+          <td className='path overflow' title={folder.path}><span>{folder.path}</span></td>
+          <td className='default-kind'>
             <span className='select-container select-alwaysicon'>
               <select value={folder.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
             </span>
           </td>
-          <td><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
+          <td className='remove'><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
         </tr>
       ));
     } catch(e) {
@@ -2773,12 +2773,12 @@ class MynSettingsFolders extends React.Component {
 
         <div id="settings-folders-folders" className='subsection'>
           <h2>Watchfolders</h2>
-          <table style={{visibility: this.state.existingFolders.length > 0 ? "visible" : "hidden"}}>
+          <table className='watchfolders-table' style={{visibility: this.state.existingFolders.length > 0 ? "visible" : "hidden"}}>
             <thead>
               <tr>
-                <th>Path</th>
-                <th>Default Kind</th>
-                <th>Remove</th>
+                <th className='path'>Path</th>
+                <th className='default-kind'>Default Kind</th>
+                <th className='remove'>Remove</th>
               </tr>
             </thead>
             <tbody>
