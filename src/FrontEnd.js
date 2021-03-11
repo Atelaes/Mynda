@@ -4186,14 +4186,37 @@ class MynEditorSearch extends React.Component {
       // if the title field is empty, we will substitute the file name
       const filename = this.props.video.filename.match(/[^/]+$/)[0]; // get just the filename from the path // /[^/]+(?=\.\w{2,4}$)/
       console.log('filename: ' + filename);
-      const titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
-      const yearQuery = this.props.video.year !== '' ? this.props.video.year : null
-      const typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
+      this.titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
+      this.yearQuery = this.props.video.year !== '' ? this.props.video.year : null;
+      this.typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
+
+      // if we have no year, see if a year-like string is in the file name or title
+      if (this.yearQuery === null) {
+        let strings = [filename, this.props.video.title];
+        for (let str of strings) {
+          // find any 4 digit strings starting with 19 or 20
+          let results = str.match(/(?:19|20)\d{2}/g);
+          try {
+            // filter the results for years no more than 1 in the future
+            results = results.filter(el => {
+              return Number(el) <= Number(new Date().getFullYear()) + 1;
+            });
+
+            // for now, just pick the first one
+            if (results[0]) {
+              this.yearQuery = results[0];
+              break;
+            }
+          } catch(err) {
+            // there were no results, so we do nothing
+          }
+        }
+      }
 
       // compose query url
-      urlParts.push(`s=${titleQuery}`);
-      if (yearQuery) urlParts.push(`y=${yearQuery}`);
-      if (typeQuery) urlParts.push(`type=${typeQuery}`);
+      urlParts.push(`s=${this.titleQuery}`);
+      if (this.yearQuery) urlParts.push(`y=${this.yearQuery}`);
+      if (this.typeQuery) urlParts.push(`type=${this.typeQuery}`);
     }
 
     // execute query
@@ -4201,6 +4224,9 @@ class MynEditorSearch extends React.Component {
   }
 
   executeSearchQuery(urlParts) {
+    console.log(`Query:`);
+    urlParts.map(el => console.log(`    ${el}`));
+
     this.setState({searching:true});
     axios({
       method: 'get',
@@ -4218,6 +4244,27 @@ class MynEditorSearch extends React.Component {
         if (response.data.Response == "False" && urlParts.length > 2) {
           console.log('nothing found, trying again with less');
           this.executeSearchQuery(urlParts.slice(0, -1));
+          return;
+        }
+
+        // if that didn't work, try some modifications on the title
+        if (response.data.Response == "False" && this.titleQuery.split(/[\.\s]/).length > 1) {
+          console.log('nothing found, trying again with modifications');
+
+          if (/\./.test(this.titleQuery)) {
+            // if there are periods, replace them all with spaces
+            this.titleQuery = this.titleQuery.replace(/\.+/g,' ');
+          } else {
+            // if there are no periods, start lopping off the last word
+            // (and recursing until we find some results)
+            this.titleQuery = this.titleQuery.split(/\s/).slice(0,-1).join(' ');
+          }
+          urlParts = urlParts.slice(0, -1); // get rid of the old title
+          urlParts.push(`s=${this.titleQuery}`); // add the modified title
+          if (this.yearQuery) urlParts.push(`y=${this.yearQuery}`); // add back the year, if we have one
+          if (this.typeQuery) urlParts.push(`type=${this.typeQuery}`); // add back the kind, if we have one
+
+          this.executeSearchQuery(urlParts);
           return;
         }
 
