@@ -328,8 +328,8 @@ let defaultLibrary = {
           "duration"
         ]
       },
-      "hidedescription" : "show",
-      "overridedialogs" : {},
+      "hide_description" : "show",
+      "override_dialogs" : {},
       "include_user_rating_in_avg": false,
       "include_new_vids_in_playlists": true
     },
@@ -346,7 +346,7 @@ let defaultLibrary = {
     {
       "id" : "new",
       "name" : "New",
-      "filterFunction" : "video.new === true",
+      "filter_function" : "video.new === true",
       "view" : "flat",
       "tab" : true,
       "flatDefaultSort" : "dateadded",
@@ -360,7 +360,7 @@ let defaultLibrary = {
     {
       "id" : "1",
       "name" : "Movies",
-      "filterFunction" : "video.kind === 'movie'",
+      "filter_function" : "video.kind === 'movie'",
       "view" : "flat",
       "tab" : true,
       "columns" : [
@@ -376,7 +376,7 @@ let defaultLibrary = {
     {
       "id" : "2",
       "name" : "Shows",
-      "filterFunction" : "video.kind === 'show'",
+      "filter_function" : "video.kind === 'show'",
       "view" : "hierarchical",
       "tab" : true,
       "columns" : [
@@ -391,7 +391,8 @@ let defaultLibrary = {
     }
   ],
   "collections" : [],
-  "media" : []
+  "media" : [],
+  "inactive_media": []
 };
 
 // expose the class

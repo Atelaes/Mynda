@@ -363,13 +363,13 @@ class Mynda extends React.Component {
         playlist = this.state.playlists[0] // display the first one
       } catch(error) {
         console.log("Error: no playlists found, displaying nothing")
-        playlist = { "filterFunction" : "false" } // just display nothing
+        playlist = { "filter_function" : "false" } // just display nothing
       }
     }
     let filteredVids = [];
     let showNew = playlist.id === 'new' || this.state.settings.preferences.include_new_vids_in_playlists;
     try {
-      filteredVids = this.state.videos.filter(video => eval(playlist.filterFunction) && (video.new ? showNew : true));
+      filteredVids = this.state.videos.filter(video => eval(playlist.filter_function) && (video.new ? showNew : true));
     } catch(err) {
       let name = playlist ? playlist.name : 'nonexistent';
       console.error(`Unable to execute filter for ${name} playlist: ${err}`);
@@ -791,10 +791,10 @@ class MynLibrary extends React.Component {
       if (checked) {
         console.log('option to override dialog was checked!');
         let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.overridedialogs) {
-          prefs.overridedialogs = {};
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
         }
-        prefs.overridedialogs['MynLibrary-confirm-convertTerminalCol'] = true;
+        prefs.override_dialogs['MynLibrary-confirm-convertTerminalCol'] = true;
         library.replace("settings.preferences",prefs);
       }
 
@@ -1234,7 +1234,7 @@ class MynLibrary extends React.Component {
     // so we have to give the user a confirmation dialog before doing that.
     if (parent.videos) {
       // if the user hasn't previously selected the preference to override this confirmation dialog
-      if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynLibrary-confirm-convertTerminalCol']) {
+      if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibrary-confirm-convertTerminalCol']) {
         ipcRenderer.send(
           'generic-confirm',
           'MynLibrary-confirm-convertTerminalCol',
@@ -1395,10 +1395,10 @@ class MynLibTable extends React.Component {
       if (skipDialog) {
         // console.log('option to override dialog was checked!');
         let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.overridedialogs) {
-          prefs.overridedialogs = {};
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
         }
-        prefs.overridedialogs[`MynLibTable-confirm-inlineEdit`] = true;
+        prefs.override_dialogs[`MynLibTable-confirm-inlineEdit`] = true;
         library.replace("settings.preferences",prefs);
       }
     });
@@ -1987,7 +1987,7 @@ class MynLibTable extends React.Component {
     // console.log('changes == ' + JSON.stringify(changes));
 
     // user confirmation dialog
-    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynLibTable-confirm-inlineEdit']) {
+    if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibTable-confirm-inlineEdit']) {
       ipcRenderer.send('save-video-confirm', changes, originalVid, true); // pass 'true' to show the skip dialog checkbox
     } else {
       // save changes without the confirmation dialog
@@ -2264,7 +2264,7 @@ class MynDetails extends React.Component {
   }
 
   clickDescrip(e) {
-    // if (this.props.settings.preferences.hidedescription === "hide") {
+    // if (this.props.settings.preferences.hide_description === "hide") {
       try {
         document.getElementById('detail-description').classList.toggle('hide');
       } catch(err) {
@@ -2306,7 +2306,7 @@ class MynDetails extends React.Component {
     this.setTitleMarquee();
     if (!_.isEqual(oldProps.video, this.props.video)) {
       // this.setTitleMarquee();
-      if (this.props.settings.preferences.hidedescription === "hide") {
+      if (this.props.settings.preferences.hide_description === "hide") {
         try {
           document.getElementById('detail-description').classList.add('hide');
         } catch(err) {
@@ -2342,7 +2342,7 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><div className="detail-title-text">{video.title}</div></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} /></li>
-          <li className={"detail " + this.props.settings.preferences.hidedescription} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
+          <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
           <li className="detail" id="detail-ratings">{this.displayRatings()}</li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {video.director}</li>
           <li className="detail" id="detail-cast"><span className="label">Cast:</span> {video.cast.join(", ")}</li>
@@ -2409,10 +2409,10 @@ class MynOpenablePane extends React.Component {
       if (checked) {
         console.log('option to override dialog was checked!');
         let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.overridedialogs) {
-          prefs.overridedialogs = {};
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
         }
-        prefs.overridedialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`] = true;
+        prefs.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`] = true;
         library.replace("settings.preferences",prefs);
       }
 
@@ -2435,7 +2435,7 @@ class MynOpenablePane extends React.Component {
     // i.e. the confirm boolean variable tells us whether the pane wants us to confirm exit,
     // but that can be overridden by the user preference to override the confirmation dialog,
     // hence the rest of the conditional here
-    if (confirm && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`])) {
+    if (confirm && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`])) {
       ipcRenderer.send(
         'generic-confirm',
         'MynOpenablePane-confirm-exit',
@@ -2879,7 +2879,7 @@ class MynSettingsPlaylists extends React.Component {
     let newPlaylist = {
       id : uuidv4(),
       name : "",
-      filterFunction : "false",
+      filter_function : "false",
       view : "flat",
       tab : true,
       columns : _.cloneDeep(this.props.defaultcolumns.used)
@@ -2988,10 +2988,10 @@ class MynSettingsPrefs extends React.Component {
         used : _.cloneDeep(props.settings.preferences.defaultcolumns.used),
         unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
       },
-      hidedescription : props.settings.preferences.hidedescription,
+      hide_description : props.settings.preferences.hide_description,
       include_user_rating_in_avg : props.settings.preferences.include_user_rating_in_avg,
       kinds : props.settings.used.kinds,
-      overridedialogs : props.settings.preferences.overridedialogs
+      override_dialogs : props.settings.preferences.override_dialogs
     }
 
     this.update = this.update.bind(this);
@@ -3005,8 +3005,8 @@ class MynSettingsPrefs extends React.Component {
         this.setState({defaultcolumns:value});
         break;
       case "hide-description" :
-        address = "settings.preferences.hidedescription";
-        this.setState({hidedescription:value});
+        address = "settings.preferences.hide_description";
+        this.setState({hide_description:value});
         break;
       case "user-rating-avg" :
         address = "settings.preferences.include_user_rating_in_avg";
@@ -3021,11 +3021,11 @@ class MynSettingsPrefs extends React.Component {
         this.setState({kinds:value});
         break;
       case "override-dialogs" :
-        address = "settings.preferences.overridedialogs";
-        let new_od = _.cloneDeep(this.state.overridedialogs);
+        address = "settings.preferences.override_dialogs";
+        let new_od = _.cloneDeep(this.state.override_dialogs);
         new_od[subProp] = value;
         value = new_od;
-        this.setState({overridedialogs:value});
+        this.setState({override_dialogs:value});
         break;
     }
 
@@ -3092,7 +3092,7 @@ class MynSettingsPrefs extends React.Component {
             <h2>Hide Descriptions:</h2>
             <input
               type='checkbox'
-              checked={this.state.hidedescription === "hide" ? true : false}
+              checked={this.state.hide_description === "hide" ? true : false}
               onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
             />
             Hide plot summaries
@@ -3106,13 +3106,13 @@ class MynSettingsPrefs extends React.Component {
             />
             Include user rating in avg rating
           </li>
-          <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.overridedialogs && Object.keys(this.props.settings.preferences.overridedialogs).length > 0 ? 'block' : 'none'}}>
+          <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.override_dialogs && Object.keys(this.props.settings.preferences.override_dialogs).length > 0 ? 'block' : 'none'}}>
             <h2>Show Dialogs:</h2>
-            {this.state.overridedialogs ? Object.keys(this.state.overridedialogs).map(dialogName => (
+            {this.state.override_dialogs ? Object.keys(this.state.override_dialogs).map(dialogName => (
               <div className='dialog' key={dialogName} style={{display:'flex'}}>
                 <input
                   type='checkbox'
-                  checked={!this.state.overridedialogs[dialogName]}
+                  checked={!this.state.override_dialogs[dialogName]}
                   onChange={(e) => this.update('override-dialogs',!e.target.checked,dialogName)}
                 />
                 <div className='showdialog-descrip'>{dialogDescriptions[dialogName] || dialogName}</div>
@@ -3262,9 +3262,9 @@ class MynSettingsPlaylistsTableRow extends React.Component {
         <textarea
           className='edit-filter-field'
           name="playlist filter"
-          value={playlist.filterFunction}
+          value={playlist.filter_function}
           placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
-          onChange={(e) => this.props.updateValue(this.props.index,'filterFunction',e.target.value)}
+          onChange={(e) => this.props.updateValue(this.props.index,'filter_function',e.target.value)}
         />
       </div>
     );
@@ -3353,10 +3353,10 @@ class MynSettingsCollections extends React.Component {
         if (checked) {
           console.log('option to override dialog was checked!');
           let prefs = _.cloneDeep(this.props.settings.preferences);
-          if (!prefs.overridedialogs) {
-            prefs.overridedialogs = {};
+          if (!prefs.override_dialogs) {
+            prefs.override_dialogs = {};
           }
-          prefs.overridedialogs['MynSettingsCollections-confirm-delete'] = true;
+          prefs.override_dialogs['MynSettingsCollections-confirm-delete'] = true;
           library.replace("settings.preferences",prefs);
         }
       } else {
@@ -3380,10 +3380,10 @@ class MynSettingsCollections extends React.Component {
         if (checked) {
           console.log('option to override dialog was checked!');
           let prefs = _.cloneDeep(this.props.settings.preferences);
-          if (!prefs.overridedialogs) {
-            prefs.overridedialogs = {};
+          if (!prefs.override_dialogs) {
+            prefs.override_dialogs = {};
           }
-          prefs.overridedialogs['MynSettingsCollections-confirm-convertToNonTerminal'] = true;
+          prefs.override_dialogs['MynSettingsCollections-confirm-convertToNonTerminal'] = true;
           library.replace("settings.preferences",prefs);
         }
       } else {
@@ -3407,7 +3407,7 @@ class MynSettingsCollections extends React.Component {
     // if the user hasn't previously checked the option to override it,
     // show the user a confirmation dialog before adding a collection,
     // (because that will necessitate deleting any videos it has)
-    if (isTerminal && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs[`MynSettingsCollections-confirm-convertToNonTerminal`])) {
+    if (isTerminal && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`MynSettingsCollections-confirm-convertToNonTerminal`])) {
       ipcRenderer.send(
         'generic-confirm',
         'MynSettingsCollections-confirm-convertToNonTerminal',
@@ -3452,7 +3452,7 @@ class MynSettingsCollections extends React.Component {
 
     // if the user hasn't previously checked the option to override it,
     // show the user a confirmation dialog before deleting the collection
-    if (!dialogConfirmed && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs[`MynSettingsCollections-confirm-delete`])) {
+    if (!dialogConfirmed && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`MynSettingsCollections-confirm-delete`])) {
       ipcRenderer.send(
         'generic-confirm',
         'MynSettingsCollections-confirm-delete',
@@ -4153,10 +4153,10 @@ class MynEditorSearch extends React.Component {
       if (checked) {
         console.log('option to override dialog was checked!');
         let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.overridedialogs) {
-          prefs.overridedialogs = {};
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
         }
-        prefs.overridedialogs['MynEditorSearch-confirm-select'] = true;
+        prefs.override_dialogs['MynEditorSearch-confirm-select'] = true;
         library.replace("settings.preferences",prefs);
       }
 
@@ -4338,7 +4338,7 @@ class MynEditorSearch extends React.Component {
 
   chooseResult(movie) {
     // if the user hasn't previously selected the preference to override this confirmation dialog
-    if (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynEditorSearch-confirm-select']) {
+    if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynEditorSearch-confirm-select']) {
       // we ask the user to confirm, because this will overwrite any metadata
       // the movie currently has (although the revert button will still work until
       // the user saves the changes)
@@ -4518,10 +4518,10 @@ class MynEditorEdit extends React.Component {
       if (checked) {
         console.log('option to override dialog was checked!');
         let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.overridedialogs) {
-          prefs.overridedialogs = {};
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
         }
-        prefs.overridedialogs['MynEditorEdit-confirm-revert'] = true;
+        prefs.override_dialogs['MynEditorEdit-confirm-revert'] = true;
         library.replace("settings.preferences",prefs);
       }
 
@@ -4545,7 +4545,7 @@ class MynEditorEdit extends React.Component {
 
     // if the video has been changed without saving
     // and if the user hasn't previously selected the preference to override this confirmation dialog
-    if (!saved && (!this.props.settings.preferences.overridedialogs || !this.props.settings.preferences.overridedialogs['MynEditorEdit-confirm-revert'])) {
+    if (!saved && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynEditorEdit-confirm-revert'])) {
       // we ask the user to confirm, because this will erase any metadata
       // that hasn't been saved
       ipcRenderer.send(

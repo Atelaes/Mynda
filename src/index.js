@@ -59,8 +59,8 @@ function createWindow() {
   })
   win.webContents.openDevTools();
   //var child = cp.spawn('ffplay', ['E:\\DVD Movies\\Moana.mp4']);
-  win.loadFile('src/index.html');
-
+  // win.loadFile('src/index.html');
+  win.loadFile('src/player.html');
 }
 
 function checkWatchFolders() {
