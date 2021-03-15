@@ -936,7 +936,15 @@ th, tr, td {
   text-shadow: .2em .2em .1em black;
   line-height:1em;
 }
-
+#player-pane .loading {
+  --size: max(1rem,8vw);
+  width: var(--size);
+  height: var(--size);
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform: translateX(-50%) translateY(-50%);
+}
 
 /*************************************/
 /*########## SETTINGS PANE ##########*/

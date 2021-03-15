@@ -2566,23 +2566,32 @@ class MynPlayer extends MynOpenablePane {
 
     this.state = {
       paneID: 'player-pane',
-      startedMuxing: false,
-      errorMessage: null
+      // startedMuxing: false,
+      errorMessage: null,
+      showLoadingIndicator: false,
+      tries: 0
     }
+
+    this.loadingIndicator = (
+      <img className='loading' src='../images/loading-icon.gif' />
+    );
 
     // callbacks to hand off to Stream.js, for different events ffmpeg sends back
     this.callbacks = {
-      progress : (outputPath) => {
-        // called periodically throughout the process;
-        // we only want to know that progress has started, so we use a flag
-        if (this.state.startedMuxing == false) {
-          this.state.startedMuxing = true;
-          // once the process has started, it's safe to add the ffmpeg output
-          // to the video element
-          this.createVideo(outputPath);
-        }
+      codecData : (outputPath) => {
+        // // called periodically throughout the process;
+        // // we only want to know that progress has started, so we use a flag
+        // if (this.state.startedMuxing == false) {
+        //   this.state.startedMuxing = true;
+          // once the process has started, we'll check for the ffmpeg output
+          // and when it exists, add it to the video element
+          this.checkForStreamPlaylist(outputPath);
+        // }
       },
       error : (err) => {
+        // turn off loading icon
+        this.setState({showLoadingIndicator:false});
+
         // unset video player height
         try {
           this.player.current.setAttribute('height','');
@@ -2604,7 +2613,47 @@ class MynPlayer extends MynOpenablePane {
     this.player = React.createRef();
   }
 
+  checkForStreamPlaylist(playlist) {
+    this.state.tries += 1;
+    console.log('Checking for .m3u8 file: ' + playlist);
+    fs.stat(playlist, (err, stat) => {
+      if(err == null) {
+        console.log('File exists');
+        this.createVideo(playlist);
+      } else if(err.code === 'ENOENT') {
+        // file does not exist, wait a second and check again
+        if (this.state.tries < 15) {
+          this.createVidTimeout = setTimeout(() => {
+            this.checkForStreamPlaylist(playlist);
+          },1000);
+        } else {
+          // display error message to user
+          this.setState({errorMessage:(
+            <div className='error-message'>
+              <div className='header'>Error Loading Video</div>
+              Could not locate stream output
+            </div>
+          )});
+          this.setState({showLoadingIndicator:false});
+        }
+      } else {
+        console.log('Some other error: ', err.code);
+        this.setState({errorMessage:(
+          <div className='error-message'>
+            <div className='header'>Error Loading Video</div>
+            Could not locate stream output: unknown problem
+          </div>
+        )});
+        this.setState({showLoadingIndicator:false});
+      }
+    });
+
+  }
+
   createVideo(streamPath) {
+    this.setState({showLoadingIndicator:false});
+
+    console.log('Connecting video element to ffmpeg stream');
     let video;
     try {
       video = this.player.current;
@@ -2612,7 +2661,7 @@ class MynPlayer extends MynOpenablePane {
       console.error(err);
     }
     if (!video) {
-      console.log('MynPlayer did not create video');
+      console.log('MynPlayer did not create video; video element does not exist');
       return;
     }
 
@@ -2642,6 +2691,8 @@ class MynPlayer extends MynOpenablePane {
         video.play();
       });
       video.src = source;
+    } else {
+
     }
   }
 
@@ -2655,10 +2706,11 @@ class MynPlayer extends MynOpenablePane {
   componentDidUpdate(oldProps) {
     if (!oldProps.show && this.props.show) {
       this.createFFmpegStream();
+      this.setState({showLoadingIndicator:true});
     }
 
-    if (oldProps.show && !this.props.show) {
-      this.state.startedMuxing = false;
+    if (!this.props.show) {
+      // this.state.startedMuxing = false;
     }
 
   }
@@ -2697,6 +2749,7 @@ class MynPlayer extends MynOpenablePane {
         <div id="video-container" style={{width:width + 'px'}}>
           <video controls id="video-player" ref={this.player} width={width} height={height}>
           </video>
+          {this.state.showLoadingIndicator ? this.loadingIndicator : null}
           {this.state.errorMessage}
         </div>
       );

@@ -50,6 +50,10 @@ class Stream {
       ]).output(outputPath)
       .on('codecData', (data) => {
         console.log(data);
+        if (callbacks && _.isFunction(callbacks.codecData)) {
+          console.log('codecData callback');
+          callbacks.codecData(outputPath,data);
+        }
       }).on('progress', () => {
         if (callbacks && _.isFunction(callbacks.progress)) {
           console.log('progress callback');
@@ -72,11 +76,11 @@ class Stream {
 
     this.command.run();
 
-    // Kill ffmpeg after 60 seconds
-    setTimeout(() => {
-      console.log('killing');
-      this.command.kill();
-    }, 60000);
+    // // Kill ffmpeg after 60 seconds
+    // setTimeout(() => {
+    //   console.log('killing');
+    //   this.command.kill();
+    // }, 60000);
   }
 
 
