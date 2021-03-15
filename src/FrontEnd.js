@@ -18,6 +18,9 @@ const axios = require('axios');
 const accounting = require('accounting');
 const { DragDropContext, Droppable, Draggable } = require('react-beautiful-dnd');
 const hashObject = require('object-hash');
+const Hls = require('hls.js');
+const Stream = require('./Stream.js');
+
 // let savedPing = {};
 
 class Mynda extends React.Component {
@@ -42,7 +45,8 @@ class Mynda extends React.Component {
       // openablePane: null
       show : {
         settingsPane : false,
-        editorPane : false
+        editorPane : false,
+        playerPane : false
       },
       defaultSettingsView : 'folders',
     }
@@ -54,6 +58,7 @@ class Mynda extends React.Component {
     this.search = this.search.bind(this);
     this.calcAvgRatings = this.calcAvgRatings.bind(this);
     this.showDetails = this.showDetails.bind(this);
+    this.playVideo = this.playVideo.bind(this);
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
@@ -492,6 +497,10 @@ class Mynda extends React.Component {
     });
   }
 
+  playVideo() {
+    this.showOpenablePane('playerPane');
+  }
+
   showOpenablePane(name,view) {
     // the view parameter may be passed to us to tell us which tab to display in panes with tabs (only 'settings' for now)
     if (view && name === 'settingsPane') {
@@ -653,11 +662,59 @@ class Mynda extends React.Component {
   render () {
     return (
       <div id='grid-container'>
-        <MynNav playlists={this.state.playlists} setPlaylist={this.setPlaylist} search={this.search} showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}/>
-        <MynLibrary videos={this.state.filteredVideos} collections={this.state.collections} settings={this.state.settings} playlistID={this.state.currentPlaylistID} view={this.state.view} flatDefaultSort={this.state.flatDefaultSort} columns={this.state.columns} displayColumnName={this.displayColumnName} calcAvgRatings={this.calcAvgRatings} showDetails={this.showDetails} handleSelectedRows={this.handleSelectedRows} handleHoveredRow={this.handleHoveredRow} selectedRows={this.state.selectedRows} />
-        <MynDetails video={this.state.detailVideo} rowID={this.state.detailRowID} settings={this.state.settings} showEditor={() => {this.showOpenablePane("editorPane")}} scrollToVideo={this.scrollToVideo} isRowVisible={this.isRowVisible} />
-        <MynSettings show={this.state.show.settingsPane} view={this.state.settingsView} settings={this.state.settings} videos={this.state.videos} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane('settingsPane')}}/>
-        <MynEditor show={this.state.show.editorPane} video={this.state.detailVideo} batch={this.state.batchVids} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane('editorPane')}}/>
+        <MynNav
+          playlists={this.state.playlists}
+          setPlaylist={this.setPlaylist}
+          search={this.search}
+          showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
+        />
+        <MynLibrary
+          videos={this.state.filteredVideos}
+          collections={this.state.collections}
+          settings={this.state.settings}
+          playlistID={this.state.currentPlaylistID}
+          view={this.state.view}
+          flatDefaultSort={this.state.flatDefaultSort}
+          columns={this.state.columns}
+          displayColumnName={this.displayColumnName}
+          calcAvgRatings={this.calcAvgRatings}
+          showDetails={this.showDetails}
+          playVideo={this.playVideo}
+          handleSelectedRows={this.handleSelectedRows}
+          handleHoveredRow={this.handleHoveredRow}
+          selectedRows={this.state.selectedRows}
+        />
+        <MynDetails
+          video={this.state.detailVideo}
+          rowID={this.state.detailRowID}
+          settings={this.state.settings}
+          showEditor={() => {this.showOpenablePane("editorPane")}}
+          scrollToVideo={this.scrollToVideo}
+          isRowVisible={this.isRowVisible}
+        />
+        <MynSettings
+          show={this.state.show.settingsPane}
+          view={this.state.settingsView}
+          settings={this.state.settings}
+          videos={this.state.videos}
+          playlists={this.state.playlists}
+          collections={this.state.collections}
+          displayColumnName={this.displayColumnName}
+          hideFunction={() => {this.hideOpenablePane('settingsPane')}}
+        />
+        <MynEditor
+          show={this.state.show.editorPane}
+          video={this.state.detailVideo}
+          batch={this.state.batchVids}
+          collections={this.state.collections}
+          settings={this.state.settings}
+          hideFunction={() => {this.hideOpenablePane('editorPane')}}
+        />
+        <MynPlayer
+          show={this.state.show.playerPane}
+          video={this.state.detailVideo}
+          hideFunction={() => {this.hideOpenablePane('playerPane')}}
+        />
       </div>
     );
   }
@@ -1024,6 +1081,7 @@ class MynLibrary extends React.Component {
                     calcAvgRatings={this.props.calcAvgRatings}
                     collectionID={object.id}
                     showDetails={this.props.showDetails}
+                    playVideo={this.props.playVideo}
                     handleSelectedRows={this.props.handleSelectedRows}
                     handleHoveredRow={this.props.handleHoveredRow}
                     selectedRows={this.props.selectedRows}
@@ -1320,6 +1378,7 @@ class MynLibrary extends React.Component {
           displayColumnName={this.props.displayColumnName}
           calcAvgRatings={this.props.calcAvgRatings}
           showDetails={this.props.showDetails}
+          playVideo={this.props.playVideo}
           handleSelectedRows={this.props.handleSelectedRows}
           handleHoveredRow={this.props.handleHoveredRow}
           selectedRows={this.props.selectedRows}
@@ -1349,6 +1408,8 @@ class MynLibTable extends React.Component {
     if (props.view === 'hierarchical' && props.collectionID) {
       this.tableID = 'table-' + props.collectionID;
     }
+
+    this.clickTimer = null;
 
     this.state = {
       sortKey: null,
@@ -1446,12 +1507,36 @@ class MynLibTable extends React.Component {
     // this.props.showDetails(null, e);
   }
 
+  // if there was a single click on the row, select the row;
+  // if there was a double click, play the video
+  rowClick(id, rowID, index, e) {
+    let target = e.target;
+    // clear the click timer; we're no longer setting a timer in this function,
+    // but rowSelect() is using it when unselecting the clicked row
+    // (when it's the only one already selected); because in that case
+    // a double click should not unselect the row;
+    clearTimeout(this.clickTimer);
+
+    // single click, or click with mod keys: normal row selection
+    if (e.detail === 1 || this.state.shiftDown || this.state.ctrlDown) {
+      // this.clickTimer = setTimeout(() => this.rowSelect(id, rowID, index, target), 0);
+      this.rowSelect(id, rowID, index, target)
+
+    // double click with no mod keys: play video and select row
+    } else if (e.detail === 2 && !this.state.shiftDown && !this.state.ctrlDown) {
+      this.rowSelect(id, rowID, index, target, true); // 'true' forces the row to be selected; otherwise, if it was already (the only row) selected, clicking on it would unselect it
+
+      console.log('PLAYING VIDEO!');
+      this.props.playVideo(id);
+    }
+  }
+
   // select one or multiple rows (through the use of modifier keys)
   // when selected, the user can batch edit videos;
   // eventually, we'd like to enable batch drag n' drop as well
-  rowClick(id, rowID, index, e) {
+  rowSelect(id, rowID, index, target, forceSelect) {
     // console.log(`TABLE ${this.tableID} REGISTERED A CLICK`);
-    const row = findNearestOfClass(e.target,'movie-row');
+    const row = findNearestOfClass(target,'movie-row');
 
     // (THERE IS NO LONGER SUCH A THING AS A 'LOCKED' ROW, ONLY A SELECTED ROW (clicked) OR A HOVERED ROW)
     // first remove the 'locked' class from any currently locked row
@@ -1558,13 +1643,22 @@ class MynLibTable extends React.Component {
       // console.log('rowID: ' + rowID);
 
       // if there is only one video selected and this is the one we've clicked on,
-      // we actually want to unselect it
-      if (this.state.batchSelected.length === 1 && this.state.batchSelected[0] === id) {
+      // we actually want to unselect it, UNLESS forceSelect is true
+      if (!forceSelect && this.state.batchSelected.length === 1 && this.state.batchSelected[0] === id) {
         // erase any previous batch selection
-        this.setState({batchSelected:[]},() => this.handleBatch(true));
+        // but put it on a timeout, because if the user double clicked,
+        // the row will be reselected (with forceSelect == true);
+        // so that would work just fine without the timeout,
+        // but it's ugly (and maybe confusing) for the row to get unselected and
+        // then reselected on the second click. This way, it just stays selected
+        // if there's a double click
+        this.clickTimer = setTimeout(() => {
+          this.setState({batchSelected:[]},() => this.handleBatch(true));
+        },150);
 
       } else {
         // if we're here, either multiple rows, a different row, or no row was already selected,
+        // (or this row was selected but forceSelect was true)
         // and neither 'shift' nor 'cmd/ctrl' was being pressed,
         // so we want to erase any previous batch selection,
         // selecting only the row that was clicked on
@@ -2465,6 +2559,153 @@ class MynOpenablePane extends React.Component {
   }
 }
 
+// ###### Player Pane: plays the video ###### //
+class MynPlayer extends MynOpenablePane {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      paneID: 'player-pane',
+      startedMuxing: false,
+      errorMessage: null
+    }
+
+    // callbacks to hand off to Stream.js, for different events ffmpeg sends back
+    this.callbacks = {
+      progress : (outputPath) => {
+        // called periodically throughout the process;
+        // we only want to know that progress has started, so we use a flag
+        if (this.state.startedMuxing == false) {
+          this.state.startedMuxing = true;
+          // once the process has started, it's safe to add the ffmpeg output
+          // to the video element
+          this.createVideo(outputPath);
+        }
+      },
+      error : (err) => {
+        // unset video player height
+        try {
+          this.player.current.setAttribute('height','');
+        } catch(e) {
+          console.log('unable to unset video height after ffmpeg error: ' + e);
+        }
+
+        // display error message to user
+        this.setState({errorMessage:(
+          <div className='error-message'>
+            <div className='header'>Error Loading Video</div>
+            {err.message}
+          </div>
+        )});
+      }
+    }
+
+    this.render = this.render.bind(this);
+    this.player = React.createRef();
+  }
+
+  createVideo(streamPath) {
+    let video;
+    try {
+      video = this.player.current;
+    } catch(err) {
+      console.error(err);
+    }
+    if (!video) {
+      console.log('MynPlayer did not create video');
+      return;
+    }
+
+    // const source = '../video_stream/output.m3u8'
+    const source = `../${streamPath}`;
+
+    if(Hls.isSupported()) {
+      this.hls = new Hls();
+      this.hls.attachMedia(video);
+      this.hls.on(Hls.Events.MANIFEST_PARSED,function() {
+        video.play();
+
+        // this is a little hacky, but we had to set the height manually
+        // in the render function, so that the player would be the right
+        // height for the video before the video loads;
+        // but once the video loads, we don't want the height set, we want
+        // it to adjust naturally based on the width (in case the window resizes, for instance);
+        // so we unset it here, now that the video is loaded
+        setTimeout(() => {
+          video.setAttribute('height','');
+        },500);
+
+      });
+      this.hls.loadSource(source);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.addEventListener('canplay',function() {
+        video.play();
+      });
+      video.src = source;
+    }
+  }
+
+  createFFmpegStream() {
+    this.state.errorMessage = null;
+    // console.log('MynPlayer video: ' + JSON.stringify(this.props.video));
+    const stream = new Stream();
+    stream.createStream(this.props.video.filename,this.props.video.id,this.callbacks);
+  }
+
+  componentDidUpdate(oldProps) {
+    if (!oldProps.show && this.props.show) {
+      this.createFFmpegStream();
+    }
+
+    if (oldProps.show && !this.props.show) {
+      this.state.startedMuxing = false;
+    }
+
+  }
+
+
+  render() {
+    let jsx = null;
+
+    if (this.props.show) {
+      // default size for the video player if no video size is found in the metadata
+      let width = 800;
+      let height = '';
+      // let height = 600;
+
+      // get dimensions from the metadata
+      if (this.props.video.metadata) {
+        let probedWidth = this.props.video.metadata.width;
+        let probedHeight = this.props.video.metadata.height;
+        console.log(`width: ${probedWidth}, height: ${probedHeight}`);
+        if (!isNaN(probedWidth) && probedWidth > 0) {
+          width = probedWidth;
+          // style.width = Math.min(probedWidth,window.innerWidth) + 'px';
+          if (!isNaN(probedHeight) && probedHeight > 0) {
+            // style.height = Math.min(probedHeight,window.innerHeight) + 'px';
+            try {
+              height = parseFloat(this.player.current.offsetWidth) * probedHeight / probedWidth;
+            } catch(err) {}
+          } else {
+            // if we got a valid width but not a height, let the height be automatic
+            height='';
+          }
+        }
+      }
+
+      jsx = (
+        <div id="video-container" style={{width:width + 'px'}}>
+          <video controls id="video-player" ref={this.player} width={width} height={height}>
+          </video>
+          {this.state.errorMessage}
+        </div>
+      );
+    }
+
+    return super.render({jsx:jsx});
+  }
+}
+
 // ###### Settings Pane: allows user to edit settings. Only appears when user clicks to open it ###### //
 class MynSettings extends MynOpenablePane {
   constructor(props) {
@@ -2625,10 +2866,6 @@ class MynSettings extends MynOpenablePane {
     return super.render({jsx:this.createContentJSX()});
   }
 }
-
-// <li onClick={() => this.setView("folders")}>Folders</li>
-// <li onClick={() => this.setView("themes")}>Themes</li>
-
 
 class MynSettingsFolders extends React.Component {
   constructor(props) {

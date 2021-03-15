@@ -31,26 +31,40 @@ class Stream {
     // console.log(JSON.stringify(this.hls));
   }
 
-  createStream() {
+  createStream(source,video_id,callbacks) {
+    const outputPath = `video_stream/${video_id}.m3u8`;
+
     // Below is FFMPEG converting MP4 to HLS with reasonable options.
     // https://www.ffmpeg.org/ffmpeg-formats.html#hls-2
-    this.command = ffmpeg('/Users/torgo/Documents/Coding/Mynda/sandbox/Mynda\ Example\ Watchfolders/Movies/Don Manuel Fight first half.MOV', { timeout: 240 }).addOptions([
+    this.command = ffmpeg(source, { timeout: 240 }).addOptions([
         '-profile:v baseline',    // baseline profile (level 3.0) for H264 video codec
         '-level 3.0',
-        '-s 1280x720',             // 640px width, 360px height output video dimensions
+        // '-s 1280x720',            // 640px width, 360px height output video dimensions
         '-start_number 0',        // start the first .ts segment at index 0
-        '-hls_time 4',           // segment target duration in seconds - the actual length is constrained by key frames
+        '-hls_time 4',            // segment target duration in seconds - the actual length is constrained by key frames
         '-g 48',
         '-keyint_min 48',         // create key frame (I-frame) every 48 frames (~2 seconds) - will later affect correct slicing of segments and alignment of renditions
         '-hls_list_size 0',       // Maxmimum number of playlist entries (0 means all entries/infinite)
         // '-hls_playlist_type vod',  // adds the #EXT-X-PLAYLIST-TYPE:VOD tag and keeps all segments in the playlist
         '-f hls'                  // HLS format
-      ]).output('video_stream/output.m3u8').on('error', (err) => {
+      ]).output(outputPath)
+      .on('codecData', (data) => {
+        console.log(data);
+      }).on('progress', () => {
+        if (callbacks && _.isFunction(callbacks.progress)) {
+          console.log('progress callback');
+          callbacks.progress(outputPath);
+        }
+      }).on('error', (err) => {
         if (err) {
           console.log("ffmpeg had an error! Oh no!");
           console.error(err);
+          console.log({err});
         }
-        // callback
+        if (callbacks && _.isFunction(callbacks.error)) {
+          console.log('error callback');
+          callbacks.error(err);
+        }
       }).on('end', () => {
         // callback
         console.log("ENDED");

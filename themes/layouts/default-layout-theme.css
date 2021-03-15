@@ -63,6 +63,43 @@
   box-sizing: border-box;
 }
 
+/* the player pane doesn't need react-beautiful-dnd (so we can use transforms to center it),
+   and it doesn't need any min or max height,
+   as the height should be dictated by the aspect ratio of the video,
+   along with the width */
+.openable-pane#player-pane {
+  /* picking 480px arbitrarily as the smallest we want any video to appear (at least until the browser window gets smaller than that) */
+  --playerpane-minwidth: 480px;
+
+  width: auto;
+  height: auto;
+  min-width: var(--playerpane-minwidth);
+  max-width: 100%;
+  min-height: 0;
+  max-height: 100%;
+
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+}
+#video-player {
+  min-width: var(--playerpane-minwidth);
+  max-width: 100%;
+  /* max-height: 100%; */
+}
+#video-container {
+  max-width:100%;
+  min-width: var(--playerpane-minwidth);
+}
+@media (max-width: 480px) { /* 480px == var(--playerpane-minwidth) */
+  .openable-pane#player-pane,
+  #video-container,
+  #video-player {
+    min-width: 0;
+    width:100% !important;
+  }
+}
+
 @media (min-width: 1524px) { /* 1524px = --openablepane-maxwidth (40em) / --openablepane-width-factor (.7) */
   .openable-pane {
     left: calc(50% - (var(--openablepane-maxwidth)/2));
@@ -77,8 +114,11 @@
   .openable-pane {
     left: 0;
   }
+  .openable-pane#player-pane {
+    /* left: 0;
+    transform: translateX(0%) translateY(-50%); */
+  }
 }
-
 
 /* so that everything appears above the ::before element which obscures the background */
 .openable-pane * {
@@ -107,9 +147,10 @@
   /* left: calc(1 / var(--openablepane-width-factor) * var(--openablepane-left) * -1); */
   /* top: calc(1 / var(--openablepane-height-factor) * var(--openablepane-top) * -1); */
   left: -100vw;
-  top: calc(var(--openablepane-top) * -1);
+  top: -100vh;
+  /* top: calc(var(--openablepane-top) * -1); */
   width: 200vw;
-  height: 200vh;
+  height: 300vh;
 }
 
 #settings-tabs {

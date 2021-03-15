@@ -901,6 +901,42 @@ th, tr, td {
   background-color: var(--openable-closebtn-bg-color-hover);
 }
 
+/*************************************/
+/*########### PLAYER PANE ###########*/
+/*************************************/
+#player-pane {
+  background-color: rgba(0,0,0,0);
+}
+
+#video-container {
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+  overflow:hidden;
+}
+
+#video-player {
+  margin: 0;
+  padding: 0;
+}
+
+#player-pane .error-message {
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform: translateX(-50%) translateY(-50%);
+
+  font-size: max(.5rem,2vw);
+  line-height:1em;
+  text-align:center;
+}
+#player-pane .error-message .header {
+  font-family: var(--alt-font);
+  font-size: 2em;
+  text-shadow: .2em .2em .1em black;
+  line-height:1em;
+}
+
 
 /*************************************/
 /*########## SETTINGS PANE ##########*/
