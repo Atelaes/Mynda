@@ -2572,9 +2572,8 @@ class MynPlayer extends MynOpenablePane {
       tries: 0
     }
 
-    this.loadingIndicator = (
-      <img className='loading' src='../images/loading-icon.gif' />
-    );
+    this.loadingIndicator = null;
+
 
     // callbacks to hand off to Stream.js, for different events ffmpeg sends back
     this.callbacks = {
@@ -2611,6 +2610,22 @@ class MynPlayer extends MynOpenablePane {
 
     this.render = this.render.bind(this);
     this.player = React.createRef();
+  }
+
+  showLoadingIndicator() {
+    console.log('Setting timeout for loading indicator...');
+    this.loadingIndicatorTimeout = setTimeout(() => {
+      console.log('Actually showing loading indicator!');
+      this.state.loadingIndicator = (
+        <img className='loading' src='../images/loading-icon.gif' />
+      );
+    },500);
+  }
+
+  hideLoadingIndicator() {
+    console.log('Canceling timeout for/hiding loading indicator');
+    clearTimeout(this.loadingIndicatorTimeout);
+    this.state.loadingIndicator = null;
   }
 
   checkForStreamPlaylist(playlist) {
@@ -2671,7 +2686,8 @@ class MynPlayer extends MynOpenablePane {
     if(Hls.isSupported()) {
       this.hls = new Hls();
       this.hls.attachMedia(video);
-      this.hls.on(Hls.Events.MANIFEST_PARSED,function() {
+      this.hls.on(Hls.Events.MANIFEST_PARSED,() => {
+        video.currentTime = 0;
         video.play();
 
         // this is a little hacky, but we had to set the height manually
@@ -2687,10 +2703,11 @@ class MynPlayer extends MynOpenablePane {
       });
       this.hls.loadSource(source);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.addEventListener('canplay',function() {
-        video.play();
-      });
-      video.src = source;
+      console.log('the other option...');
+      // video.addEventListener('canplay',function() {
+      //   video.play();
+      // });
+      // video.src = source;
     } else {
 
     }
@@ -2699,18 +2716,57 @@ class MynPlayer extends MynOpenablePane {
   createFFmpegStream() {
     this.state.errorMessage = null;
     // console.log('MynPlayer video: ' + JSON.stringify(this.props.video));
-    const stream = new Stream();
-    stream.createStream(this.props.video.filename,this.props.video.id,this.callbacks);
+    this.stream = new Stream();
+    this.stream.createStream(this.props.video.filename,this.props.video.id,this.callbacks);
+  }
+
+  setUpVideo() {
+    let promise;
+    if (this.player.current) {
+      this.player.current.src = this.props.video.filename;
+      this.player.current.focus(); // so that the key commands will work
+      promise = this.player.current.play();
+    } else {
+      console.error('Could not play video at all; could not find video element');
+    }
+
+    if (typeof promise !== "undefined") {
+      promise.then(() => {
+        console.log('Browser can play video natively!');
+        this.setState({showLoadingIndicator:false});
+      }).catch((err) => {
+        console.error(`Browser could not play video natively, using HLS fallback: ${err}`);
+        this.createFFmpegStream();
+      });
+    } else {
+      console.error('Video player promise was undefined');
+    }
+
+  }
+
+  // key commands for the video player;
+  // spacebar already works natively,
+  // as does escape to exit fullscreen;
+  keyCommand(e) {
+    let isFullscreen = document.fullscreenElement !== null;
+
+    // ESC
+    if (e.keyCode === 27 && !isFullscreen) {
+      // while not in fullscreen, use escape to close the video;
+      // don't do anything while in fullscreen, because escape already exits fullscreen natively
+      this.props.hideFunction();
+    }
   }
 
   componentDidUpdate(oldProps) {
     if (!oldProps.show && this.props.show) {
-      this.createFFmpegStream();
       this.setState({showLoadingIndicator:true});
+      this.setUpVideo();
     }
 
     if (!this.props.show) {
-      // this.state.startedMuxing = false;
+      this.state.errorMessage = null;
+      this.state.showLoadingIndicator = false;
     }
 
   }
@@ -2720,6 +2776,15 @@ class MynPlayer extends MynOpenablePane {
     let jsx = null;
 
     if (this.props.show) {
+      // we decide whether to show the loading indicator
+      // using functions instead of just doing it directly in the JSX
+      // because we want to use a brief timeout before actually displaying it
+      if (this.state.showLoadingIndicator) {
+        this.showLoadingIndicator();
+      } else {
+        this.hideLoadingIndicator();
+      }
+
       // default size for the video player if no video size is found in the metadata
       let width = 800;
       let height = '';
@@ -2746,10 +2811,10 @@ class MynPlayer extends MynOpenablePane {
       }
 
       jsx = (
-        <div id="video-container" style={{width:width + 'px'}}>
+        <div id="video-container" style={{width:width + 'px'}} onKeyUp={(e) => this.keyCommand(e)}>
           <video controls id="video-player" ref={this.player} width={width} height={height}>
           </video>
-          {this.state.showLoadingIndicator ? this.loadingIndicator : null}
+          {this.state.loadingIndicator}
           {this.state.errorMessage}
         </div>
       );
