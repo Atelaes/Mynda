@@ -2747,7 +2747,7 @@ class MynPlayer extends MynOpenablePane {
   // key commands for the video player;
   // spacebar already works natively,
   // as does escape to exit fullscreen;
-  keyCommand(e) {
+  keyCommand(e) {    
     let isFullscreen = document.fullscreenElement !== null;
 
     // ESC

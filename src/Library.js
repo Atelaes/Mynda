@@ -47,7 +47,7 @@ class Library {
   //address: the location of the operation
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
-  alter({opType=null, address=null, entry=null, sync=false, origin=null} = {}) {
+  alter({opType=null, address=null, entry=null, sync=false, origin=null, cb=()=>{}} = {}) {
     console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     try {
       //Start with some basic validation
@@ -121,6 +121,9 @@ class Library {
 
         //If this was a local operation, request other library mirror it
         this.sync({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
+
+        // execute callback;
+        cb();
       }
 
       // let React know that we've done a save, so that it can perform whatever re-rendering it needs to
@@ -135,19 +138,19 @@ class Library {
   }
 
   // Takes a string address in dot format, and adds "addition" to that location.
-  add(address, addition) {
+  add(address, addition, cb) {
     console.log('adding...')
-    this.addToQueue({opType: 'add', address: address, entry: addition, sync: false, origin: null});
+    this.addToQueue({opType: 'add', address: address, entry: addition, sync: false, origin: null, cb:cb});
   }
 
   // Takes a string address in dot format, and replaces whatever is there with "replacement".
-  replace(address, replacement) {
-    this.addToQueue({opType: 'replace', address: address, entry: replacement, sync: false, origin: null});
+  replace(address, replacement, cb) {
+    this.addToQueue({opType: 'replace', address: address, entry: replacement, sync: false, origin: null, cb:cb});
   }
 
   // Takes a string address in dot format, and removes whatever is there.
-  remove(address) {
-    this.addToQueue({opType: 'remove', address: address, entry: null, sync: false, origin: null});
+  remove(address, cb) {
+    this.addToQueue({opType: 'remove', address: address, entry: null, sync: false, origin: null, cb:cb});
   }
 
   addToQueue(argObj) {
