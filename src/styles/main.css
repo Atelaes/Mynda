@@ -307,6 +307,17 @@ img.ratings-icon {
   margin: var(--navcontrolschildren-margin);
 }
 
+#nav-message {
+  display:inline-block;
+  /* position:absolute;
+  top:0;
+  left:0; */
+  margin-left:.2rem;
+  font-size:.8rem;
+  /* line-height:.8rem; */
+  color:red;
+}
+
 /* search input container */
 #search-field {
   height: var(--searchfield-height);

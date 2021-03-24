@@ -3,19 +3,22 @@ const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const {v4: uuidv4} = require('uuid');
+const {v4: uuidv4, v5: uuidv5} = require('uuid');
+const crypto = require('crypto');
 const Library = require("./Library.js");
 const dl = require('./download');
 const _ = require('lodash');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
 
+let win;
 let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 let libFileTree = {name:'root', folders:[]}; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
+let numNewVids = 0; // the number of new videos found whenever we check the watchfolders
 
 app.whenReady().then(start);
 
@@ -53,7 +56,7 @@ function eraseTempImages() {
 }
 
 function createWindow() {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1440,
     height: 900,
     webPreferences: {
@@ -67,11 +70,34 @@ function createWindow() {
 }
 
 function checkWatchFolders() {
-  // setTimeout(() => {
-  //   console.log(JSON.stringify(libFileTree));
-  // },20000);
+  // first, search library for videos whose files are gone (whether moved, renamed, or deleted)
+  // if any are missing, move the video object from library.media to library.inactive_media,
+  // where it can be recovered if the file is added back or rediscovered (in the case that it was moved or renamed)
+  console.log('-- Checking for deleted/renamed/moved files...');
+  let numRemovedVids = 0;
+  library.media.map((video, index) => {
+    if (!fs.existsSync(video.filename)) {
+      console.log(`${video.filename} no longer exists...`);
+      numRemovedVids++;
+      removeVideo(video, index);
+    } else {
+      // console.log(`${video.filename} still exists!`);
 
+      // erase any duplicate entries of this video that may be in library.inactive_media
+      // there shouldn't ever be any, but you never know...
+      library.inactive_media.map((i_video, i_index) => {
+        if (i_video.id === video.id) {
+          console.log(`Found duplicate entry of ${video.filename} in library.inactive_media under the filename ${i_video.filename}`);
+          deleteFromInactive(i_video,i_index);
+        }
+      });
+    }
+  });
+  console.log(`Done checking for removed files (${numRemovedVids} found).`);
 
+  // next, search watchfolders for new files and add any new videos to the library
+  console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
+  numNewVids = 0; // reset the number of new videos found
   let folders = library.settings.watchfolders;
   for (let i=0; i<folders.length; i++) {
     let thisFolder = folders[i];
@@ -86,7 +112,6 @@ function checkWatchFolders() {
     }
     findVideosFromFolder(thisNode);
   }
-
 }
 
 // recursively maps out the folder structure and files (only videos/DVDs and subtitle files)
@@ -126,7 +151,7 @@ function findVideosFromFolder(folderNode) {
       if (component.isDirectory()) {
         if (isDVDRip(compAddress)) {
           // if it is, add it as a video
-          console.log(`${compAddress} is a DVD rip`);
+          // console.log(`${compAddress} is a DVD rip`);
           folderNode.videos.push({dvd:compAddress}); // add the DVD to libFileTree
         } else {
           // if it's not, recurse on it as a folder
@@ -140,20 +165,16 @@ function findVideosFromFolder(folderNode) {
 
         if (videoExtensions.includes(fileExt)) {
           // if it's a video file, add it as a video
-          console.log(`${compAddress} is a regular video file`);
+          // console.log(`${compAddress} is a regular video file`);
           folderNode.videos.push(compAddress); // add the video to this node of the libFileTree
-          // addVideoFile(folderNode, rootWatchFolder, kind, compAddress, false);
         } else if (subtitleExtensions.includes(fileExt)) {
           // if it's a subtitle file, add it as a subtitle
-          console.log(`${compAddress} is a subtitle file`);
+          // console.log(`${compAddress} is a subtitle file`);
           folderNode.subtitles.push(compAddress); // add the subtitles file to this node of the libFileTree
         }
       }
     }
 
-    // folderNode.videos.map(video => {
-    //   addVideoFile(folderNode, rootWatchFolder, kind, video, false);
-    // });
     parsing[id] = false;
     let stillGoing = false;
     for (let call of Object.keys(parsing)) {
@@ -166,8 +187,49 @@ function findVideosFromFolder(folderNode) {
   });
 }
 
-function removeVideosFromLibrary(path) {
-  console.log('REMOVING videos from library in ' + path);
+function removeWatchfolderVideosFromLibrary(folder) {
+  console.log('REMOVING videos from library in ' + folder);
+}
+
+function removeVideo(video, index, fromInactive) {
+  let address;
+  if (fromInactive) {
+    console.log(`Deleting ${video.filename} from library.inactive_media`);
+    address = 'inactive_media';
+  } else {
+    console.log(`Removing ${video.filename} from library.media and adding to library.inactive_media`);
+    address = 'media';
+  }
+
+  // if we weren't given an index, find it
+  if (typeof index === "undefined") {
+    index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
+  }
+
+  // remove from library.media
+  library.remove(`${address}.${index}`, (err) => {
+    if (err) {
+      console.log(`Error removing ${video.title} (${video.filename}); given bad index (index === ${index}) or could not find video in library.${address}:\n${err}`);
+      return;
+    }
+
+    if (!fromInactive) {
+      // remove video id from its watchfolder's list of video ids
+      library.settings.watchfolders.map((wf, i) => {
+        if (new RegExp('^' + wf.path).test(video.filename)) {
+          console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
+          wf.videos = wf.videos.filter(id => id !== video.id);
+          library.replace(`settings.watchfolders.${i}`, library.settings.watchfolders[i]);
+        }
+      });
+
+      // add the video to library.inactive_media
+      library.add('inactive_media.push',video);
+    }
+  });
+}
+function deleteFromInactive(video, index) {
+  return removeVideo(video, index, true);
 }
 
 //Takes a complete file address of a directory.
@@ -231,27 +293,10 @@ let videoTemplate =   {
     }
   }
 
-//Takes a full directory address and adds it to library
-// function addDVDRip(rootWatchFolder, folder, kind) {
-//   if (isAlreadyInLibrary(folder)) {
-//     return;
-//   } else {
-//     let vidObj = _.cloneDeep(videoTemplate);
-//     vidObj.filename = folder;
-//     vidObj.title = path.basename(folder);
-//     vidObj.kind = kind;
-//     vidObj.id = uuidv4();
-//     vidObj.dateadded = Math.floor(Date.now() / 1000);
-//     library.add('media.push', vidObj);
-//
-//     console.log('Added DVD rip: ' + vidObj.title);
-//   }
-// }
-
 function addVideosToLibrary() {
   clearTimeout(addVideoTimeout);
   addVideoTimeout = setTimeout(() => {
-    console.log("PARSING IS DONE: ADDING VIDEOS TO LIBRARY!!");
+    console.log("Parsing done, checking parsed tree for new videos/subtitles...");
 
     // walk through libFileTree, adding all the videos to the library
     // (and making our best guess as to which subtitles go with which videos)
@@ -269,7 +314,8 @@ function addVideosFromFolder(folderNode, rootFolder) {
   }
   if (folderNode.videos && folderNode.videos.length > 0) {
     for (let video of folderNode.videos) {
-      addVideoFile(folderNode, video, rootFolder);
+
+      addVideoFile(folderNode, video, rootFolder).catch((err) => {console.log(err)});
     }
   }
 }
@@ -283,16 +329,18 @@ function addVideosFromFolder(folderNode, rootFolder) {
 //    kind : the media kind (e.g. movie, show) determined by the watch folder default
 //    isDVD : boolean, is this video a DVD (as opposed to a video file, such as an .mp4)
 //    numSisters : for files (not DVD folders), how many other videos are in this same folder (helpful for determining which subtitles may belong to this video)
-function addVideoFile(folderNode, file, rootWatchFolder) {
+async function addVideoFile(folderNode, file, rootWatchFolder) {
   let isDVD;
   if (file.dvd) {
     isDVD = true;
     file = file.dvd;
   }
   let fileBasename = path.basename(file,path.extname(file));
-  console.log(`Adding ${path.basename(file)}${isDVD ? ' (DVD)':''}`);
 
-  // first check for subtitles
+  // first create the id for this file, then everything else happens in the callback from that
+  let id = await createVideoID(file);
+
+  // then check for subtitles
   let allSubs = getSubs(folderNode); // get all subtitles from this clade
   let subtitles = [];
   if (folderNode.videos.length === 1) {
@@ -310,72 +358,127 @@ function addVideoFile(folderNode, file, rootWatchFolder) {
     }
   }
 
+  //########### VIDEO IS ALREADY IN LIBRARY ###########//
+
   // if the video is already in the library, update the subtitles
   // and update the video in the library and then we're done
-  let vidIndex = indexOfVideoInLibrary(file);
+  let vidIndex = indexOfVideoInLibrary(id);
   if (vidIndex !== null) {
     let video = library.media[vidIndex];
     if (!_.isEqual(video.subtitles,subtitles)) {
-      video.subtitles = subtitles;
+      console.log(`Subtitle files have changed for ${fileBasename}. Updating subtitles.`);
+      // eventually here, we need to be more sophisticated. We don't want to
+      // remove any subtitles the user has manually added from other locations,
+      // but we do want to remove any subtitles from the searched folders that
+      // no longer exist (as well as adding any new ones);
+      // for the moment, all this does is add new ones
+
+      // add any new subtitles, removing duplicates
+      video.subtitles = [...new Set([...video.subtitles, ...subtitles])];
       library.replace(`media.${vidIndex}`,video);
     }
+    return;
+  }
+
+  //########### VIDEO IS ** NOT ** ALREADY IN LIBRARY ###########//
+
+  let vidObj;
+
+  // check if the video already has an object in library.inactive_media
+  // (this would be the case if it was previously in the library, but was moved/deleted/renamed)
+  let inactiveVidIndex = indexOfVideoInInactiveMedia(id);
+  if (inactiveVidIndex !== null) {
+    // ------------- VIDEO IS IN LIBRARY.INACTIVE_MEDIA ------------- //
+
+    // remove the video object from inactive media (it will be added to active media below)
+    console.log(`There is a video object for ${fileBasename} in library.inactive_media. Moving to library.media...`);
+
+    try {
+      vidObj = _.cloneDeep(library.inactive_media[inactiveVidIndex]);
+      vidObj.filename = file; // this is important because the file may have been renamed
+
+      library.remove(`inactive_media.${inactiveVidIndex}`,(err) => {
+        if (err) {
+          throw err;
+          console.log(err);
+        }
+      });
+
+    } catch(err) {
+      console.log(`Error: found video object for ${fileBasename} in library.inactive_media but could not remove: ${err}`);
+      return;
+    }
+
+
   } else {
+    // ------------- VIDEO IS BRAND NEW ------------- //
+
     // otherwise, add the video from scratch
-    let vidObj = _.cloneDeep(videoTemplate);
+    console.log(`Found new video: ${path.basename(file)}${isDVD ? ' (DVD)':''} -- Adding to library`);
+
+    // start creating the video object
+    vidObj = _.cloneDeep(videoTemplate);
     vidObj.filename = file;
     // let fileExt = path.extname(file);
     // vidObj.title = isDVD ? path.basename(file) : path.basename(file, fileExt);
     vidObj.title = fileBasename;
     vidObj.kind = folderNode.kind;
-    vidObj.id = uuidv4();
-    vidObj.subtitles = subtitles;
-    vidObj.dateadded = Math.floor(Date.now() / 1000); // this will be overwritten by the date of the file's creation, if the OS gives it to us
+    vidObj.id = id;
+    try {
+      // get the date the file was added, from the OS
+      vidObj.dateadded = await getFileBirthtime(file);
+    } catch(err) {
+      // if we couldn't get the file creation/added date from the OS, just use now
+      vidObj.dateadded = Math.floor(Date.now() / 1000);
+      console.log(err);
+    }
 
-    // get the date the file was added, from the OS
-    fs.stat(file,(err, stats) => {
-      if (err) {
-        console.log(`Error. Could not retrieve file stats for ${file} : ${err}`);
-      } else {
-        console.log(`GOT STATS FOR ${file}`);
-        console.log(JSON.stringify(stats));
+    // get video data from the file itself (duration, codec, dimensions, whatever)
+    try {
+      // vidObj.metadata = await getVideoMetadata(file);
+      let data = await ffprobe(file, { path: ffprobeStatic.path });
 
+      console.log(data);
+
+      for (const stream of data.streams) {
         try {
-          vidObj.dateadded = Math.floor(stats.birthtimeMs / 1000);
-        } catch(e) {
-          console.log(`Unable to add dateadded to file: ${e}`);
+          if (stream.codec_type === 'video') {
+            vidObj.metadata.codec = stream.codec_name;
+            vidObj.metadata.duration = Number(stream.duration);
+            vidObj.metadata.width = stream.width;
+            vidObj.metadata.height = stream.height;
+            vidObj.metadata.aspect_ratio = stream.display_aspect_ratio;
+            let f = stream.avg_frame_rate.split('/');
+            vidObj.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
+          }
+          if (stream.codec_type === 'audio') {
+            vidObj.metadata.audio_codec = stream.codec_name;
+            vidObj.metadata.audio_layout = stream.channel_layout;
+            vidObj.metadata.audio_channels = stream.channels;
+          }
+        } catch(err) {
+          console.log(`Error storing metadata for ${file}: ${err}`);
         }
       }
 
-      // get video data from the file itself (duration, codec, dimensions, whatever)
-      ffprobe(file, { path: ffprobeStatic.path }).then(data => {
-        console.log(data);
-        for (const stream of data.streams) {
-          try {
-            if (stream.codec_type === 'video') {
-              vidObj.metadata.codec = stream.codec_name;
-              vidObj.metadata.duration = Number(stream.duration);
-              vidObj.metadata.width = stream.width;
-              vidObj.metadata.height = stream.height;
-              vidObj.metadata.aspect_ratio = stream.display_aspect_ratio;
-              let f = stream.avg_frame_rate.split('/');
-              vidObj.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
-            }
-            if (stream.codec_type === 'audio') {
-              vidObj.metadata.audio_codec = stream.codec_name;
-              vidObj.metadata.audio_layout = stream.channel_layout;
-              vidObj.metadata.audio_channels = stream.channels;
-            }
-          } catch(err) {
-            console.log(`Error storing metadata for ${file}: ${err}`);
-          }
-        }
+    } catch(err) {
+      console.log(`Unable to retrieve metadata for ${file}: ${err}`);
+    }
+  }
 
-      }).catch(err => {
-        console.log(`Error retrieving video metadata from ${file} : ${err}`);
-      }).finally(() => {
-        // add video to library, and add its ID to its watchfolder
-        console.log('Adding Movie: ' + JSON.stringify(vidObj));
-        library.add('media.push', vidObj);
+  //########### ADD VIDEO TO (ACTIVE) LIBRARY ###########//
+  //#### BOTH FOR NEW VIDEOS AND FOR INACTIVE VIDEOS ####//
+
+  if (typeof vidObj === 'object' && vidObj !== null) {
+    vidObj.subtitles = subtitles; // add subtitles
+
+    // add video to library, and add its ID to its watchfolder
+    console.log('Adding Movie: ' + JSON.stringify(vidObj));
+    library.add('media.push', vidObj, (err) => {
+      if (err) {
+        console.log(err);
+      } else {
+        // remove video's id from its watchfolder's manifest
         library.settings.watchfolders.map((folder,index) => {
           if (folder.path === rootWatchFolder) {
             folder.videos.push(vidObj.id);
@@ -383,9 +486,46 @@ function addVideoFile(folderNode, file, rootWatchFolder) {
             library.replace('settings.watchfolders.' + index, library.settings.watchfolders[index]);
           }
         });
-      });
+
+        // count the new video and tell the browser how many have been added so far
+        numNewVids++;
+        win.webContents.send('videos_added',numNewVids);
+      }
     });
   }
+}
+
+// create a uuid based on a hash of the video file; this will be the video's id in the library
+function createVideoID(filepath) {
+  return new Promise((resolve,reject) => {
+    fs.lstat(filepath, (err, stats) => {
+      if (err) {
+        reject(`Error when trying to create id for ${filepath}, could not read path to determine if it was a directory or a file. Not adding video.\n${err}`);
+      }
+
+      // if filepath is not a folder
+      if(!stats.isDirectory()) {
+        fs.createReadStream(filepath).
+          pipe(crypto.createHash('sha1').setEncoding('hex')).
+          on('finish', function () {
+            filehash = this.read();
+            console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
+            const id = uuidv5(filehash, library.id);
+            console.log(`UUID of the hash is ${id}`);
+
+            resolve(id);
+            // callback(id);
+          }).
+          on('error', (err) => {
+            reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
+          })
+      } else {
+        // filepath is a folder (which happens when it's a DVD rip);
+        // eventually we need to somehow hash the directory here
+        reject(`${filepath} is a directory, cannot create hash; not adding video`);
+      }
+    });
+  });
 }
 
 function getSubs(folderNode) {
@@ -405,15 +545,44 @@ function getSubs(folderNode) {
 
 //Takes a full address for a file/folder and checks to see if
 //we already have it in the library. Returns index in library
-function indexOfVideoInLibrary(address) {
-  let allMedia = library.media;
-  for (let i=0; i<allMedia.length; i++) {
-    let currentMedia = allMedia[i];
-    if (currentMedia.filename === address) {
+// if checkInactive is true, return the index from library.inactive_media
+// instead of from library.media
+function indexOfVideoInLibrary(id, checkInactive) {
+  let media = checkInactive ? library.inactive_media : library.media;
+  for (let i=0; i<media.length; i++) {
+    // if (media[i].filename === filepath) {
+    if (media[i].id === id) {
       return i;
     }
   }
   return null;
+}
+function indexOfVideoInInactiveMedia(id) {
+  return indexOfVideoInLibrary(id,true);
+}
+
+function getFileBirthtime(file) {
+  return new Promise((resolve, reject) => {
+    fs.stat(file,(err, stats) => {
+      if (err) {
+        reject(`Error. Could not retrieve file stats for ${file} : ${err}`);
+      } else {
+        console.log(`GOT STATS FOR ${file}`);
+        console.log(JSON.stringify(stats));
+
+        let dateadded;
+        try {
+          dateadded = Math.floor(stats.birthtimeMs / 1000);
+        } catch(e) {
+          reject(`Unable to add dateadded to file: ${e}`);
+        }
+
+        if (typeof dateadded !== "undefined") {
+          resolve(dateadded);
+        }
+      }
+    });
+  });
 }
 
 ipcMain.on('settings-watchfolder-select', (event) => {
@@ -433,8 +602,11 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
     // if path exists and is a folder
     if(!err && stats.isDirectory()) {
       // add to library
-      library.add('settings.watchfolders.push', {"path" : path, "kind" : kind, "videos" : []}, () => {
+      let folderObject = {"path" : path, "kind" : kind, "videos" : []};
+      library.add('settings.watchfolders.push', folderObject, () => {
         checkWatchFolders();
+        // tell the client side what happened
+        // event.sender.send('settings-watchfolder-added', _.cloneDeep(folderObject), numNewVids);
       });
       // findVideosFromFolder(path, path, kind);
     } else {
@@ -446,6 +618,7 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
       });
     }
   });
+
 })
 
 ipcMain.on('settings-watchfolder-remove', (event, path) => {
@@ -456,7 +629,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
     buttons : ['Cancel','Remove Folder'],
     message : 'Are you sure you want to remove following folder from the library?\n\n' +
               path + '\n\n' +
-              'This will remove all videos in this folder from the library (but will save the metadata in case you decide to add the folder again)'
+              'This will remove all videos in this folder from the library (but will save the video information in case you decide to add the folder again)'
   };
   dialog.showMessageBox(options).then(result => {
     let removed = false;
@@ -471,7 +644,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
           }
         });
         library.remove(`settings.watchfolders.${index}`);
-        removeVideosFromLibrary(path);
+        removeWatchfolderVideosFromLibrary(path);
         removed = true;
       } catch(err) {
         console.log(err);

@@ -2,6 +2,7 @@
 const electron = require('electron');
 const path = require('path');
 const fs = require('fs');
+const {v4: uuidv4} = require('uuid');
 const _ = require('lodash');
 const { ipcRenderer } = require('electron');
 
@@ -35,7 +36,8 @@ class Library {
     this.path = path.join(this.dataPath, "Library", "library.json");
 
     const data = this.load();
-    ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
+    Object.keys(data).map((key) => {this[key] = data[key]});
+    // ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
 
     this.Queue = [];
     this.waitConfirm = null;
@@ -47,7 +49,7 @@ class Library {
   //address: the location of the operation
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
-  alter({opType=null, address=null, entry=null, sync=false, origin=null, cb=()=>{}} = {}) {
+  alter({opType=null, address=null, entry=null, sync=false, origin=null, cb=(err)=>{if (err) console.log(err)}} = {}) {
     console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     try {
       //Start with some basic validation
@@ -131,7 +133,7 @@ class Library {
         savedPing.saved(address);
       }
     } catch(e) {
-      console.log(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
+      cb(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
 
 
@@ -226,7 +228,7 @@ class Library {
   save() {
     try {
       let saveObj = {};
-      ['settings', 'playlists', 'collections', 'media'].map((key) => {saveObj[key] = this[key]});
+      Object.keys(defaultLibrary).map((key) => {saveObj[key] = this[key]});
       fs.writeFileSync(this.path, JSON.stringify(saveObj));
     } catch(e) {
       console.log("Error writing to file: " + e.toString());
@@ -241,7 +243,7 @@ class Library {
       return JSON.parse(fs.readFileSync(this.path));
     } catch(error) {
       // if there was some kind of error, return the passed in defaults instead.
-      console.log("No file found, creating default file");
+      console.log("No library found, creating default empty library");
       try {
         let libDir = path.join(this.dataPath, "Library");
         let artDir = path.join(libDir, "Artwork");
@@ -260,7 +262,8 @@ class Library {
   }
 }
 
-let defaultLibrary = {
+const defaultLibrary = {
+  "id" : uuidv4(),
   "settings" : {
     "watchfolders" : [],
     "themes" : {

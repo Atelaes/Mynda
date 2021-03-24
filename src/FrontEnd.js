@@ -725,6 +725,15 @@ class MynNav extends React.Component {
   constructor(props) {
     super(props)
 
+    this.state = {
+      numVidsAdded:0
+    }
+
+    // sent by index.js when a video is added to the library;
+    ipcRenderer.on('videos_added', (event, numVidsAdded) => {
+      this.setState({numVidsAdded:numVidsAdded});
+    });
+
     this.render = this.render.bind(this);
   }
 
@@ -735,9 +744,12 @@ class MynNav extends React.Component {
   }
 
   render() {
-    return (<div id="nav-pane" className="pane">
+    return (
+      <div id="nav-pane" className="pane">
         <ul id="nav-playlists">
           {this.props.playlists.map((playlist, index) => {
+            let newVidAlert = null;
+
             // this bit is to NOT display the 'new' playlist
             // unless there is at least one new video
             if (playlist.id === 'new') {
@@ -749,11 +761,28 @@ class MynNav extends React.Component {
                 }
               }
               if (!anyNew) return;
+
+              if (this.state.numVidsAdded > 0) {
+                newVidAlert = (
+                  <div id='nav-message'>({this.state.numVidsAdded})</div>
+                );
+              }
             }
 
             // if playlist is selected to be displayed in as a tab in the navbar
             if (playlist.tab) {
-              return (<li key={playlist.id} id={"playlist-" + playlist.id} style={{zIndex: 100 - index}} className={playlist.view} onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}>{playlist.name}</li>);
+              return (
+                <li
+                  key={playlist.id}
+                  id={"playlist-" + playlist.id}
+                  style={{zIndex: 100 - index}}
+                  className={playlist.view}
+                  onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
+                >
+                  {playlist.name}
+                  {newVidAlert}
+                </li>
+              );
             } else {
               // eventually we'll probably add the others to a dropdown/flyout menu
             }
@@ -764,7 +793,8 @@ class MynNav extends React.Component {
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
         </div>
-      </div>)
+      </div>
+    )
   }
 }
 
@@ -2747,7 +2777,7 @@ class MynPlayer extends MynOpenablePane {
   // key commands for the video player;
   // spacebar already works natively,
   // as does escape to exit fullscreen;
-  keyCommand(e) {    
+  keyCommand(e) {
     let isFullscreen = document.fullscreenElement !== null;
 
     // ESC
@@ -2767,6 +2797,7 @@ class MynPlayer extends MynOpenablePane {
     if (!this.props.show) {
       this.state.errorMessage = null;
       this.state.showLoadingIndicator = false;
+      this.state.tries = 0;
     }
 
   }
@@ -2992,6 +3023,7 @@ class MynSettingsFolders extends React.Component {
     this.state = {
       existingFolders : [],
       folderToAdd: null
+
     }
 
     ipcRenderer.on('settings-watchfolder-selected', (event, args) => {
