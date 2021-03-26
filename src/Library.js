@@ -40,6 +40,7 @@ class Library {
     // ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
 
     this.Queue = [];
+    this.arrayCleanupHistory = [];
     this.waitConfirm = null;
     // this.lastUpdate = Date.now();
   }
@@ -68,10 +69,15 @@ class Library {
       for (let i=0; i<addArr.length-1; i++) {
         dest = dest[addArr[i]];
       }
+
       //Figure out what we have to do and do it
       //Start with operations on an array
       //Push is used as address terminus if we're just adding to end of array
       if (Array.isArray(dest)) {
+        // remember the array we're operating on so that once the queue is empty,
+        // we can clean up any null values left after something is removed
+        this.arrayCleanupHistory.push(dest);
+
         if (addEnd === 'push') {
           switch(opType) {
             case 'add':
@@ -89,7 +95,14 @@ class Library {
               dest[addEnd] = entry;
               break;
             case 'remove':
-              dest.splice(addEnd, 1);
+              // if there are items in queue, don't remove elements,
+              // because that will throw off other operations reliant on indices;
+              // at the end, all the null elements will be removed
+              // if (this.Queue.length > 0) {
+                dest.splice(addEnd, 1, null);
+              // } else {
+              //   dest.splice(addEnd, 1);
+              // }
           }
         }
       } else {
@@ -118,6 +131,19 @@ class Library {
         //If this was requested by other library, let them know we did it
         this.confirm({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       } else {
+        // get rid of null placeholders, if the queue is empty
+        if (this.Queue.length === 0) {
+          console.log('cleaning up...');
+          this.arrayCleanupHistory.map(dest => {
+            if (Array.isArray(dest)) {
+              console.log(`cleaning `);
+              dest = dest.filter(el => el !== null);
+            }
+          });
+          // reset it
+          this.arrayCleanupHistory = [];
+        }
+
         // Start by saving to file.
         this.save();
 

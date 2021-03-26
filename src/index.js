@@ -15,7 +15,7 @@ let win;
 let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
-let libFileTree = {name:'root', folders:[]}; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
+let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
 let numNewVids = 0; // the number of new videos found whenever we check the watchfolders
@@ -70,23 +70,31 @@ function createWindow() {
 }
 
 function checkWatchFolders() {
+  // reset libFileTree
+  libFileTree = {name:'root', folders:[]};
+
   // first, search library for videos whose files are gone (whether moved, renamed, or deleted)
   // if any are missing, move the video object from library.media to library.inactive_media,
   // where it can be recovered if the file is added back or rediscovered (in the case that it was moved or renamed)
   console.log('-- Checking for deleted/renamed/moved files...');
   let numRemovedVids = 0;
   library.media.map((video, index) => {
+    if (!video) return;
+
     if (!fs.existsSync(video.filename)) {
-      console.log(`${video.filename} no longer exists...`);
       numRemovedVids++;
-      removeVideo(video, index);
+
+      console.log(`${video.filename} no longer exists...`);
+        removeVideo(video, index).catch(err => {
+          console.log(err);
+        });
     } else {
       // console.log(`${video.filename} still exists!`);
 
       // erase any duplicate entries of this video that may be in library.inactive_media
       // there shouldn't ever be any, but you never know...
       library.inactive_media.map((i_video, i_index) => {
-        if (i_video.id === video.id) {
+        if (i_video && i_video.id === video.id) {
           console.log(`Found duplicate entry of ${video.filename} in library.inactive_media under the filename ${i_video.filename}`);
           deleteFromInactive(i_video,i_index);
         }
@@ -101,17 +109,20 @@ function checkWatchFolders() {
   let folders = library.settings.watchfolders;
   for (let i=0; i<folders.length; i++) {
     let thisFolder = folders[i];
-    let thisNode;
-    let filtered = libFileTree.folders.filter(folder => folder.name === thisFolder.path);
-    if (filtered.length === 0) {
-      let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
-      libFileTree.folders.push(child);
-      thisNode = libFileTree.folders[libFileTree.folders.length-1];
-    } else {
-      thisNode = filtered[0];
+    if (thisFolder) {
+      let thisNode;
+      let filtered = libFileTree.folders.filter(folder => folder.name === thisFolder.path);
+      if (filtered.length === 0) {
+        let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
+        libFileTree.folders.push(child);
+        thisNode = libFileTree.folders[libFileTree.folders.length-1];
+      } else {
+        thisNode = filtered[0];
+      }
+      findVideosFromFolder(thisNode);
     }
-    findVideosFromFolder(thisNode);
   }
+  if (folders.length === 0) console.log('Done parsing. No watchfolders found.');
 }
 
 // recursively maps out the folder structure and files (only videos/DVDs and subtitle files)
@@ -187,45 +198,100 @@ function findVideosFromFolder(folderNode) {
   });
 }
 
-function removeWatchfolderVideosFromLibrary(folder) {
+function removeWatchfolder(path) {
+  // in case we're currently adding media, we need to delete the removed
+  // watchfolder from libFileTree, otherwise videos may get re-added as they get removed
+  libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== path);
+  console.log('Removing watchfolder from libFileTree');
+  console.log(JSON.stringify(libFileTree));
+
+  // remove videos
+  removeWatchfolderVideosFromLibrary(path);
+
+  // remove the watchfolder
+  try {
+    let index;
+    library.settings.watchfolders.map((folder,i) => {
+      if (folder && folder.path === path) {
+        index = i;
+      }
+    });
+    library.remove(`settings.watchfolders.${index}`);
+
+    return true;
+  } catch(err) {
+    console.log(err);
+    return false;
+  }
+}
+
+
+
+async function removeWatchfolderVideosFromLibrary(folder) {
   console.log('REMOVING videos from library in ' + folder);
+
+  let vidIDs;
+  try {
+    vidIDs = library.settings.watchfolders.filter(wf => wf.path === folder)[0].videos;
+  } catch(err) {
+    console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
+    vidIDs = library.media.filter(v => new RegExp('^' + folder).test(v.filename)).map(v => v.id);
+  }
+
+  let removedMedia = [];
+  let keptMedia = library.media.filter(v => {
+    if (!vidIDs.includes(v.id)) return true;
+    removedMedia.push(_.cloneDeep(v));
+    return false;
+  });
+  let inactiveMedia = [...library.inactive_media, ...removedMedia];
+
+  library.replace('media',keptMedia);
+  library.replace('inactive_media',inactiveMedia);
 }
 
 function removeVideo(video, index, fromInactive) {
-  let address;
-  if (fromInactive) {
-    console.log(`Deleting ${video.filename} from library.inactive_media`);
-    address = 'inactive_media';
-  } else {
-    console.log(`Removing ${video.filename} from library.media and adding to library.inactive_media`);
-    address = 'media';
-  }
-
-  // if we weren't given an index, find it
-  if (typeof index === "undefined") {
-    index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
-  }
-
-  // remove from library.media
-  library.remove(`${address}.${index}`, (err) => {
-    if (err) {
-      console.log(`Error removing ${video.title} (${video.filename}); given bad index (index === ${index}) or could not find video in library.${address}:\n${err}`);
-      return;
+  return new Promise((resolve,reject) => {
+    let address;
+    if (fromInactive) {
+      console.log(`Deleting ${video.filename} from library.inactive_media`);
+      address = 'inactive_media';
+    } else {
+      console.log(`Removing ${video.filename} from library.media and adding to library.inactive_media`);
+      address = 'media';
     }
 
-    if (!fromInactive) {
-      // remove video id from its watchfolder's list of video ids
-      library.settings.watchfolders.map((wf, i) => {
-        if (new RegExp('^' + wf.path).test(video.filename)) {
-          console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
-          wf.videos = wf.videos.filter(id => id !== video.id);
-          library.replace(`settings.watchfolders.${i}`, library.settings.watchfolders[i]);
-        }
-      });
-
-      // add the video to library.inactive_media
-      library.add('inactive_media.push',video);
+    // if we weren't given an index, find it
+    if (typeof index === "undefined") {
+      index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
     }
+
+    // remove from library.media
+    library.remove(`${address}.${index}`, (err) => {
+      if (err) {
+        reject(`Error removing ${video.title} (${video.filename}); given bad index (index === ${index}) or could not find video in library.${address}:\n${err}`);
+      }
+
+      if (!fromInactive) {
+        // add the video to library.inactive_media
+        library.add('inactive_media.push',video);
+
+        // remove video id from its watchfolder's list of video ids
+        library.settings.watchfolders.map((wf, i) => {
+          if (new RegExp('^' + wf.path).test(video.filename)) {
+            console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
+            wf.videos = wf.videos.filter(id => id !== video.id);
+            library.replace(`settings.watchfolders.${i}`, library.settings.watchfolders[i], (err) => {
+              if (err) {
+                reject(`Error: could not update watchfolder manifest: ${err}`);
+              } else {
+                resolve();
+              }
+            });
+          }
+        });
+      }
+    });
   });
 }
 function deleteFromInactive(video, index) {
@@ -278,6 +344,7 @@ let videoTemplate =   {
     "lastseen" : '',
     "kind" : '',
     "artwork" : '',
+    "subtitles" : [],
     "filename" : '',
     "new" : true,
     "metadata" : {
@@ -297,6 +364,7 @@ function addVideosToLibrary() {
   clearTimeout(addVideoTimeout);
   addVideoTimeout = setTimeout(() => {
     console.log("Parsing done, checking parsed tree for new videos/subtitles...");
+    console.log(JSON.stringify(libFileTree));
 
     // walk through libFileTree, adding all the videos to the library
     // (and making our best guess as to which subtitles go with which videos)
@@ -313,9 +381,9 @@ function addVideosFromFolder(folderNode, rootFolder) {
     }
   }
   if (folderNode.videos && folderNode.videos.length > 0) {
-    for (let video of folderNode.videos) {
+    for (let videoFilename of folderNode.videos) {
 
-      addVideoFile(folderNode, video, rootFolder).catch((err) => {console.log(err)});
+      addVideoFile(folderNode, videoFilename, rootFolder).catch((err) => {console.log(err)});
     }
   }
 }
@@ -337,7 +405,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
   }
   let fileBasename = path.basename(file,path.extname(file));
 
-  // first create the id for this file, then everything else happens in the callback from that
+  // first create the id for this file
   let id = await createVideoID(file);
 
   // then check for subtitles
@@ -385,7 +453,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
   let vidObj;
 
   // check if the video already has an object in library.inactive_media
-  // (this would be the case if it was previously in the library, but was moved/deleted/renamed)
+  // (this would be the case if it was previously in the library, but was moved/deleted/renamed, or its watchfolder was removed)
   let inactiveVidIndex = indexOfVideoInInactiveMedia(id);
   if (inactiveVidIndex !== null) {
     // ------------- VIDEO IS IN LIBRARY.INACTIVE_MEDIA ------------- //
@@ -393,9 +461,19 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
     // remove the video object from inactive media (it will be added to active media below)
     console.log(`There is a video object for ${fileBasename} in library.inactive_media. Moving to library.media...`);
 
+
+
     try {
       vidObj = _.cloneDeep(library.inactive_media[inactiveVidIndex]);
       vidObj.filename = file; // this is important because the file may have been renamed
+
+      try {
+        // update the video's kind based on the watchfolder's default kind;
+        // in case the user has changed the default kind, we want to update it when re-adding the video
+        vidObj.kind = library.settings.watchfolders.filter(wf => wf.path === rootWatchFolder)[0].kind;
+      } catch(err) {
+        console.log('Could not update kind based on watchfolder default kind: ' + err);
+      }
 
       library.remove(`inactive_media.${inactiveVidIndex}`,(err) => {
         if (err) {
@@ -470,7 +548,8 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
   //#### BOTH FOR NEW VIDEOS AND FOR INACTIVE VIDEOS ####//
 
   if (typeof vidObj === 'object' && vidObj !== null) {
-    vidObj.subtitles = subtitles; // add subtitles
+    // add any new subtitles, removing duplicates
+    vidObj.subtitles = [...new Set([...vidObj.subtitles, ...subtitles])];
 
     // add video to library, and add its ID to its watchfolder
     console.log('Adding Movie: ' + JSON.stringify(vidObj));
@@ -483,7 +562,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
           if (folder.path === rootWatchFolder) {
             folder.videos.push(vidObj.id);
             console.log('index is ' + index);
-            library.replace('settings.watchfolders.' + index, library.settings.watchfolders[index]);
+            library.replace('settings.watchfolders.' + index, folder);
           }
         });
 
@@ -551,7 +630,7 @@ function indexOfVideoInLibrary(id, checkInactive) {
   let media = checkInactive ? library.inactive_media : library.media;
   for (let i=0; i<media.length; i++) {
     // if (media[i].filename === filepath) {
-    if (media[i].id === id) {
+    if (media[i] && media[i].id === id) {
       return i;
     }
   }
@@ -636,19 +715,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
 
     // if the user said okay
     if (result.response === 1) {
-      try {
-        let index;
-        library.settings.watchfolders.map((folder,i) => {
-          if (folder.path === path) {
-            index = i;
-          }
-        });
-        library.remove(`settings.watchfolders.${index}`);
-        removeWatchfolderVideosFromLibrary(path);
-        removed = true;
-      } catch(err) {
-        console.log(err);
-      }
+      removed = removeWatchfolder(path);
     } else {
       // if the user canceled
       console.log('User canceled the folder removal');

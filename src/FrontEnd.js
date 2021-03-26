@@ -374,7 +374,7 @@ class Mynda extends React.Component {
     let filteredVids = [];
     let showNew = playlist.id === 'new' || this.state.settings.preferences.include_new_vids_in_playlists;
     try {
-      filteredVids = this.state.videos.filter(video => eval(playlist.filter_function) && (video.new ? showNew : true));
+      filteredVids = this.state.videos.filter(video => video && eval(playlist.filter_function) && (video.new ? showNew : true));
     } catch(err) {
       let name = playlist ? playlist.name : 'nonexistent';
       console.error(`Unable to execute filter for ${name} playlist: ${err}`);
@@ -396,7 +396,7 @@ class Mynda extends React.Component {
 
     // set the playlist, and erase any row selection from the previous playlist (only if we actually switched playlists)
     let videos = this.playlistFilter(id);
-    let playlist = this.state.playlists.filter(playlist => playlist.id == id)[0];
+    let playlist = this.state.playlists.filter(playlist => playlist && playlist.id == id)[0];
     let view = playlist ? playlist.view : null; // set the view state variable to this playlist's view
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
     let flatDefaultSort = playlist.flatDefaultSort; // default sort column for this playlist, but only applies when viewed in flat view
@@ -590,6 +590,14 @@ class Mynda extends React.Component {
         });
       }
 
+      // if the whole media array was replaced at one time
+      // (this happens when a watchfolder is removed)
+      if (address === 'media') {
+        console.log('library.media was replaced. Refreshing videos');
+
+        this.setState({videos:library.media});
+      }
+
       // if a movie was changed
       if (address.includes('media')) {
         console.log('a video was edited');
@@ -638,7 +646,7 @@ class Mynda extends React.Component {
     console.log('Refreshing Details');
     if (this.state.detailVideo) {
       if (this.state.detailVideo.id !== 'batch') {
-        this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
+        this.setState({detailVideo : this.state.videos.filter(video => video && video.id === this.state.detailVideo.id)[0]});
       } else {
         // if the detailVideo id is 'batch', that means multiple rows are selected;
         // calling handleSelectedRows with no parameters will reset the details pane and the editor
@@ -748,6 +756,7 @@ class MynNav extends React.Component {
       <div id="nav-pane" className="pane">
         <ul id="nav-playlists">
           {this.props.playlists.map((playlist, index) => {
+            if (!playlist) return null;
             let newVidAlert = null;
 
             // this bit is to NOT display the 'new' playlist
@@ -924,7 +933,7 @@ class MynLibrary extends React.Component {
 
   createCollectionsMap() {
     // console.log("Creating new collections map");
-    this.state.hierarchy = this.state.collections.map(collection => (this.findCollections(collection)));
+    this.state.hierarchy = this.state.collections.map(collection => this.findCollections(collection));
 
     // create dummy collection of leftover videos, if any
     let leftovers = this.state.videos.filter(v => !this.state.vidsInHierarchy.includes(v.id));
@@ -940,6 +949,8 @@ class MynLibrary extends React.Component {
   // recursive function that walks down the collections and returns each branch
   // as JSX if and only if it contains one of the videos in our playlist
   findCollections(object) {
+    if (!object) return null;
+
     // if this object contains sub-collections
     if (object.collections) {
       let results = []
@@ -1234,7 +1245,7 @@ class MynLibrary extends React.Component {
       }
       if (source.droppableId !== 'uncategorized') {
         srcCol = colsCopy.get(source.droppableId);
-        oldOrder = colsCopy.get(source.droppableId).videos.filter(v => v.id === videoID)[0].order;
+        oldOrder = colsCopy.get(source.droppableId).videos.filter(v => v && v.id === videoID)[0].order;
       }
       // console.log('old order: ' + oldOrder);
 
@@ -2273,7 +2284,10 @@ class MynLibAddExistingCollection extends React.Component {
   constructor(props) {
     super(props)
 
-    this.options = this.getOptions();
+    this.state = {
+      options: this.getOptions()
+    }
+
     this.render = this.render.bind(this);
     this.handleChange = this.handleChange.bind(this);
   }
@@ -2286,7 +2300,8 @@ class MynLibAddExistingCollection extends React.Component {
       let idArr = c.id.split('-');
       let ancestry = idArr.map((el,i) => {
         let id = idArr.slice(0,i+1).join('-');
-        return cols.get(id).name;
+        let ancestor = cols.get(id);
+        return ancestor ? ancestor.name : null;
       });
       let displayStr = ancestry.join(' \u27A5 ');
 
@@ -2311,6 +2326,12 @@ class MynLibAddExistingCollection extends React.Component {
      this.props.choose(e.target.value);
   }
 
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(oldProps.collections,this.props.collections)) {
+      this.setState({options:this.getOptions()});
+    }
+  }
+
   render() {
     return (
       <div id="library-addToExistingCollection" ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
@@ -2318,8 +2339,8 @@ class MynLibAddExistingCollection extends React.Component {
         <div className="select-container select-alwaysicon">
           <select name="collections" defaultValue="" onChange={this.handleChange}>
             <option value="" disabled hidden>[Choose a collection and drop a video here to add to it]</option>
-            {Object.keys(this.options).map((opt,i) => (
-              <option key={i} value={this.options[opt]}>{opt}</option>
+            {Object.keys(this.state.options).map((opt,i) => (
+              <option key={i} value={this.state.options[opt]}>{opt}</option>
             ))}
           </select>
         </div>
@@ -3050,9 +3071,10 @@ class MynSettingsFolders extends React.Component {
   formFieldKindOptions() {
     let options;
     try {
-      options = this.props.kinds.map((kind) => (
-        <option key={kind} value={kind}>{kind.replace(/\b\w/g,(letter) => letter.toUpperCase())}</option>
-      ));
+      options = this.props.kinds.map((kind) => {
+        if (!kind) return null;
+        return (<option key={kind} value={kind}>{kind.replace(/\b\w/g,(letter) => letter.toUpperCase())}</option>)
+      });
       options.unshift(<option key="none" value="none">(none)</option>);
     } catch(e) {
       console.error("Unable to find list of media kinds in library: " + e.toString());
@@ -3108,17 +3130,20 @@ class MynSettingsFolders extends React.Component {
   displayFolders() {
     let folders;
     try {
-      folders = this.state.existingFolders.map((folder, index) => (
-        <tr key={index}>
-          <td className='path overflow' title={folder.path}><span>{folder.path}</span></td>
-          <td className='default-kind'>
-            <span className='select-container select-alwaysicon'>
-              <select value={folder.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
-            </span>
-          </td>
-          <td className='remove'><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
-        </tr>
-      ));
+      folders = this.state.existingFolders.map((folder, index) => {
+        if (!folder) return null;
+        return (
+          <tr key={index}>
+            <td className='path overflow' title={folder.path}><span>{folder.path}</span></td>
+            <td className='default-kind'>
+              <span className='select-container select-alwaysicon'>
+                <select value={folder.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
+              </span>
+            </td>
+            <td className='remove'><button onClick={() => this.editRemove(folder.path, index)}>Remove</button></td>
+          </tr>
+        )
+      });
     } catch(e) {
       console.error("Error finding watchfolders from library: " + e.toString());
     }
@@ -3314,25 +3339,28 @@ class MynSettingsPlaylists extends React.Component {
   render() {
     // console.log(JSON.stringify(this.state.playlists));
 
-    let playlists = this.state.playlists.map((playlist,i) => (
-      <Draggable key={playlist.id} draggableId={'' + playlist.id} index={i}>
-        {(provided) => (
-          <MynSettingsPlaylistsTableRow
-            playlist={playlist}
-            index={i}
-            allColumns={this.props.defaultcolumns.used.concat(this.props.defaultcolumns.unused)}
-            defaultcolumns={this.props.defaultcolumns}
-            updateValue={this.updateValue}
-            showEditPlaylist={this.showEditPlaylist}
-            deletePlaylist={this.deletePlaylist}
-            reportValid={this.reportValid}
-            displayColumnName={this.props.displayColumnName}
-            innerRef={provided.innerRef}
-            provided={provided}
-          />
-        )}
-      </Draggable>
-    ));
+    let playlists = this.state.playlists.map((playlist,i) => {
+      if (!playlist) return null;
+      return (
+        <Draggable key={playlist.id} draggableId={'' + playlist.id} index={i}>
+          {(provided) => (
+            <MynSettingsPlaylistsTableRow
+              playlist={playlist}
+              index={i}
+              allColumns={this.props.defaultcolumns.used.concat(this.props.defaultcolumns.unused)}
+              defaultcolumns={this.props.defaultcolumns}
+              updateValue={this.updateValue}
+              showEditPlaylist={this.showEditPlaylist}
+              deletePlaylist={this.deletePlaylist}
+              reportValid={this.reportValid}
+              displayColumnName={this.props.displayColumnName}
+              innerRef={provided.innerRef}
+              provided={provided}
+            />
+          )}
+        </Draggable>
+      )
+    });
 
     // add a divider at the end of the tab==true playlists
     // for (let i=0; i<this.state.playlists.length; i++) {
@@ -3377,7 +3405,7 @@ class MynSettingsPrefs extends React.Component {
       },
       hide_description : props.settings.preferences.hide_description,
       include_user_rating_in_avg : props.settings.preferences.include_user_rating_in_avg,
-      kinds : props.settings.used.kinds,
+      kinds : props.settings.used.kinds.filter(kind => !!kind),
       override_dialogs : props.settings.preferences.override_dialogs
     }
 
@@ -3906,10 +3934,14 @@ class MynSettingsCollections extends React.Component {
   }
 
   findCollections(collections) {
+    if (!collections) return null;
+
     // if collections is a class object, unwrap it
     if (collections.c) collections = collections.c;
 
     let collectionsJSX = collections.map(collection => {
+      if (!collection) return null;
+
       let children = null;
       let isTerminal = false;
 
@@ -3931,7 +3963,7 @@ class MynSettingsCollections extends React.Component {
         let childrenEls = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
           let video = null;
           try {
-            video = this.props.videos.filter(video => video.id === vidToken.id)[0];
+            video = this.props.videos.filter(video => video && video.id === vidToken.id)[0];
 
             return (
               <div key={vidToken.order} className='video'>
@@ -4030,13 +4062,18 @@ class MynSettingsCollections extends React.Component {
     // create a droppableId for this collections level
     // by recreating the parent collection's id from its 1st member
     let droppableId = '-';
-    if (collections.length > 0) {
-      let match = collections[0].id.match(/.+(?=-\d+$)/);
-      if (match !== null && match.length > 0) {
-        droppableId = match[0];
+    for (let col of collections) {
+      try {
+        let match = col.id.match(/.+(?=-\d+$)/);
+        if (match !== null && match.length > 0) {
+          droppableId = match[0];
+          break;
+        }
+      } catch(err) {
+        // do nothing, keep looping
       }
-      // console.log('DROPPABLE ID matches == ' + JSON.stringify(id));
     }
+    // console.log('DROPPABLE ID matches == ' + JSON.stringify(id));
 
     return (
       <Droppable droppableId={droppableId}>
@@ -4383,7 +4420,7 @@ class MynEditor extends MynOpenablePane {
       // we don't want to save this)
       let temp = _.cloneDeep(this.state.video);
       delete temp.collections;
-      let index = library.media.findIndex((video) => video.id === this.props.video.id);
+      let index = library.media.findIndex((video) => video && video.id === this.props.video.id);
       library.replace("media." + index, temp);
     }
 
@@ -5670,9 +5707,9 @@ class MynEditCollections extends MynEdit {
 
     let collection;
     try {
-      collection = parentList.filter(collection => collection.name === name)[0];
+      collection = parentList.filter(collection => collection && collection.name === name)[0];
     } catch(err) {
-      console.error('This collection has no subcollections');
+      console.error(`Could not find collection to add video to it: ${err}`);
     }
 
     try {
@@ -5706,7 +5743,7 @@ class MynEditCollections extends MynEdit {
         // the update function will take care of updating the library.collections object to correspond to our edit
       }
     } catch(err) {
-      console.error('Unable to add collection: ' + err);
+      console.error('Unable to add video to collection: ' + err);
     }
   }
 
@@ -5841,6 +5878,8 @@ class MynEditCollections extends MynEdit {
     // console.log("Creating new collections map");
     let results = []
     this.props.collections.map(collection => (this.findCollections(collection))).map(result => {
+      if (!result) return;
+
       // put hidden collections (ones that this video doesn't belong to, but the user might add it to)
       // at the top of the list, so that when they're added, the user can see them easily
       if (result.show) {
@@ -5866,6 +5905,8 @@ class MynEditCollections extends MynEdit {
   // recursive function that walks down the collections and returns each branch as JSX
   // if it contains this video, display it to the user, otherwise hide it
   findCollections(collection) {
+    if (!collection) return null;
+
     let results = []
     let childrenOpts = []
     let show = false;
@@ -5880,18 +5921,20 @@ class MynEditCollections extends MynEdit {
         // if this child isn't being shown (i.e. our video isn't in its branch)
         // add it to the beginning of the results array, so that if the user adds it, it appears at the top;
         // also add it to the list of options to display to the user for adding the video to its branch
-        try {
-          if (child.show === false) {
-            results.unshift(child)
-            childrenOpts.push(collection.collections[i].name);
-          } else {
-            // if the child IS being shown, add it to the end of the results array,
-            // so that it appears after any hidden collections that the user might add
-            results.push(child);
+        if (child) {
+          try {
+            if (child.show === false) {
+              results.unshift(child)
+              childrenOpts.push(collection.collections[i].name);
+            } else {
+              // if the child IS being shown, add it to the end of the results array,
+              // so that it appears after any hidden collections that the user might add
+              results.push(child);
+            }
+          } catch(err) {
+            console.error(err);
+            console.log(`i==${i}, collection.collections[i]==${JSON.stringify(collection.collections[i])}`);
           }
-        } catch(err) {
-          console.error(err);
-          console.log(`i==${i}, collection.collections[i]==${JSON.stringify(collection.collections[i])}`);
         }
       }
       // if there are no child collections within this collection;
@@ -5943,7 +5986,7 @@ class MynEditCollections extends MynEdit {
       // if any results have their 'show' as positive
       // set show here to true
       for (const result of results) {
-        if (result.show === true) {
+        if (result && result.show === true) {
           show = true;
           break;
         }
@@ -5960,6 +6003,8 @@ class MynEditCollections extends MynEdit {
             {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,collection) : null}
             <div className="children">
               {results.map((result,i) => {
+                if (!result) return null;
+
                 // console.log('child show ? ' + result.show);
                 // figure out if this child is an older sister to any
                 // other collections that are visible
@@ -6037,6 +6082,8 @@ class MynEditCollections extends MynEdit {
   }
 
   updateOrder(order, target, collection) {
+    if (!collection) return;
+
     // let target = event.target;
     // let order = event.target.value;
     // order = !isNaN(Number(order)) && Number(order) !== 0 ? Number(order) : !isNaN(parseInt(order)) ? parseInt(order) : '';
@@ -6078,7 +6125,7 @@ class MynEditCollections extends MynEdit {
 
     // get list of top-level collections that this video does not belong within,
     // in order to display as dropdown options when the user clicks the top level + button
-    let childrenOpts = this.props.collections.filter(collection => Object.keys(this.props.video.collections).filter(key => key.split('-')[0] === collection.id).length == 0).map(collection => collection.name);
+    let childrenOpts = this.props.collections.filter(collection => collection && Object.keys(this.props.video.collections).filter(key => key.split('-')[0] === collection.id).length == 0).map(collection => collection.name);
 
     return (
       <div className="top-level collection">

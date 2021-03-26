@@ -52,10 +52,11 @@ class Collections {
   // if includeBarren is true, we also include collections
   // that have neither child collections nor videos
   getAllTerminal(includeBarren) {
-    // console.log('GET ALL TERMINAL')
+    console.log('GET ALL TERMINAL')
     let results = [];
 
     this.c.map(c => {
+      if (!c) return;
       // c = new Collection(c);
       // console.log(c.id + ' t==' + c.isTerminal);
       if (c.videos || (includeBarren ? (!c.collections || c.collections.length===0) : false)) {
@@ -68,7 +69,7 @@ class Collections {
       }
     });
 
-    // console.log(results.map(c => c.name));
+    console.log(JSON.stringify(results)/*.map(c => c.name)*/);
 
     return results;
   }
@@ -81,6 +82,7 @@ class Collections {
     try {
       let vidCollections = {};
       this.c.map(col => {
+        if (!col) return;
         // let col = new Collection(c);
         if (!col.videos) {
           // let children = new Collections(col.getChildren());
@@ -118,7 +120,7 @@ class Collections {
     // otherwise, it is a top-level collection,
     // so we delete it directly
     } else {
-      this.c = this.c.filter(c => c.id !== id);
+      this.c = this.c.filter(c => !c || c.id !== id);
     }
   }
 
@@ -134,9 +136,11 @@ class Collections {
     // create the id based on the highest id of the existing collections;
     // if there are no collections, then we can't create an id,
     // because we have no idea what the id should be
-    if (this.c.length > 0) {
-      let idArray = this.c[0].id.split('-');
-      idArray.splice(-1,1,this.c.length);
+    let noGarbage = this.c.filter(c => !!c);
+    console.log("Collections length (minus any garbage entries): " + noGarbage.length);
+    if (noGarbage.length > 0) {
+      let idArray = noGarbage[0].id.split('-');
+      idArray.splice(-1,1,noGarbage.length);
       collection.id = idArray.join('-');
     } else if (topLevel) {
       // unless topLevel is true;
@@ -157,33 +161,40 @@ class Collections {
 
     // return this.get(collection.id);
     // return new Collection(this.c[this.c.length-1]);
-    return this.c.filter(c => c.name === collection.name)[0];
+    return this.c.filter(c => c && c.name === collection.name)[0];
   }
 
   sort() {
-    console.log('Sorting: ' + this.c.map(col => '\n' + col.name))
+    console.log('Sorting: ' + this.c.map(col => '\n' + (col ? col.name : String(col))))
     // sort the collections array alphabetically (ignoring leading articles)
     this.c.sort((a,b) => {
-      const a_sort = a.name.toLowerCase().replace(/^the\s|^a\s/,'');
-      const b_sort = b.name.toLowerCase().replace(/^the\s|^a\s/,'');
+      // force null values to the end
+      if (a === null) return 1;
+      if (b === null) return -1;
+
+      // otherwise, sort as normal
+      const a_sort = a ? a.name.toLowerCase().replace(/^the\s|^a\s/,'') : '';
+      const b_sort = b ? b.name.toLowerCase().replace(/^the\s|^a\s/,'') : '';
       if (a_sort > b_sort)    return 1;
-      if (a_sort === b_sort)  return 0;
+      if (a_sort == b_sort)  return 0;
       if (a_sort < b_sort)    return -1;
     });
     // then we have to adjust their ids (and their children's ids)
     this.c.map((c,i) => {
+      if (!c) return;
       const depth = c.id.split('-').length - 1;
       // let col = new Collection(c);
       this.changeID(c,depth,i);
     });
 
-    console.log('Sorted!!!: ' + this.c.map(col => '\n' + col.name))
+    console.log('Sorted!!!: ' + this.c.map(col => '\n' + (col ? col.name : String(col))))
   }
 
   // sorts recursively
   sortAll() {
     this.sort();
     this.c.map(col => {
+      if (!col) return;
       if (col.collections) {
         let children = new Collections(col.collections);
         children.sortAll();
@@ -210,6 +221,11 @@ class Collections {
   // in addition to that, we need to do the same alteration to all of this collections
   // children, grandchildren, etc., so we simply call the same function recursively
   changeID(c,depth,value) {
+    if (!c) {
+      console.error(`Error: cannot change id of ${c}`);
+      return;
+    }
+
     let arrayID = c.id.split('-');
     arrayID[depth] = value;
     c.id = arrayID.join('-');
@@ -227,7 +243,7 @@ class Collections {
   // ---------------------------------- //
 
   addChild(c,name) {
-    if (c.videos) return; // if c has videos, it is terminal, and a child cannot be added
+    if (!c || c.videos) return; // if c has videos, it is terminal, and a child cannot be added
 
     console.log(`Adding child to '${c.name}'`);
 
@@ -260,7 +276,7 @@ class Collections {
   removeChild(c,id) {
     // if c has videos, it is terminal, so there is no child to be removed
     // or if it has no collections, same thing
-    if (c.videos || !c.collections) return;
+    if (!c || c.videos || !c.collections) return;
 
     // this.c.collections = this.c.collections.filter(c => c.id !== id);
     let temp = [];
@@ -295,13 +311,13 @@ class Collections {
 
 
   containsVideo(c,id) {
-    if (!c.videos) return false;
+    if (!c || !c.videos) return false;
 
     return c.videos.filter(v => v.id === id).length > 0;
   }
 
   getVidOrder(c,id) {
-    if (!c.videos) return;
+    if (!c || !c.videos) return;
 
     try {
       return c.videos.filter(v => v.id === id)[0].order;
@@ -313,7 +329,7 @@ class Collections {
 
   // id is the video id
   updateOrder(c,id,order) {
-    if (!c.videos) return;
+    if (!c || !c.videos) return;
 
     try {
       // this.videos.filter(v => v.id === id)[0].order = order;
@@ -332,6 +348,8 @@ class Collections {
   // the user dropped the video at, and adjust the order accordingly
   // (of both the video added and the subsequent videos in the array)
   addVideo(c, id, order, index) {
+    if (!c) return;
+
     if (!c.videos) {
       // if this collection has child collections, then it cannot become a terminal collection
       // and so we cannot add a video
@@ -425,7 +443,7 @@ class Collections {
   }
 
   removeVideo(c,id) {
-    if (!c.videos) return;
+    if (!c || !c.videos) return;
     let index = this._getVidIndex(c,id);
     console.log("index: " + index);
     if (index === -1) return false;
@@ -442,12 +460,16 @@ class Collections {
   }
 
   convertToNonTerminal(c) {
+    if (!c) return;
+
     console.log(`Converting '${c.name}' to non-terminal`)
     delete c.videos;
     // c.isTerminal = false;
   }
 
   _getVidIndex(c,id) {
+    if (!c) return;
+
     if (!c.videos) return -1;
     // console.log('id: ' + id);
     // console.log('videos: ' + JSON.stringify(this.videos));
@@ -462,7 +484,7 @@ class Collections {
   }
 
   _sortVidsByOrder(c) {
-    if (!c.videos) return;
+    if (!c || !c.videos) return;
 
     return c.videos.sort((a,b) => a.order > b.order ? 1 : (a.order === b.order ? 0 : -1));
   }
