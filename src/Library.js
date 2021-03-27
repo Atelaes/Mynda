@@ -40,7 +40,7 @@ class Library {
     // ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
 
     this.Queue = [];
-    this.arrayCleanupHistory = [];
+    this.arrayCleanupHistory = {};
     this.waitConfirm = null;
     // this.lastUpdate = Date.now();
   }
@@ -65,8 +65,10 @@ class Library {
       //Most operations won't work if we go all the way
       let addArr = address.split('.');
       let dest = this;
-      let addEnd = addArr[addArr.length-1];
-      for (let i=0; i<addArr.length-1; i++) {
+      // let addEnd = addArr[addArr.length-1];
+      let addEnd = addArr.pop();
+      // for (let i=0; i<addArr.length-1; i++) {
+      for (let i=0; i<addArr.length; i++) {
         dest = dest[addArr[i]];
       }
 
@@ -74,10 +76,6 @@ class Library {
       //Start with operations on an array
       //Push is used as address terminus if we're just adding to end of array
       if (Array.isArray(dest)) {
-        // remember the array we're operating on so that once the queue is empty,
-        // we can clean up any null values left after something is removed
-        this.arrayCleanupHistory.push(dest);
-
         if (addEnd === 'push') {
           switch(opType) {
             case 'add':
@@ -89,12 +87,22 @@ class Library {
         } else {
           switch (opType) {
             case 'add':
-              dest.splice(addEnd, 0, entry);
+              throw "Add can only be used with push.";
+              // dest.splice(addEnd, 0, entry);
               break;
             case 'replace':
               dest[addEnd] = entry;
               break;
             case 'remove':
+              // remember the array we're operating on so that once the queue is empty,
+              // we can clean up any null values left after something is removed
+              // the key is the address minus addEnd; this way if multiple things are
+              // removed from that same array, this same key will be overwritten;
+              // this is good because we only need to remember the edited array once
+              // let temp = [...addArr];
+              // temp.splice(-1);
+              this.arrayCleanupHistory[addArr.join('.')] = dest;
+
               // if there are items in queue, don't remove elements,
               // because that will throw off other operations reliant on indices;
               // at the end, all the null elements will be removed
@@ -126,23 +134,43 @@ class Library {
             delete dest[addEnd];
         }
       }
-      //If we haven't errored out yet, save to file, communicate with partner library
+
+      // cleanup...
+      // get rid of null placeholders in any array that we've removed something from,
+      // but only if the queue is empty
+      if (this.Queue.length === 0) {
+        console.log('cleaning up...');
+        console.log(JSON.stringify(this.arrayCleanupHistory));
+        Object.keys(this.arrayCleanupHistory).map(key => {
+          let cleaned = this.arrayCleanupHistory[key];
+          if (Array.isArray(cleaned)) {
+            console.log(`cleaning ${key}`);
+            cleaned = cleaned.filter(el => el !== null);
+            console.log(`Cleaned: ${JSON.stringify(cleaned)}`);
+
+            // for some reason we have to do this part over again, I don't know...
+            let destination = this;
+            let map = key.split('.');
+            let end = map.pop();
+            map.map(loc => {
+              destination = destination[loc];
+            });
+            console.log(`\nBefore cleaning: ${JSON.stringify(destination[end])}\n`);
+            destination[end] = _.cloneDeep(cleaned);
+            console.log(`\nAfter cleaning: ${JSON.stringify(destination[end])}\n`);
+            console.log(`\n==== WATCHFOLDERS ====\n\n\n${JSON.stringify(this.settings.watchfolders)}\n\n\n`);
+            console.log(`\n==== INACTIVE_MEDIA ====\n\n\n${JSON.stringify(this.inactive_media)}\n\n\n`);
+          }
+        });
+        // reset it
+        this.arrayCleanupHistory = {};
+      }
+
+      // save to file, communicate with partner library
       if (sync) {
         //If this was requested by other library, let them know we did it
         this.confirm({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
       } else {
-        // get rid of null placeholders, if the queue is empty
-        if (this.Queue.length === 0) {
-          console.log('cleaning up...');
-          this.arrayCleanupHistory.map(dest => {
-            if (Array.isArray(dest)) {
-              console.log(`cleaning `);
-              dest = dest.filter(el => el !== null);
-            }
-          });
-          // reset it
-          this.arrayCleanupHistory = [];
-        }
 
         // Start by saving to file.
         this.save();
@@ -255,6 +283,7 @@ class Library {
     try {
       let saveObj = {};
       Object.keys(defaultLibrary).map((key) => {saveObj[key] = this[key]});
+      console.log(`\n==== SAVING ====\n\n\n${JSON.stringify(saveObj)}\n\n\n`);
       fs.writeFileSync(this.path, JSON.stringify(saveObj));
     } catch(e) {
       console.log("Error writing to file: " + e.toString());

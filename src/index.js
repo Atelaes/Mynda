@@ -22,8 +22,9 @@ let numNewVids = 0; // the number of new videos found whenever we check the watc
 
 app.whenReady().then(start);
 
-function start() {
+async function start() {
   eraseTempImages();
+  await cleanLibrary();
   checkWatchFolders();
   createWindow();
 }
@@ -67,6 +68,14 @@ function createWindow() {
   //var child = cp.spawn('ffplay', ['E:\\DVD Movies\\Moana.mp4']);
   win.loadFile('src/index.html');
   // win.loadFile('src/player.html');
+}
+
+// get rid of any null values in media, inactive_media, watchfolders, etc.
+function cleanLibrary() {
+  return new Promise((resolve,reject) => {
+    // library.media.map();
+    resolve();
+  });
 }
 
 function checkWatchFolders() {
@@ -232,14 +241,15 @@ async function removeWatchfolderVideosFromLibrary(folder) {
 
   let vidIDs;
   try {
-    vidIDs = library.settings.watchfolders.filter(wf => wf.path === folder)[0].videos;
+    vidIDs = library.settings.watchfolders.filter(wf => wf && wf.path === folder)[0].videos;
   } catch(err) {
     console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
-    vidIDs = library.media.filter(v => new RegExp('^' + folder).test(v.filename)).map(v => v.id);
+    vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
   }
 
   let removedMedia = [];
   let keptMedia = library.media.filter(v => {
+    if (!v) return false;
     if (!vidIDs.includes(v.id)) return true;
     removedMedia.push(_.cloneDeep(v));
     return false;
@@ -278,6 +288,8 @@ function removeVideo(video, index, fromInactive) {
 
         // remove video id from its watchfolder's list of video ids
         library.settings.watchfolders.map((wf, i) => {
+          if (!wf) return;
+
           if (new RegExp('^' + wf.path).test(video.filename)) {
             console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
             wf.videos = wf.videos.filter(id => id !== video.id);
@@ -429,7 +441,8 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
   //########### VIDEO IS ALREADY IN LIBRARY ###########//
 
   // if the video is already in the library, update the subtitles
-  // and update the video in the library and then we're done
+  // and update the video in the library, check to make sure the id
+  // is in the watchfolder manifest, and then we're done
   let vidIndex = indexOfVideoInLibrary(id);
   if (vidIndex !== null) {
     let video = library.media[vidIndex];
@@ -445,6 +458,20 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
       video.subtitles = [...new Set([...video.subtitles, ...subtitles])];
       library.replace(`media.${vidIndex}`,video);
     }
+
+    // if the id for this video isn't already in its watchfolder, add it
+    // (this shouldn't really ever happen, but just in case)
+    library.settings.watchfolders.map((wf,i) => {
+      if (!wf) return;
+      if (wf.path === rootWatchFolder) {
+        if (wf.videos.filter(wf_id => wf_id === id).length === 0) {
+          library.add(`settings.watchfolders.${i}.videos.push`,id, (err) => {
+            if (err) console.log(`Could not add ${fileBasename}'s id to watchfolder manifest: ${err}`);
+          });
+        }
+      }
+    });
+
     return;
   }
 
@@ -470,7 +497,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
       try {
         // update the video's kind based on the watchfolder's default kind;
         // in case the user has changed the default kind, we want to update it when re-adding the video
-        vidObj.kind = library.settings.watchfolders.filter(wf => wf.path === rootWatchFolder)[0].kind;
+        vidObj.kind = library.settings.watchfolders.filter(wf => wf && wf.path === rootWatchFolder)[0].kind;
       } catch(err) {
         console.log('Could not update kind based on watchfolder default kind: ' + err);
       }
@@ -559,6 +586,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
       } else {
         // remove video's id from its watchfolder's manifest
         library.settings.watchfolders.map((folder,index) => {
+          if (!folder) return;
           if (folder.path === rootWatchFolder) {
             folder.videos.push(vidObj.id);
             console.log('index is ' + index);
