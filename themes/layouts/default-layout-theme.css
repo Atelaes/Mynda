@@ -232,8 +232,12 @@
   grid-row: 10;
   grid-column: 1 / span 3;
 }
+.edit-field.subtitles {
+  grid-row: 11 / span 2;
+  grid-column: 1 / span 3;
+}
 .edit-field.collections {
-  grid-row: 11 / span 10;
+  grid-row: 13 / span 10;
   grid-column: 1 / span 3;
 }
 

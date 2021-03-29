@@ -544,6 +544,7 @@
   --listwidget-item-fontstyle: initial;
   --listwidget-item-fontweight: 300;
   --listwidget-item-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--listwidget-item-bg-color) 30%);
+  --listwidget-item-ellipsis-grad-left: linear-gradient(270deg, rgba(37,39,43,0) 50%, var(--listwidget-item-bg-color) 85%);
   --listwidget-item-ellipsis-width: 2rem;
 
   --listwidgetdel-item-fontsize-factor: .75;

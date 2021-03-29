@@ -140,13 +140,13 @@ class Library {
       // but only if the queue is empty
       if (this.Queue.length === 0) {
         console.log('cleaning up...');
-        console.log(JSON.stringify(this.arrayCleanupHistory));
+        // console.log(JSON.stringify(this.arrayCleanupHistory));
         Object.keys(this.arrayCleanupHistory).map(key => {
           let cleaned = this.arrayCleanupHistory[key];
           if (Array.isArray(cleaned)) {
             console.log(`cleaning ${key}`);
             cleaned = cleaned.filter(el => el !== null);
-            console.log(`Cleaned: ${JSON.stringify(cleaned)}`);
+            // console.log(`Cleaned: ${JSON.stringify(cleaned)}`);
 
             // for some reason we have to do this part over again, I don't know...
             let destination = this;
@@ -155,11 +155,11 @@ class Library {
             map.map(loc => {
               destination = destination[loc];
             });
-            console.log(`\nBefore cleaning: ${JSON.stringify(destination[end])}\n`);
+            // console.log(`\nBefore cleaning: ${JSON.stringify(destination[end])}\n`);
             destination[end] = _.cloneDeep(cleaned);
-            console.log(`\nAfter cleaning: ${JSON.stringify(destination[end])}\n`);
-            console.log(`\n==== WATCHFOLDERS ====\n\n\n${JSON.stringify(this.settings.watchfolders)}\n\n\n`);
-            console.log(`\n==== INACTIVE_MEDIA ====\n\n\n${JSON.stringify(this.inactive_media)}\n\n\n`);
+            // console.log(`\nAfter cleaning: ${JSON.stringify(destination[end])}\n`);
+            // console.log(`\n==== WATCHFOLDERS ====\n\n\n${JSON.stringify(this.settings.watchfolders)}\n\n\n`);
+            // console.log(`\n==== INACTIVE_MEDIA ====\n\n\n${JSON.stringify(this.inactive_media)}\n\n\n`);
           }
         });
         // reset it
@@ -283,7 +283,7 @@ class Library {
     try {
       let saveObj = {};
       Object.keys(defaultLibrary).map((key) => {saveObj[key] = this[key]});
-      console.log(`\n==== SAVING ====\n\n\n${JSON.stringify(saveObj)}\n\n\n`);
+      // console.log(`\n==== SAVING ====\n\n\n${JSON.stringify(saveObj)}\n\n\n`);
       fs.writeFileSync(this.path, JSON.stringify(saveObj));
     } catch(e) {
       console.log("Error writing to file: " + e.toString());

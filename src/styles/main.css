@@ -1551,6 +1551,10 @@ th, tr, td {
   margin:0em;
 }
 
+.list-widget-list li {
+  list-style-type: none;
+}
+
 /* e.g. individual cast and tags items (<li>) */
 .list-widget-item {
   list-style-type: none;
@@ -1587,6 +1591,30 @@ th, tr, td {
   top: 0em;
   /* z-index:100; */
 }
+
+/* for a list-widget with browse, we want the text to overflow to the left
+   so the user can see the right end of the filename */
+.browse .list-widget-item {
+  white-space: nowrap;
+  text-align: right;
+  direction: rtl;
+}
+.browse .list-widget-item::after {
+  content:"";
+  background: none;
+}
+.browse .list-widget-item::before {
+  content:"";
+  background: var(--listwidget-item-ellipsis-grad-left);
+  width: var(--listwidget-item-ellipsis-width);
+  height: 100%;
+  position: absolute;
+  left: -.1em;
+  top: 0em;
+  /* z-index:100; */
+}
+
+
 
 /* .list-widget-delete-item { */
 .inline-delete-button {
@@ -1655,6 +1683,12 @@ th, tr, td {
   margin: var(--listwidgetadd-input-margin);
   padding: var(--listwidgetadd-input-padding); */
 }
+/* increase padding on text input to make room for browse button on left */
+#editor-pane .list-widget-add-with-browse .list-widget-add.inline input.list-widget-add-input,
+#settings-pane .list-widget-add-with-browse .list-widget-add.inline input.list-widget-add-input {
+  padding-left: 2em;
+}
+
 
 /* .list-widget-add button { */
 .editor-inline-button {
@@ -1685,6 +1719,51 @@ th, tr, td {
 .editor-inline-button:hover {
   border: var(--listwidgetadd-button-border);
 }
+
+.editor-inline-button.list-widget-browse {
+  font-size: .8rem;
+  right:initial;
+  left:0em;
+  border-radius: var(--listwidget-item-borderradius-radius) 0em 0em var(--listwidget-item-borderradius-radius);
+}
+
+/* folder icon */
+/* .list-widget-browse img {
+  height:1em;
+  opacity:.8;
+  margin-top: auto;
+  margin-bottom: auto;
+  margin-left:.4em;
+  margin-right:.2em;
+} */
+/* inline browse button with folder icon */
+.editor-inline-button.list-widget-browse {
+  width:1.8em;
+  padding-left:.3em;
+  padding-right:.1em;
+}
+.editor-inline-button.list-widget-browse div {
+  opacity: .8;
+  background-image: url('../../images/folder-icon_white.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 1em;
+  height:100%;
+}
+.editor-inline-button.list-widget-browse:hover div {
+  opacity: 1;
+}
+
+.list-widget-list.browse .list-widget-item {
+  max-width:100%;
+}
+
+.edit-field.subtitles .list-widget-item {
+  /* -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 1.0) 2em);
+  -webkit-mask-position: 0 0;
+  -webkit-mask-repeat: repeat-y; */
+}
+
 
 /* artwork image */
 .edit-field.artwork .edit-field-editor img {

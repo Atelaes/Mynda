@@ -11,6 +11,17 @@ const _ = require('lodash');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
 
+const videoExtensions = [
+  '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
+  'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
+  'mpe', 'mpeg', 'mpg',  'mpv', 'mts', 'mxf', 'nsv',  'ogg',  'ogv', 'qt',
+  'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
+]
+const subtitleExtensions = [
+  'srt', 'ass', 'ssa', 'vtt', 'usf', 'ttml'
+];
+
+
 let win;
 let library = new Library;
 const app = electron.app;
@@ -143,17 +154,6 @@ function findVideosFromFolder(folderNode) {
 
   const folder = folderNode.path;
   const kind = folderNode.kind;
-
-  const videoExtensions = [
-    '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
-    'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
-    'mpe', 'mpeg', 'mpg',  'mpv', 'mts', 'mxf', 'nsv',  'ogg',  'ogv', 'qt',
-    'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
-  ]
-
-  const subtitleExtensions = [
-    'srt', 'ass', 'ssa', 'vtt', 'usf', 'ttml'
-  ];
 
   // read the contents of this folder
   fs.readdir(folder, {withFileTypes : true}, function (err, components) {
@@ -771,7 +771,19 @@ ipcMain.on('editor-artwork-select', (event) => {
   event.sender.send('editor-artwork-selected', result.filePaths[0]);
 }).catch(err => {
   console.log(err)
-})})
+})});
+
+ipcMain.on('editor-subtitle-select', (event) => {
+  let options = {
+    filters: [{name: 'Subtitles', extensions: subtitleExtensions}],
+    properties: ['openFile']
+  };
+  dialog.showOpenDialog(null, options).then(result => {
+    event.sender.send('editor-subtitle-selected', result.filePaths);
+  }).catch(err => {
+    console.log(err)
+  })
+});
 
 ipcMain.on('download', (event, url, destination) => {
   let response = {success:false, message:''};

@@ -2085,15 +2085,15 @@ class MynLibTable extends React.Component {
       try {
         this.requestSort(this.props.initialSort, this.props.initialSortAscending);
       } catch(e) {
-        console.log("No initial sort parameter")
-        console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
-                   \ncolumns: ${this.props.columns}`);
+        // console.log("No initial sort parameter")
+        // console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
+        //            \ncolumns: ${this.props.columns}`);
         // no initial sort parameter, so if the playlist has a default sort column, use that
         if (this.props.flatDefaultSort && this.props.columns.includes(this.props.flatDefaultSort)) {
-          console.log("Sorting by flatDefaultSort: " + this.props.flatDefaultSort);
+          // console.log("Sorting by flatDefaultSort: " + this.props.flatDefaultSort);
           this.requestSort(this.props.flatDefaultSort);
         } else {
-          console.log("Also, no flatDefaultSort, so sorting by [Title]");
+          // console.log("Also, no flatDefaultSort, so sorting by [Title]");
           // if not, sort by title
           this.requestSort('title');
         }
@@ -3087,7 +3087,6 @@ class MynSettingsFolders extends React.Component {
     console.log("user wants to remove " + path + " which is at index " + index);
 
     ipcRenderer.send('settings-watchfolder-remove', path);
-    //boobs
   }
 
   // edit the default kind of an existing watchfolder
@@ -5151,6 +5150,22 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    let subtitles = (
+      <div className='edit-field subtitles'>
+        <label className="edit-field-name" htmlFor="subtitles">Subtitles: </label>
+        <div className="edit-field-editor">
+          <MynEditSubtitles
+            object={this.props.video}
+            property={'subtitles'}
+            update={this.props.handleChange}
+            validator={this.state.validators.everything.exp}
+            validatorTip={this.state.validators.everything.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
     /* CAST */
     let cast = (
       <div className='edit-field cast'>
@@ -5471,6 +5486,7 @@ class MynEditorEdit extends React.Component {
           {position}
           {dateadded}
           {artwork}
+          {subtitles}
           {!this.props.batch ? collections : null}
           {ratings}
           {boxoffice}
@@ -6829,6 +6845,7 @@ class MynEditListWidget extends MynEditWidget {
   }
 
   updateList(list) {
+    // console.log('ORIGINAL UPDATELIST')
     this.setState({ list : list });
     this.props.update(this.props.property,list);
   }
@@ -6853,7 +6870,7 @@ class MynEditListWidget extends MynEditWidget {
         displayItem = item
       }
 
-      return (<li key={index} className="list-widget-item">{displayItem}<div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>);
+      return (<li key={index} className="list-widget-item" title={item}>{displayItem}<div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>);
     });
   }
 
@@ -6982,6 +6999,96 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
         <MynEditAddToList object={this.props.object} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
+      </ul>
+    );
+  }
+}
+
+class MynEditSubtitles extends MynEditListWidget {
+  constructor(props) {
+    super(props)
+
+
+    this.validator = {
+      test: (val) => (val && val !== '' && fs.existsSync(val))
+    }
+
+    this.validatorTip = 'File does not exist';
+
+    // this.input = React.createRef();
+
+    ipcRenderer.on('editor-subtitle-selected', (event, subs) => {
+      if (subs) {
+        let update = [...this.props.object[this.props.property], ...subs];
+        this.updateList(update);
+      } else {
+        console.log("Unable to select subtitle file(s): nothing returned from server");
+      }
+    });
+
+    this.render = this.render.bind(this);
+    this.addToListUpdate = this.addToListUpdate.bind(this);
+  }
+
+  // update(property,list) {
+  //   if (input.value !== '' && fs.existsSync(input.value)) {
+  //     let update = [...this.props.video.subtitles, input.value]
+  //     this.props.update('subtitles',update);
+  //   }
+  // }
+
+  // override updateList from MynEditListWidget to check if the file exists;
+  // we're also using the validator function passed to MynEditAddToList
+  // to do an existence check as the user types a file name,
+  // because that gives visual feedback before the user tries to add the file;
+  // (note: MynEditAddToList has its own updateList function, which is also called
+  // when the user adds an item, which may be confusing: MynEditAddToList's own
+  // updateList function , but we're passing THIS updateList
+  // function to MynEditAddToList as its props.update function (well, through
+  // this.addToListUpdate which just fixes the parameters), which it runs when the
+  // user clicks to add; we do that so we can reuse this logic, mainly to prevent
+  // the user from adding a duplicate, though it also checks for existence again)
+  //
+  // so to summarize: this function runs when the user clicks 'open' from the
+  // browse dialog window, and when the user clicks the add (+) button next to the
+  // text input field (if there is valid input in it)
+  updateList(list) {
+    // console.log('NEW UPDATELIST')
+    let added = list.filter(el => !this.state.list.includes(el));
+    let rejected = [];
+    added.map(sub => {
+      if (typeof sub !== 'string' || !fs.existsSync(sub)) {
+        rejected.push(sub);
+      }
+    })
+
+    // filter nonexistent files and get rid of duplicates
+    list = Array.from(new Set(list.filter(el => !rejected.includes(el))));
+
+    if (rejected.length > 0) {
+      alert(`The following subtitle files could not be found:\n${rejected.map(el=>'\n'+el)}`);
+    }
+
+    this.setState({ list : list });
+    this.props.update(this.props.property,list);
+  }
+
+  // passed to MynEditAddToList as its props.update function,
+  // all we do is take the list parameter and call updateList
+  // with it, since that function doesn't take the property parameter
+  addToListUpdate(property,list) {
+    this.updateList(list);
+  }
+
+
+  render() {
+    return (
+      <ul className={"list-widget-list browse subtitles"}>
+        {this.displayList()}
+        <li className='list-widget-add-with-browse'>
+          <MynEditAddToList object={this.props.object} property={this.props.property} update={this.addToListUpdate} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.validator} validatorTip={this.validatorTip} />
+          <button className='list-widget-browse editor-inline-button' onClick={() => ipcRenderer.send('editor-subtitle-select')}><div className='icon-container'></div></button>
+        </li>
       </ul>
     );
   }
@@ -7287,6 +7394,7 @@ function validateVideo(video) {
     'kind':'string',
     'filename':'string',
     'artwork':'string',
+    'subtitles':'array',
     'collections':'object',
     'boxoffice':'number',
     'rated':'string',
