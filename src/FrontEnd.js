@@ -1825,30 +1825,6 @@ class MynLibTable extends React.Component {
     });
   }
 
-  titleHovered(e) {
-    // console.log("enter");
-    e.stopPropagation();
-    // detect if the movie title is too long for the table cell
-    // and if so, add the 'overflow' class during mouseover
-    // so the css can show the whole thing, however it wants to handle that
-    // if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
-    //   let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
-    //   if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
-    //     titleDiv.classList.add('overflow');
-    //   }
-    // }
-  }
-
-  titleOut(e) {
-    // console.log("leave");
-    e.stopPropagation();
-    // // remove the 'overflow' class in case it was added
-    // if (e.target.tagName == 'TD') { // only execute on the title cell, not the title text container within it
-    //   let titleDiv = e.target.getElementsByClassName("table-title-text")[0];
-    //   titleDiv.classList.remove('overflow');
-    // }
-  }
-
   requestSort(key, ascending) {
     // console.log(key);
     if (key === undefined) {
@@ -1953,7 +1929,7 @@ class MynLibTable extends React.Component {
 
       let cellJSX = {
         order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{this.state.vidOrderDisplay[movie.id]}</td>),
-        title: (<td key="title" className="title" onMouseEnter={(e) => this.titleHovered(e)} onMouseLeave={(e) => this.titleOut(e)}><div className="table-title-text">{movie.title}</div></td>),
+        title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={movie.title} /></td>),
         year: (<td key="year" className="year centered mono">{movie.year}</td>),
         director: (<td key="director" className="director">{movie.director}</td>),
         genre: (<td key="genre" className="genre">{movie.genre}</td>),
@@ -2181,32 +2157,33 @@ class MynLibTable extends React.Component {
       }
     }
 
-    // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
-    // so that when the CSS marquee scrolls to 100%, that means it will scroll just enough to show the end of the text;
-    // and give it the 'overflow' class so the css can scroll it (or whatever it wants to do)
-    Array.from(document.getElementsByClassName('movie-table')).map((table) => {
-      Array.from(table.getElementsByClassName('table-title-text')).map((titleDiv) => {
-        // if (titleDiv.innerHTML == 'The Adventures of Buckaroo Banzai Across the 8th Dimension') {
-        if (titleDiv.innerHTML == 'The Craziest Final 2 Minutes in NFL History   NFL Vault') {
-          console.log(titleDiv.innerHTML);
-          console.log('parent offsetWidth: ' + titleDiv.parentNode.offsetWidth);
-          console.log('self offsetWidth: ' + titleDiv.offsetWidth);
-          console.log('scrollWidth: ' + titleDiv.scrollWidth);
-        }
-
-         // text is overflowing
-        if (titleDiv.parentNode.offsetWidth < titleDiv.scrollWidth) {// && !/\boverflow\b/.test(titleDiv.className)) {
-          // console.log('--found overflowing title: ' + titleDiv.innerHTML);
-          titleDiv.style.marginRight = titleDiv.parentNode.offsetWidth + 'px'; // necessary to force the parent element (the <td>) to stay wide; otherwise if this is the only overflowing row, the <td> will shrink if we don't add this margin
-          titleDiv.style.width = titleDiv.scrollWidth - titleDiv.parentNode.offsetWidth + 'px';
-          // titleDiv.style.border = '1px solid red';
-
-          titleDiv.classList.add('overflow');
-        }
-
-        // console.log('width: ' + titleDiv.style.width);
-      });
-    });
+    // no need for the below anymore, we made a component for it
+    // // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
+    // // so that when the CSS marquee scrolls to 100%, that means it will scroll just enough to show the end of the text;
+    // // and give it the 'overflow' class so the css can scroll it (or whatever it wants to do)
+    // Array.from(document.getElementsByClassName('movie-table')).map((table) => {
+    //   Array.from(table.getElementsByClassName('table-title-text')).map((titleDiv) => {
+    //     // if (titleDiv.innerHTML == 'The Adventures of Buckaroo Banzai Across the 8th Dimension') {
+    //     if (titleDiv.innerHTML == 'The Craziest Final 2 Minutes in NFL History   NFL Vault') {
+    //       console.log(titleDiv.innerHTML);
+    //       console.log('parent offsetWidth: ' + titleDiv.parentNode.offsetWidth);
+    //       console.log('self offsetWidth: ' + titleDiv.offsetWidth);
+    //       console.log('scrollWidth: ' + titleDiv.scrollWidth);
+    //     }
+    //
+    //      // text is overflowing
+    //     if (titleDiv.parentNode.offsetWidth < titleDiv.scrollWidth) {// && !/\boverflow\b/.test(titleDiv.className)) {
+    //       // console.log('--found overflowing title: ' + titleDiv.innerHTML);
+    //       titleDiv.style.marginRight = titleDiv.parentNode.offsetWidth + 'px'; // necessary to force the parent element (the <td>) to stay wide; otherwise if this is the only overflowing row, the <td> will shrink if we don't add this margin
+    //       titleDiv.style.width = titleDiv.scrollWidth - titleDiv.parentNode.offsetWidth + 'px';
+    //       // titleDiv.style.border = '1px solid red';
+    //
+    //       titleDiv.classList.add('overflow');
+    //     }
+    //
+    //     // console.log('width: ' + titleDiv.style.width);
+    //   });
+    // });
 
   }
 
@@ -2378,36 +2355,38 @@ class MynDetails extends React.Component {
     return displaydate;
   }
 
-  // if the title text overflows its container,
-  // set up title div with the appropriate width and class name for the css to apply a marquee effect
-  setTitleMarquee() {
-    try {
-      let titleDiv = document.getElementById('detail-title').getElementsByClassName('detail-title-text')[0];
-      // titleDiv.style.width = '100%';
-      titleDiv.style.width = window.getComputedStyle(titleDiv.parentNode, null).getPropertyValue('width');
-      let computed = window.getComputedStyle(titleDiv, null);
-      // console.log(titleDiv.innerHTML);
-      // console.log('width: ' + titleDiv.style.width);
-      // console.log('actual width: ' + computed.getPropertyValue('width'));
-      // console.log('offsetWidth: ' + titleDiv.offsetWidth);
-      // console.log('scrollWidth: ' + titleDiv.scrollWidth);
-      // console.log('getBoundingClientRect().width: ' + titleDiv.getBoundingClientRect().width);
-      // console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
-      // console.log('font-size: ' + computed.getPropertyValue('font-size'));
-      // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
 
-      if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
-        titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth + 'px';
-        titleDiv.classList.add('overflow');
-      } else {
-        titleDiv.classList.remove('overflow');
-      }
-
-      // console.log('new width: ' + titleDiv.style.width);
-    } catch(e) {
-
-    }
-  }
+  // don't need the below anymore, we made a component for it instead
+  // // if the title text overflows its container,
+  // // set up title div with the appropriate width and class name for the css to apply a marquee effect
+  // setTitleMarquee() {
+  //   try {
+  //     let titleDiv = document.getElementById('detail-title').getElementsByClassName('detail-title-text')[0];
+  //     // titleDiv.style.width = '100%';
+  //     titleDiv.style.width = window.getComputedStyle(titleDiv.parentNode, null).getPropertyValue('width');
+  //     let computed = window.getComputedStyle(titleDiv, null);
+  //     // console.log(titleDiv.innerHTML);
+  //     // console.log('width: ' + titleDiv.style.width);
+  //     // console.log('actual width: ' + computed.getPropertyValue('width'));
+  //     // console.log('offsetWidth: ' + titleDiv.offsetWidth);
+  //     // console.log('scrollWidth: ' + titleDiv.scrollWidth);
+  //     // console.log('getBoundingClientRect().width: ' + titleDiv.getBoundingClientRect().width);
+  //     // console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
+  //     // console.log('font-size: ' + computed.getPropertyValue('font-size'));
+  //     // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
+  //
+  //     if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
+  //       titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth + 'px';
+  //       titleDiv.classList.add('overflow');
+  //     } else {
+  //       titleDiv.classList.remove('overflow');
+  //     }
+  //
+  //     // console.log('new width: ' + titleDiv.style.width);
+  //   } catch(e) {
+  //
+  //   }
+  // }
 
   clickDescrip(e) {
     // if (this.props.settings.preferences.hide_description === "hide") {
@@ -2449,7 +2428,7 @@ class MynDetails extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    this.setTitleMarquee();
+    // this.setTitleMarquee();
     if (!_.isEqual(oldProps.video, this.props.video)) {
       // this.setTitleMarquee();
       if (this.props.settings.preferences.hide_description === "hide") {
@@ -2486,7 +2465,7 @@ class MynDetails extends React.Component {
       details = (
         <ul>
           <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark-details.png'} /></li>
-          <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} endPadding='.2em' time={6} delay={.5} /></li>
+          <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
           <li className="detail" id="detail-ratings">{this.displayRatings()}</li>
@@ -2539,20 +2518,176 @@ class MynDetails extends React.Component {
   }
 }
 
-// <MynOverflowTextMarquee class="detail-title-text" text={video.title} endPadding='.2em' time={6} delay={.5} />
+// <MynOverflowTextMarquee class="detail-title-text" text={video.title} endPadding='.2em' time={6} timeR={3} delay={.5} delayR={0} timingFuncR='ease-in-out' />
 class MynOverflowTextMarquee extends React.Component {
   constructor(props) {
     super(props)
 
-    this.state = {
-    }
-
+    // this.state = {
+    //   reverse: false,
+    //   style : {
+    //
+    //   },
+    //   time: `${!isNaN(this.props.time) ? this.props.time : '5'}s`,
+    //   timingFunc: this.props.timingFunc ? this.props.timingFunc : 'cubic-bezier(.5, 0, .8, 1)',
+    //   timingFuncR: this.props.timingFuncR ? this.props.timingFuncR : 'cubic-bezier(.2, 0, .5, 1)',
+    //   delay: `${!isNaN(this.props.delay) ? this.props.delay : '0'}s`
+    // }
+    //
+    // this.baseStyle = {
+    //   whiteSpace:'no-wrap',
+    //   overflow:'visible'
+    // };
+    // this.overflowHoverStyle = {
+    //   // animation: `details-scroll-left ${this.props.time ? this.props.time : '5'}s cubic-bezier(.5, 0, .8, 1) infinite`,
+    //   // animationDelay: this.props.delay ? `${this.props.delay}s` : '0s',
+    //   // animationDirection: 'alternate',
+    //   // animationFillMode: 'both',
+    //
+    //
+    //   transform: `translateX(calc(-100%${this.props.endPadding ? (' - ' + this.props.endPadding) : ''}))`,
+    //   transitionProperty: 'transform',
+    //   transitionDuration: this.state.time,
+    //   transitionTimingFunction: this.state.timingFunc,
+    //   transitionDelay: this.state.delay
+    //
+    // };
+    //
+    // this.overflowHoverStyleReverse = {
+    //   transform: 'translateX(0%)',
+    //   transitionProperty: 'transform',
+    //   transitionDuration: !isNaN(this.props.timeR) ? `${this.props.timeR}s` : this.state.time,
+    //   transitionTimingFunction: this.state.timingFuncR,
+    //   transitionDelay: !isNaN(this.props.delayR) ? `${this.props.delayR}s` : this.state.delay
+    //
+    // };
+    //
+    //
+    // this.switchDir = this.switchDir.bind(this);
+    this.theDiv = React.createRef();
     this.render = this.render.bind(this);
+  }
 
+  // initialize() {
+  //   this.setState({style:{...this.baseStyle}});
+  //
+  //   // check for overflow
+  //   try {
+  //     this.overflowHoverStyle.border = '1px solid red';
+  //     this.overflowHoverStyle.width = window.getComputedStyle(this.theDiv.current.parentNode, null).getPropertyValue('width');
+  //
+  //     // let computed = window.getComputedStyle(this.theDiv.current, null);
+  //     // console.log(this.theDiv.current.innerHTML);
+  //     // console.log('width: ' + this.theDiv.current.style.width);
+  //     // console.log('actual width: ' + computed.getPropertyValue('width'));
+  //     // console.log('offsetWidth: ' + this.theDiv.current.offsetWidth);
+  //     // console.log('scrollWidth: ' + this.theDiv.current.scrollWidth);
+  //     // console.log('getBoundingClientRect().width: ' + this.theDiv.current.getBoundingClientRect().width);
+  //     // console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
+  //     // console.log('font-size: ' + computed.getPropertyValue('font-size'));
+  //     // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
+  //
+  //     // if the text is overflowing the container
+  //     if (this.theDiv.current.offsetWidth < this.theDiv.current.scrollWidth) { // text is overflowing
+  //       this.overflowHoverStyle.width = this.theDiv.current.scrollWidth - this.theDiv.current.offsetWidth + 'px';
+  //       this.overflowHoverStyle.marginRight = titleDiv.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
+  //       this.theDiv.current.classList.add('overflow');
+  //     } else {
+  //       // the text is not overflowing, so we don't need to do anything special
+  //       this.theDiv.current.classList.remove('overflow');
+  //     }
+  //
+  //     // console.log('new width: ' + this.theDiv.style.width);
+  //   } catch(err) {
+  //     console.error(`Could not apply overflow styles: ${err}`);
+  //   }
+  // }
+
+  initialize() {
+    // check for overflow
+    try {
+      this.theDiv.current.style.width = window.getComputedStyle(this.theDiv.current.parentNode, null).getPropertyValue('width');
+
+      // let computed = window.getComputedStyle(this.theDiv.current, null);
+      // console.log(this.theDiv.current.innerHTML);
+      // console.log('width: ' + this.theDiv.current.style.width);
+      // console.log('actual width: ' + computed.getPropertyValue('width'));
+      // console.log('offsetWidth: ' + this.theDiv.current.offsetWidth);
+      // console.log('scrollWidth: ' + this.theDiv.current.scrollWidth);
+      // console.log('getBoundingClientRect().width: ' + this.theDiv.current.getBoundingClientRect().width);
+      // console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
+      // console.log('font-size: ' + computed.getPropertyValue('font-size'));
+      // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
+
+      // if the text is overflowing the container
+      // set the width and stuff so that the CSS animation scrolls the appropriate amount;
+      // then we just add the 'overflow' class and let the CSS do the actual animation
+      if (this.theDiv.current.offsetWidth < this.theDiv.current.scrollWidth) { // text is overflowing
+        this.theDiv.current.style.width = this.theDiv.current.scrollWidth - this.theDiv.current.offsetWidth + 'px';
+        this.theDiv.current.style.marginRight = this.theDiv.current.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
+        this.theDiv.current.classList.add('overflow');
+      } else {
+        // the text is not overflowing, so we don't need to do anything special
+        this.theDiv.current.classList.remove('overflow');
+      }
+
+      // console.log('new width: ' + this.theDiv.current.style.width);
+    } catch(err) {
+      console.error(`Could not apply overflow styles: ${err}`);
+    }
+  }
+
+  // switchDir() {
+  //   // if this.state.reverse === true NOW, then we're currently reversing, so we want to switch to forward
+  //   let hoverStyle = this.state.reverse ? this.overflowHoverStyle : this.overflowHoverStyleReverse
+  //
+  //   this.setState({
+  //     reverse: !this.state.reverse,
+  //     style: {...this.baseStyle,...hoverStyle}
+  //   });
+  // }
+  //
+  // hover(e) {
+  //   // if the text is overflowing, set the overflow CSS animation
+  //   if (this.theDiv.current.offsetWidth < this.theDiv.current.scrollWidth) {
+  //     this.theDiv.current.addEventListener('transitionend', this.switchDir);
+  //
+  //     // start the animation (always start forward)
+  //     this.setState({
+  //       reverse: false,
+  //       style: {...this.baseStyle,...this.overflowHoverStyle}
+  //     });
+  //   }
+  // }
+  //
+  // unhover(e) {
+  //   this.setState({style:{...this.baseStyle}});
+  //   this.theDiv.current.removeEventListener('transitionend', this.switchDir);
+  // }
+
+  componentDidMount() {
+    this.initialize();
+  }
+
+  componentDidUpdate(oldProps) {
+    if (oldProps.text !== this.props.text) {
+      this.initialize();
+    }
   }
 
   render() {
-    return null;
+    // return (
+    //   <div ref={this.theDiv} className={this.props.class} style={this.state.style} onMouseEnter={(e) => this.hover(e)} onMouseLeave={(e) => this.unhover(e)}>
+    //     {this.props.text}
+    //   </div>
+    // );
+
+    return (
+      <div ref={this.theDiv} className={this.props.class}>
+        {this.props.text}
+      </div>
+    );
+
   }
 
 }
