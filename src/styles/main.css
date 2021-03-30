@@ -476,18 +476,16 @@ th, tr, td {
   position: relative; /* necessary for the positioning of the ellipsis gradient */
 }
 /* ellipsis gradient */
-.movie-row .title::after, .movie-row:hover .title::after {
+/* .movie-row .title::after, .movie-row:hover .title::after {
   display: inline-block;
-  /* border:1px solid red; */
   content: "";
   width: 1em;
   position: absolute;
   top:0px;
   right: 0px;
-  /* width: 100%; */
   height: 100%;
-}
-.movie-row .title::after {
+} */
+/* .movie-row .title::after {
   background: var(--tablecell-ellipsis-grad);
 }
 .movie-row:nth-of-type(odd) .title::after {
@@ -510,7 +508,7 @@ th, tr, td {
 .movie-row.locked .title::after,
 .movie-row.locked:hover .title::after {
   background: var(--tablecell-ellipsis-grad-locked);
-}
+} */
 .movie-row .dateadded,
 .movie-row .lastseen {
   font-size: var(--movie-row-date-font-size) !important;
@@ -1293,14 +1291,14 @@ th, tr, td {
   white-space: nowrap;
   overflow:hidden;
 }
-#settings-folders-folders td.path.overflow {
+/* #settings-folders-folders td.path.overflow {
   -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 1.0) 3em);
   -webkit-mask-position: 0 0;
   -webkit-mask-repeat: repeat-y;
 }
 #settings-folders-folders td.path.overflow span {
   float:right;
-}
+} */
 
 #settings-folders-folders th.default-kind { /* the default kind column of the table */
   width:6em;
@@ -1503,6 +1501,10 @@ th, tr, td {
   background: var(--editor-input-title-background);
   padding: var(--editor-input-title-padding);
   border-radius: var(--editor-input-title-borderradius);
+
+  -webkit-mask-image: linear-gradient(to left, transparent .3em, rgba(0, 0, 0, 1.0) .6em);
+  -webkit-mask-position: 0 0;
+  -webkit-mask-repeat: repeat-y;
 }
 
 /* edit widgets are little graphical editors, such as the rating stars and the checkmark
@@ -1594,7 +1596,7 @@ th, tr, td {
 
 /* for a list-widget with browse, we want the text to overflow to the left
    so the user can see the right end of the filename */
-.browse .list-widget-item {
+/* .browse .list-widget-item {
   white-space: nowrap;
   text-align: right;
   direction: rtl;
@@ -1611,8 +1613,7 @@ th, tr, td {
   position: absolute;
   left: -.1em;
   top: 0em;
-  /* z-index:100; */
-}
+} */
 
 
 

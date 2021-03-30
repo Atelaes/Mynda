@@ -1929,7 +1929,7 @@ class MynLibTable extends React.Component {
 
       let cellJSX = {
         order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{this.state.vidOrderDisplay[movie.id]}</td>),
-        title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={movie.title} /></td>),
+        title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={movie.title} ellipsis='fade' /></td>),
         year: (<td key="year" className="year centered mono">{movie.year}</td>),
         director: (<td key="director" className="director">{movie.director}</td>),
         genre: (<td key="genre" className="genre">{movie.genre}</td>),
@@ -2523,6 +2523,22 @@ class MynOverflowTextMarquee extends React.Component {
   constructor(props) {
     super(props)
 
+    this.ellipsisBaseStyle = {
+      // position: 'absolute',
+      // right: '0',
+      // top: '0',
+      // height: '100%',
+      // width: '1em'
+    }
+
+
+    this.state = {
+      ellipsisStyle: {...this.ellipsisBaseStyle},
+      direction: props.direction ? props.direction : 'right',
+      oppositeDir: props.direction === 'left' ? 'right' : 'left',
+      fadeSize: props.fadeSize ? props.fadeSize : '1em'
+    }
+
     // this.state = {
     //   reverse: false,
     //   style : {
@@ -2604,9 +2620,13 @@ class MynOverflowTextMarquee extends React.Component {
   // }
 
   initialize() {
+    let ellipsisStyle = {};
+    // console.log('INITIALIZE');
     // check for overflow
     try {
-      this.theDiv.current.style.width = window.getComputedStyle(this.theDiv.current.parentNode, null).getPropertyValue('width');
+      // I'm not sure why, but the following line seems to fix an issue where the
+      // scrollWidth (I think) gives inconsistent numbers, resulting in a mess
+      this.theDiv.current.style.width = window.getComputedStyle(this.theDiv.current.parentNode.parentNode, null).getPropertyValue('width');
 
       // let computed = window.getComputedStyle(this.theDiv.current, null);
       // console.log(this.theDiv.current.innerHTML);
@@ -2623,13 +2643,43 @@ class MynOverflowTextMarquee extends React.Component {
       // set the width and stuff so that the CSS animation scrolls the appropriate amount;
       // then we just add the 'overflow' class and let the CSS do the actual animation
       if (this.theDiv.current.offsetWidth < this.theDiv.current.scrollWidth) { // text is overflowing
+        // console.log('OVERFLOWING')
+
         this.theDiv.current.style.width = this.theDiv.current.scrollWidth - this.theDiv.current.offsetWidth + 'px';
-        this.theDiv.current.style.marginRight = this.theDiv.current.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
+        if (this.state.direction === 'right') this.theDiv.current.style.marginRight = this.theDiv.current.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
+        if (this.state.direction === 'left') this.theDiv.current.style.marginLeft = this.theDiv.current.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
         this.theDiv.current.classList.add('overflow');
+        this.theDiv.current.classList.add(this.state.direction);
+
+        if (this.props.ellipsis === 'fade') {
+          console.log('fade');
+          let fade = {
+            WebkitMaskImage: `linear-gradient(to ${this.state.oppositeDir}, transparent 0, rgba(0, 0, 0, 1.0) ${this.state.fadeSize})`,
+            WebkitMaskPosition: '0 0',
+            WebkitMaskRepeat: 'repeat-y'
+          }
+          ellipsisStyle = {...this.ellipsisBaseStyle,...fade};
+        }
       } else {
+        // console.log('NOT OVERFLOWING');
+        this.theDiv.current.style.width = null;
+        this.theDiv.current.style.marginRight = null;
+
+        ellipsisStyle = {...this.ellipsisBaseStyle};
+
         // the text is not overflowing, so we don't need to do anything special
         this.theDiv.current.classList.remove('overflow');
+        this.theDiv.current.classList.remove(this.state.direction);
       }
+
+      // when we're overflowing left, this.theDiv is set to absolute,
+      // which means the container will have a height of 0, so we have to compensate for that
+      if (this.state.direction === 'left') {
+        ellipsisStyle.height = this.theDiv.current.offsetHeight + 'px';
+      }
+
+      this.setState({ellipsisStyle:ellipsisStyle});
+
 
       // console.log('new width: ' + this.theDiv.current.style.width);
     } catch(err) {
@@ -2682,9 +2732,23 @@ class MynOverflowTextMarquee extends React.Component {
     //   </div>
     // );
 
+    let style = {
+      whiteSpace: 'nowrap',
+      // overflow: 'hidden'
+    };
+    if (this.state.direction === 'left') {
+      style.textAlign = 'right';
+      style.direction = 'rtl';
+      style.position = 'absolute';
+      style.right = '0';
+      // style.float = 'right'
+    }
+
     return (
-      <div ref={this.theDiv} className={this.props.class}>
-        {this.props.text}
+      <div className='marquee-container' style={this.state.ellipsisStyle}>
+        <div ref={this.theDiv} className={this.props.class} style={style}>
+          {this.props.text}
+        </div>
       </div>
     );
 
@@ -3288,7 +3352,7 @@ class MynSettingsFolders extends React.Component {
         if (!folder) return null;
         return (
           <tr key={index}>
-            <td className='path overflow' title={folder.path}><span>{folder.path}</span></td>
+            <td className='path' title={folder.path}><MynOverflowTextMarquee text={folder.path} ellipsis='fade' fadeSize='3em' direction='left' /></td>
             <td className='default-kind'>
               <span className='select-container select-alwaysicon'>
                 <select value={folder.kind} onChange={(e) => this.editKind(e,index)}>{this.formFieldKindOptions()}</select>
@@ -5316,6 +5380,8 @@ class MynEditorEdit extends React.Component {
             validator={this.state.validators.everything.exp}
             validatorTip={this.state.validators.everything.tip}
             reportValid={this.props.reportValid}
+            marquee={true}
+            overflowDirection={'left'}
           />
         </div>
       </div>
@@ -7029,7 +7095,19 @@ class MynEditListWidget extends MynEditWidget {
         displayItem = item
       }
 
-      return (<li key={index} className="list-widget-item" title={item}>{displayItem}<div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>{"\u2715"}</div></li>);
+      if (this.props.marquee) {
+        displayItem = (<MynOverflowTextMarquee text={displayItem} direction={this.props.overflowDirection} ellipsis='fade' fadeSize='2em' />);
+      }
+
+      return (
+        <li key={index} className="list-widget-item" title={item}>
+          {displayItem}
+          <div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>
+            {"\u2715"}
+          </div>
+        </li>
+      );
+
     });
   }
 

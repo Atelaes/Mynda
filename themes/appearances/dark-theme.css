@@ -472,7 +472,7 @@
   --editor-input-title-margin: -.5rem 0em -1rem 0em;
   --editor-input-title-color: var(--detailtitle-text);
   --editor-input-title-background: initial;
-  --editor-input-title-padding: 0em;
+  --editor-input-title-padding: 0em .3em 0em 0em;
   --editor-input-title-borderradius: 0em;
   --editor-input-title-zindex: calc(var(--openablepane-zindex) + 10);
 
@@ -880,24 +880,71 @@ in lieu of that, we will use a negative margin on the selected element instead (
     transform: translateX(0%);
   }
   100% {
-    transform: translateX(-101%);
+    transform: translateX(calc(-100% - .2em));
   }
 }
 
 .movie-row .title:hover .table-title-text.overflow {
   /* marquee effect */
-  animation: table-scroll-left 4s cubic-bezier(.5, 0, .8, 1) infinite;
+  animation: scroll-left 4s cubic-bezier(.5, 0, .8, 1) infinite;
   animation-delay: 0s;
   animation-direction: alternate;
   animation-fill-mode: both;
 }
 
-@keyframes table-scroll-left {
+@keyframes scroll-left {
   0% {
     transform: translateX(0%);
   }
   100% {
-    transform: translateX(calc(-100% - 1em));
+    transform: translateX(calc(-100% - 1.5em));
+  }
+}
+@keyframes scroll-right {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(calc(100% + 1.5em));
+  }
+}
+
+.list-widget-item:hover .overflow {
+  /* marquee effect */
+  animation: list-scroll-left 6s cubic-bezier(.2, 0, .8, 1) infinite;
+  animation-delay: .3s;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+}
+.list-widget-item:hover .overflow.left {
+  /* marquee effect */
+  animation-name: list-scroll-right;
+}
+
+/* the path column of the table in settings/watchfolders */
+#settings-folders-folders td.path:hover .overflow.left {
+  /* marquee effect */
+  animation: scroll-right 6s cubic-bezier(.2, 0, .8, 1) infinite;
+  animation-delay: 1.5s;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+}
+
+
+@keyframes list-scroll-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(calc(-100% - 3em));
+  }
+}
+@keyframes list-scroll-right {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(calc(100% + 3em));
   }
 }
 
@@ -992,7 +1039,8 @@ in lieu of that, we will use a negative margin on the selected element instead (
   background-size: .6em .6em !important;
   /* background: rgba(0,0,0,0) var(--inputicon-filled) no-repeat 0% 50%; */
   height:100%;
-  width: 1.2em;
+  /* width: 1.2em; */
+  width: 1em;
   right:0em;
 }
 
