@@ -2187,18 +2187,19 @@ class MynLibTable extends React.Component {
     Array.from(document.getElementsByClassName('movie-table')).map((table) => {
       Array.from(table.getElementsByClassName('table-title-text')).map((titleDiv) => {
         // if (titleDiv.innerHTML == 'The Adventures of Buckaroo Banzai Across the 8th Dimension') {
-        // if (titleDiv.innerHTML == 'The Matrix') {
-        //   console.log(titleDiv.innerHTML);
-        //   console.log('parent offsetWidth: ' + titleDiv.parentNode.offsetWidth);
-        //   console.log('self offsetWidth: ' + titleDiv.offsetWidth);
-        //   console.log('scrollWidth: ' + titleDiv.scrollWidth);
-        // }
+        if (titleDiv.innerHTML == 'The Craziest Final 2 Minutes in NFL History   NFL Vault') {
+          console.log(titleDiv.innerHTML);
+          console.log('parent offsetWidth: ' + titleDiv.parentNode.offsetWidth);
+          console.log('self offsetWidth: ' + titleDiv.offsetWidth);
+          console.log('scrollWidth: ' + titleDiv.scrollWidth);
+        }
 
          // text is overflowing
         if (titleDiv.parentNode.offsetWidth < titleDiv.scrollWidth) {// && !/\boverflow\b/.test(titleDiv.className)) {
           // console.log('--found overflowing title: ' + titleDiv.innerHTML);
-          titleDiv.style.marginRight = titleDiv.parentNode.offsetWidth; // necessary to force the parent element (the <td>) to stay wide; otherwise if this is the only overflowing row, the <td> will shrink if we don't add this margin
-          titleDiv.style.width = titleDiv.scrollWidth - titleDiv.parentNode.offsetWidth;
+          titleDiv.style.marginRight = titleDiv.parentNode.offsetWidth + 'px'; // necessary to force the parent element (the <td>) to stay wide; otherwise if this is the only overflowing row, the <td> will shrink if we don't add this margin
+          titleDiv.style.width = titleDiv.scrollWidth - titleDiv.parentNode.offsetWidth + 'px';
+          // titleDiv.style.border = '1px solid red';
 
           titleDiv.classList.add('overflow');
         }
@@ -2396,7 +2397,7 @@ class MynDetails extends React.Component {
       // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
 
       if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
-        titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth;
+        titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth + 'px';
         titleDiv.classList.add('overflow');
       } else {
         titleDiv.classList.remove('overflow');
@@ -2485,7 +2486,7 @@ class MynDetails extends React.Component {
       details = (
         <ul>
           <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark-details.png'} /></li>
-          <li className="detail" id="detail-title"><div className="detail-title-text">{video.title}</div></li>
+          <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} endPadding='.2em' time={6} delay={.5} /></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
           <li className="detail" id="detail-ratings">{this.displayRatings()}</li>
@@ -2537,6 +2538,25 @@ class MynDetails extends React.Component {
     )
   }
 }
+
+// <MynOverflowTextMarquee class="detail-title-text" text={video.title} endPadding='.2em' time={6} delay={.5} />
+class MynOverflowTextMarquee extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+    }
+
+    this.render = this.render.bind(this);
+
+  }
+
+  render() {
+    return null;
+  }
+
+}
+
 
 class MynOpenablePane extends React.Component {
   constructor(props) {
@@ -6405,7 +6425,11 @@ class MynEditArtwork extends MynEdit {
 
       // on finishing, whether successful or not,
       // hide message and show input field again
-      this.input.current.style.visibility = 'visible';
+      try {
+        this.input.current.style.visibility = 'visible';
+      } catch(err) {
+        document.getElementById('edit-field-artwork').style.visibility = 'visible';
+      }
       this._isMounted && this.setState({message: ""});
       this.dlMsg.current.style.display = 'none';
 
@@ -7497,8 +7521,8 @@ function validateVideo(video) {
 // helper function to determine if a string is a valid URL
 function isValidURL(s) {
   try {
-    new URL(s);
-    return true;
+    let url = new URL(s);
+    return url.host !== '';
   } catch (error) {
     return false;
   }

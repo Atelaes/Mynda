@@ -886,7 +886,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 .movie-row .title:hover .table-title-text.overflow {
   /* marquee effect */
-  animation: table-scroll-left 5s cubic-bezier(.5, 0, .8, 1) infinite;
+  animation: table-scroll-left 4s cubic-bezier(.5, 0, .8, 1) infinite;
   animation-delay: 0s;
   animation-direction: alternate;
   animation-fill-mode: both;
@@ -897,7 +897,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
     transform: translateX(0%);
   }
   100% {
-    transform: translateX(-110%);
+    transform: translateX(calc(-100% - 1em));
   }
 }
 
