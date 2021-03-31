@@ -636,12 +636,14 @@
   --editartwork-img-width: 100%;
   --editartwork-img-height: auto;
 
+  --editartwork-btns-pad: .2rem;
   --editartwork-browse-position: absolute;
   --editartwork-browse-top: initial;
-  --editartwork-browse-bottom: calc(.3em + var(--editor-textinput-height));
+  --editartwork-browse-bottom: calc(var(--editartwork-btns-pad) + var(--editor-textinput-height));
   --editartwork-browse-left: initial;
-  --editartwork-browse-right: .3em;
+  --editartwork-browse-right: var(--editartwork-btns-pad);
 
+  --editartwork-revert-fontsize: 1.5em;
   --editartwork-revert-position: absolute;
   --editartwork-revert-top: var(--editartwork-browse-top);
   --editartwork-revert-bottom: var(--editartwork-browse-bottom);

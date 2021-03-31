@@ -4827,7 +4827,8 @@ class MynEditorSearch extends React.Component {
       // of the movie object, if present; OMDB only allows us to search by Title,
       // Year, and Type;
       // if the title field is empty, we will substitute the file name
-      const filename = this.props.video.filename.match(/[^/]+$/)[0]; // get just the filename from the path // /[^/]+(?=\.\w{2,4}$)/
+      // const filename = this.props.video.filename.match(/[^/]+$/)[0]; // get just the filename from the path // /[^/]+(?=\.\w{2,4}$)/
+      const filename = path.basename(this.props.video.filename,path.extname(this.props.video.filename));
       console.log('filename: ' + filename);
       this.titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
       this.yearQuery = this.props.video.year !== '' ? this.props.video.year : null;
@@ -4891,14 +4892,19 @@ class MynEditorSearch extends React.Component {
         }
 
         // if that didn't work, try some modifications on the title
-        if (response.data.Response == "False" && this.titleQuery.split(/[\.\s]/).length > 1) {
+        if (response.data.Response == "False" && this.titleQuery.split(/[\.-–—_,;/\\\s]/).length > 1) {
           console.log('nothing found, trying again with modifications');
 
           if (/\./.test(this.titleQuery)) {
             // if there are periods, replace them all with spaces
             this.titleQuery = this.titleQuery.replace(/\.+/g,' ');
+          } else if (/[-–—_,;/\\]/.test(this.titleQuery)) {
+            // if that didn't work,
+            // replace most other punctuation with spaces
+            // and try again
+            this.titleQuery = this.titleQuery.replace(/[-–—_,;/\\]+/g,' ');
           } else {
-            // if there are no periods, start lopping off the last word
+            // if that didn't work, start lopping off the last word
             // (and recursing until we find some results)
             this.titleQuery = this.titleQuery.split(/\s/).slice(0,-1).join(' ');
           }
@@ -5034,32 +5040,32 @@ class MynEditorSearch extends React.Component {
           };
           try {
             newData.boxoffice = accounting.parse(response.data.BoxOffice) || 0; //parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse boxoffice: ${err}`); }
           try {
             newData.directorsort = /^\w+\s\w+$/.test(response.data.Director) ? response.data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : response.data.Director; // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse directorsort: ${err}`); }
           try {
             newData.cast = response.data.Actors.split(', ');
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse actors: ${err}`); }
           try {
             newData.genre = response.data.Genre.split(', ')[0]; // just pick the first genre for genre, since we only allow one
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse genre: ${err}`); }
           try {
             newData.languages = response.data.Language.split(', ');
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse languages: ${err}`); }
           try {
             newData.tags = Array.from(new Set(response.data.Genre.split(', ').map((item) => item.toLowerCase()).concat(this.props.video.tags))); // add new tags to existing tags, removing duplicates
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse tags: ${err}`); }
           let ratings = _.cloneDeep(this.props.video.ratings);
           try {
             ratings.imdb = Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)); // / 10;
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse imdb rating: ${err}`); }
           try {
             ratings.rt = Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)); // / 100;
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse rt rating: ${err}`); }
           try {
             ratings.mc = Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
-          } catch(err) { console.error(`OMDB parse: ${err}`); }
+          } catch(err) { console.error(`OMDB parse mc rating: ${err}`); }
           newData.ratings = ratings;
 
           // put the new data into the editor fields
@@ -5077,7 +5083,7 @@ class MynEditorSearch extends React.Component {
 
   render() {
     let clearBtn = this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
-    let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>);
+    let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on IMDb ID if present, then title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>);
     return (
         <div id='edit-search'>
           <div id='edit-search-controls'>

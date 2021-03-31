@@ -1469,6 +1469,11 @@ th, tr, td {
   font-weight: var(--editfield-descrip-fontweight);
 }
 
+/* without this there's an annoying gap below the artwork for some reason */
+.edit-field.artwork .edit-field-editor {
+  line-height:0;
+}
+
 .edit-field.title .edit-field-name,
 .edit-field.description .edit-field-name,
 .edit-field.artwork .edit-field-name {
@@ -1790,15 +1795,15 @@ th, tr, td {
   bottom: var(--editartwork-revert-bottom);
   left: var(--editartwork-revert-left);
   right: var(--editartwork-revert-right);
-  /* width:1em; */
-  height:1em;
-  font-size: 1.5em;
-  font-weight: 800;
   color: var(--editartwork-revert-text);
   text-shadow: var(--editartwork-revert-textshadow);
+  line-height: 1rem;
+  height: 1rem;
 }
 #editor-pane .edit-field-revert::after {
   content:"\21BA";
+  font-size: var(--editartwork-revert-fontsize);
+  font-weight: 800;
 }
 #editor-pane .edit-field-revert:hover {
   color: var(--editartwork-revert-text-hover);
