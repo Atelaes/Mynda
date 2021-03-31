@@ -34,10 +34,10 @@ let numNewVids = 0; // the number of new videos found whenever we check the watc
 app.whenReady().then(start);
 
 async function start() {
+  createWindow();  //createWindow needs to come first else we get a big delay.
   eraseTempImages();
   await cleanLibrary();
   checkWatchFolders();
-  createWindow();
 }
 
 function eraseTempImages() {
