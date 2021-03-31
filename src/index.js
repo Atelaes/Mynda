@@ -337,6 +337,7 @@ function isDVDRip(folder) {
 
 let videoTemplate =   {
     "id" : '',
+    "imdbID" : '',
     "title" : '',
     "year" : '',
     "director" : '',

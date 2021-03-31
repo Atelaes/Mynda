@@ -4817,8 +4817,9 @@ class MynEditorSearch extends React.Component {
     let urlParts = [this.state.searchBaseURL];
 
     // first check to see if the user has entered an IMDb ID
-    let imdbSearchID = document.getElementById('editor-search-imdbID').value;
-    if (imdbSearchID !== '') {
+    // let imdbSearchID = document.getElementById('editor-search-imdbID').value;
+    let imdbSearchID = this.props.video.imdbID;
+    if (imdbSearchID && imdbSearchID !== '') {
       // if they have, then we add that to the search
       urlParts.push(`i=${imdbSearchID}`);
     } else {
@@ -5021,6 +5022,7 @@ class MynEditorSearch extends React.Component {
           // if we're here, we have the movie, so all we have to do is overwrite
           // the existing values with the new ones;
           const newData = {
+            imdbID: response.data.imdbID,
             title: response.data.Title,
             description: response.data.Plot,
             artwork: response.data.Poster, // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
@@ -5080,10 +5082,6 @@ class MynEditorSearch extends React.Component {
         <div id='edit-search'>
           <div id='edit-search-controls'>
             {searchBtn}
-            <div className="input-container controls">
-              <input id="editor-search-imdbID" className="filled" type="text" placeholder="IMDb ID (optional)" />
-              <div className="input-clear-button hover" onClick={() => {document.getElementById('editor-search-imdbID').value = ''}}></div>
-            </div>
           </div>
           <table id='edit-search-results'>
             <thead>
@@ -5100,6 +5098,12 @@ class MynEditorSearch extends React.Component {
           </table>
         </div>
     );
+
+    // <div className="input-container controls">
+    //   <input id="editor-search-imdbID" className="filled" type="text" placeholder="IMDb ID (optional)" />
+    //   <div className="input-clear-button hover" onClick={() => {document.getElementById('editor-search-imdbID').value = ''}}></div>
+    // </div>
+
   }
 }
 
@@ -5144,6 +5148,10 @@ class MynEditorEdit extends React.Component {
         money: {
           exp: { test: value => !isNaN(accounting.unformat(value)) && accounting.unformat(value) >= 0 },
           tip: "Non-negative monetary value"
+        },
+        imdb: {
+          exp: /^tt\d+$/,
+          tip: "Enter a valid IMDb ID"
         },
         everything: {
           exp: /.*/,
@@ -5253,6 +5261,25 @@ class MynEditorEdit extends React.Component {
             options={null}
             validator={this.state.validators.everything.exp}
             validatorTip={this.state.validators.everything.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
+    /* IMDb ID */
+    let imdbID = (
+      <div className='edit-field imdbID'>
+        <label className="edit-field-name" htmlFor="imdbID">IMDb ID: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="imdbID"
+            className="edit-field-imdbID"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.imdb.exp}
+            validatorTip={this.state.validators.imdb.tip}
             reportValid={this.props.reportValid}
           />
         </div>
@@ -5693,6 +5720,7 @@ class MynEditorEdit extends React.Component {
         {batchNotification}
         <form onSubmit={this.props.saveChanges}>
           {title}
+          {imdbID}
           {description}
           {year}
           {director}
@@ -6631,8 +6659,13 @@ class MynEditArtwork extends MynEdit {
       } catch(err) {
         document.getElementById('edit-field-artwork').style.visibility = 'visible';
       }
+      try {
+        this.dlMsg.current.style.display = 'none';
+      } catch(err) {
+        document.getElementById('edit-field-artwork-dl-msg').style.display = 'none';
+      }
+
       this._isMounted && this.setState({message: ""});
-      this.dlMsg.current.style.display = 'none';
 
     });
 

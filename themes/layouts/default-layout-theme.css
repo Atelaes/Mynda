@@ -163,7 +163,7 @@
 
 #edit-container form {
   display:grid;
-  grid-template-columns: 2fr 1fr 1fr minmax(10rem,2fr);
+  grid-template-columns: 2fr 2fr minmax(5rem,1fr) minmax(5rem,1fr);
   grid-template-rows: repeat(14, auto);
 
   grid-gap: 0.5em;
@@ -182,23 +182,19 @@
 /* column 1 */
 .edit-field.title {
   grid-row: 1 / span 2;
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 .edit-field.description {
   grid-row: 3;
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 .edit-field.year {
   grid-row: 4;
   grid-column: 1;
 }
-.edit-field.rating {
+.edit-field.imdbID {
   grid-row: 4;
   grid-column: 2;
-}
-.edit-field.seen {
-  grid-row: 4;
-  grid-column: 3;
 }
 .edit-field.director {
   grid-row: 5;
@@ -206,7 +202,7 @@
 }
 .edit-field.directorsort {
   grid-row: 5;
-  grid-column: 2 / span 2;
+  grid-column: 2;
 }
 .edit-field.genre {
   grid-row: 6;
@@ -214,7 +210,7 @@
 }
 .edit-field.kind {
   grid-row: 6;
-  grid-column: 2 / span 2;
+  grid-column: 2;
 }
 .edit-field.rated {
   grid-row: 7;
@@ -222,61 +218,73 @@
 }
 .edit-field.boxoffice {
   grid-row: 7;
-  grid-column: 2 / span 2;
+  grid-column: 2;
 }
 .edit-field.cast {
   grid-row: 8 / span 2;
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 .edit-field.tags {
   grid-row: 10;
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 .edit-field.subtitles {
   grid-row: 11 / span 2;
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 .edit-field.collections {
   grid-row: 13 / span 10;
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 2;
 }
 
-/* column 4 */
+/* column 3 */
 .edit-field.save-btn {
   grid-row: 1;
-  grid-column: 4;
+  grid-column: 3 / span 2;
 }
 .edit-field.revert-btn {
   grid-row: 2;
-  grid-column: 4;
+  grid-column: 3 / span 2;
 }
 .edit-field.artwork {
   grid-row: 3 / span 4;
-  grid-column: 4;
+  grid-column: 3 / span 2;
 }
-.edit-field.position {
+.edit-field.rating {
+  grid-row: 7;
+  grid-column: 3;
+}
+.edit-field.seen {
   grid-row: 7;
   grid-column: 4;
 }
-.edit-field.lastseen {
+.edit-field.position {
   grid-row: 8;
-  grid-column: 4;
+  grid-column: 3 / span 2;
+}
+.edit-field.lastseen {
+  grid-row: 9;
+  grid-column: 3 / span 2;
 }
 .edit-field.dateadded {
-  grid-row: 9;
-  grid-column: 4;
+  grid-row: 10;
+  grid-column: 3 / span 2;
 }
 .edit-field.ratings {
-  grid-row: 10;
-  grid-column: 4;
+  grid-row: 11;
+  grid-column: 3 / span 2;
 }
 .edit-field.country {
-  grid-row: 11;
-  grid-column: 4;
+  grid-row: 12;
+  grid-column: 3 / span 2;
 }
 .edit-field.languages {
-  grid-row: 12;
-  grid-column: 4;
+  grid-row: 13;
+  grid-column: 3 / span 2;
+}
+.edit-field.new {
+  grid-row: 14;
+  grid-column: 3 / span 2;
 }
 
 
