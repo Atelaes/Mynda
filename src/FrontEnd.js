@@ -7553,7 +7553,8 @@ class MynTooltip extends React.Component {
 
     this.state = {
       id : uuidv4(),
-      timeout : null
+      timeout : null,
+      shown : false
     }
 
     this.tipDiv = null;
@@ -7564,12 +7565,15 @@ class MynTooltip extends React.Component {
   }
 
   showTip(x,y) {
+    this.state.shown = true;
     // show the div
     this.tipDiv.style.display = 'block';
 
-    // set the div position based on the mouse position
-    // let x = e.clientX;
-    // let y = e.clientY;
+    // if (typeof x === 'undefined' || typeof y === 'undefined') {
+    //   // set the div position based on the mouse position
+    //   let x = e.clientX;
+    //   let y = e.clientY;
+    // }
 
     // set the div position based on the icon div's position
     // let x = this.iconDiv.current.getBoundingClientRect().left;
@@ -7613,8 +7617,17 @@ class MynTooltip extends React.Component {
   }
 
   hideTip() {
+    this.state.shown = false;
     this.tipDiv.style.display = 'none';
     clearTimeout(this.state.timeout);
+  }
+
+  toggleTip(e) {
+    if (this.state.shown) {
+      this.hideTip();
+    } else {
+      this.showTip(e.pageX,e.pageY);
+    }
   }
 
   componentDidMount() {
@@ -7644,6 +7657,7 @@ class MynTooltip extends React.Component {
         className='tooltip-icon'
         onMouseEnter={(e) => {let x = e.pageX; let y = e.pageY; this.state.timeout = setTimeout(() => this.showTip(x,y),200)}}
         onMouseLeave={this.hideTip}
+        onClick={(e) => this.toggleTip(e)}
       />
     );
   }
