@@ -625,17 +625,18 @@ class Mynda extends React.Component {
           // }
 
           // if the user changed the pref for including the user rating in the average rating calculation
-          if (address === 'settings.preferences.include_user_rating_in_avg') {
-            // first test if the current playlist displays the average;
-            // if it doesn't, we don't need to do anything
-            let currentPlaylist = this.state.playlists.filter(p => p.id === this.state.currentPlaylistID)[0];
-            console.log('current playlist: ' + JSON.stringify(currentPlaylist));
-            if (currentPlaylist && currentPlaylist.columns.includes('ratings_avg')) {
-              console.log('resetting playlist!')
-              // if it does, reload the playlist
-              this.setPlaylist(this.state.currentPlaylistID);
-            }
-          }
+          // if (address === 'settings.preferences.include_user_rating_in_avg') {
+          //   console.log('HEEYYYYYY, USER RATING IN AVG SETTING CHANGED')
+          //   // first test if the current playlist displays the average;
+          //   // if it doesn't, we don't need to do anything
+          //   let currentPlaylist = this.state.playlists.filter(p => p.id === this.state.currentPlaylistID)[0];
+          //   console.log('current playlist: ' + JSON.stringify(currentPlaylist));
+          //   if (currentPlaylist && currentPlaylist.columns.includes('ratings_avg')) {
+          //     console.log('resetting playlist!')
+          //     // if it does, reload the playlist
+          //     this.setPlaylist(this.state.currentPlaylistID);
+          //   }
+          // }
         });
       }
     };
@@ -1471,7 +1472,8 @@ class MynLibTable extends React.Component {
       rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : ''),
       idFromRowID: (rowID) => (this.props.collectionID ? rowID.replace(new RegExp('_' + this.props.collectionID + '$'),'') : rowID),
       shiftDown: false,
-      ctrlDown: false
+      ctrlDown: false,
+      include_user_rating_in_avg: props.settings.preferences.include_user_rating_in_avg
     }
 
     // this.keyDown = this.keyDown.bind(this);
@@ -2134,23 +2136,30 @@ class MynLibTable extends React.Component {
     // if the playlist was changed, reset the playlist,
     // sorting by the table by initial values (props.initialSort if it exists, or flatDefaultSort)
     if (oldProps.playlistID !== this.props.playlistID) {
-      console.log("============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
+      console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
       this.reset(true,true);
     } else {
       // if the playlist was NOT changed, but
       // if any videos in the playlist were changed...
+      // (or if the setting to include user ratings in avg was changed)
+
+      // console.log("USER_RATING_IN_AVG STATE == " + this.state.include_user_rating_in_avg);
+      // console.log("USER_RATING_IN_AVG PROPS == " + this.props.settings.preferences.include_user_rating_in_avg);
 
       // we have to sort the movies array before comparing it,
       // otherwise the conditional fires when the elements change order,
       // whereas we want them to change only when a movie is changed, added, or removed
       let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
       let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
-      if (!_.isEqual(tempOld,tempNew)) {
-        // console.log("----props.movies updated----");
+      if (!_.isEqual(tempOld,tempNew) || this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
+        console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
         // let diff = getObjectDiff(tempOld,tempNew);
         // diff.map(key => {
         //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
         // });
+
+        // for some reason, comparing oldProps did not work for this, because oldProps and this.props were always the same; I have no idea why; so we just use a state variable to compare
+        this.state.include_user_rating_in_avg = this.props.settings.preferences.include_user_rating_in_avg;
 
         // re-render the table (sorting by the current values)
         this.reset(false,true);
@@ -2652,7 +2661,7 @@ class MynOverflowTextMarquee extends React.Component {
         this.theDiv.current.classList.add(this.state.direction);
 
         if (this.props.ellipsis === 'fade') {
-          console.log('fade');
+          // console.log('fade');
           let fade = {
             WebkitMaskImage: `linear-gradient(to ${this.state.oppositeDir}, transparent 0, rgba(0, 0, 0, 1.0) ${this.state.fadeSize})`,
             WebkitMaskPosition: '0 0',
@@ -3706,8 +3715,8 @@ class MynSettingsPrefs extends React.Component {
               deleteDialog={'Videos of this kind will not be affected until edited.'}
               storeTransform={value => value.toLowerCase()}
               displayTransform={value => value.replace(/\b\w/g,(letter) => letter.toUpperCase())}
-              validator={/^[a-zA-Z0-9_\-\.&\s]+$/}
-              validatorTip={"Allowed: a-z A-Z 0-9 _ - . & [space]"}
+              validator={/^[^=;{}]+$/}
+              validatorTip={"Not allowed: = ; { }"}
               reportValid={() => {}}
             />
           </li>
@@ -3718,7 +3727,7 @@ class MynSettingsPrefs extends React.Component {
               checked={this.state.include_new_vids_in_playlists ? true : false}
               onChange={(e) => this.update('include-new',e.target.checked)}
             />
-            Include newly added videos in playlists
+            Include new videos in playlists
             <MynTooltip tip="If unchecked, newly added videos will only appear in the 'New' playlist until edited/tagged" />
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
@@ -3740,7 +3749,7 @@ class MynSettingsPrefs extends React.Component {
             Include user rating in avg rating
           </li>
           <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.override_dialogs && Object.keys(this.props.settings.preferences.override_dialogs).length > 0 ? 'block' : 'none'}}>
-            <h2>Show Dialogs:</h2>
+            <h2>Show Confirmation Dialogs:</h2>
             {this.state.override_dialogs ? Object.keys(this.state.override_dialogs).map(dialogName => (
               <div className='dialog' key={dialogName} style={{display:'flex'}}>
                 <input
@@ -7554,7 +7563,7 @@ class MynTooltip extends React.Component {
     this.hideTip = this.hideTip.bind(this);
   }
 
-  showTip(e) {
+  showTip(x,y) {
     // show the div
     this.tipDiv.style.display = 'block';
 
@@ -7563,8 +7572,8 @@ class MynTooltip extends React.Component {
     // let y = e.clientY;
 
     // set the div position based on the icon div's position
-    let x = this.iconDiv.current.getBoundingClientRect().left;
-    let y = this.iconDiv.current.getBoundingClientRect().top;
+    // let x = this.iconDiv.current.getBoundingClientRect().left;
+    // let y = this.iconDiv.current.getBoundingClientRect().top;
 
     let fontSize = window.getComputedStyle(this.tipDiv, null).getPropertyValue('font-size');
     let maxWidth = Math.min(parseFloat(fontSize) * 25,window.innerWidth);
@@ -7579,7 +7588,7 @@ class MynTooltip extends React.Component {
 
 
     if (scrollWidth > minWidthIfWrapping) {
-      console.log('wrapping...');
+      // console.log('wrapping...');
       // if the text is long enough to fill the minimum width we've set, set the width to at least that;
       width = Math.max(width,minWidthIfWrapping);
       this.tipDiv.style.width = width + 'px';
@@ -7594,13 +7603,13 @@ class MynTooltip extends React.Component {
     this.tipDiv.style.maxWidth = maxWidth + 'px';
 
 
-    console.log('font size: ' + fontSize);
-    console.log('element width: ' + this.tipDiv.offsetWidth);
-    console.log('min width if wrapping: ' + minWidthIfWrapping);
-    console.log('scroll width: ' + scrollWidth);
-    console.log('window width: ' + window.innerWidth);
-    console.log('right overflow: ' + rightOverflow);
-    console.log(`x: ${x}, y: ${y}`);
+    // console.log('font size: ' + fontSize);
+    // console.log('element width: ' + this.tipDiv.offsetWidth);
+    // console.log('min width if wrapping: ' + minWidthIfWrapping);
+    // console.log('scroll width: ' + scrollWidth);
+    // console.log('window width: ' + window.innerWidth);
+    // console.log('right overflow: ' + rightOverflow);
+    // console.log(`x: ${x}, y: ${y}`);
   }
 
   hideTip() {
@@ -7633,7 +7642,7 @@ class MynTooltip extends React.Component {
       <div
         ref={this.iconDiv}
         className='tooltip-icon'
-        onMouseEnter={(e) => {this.state.timeout = setTimeout((e) => this.showTip(e),200)}}
+        onMouseEnter={(e) => {let x = e.pageX; let y = e.pageY; this.state.timeout = setTimeout(() => this.showTip(x,y),200)}}
         onMouseLeave={this.hideTip}
       />
     );

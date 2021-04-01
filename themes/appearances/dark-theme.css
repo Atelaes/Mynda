@@ -927,7 +927,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 #settings-folders-folders td.path:hover .overflow.left {
   /* marquee effect */
   animation: scroll-right 6s cubic-bezier(.2, 0, .8, 1) infinite;
-  animation-delay: 1.5s;
+  animation-delay: 1s;
   animation-direction: alternate;
   animation-fill-mode: both;
 }

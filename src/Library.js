@@ -390,7 +390,15 @@ const defaultLibrary = {
         ]
       },
       "hide_description" : "show",
-      "override_dialogs" : {},
+      "override_dialogs" : {
+        "MynEditorSearch-confirm-select": false,
+        "MynEditor-confirm-exit": false,
+        "MynEditorEdit-confirm-revert": false,
+        "MynLibTable-confirm-inlineEdit": false,
+        "MynSettingsCollections-confirm-delete": false,
+        "MynSettingsCollections-confirm-convertToNonTerminal": false,
+        "MynLibrary-confirm-convertTerminalCol": false
+      },
       "include_user_rating_in_avg": false,
       "include_new_vids_in_playlists": true
     },
