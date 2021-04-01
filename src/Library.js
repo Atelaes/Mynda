@@ -91,7 +91,27 @@ class Library {
               // dest.splice(addEnd, 0, entry);
               break;
             case 'replace':
-              dest[addEnd] = entry;
+              // if addEnd is an integer, we take it as an index
+              if (Number.isInteger(Number(addEnd))) {
+                dest[addEnd] = entry;
+                // otherwise, addEnd should be a string of form:
+                // 'property=value' (e.g. 'id=582c8160-b185-5843-9eaf-8e71f177ae65')
+                // and we'll try to find an object in dest with that prop/value pair
+                // and replace it with entry
+              } else if (addEnd.split('=').length > 1) {
+                let components = addEnd.split('=');
+                let prop = components[0];
+                let val = components.slice(1).join('=');
+                let results = dest.filter(el => typeof el[prop] !== 'undefined' && el[prop] === val);
+                if (results.length > 0) {
+                  console.log('found element to replace, replacing...');
+                  results[0] = entry;
+                } else {
+                  throw `Unable to find element (${addEnd}) to replace.`
+                }
+              } else {
+                throw 'Unable to parse address for replace operation'
+              }
               break;
             case 'remove':
               // remember the array we're operating on so that once the queue is empty,
@@ -124,11 +144,11 @@ class Library {
             }
             break;
           case 'replace':
-            if (typeof dest[addEnd] !== "undefined") {
+            // if (typeof dest[addEnd] !== "undefined") {
               dest[addEnd] = entry;
-            } else {
-              throw 'Nothing to replace, use add.';
-            }
+            // } else {
+            //   throw 'Nothing to replace, use add.';
+            // }
             break;
           case 'remove':
             delete dest[addEnd];

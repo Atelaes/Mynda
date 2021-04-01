@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const Library = require("./Library.js");
 const dl = require('./download');
 const _ = require('lodash');
+const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
 
@@ -562,9 +563,24 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
             vidObj.metadata.audio_layout = stream.channel_layout;
             vidObj.metadata.audio_channels = stream.channels;
           }
+          // if we didn't get a duration already,
+          // grab one from whatever stream has one
+          // (e.g. mkv files don't seem to store duration
+          // in the video or audio streams, but may have it in a subtitle stream)
+          // if (!vidObj.metadata.duration) {
+          //   console.log(`Taking duration (${stream.duration}) from ${stream.codec_type} stream`);
+          //   vidObj.metadata.duration = Number(stream.duration);
+          // }
         } catch(err) {
           console.log(`Error storing metadata for ${file}: ${err}`);
         }
+      }
+
+      // some files (.mkv) will give us metadata, but do not store the duration for some reason;
+      // in this case, we analyze the file with ffmpeg to obtain the duration
+      // (which will be added to the video object later in a separate library call)
+      if (!vidObj.metadata.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
+        getDurationFromFFmpeg(file,id);
       }
 
     } catch(err) {
@@ -692,6 +708,67 @@ function getFileBirthtime(file) {
     });
   });
 }
+
+function getDurationFromFFmpeg(filepath,id) {
+  try {
+    console.log('Could not find duration with ffprobe, trying with ffmpeg...');
+    console.log(filepath);
+
+    let tempFile = `temp-${uuidv4()}.mkv`;
+
+    // var outStream = fs.createWriteStream('output.mkv');
+
+    let cmd = ffmpeg(filepath, {
+      // timeout:600
+    }).on('codecData', (data) => {
+      cmd.kill();
+
+      console.log('==== FFMPEG codecData ====');
+      console.log(JSON.stringify(data));
+      if (data.duration) {
+        let timeArr = data.duration.split(':');
+        let seconds = 0;
+        if (timeArr.length >= 3) {
+          seconds += timeArr[0] * 60 * 60;
+          seconds += timeArr[1] * 60;
+          seconds += timeArr[2] * 1;
+        } else if (!isNaN(Number(data.duration))) {
+          seconds = Number(data.duration);
+        }
+
+        // update video in library with new duration.
+        for (let i=0; i<library.media.length; i++) {
+          if (library.media[i].id === id) {
+            console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
+            library.replace(`media.${i}.metadata.duration`,seconds);
+            break;
+          }
+        }
+
+      }
+    }).on('end', (stdout, stderr) => {
+      console.log('==== FFMPEG end ====');
+      console.log(stdout);
+    }).on('error', (err) => {
+      // console.log('==== FFMPEG error ====');
+      console.log(err.message);
+      fs.unlink(tempFile, () => {
+        console.log('deleted temp file used by ffmpeg');
+      });
+    }).save(tempFile);
+
+    // .save('~/Documents/Coding/Mynda/sandbox/Mynda Example Watchfolders/temp_output.mkv');
+
+    // let stream = cmd.pipe();
+    // stream.on('data', (chunk) => {
+    //   console.log('ffmpeg just wrote ' + chunk.length + ' bytes');
+    // });
+
+  } catch(err) {
+    console.log('----- Error in getDurationFromFFmpeg: ' + err);
+  }
+}
+
 
 ipcMain.on('settings-watchfolder-select', (event) => {
   let options = {properties: ['openDirectory']};

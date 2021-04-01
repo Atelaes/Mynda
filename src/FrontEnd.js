@@ -7043,9 +7043,10 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   }
 
   updateGraphic(position) {
-    const duration = this.props.movie.metadata ? this.props.movie.metadata.duration : null;
+    const duration = this.props.movie.metadata ? Number(this.props.movie.metadata.duration) : null;
+    if (!duration) return;
 
-    position = Math.min(Math.max(position,0),duration);
+    position = Number(Math.min(Math.max(position,0),duration));
     let graphic = (
       <div className="position-widget">
         <div className="position-outer"
@@ -7055,8 +7056,8 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
             <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
         </div>
         <div className="position-text">
-          {position > 20 ? `${Math.floor(Number(position) / 60)}:${(Number(position) % 60) < 10 ? '0' : ''}${Math.floor(Number(position) % 60)} \u2022 ` : null}
-          {duration ? `${Math.max(Math.round(Number(duration) / 60),1)} min` : null}
+          {position / duration > .01 ? `${Math.floor(position / 60)}:${(position % 60) < 10 ? '0' : ''}${Math.floor(position % 60)} \u2022 ` : null}
+          {duration ? (duration >= 60 ? `${Math.round(duration / 60)} min` : `${Math.round(duration)} sec`) : null}
         </div>
       </div>
     );
