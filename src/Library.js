@@ -102,13 +102,29 @@ class Library {
                 let components = addEnd.split('=');
                 let prop = components[0];
                 let val = components.slice(1).join('=');
-                let results = dest.filter(el => typeof el[prop] !== 'undefined' && el[prop] === val);
-                if (results.length > 0) {
-                  console.log('found element to replace, replacing...');
-                  results[0] = entry;
-                } else {
+
+                let found = false;
+                for (let i=0; i<dest.length; i++) {
+                  if (typeof dest[i][prop] !== 'undefined' && dest[i][prop] === val) {
+                    console.log(`found element to replace at index ${i}; replacing...`);
+                    found = true;
+                    dest[i] = entry;
+                    // we could remove the break statement to replace all instances
+                    // instead of just the first one
+                    break;
+                  }
+                }
+                if (!found) {
                   throw `Unable to find element (${addEnd}) to replace.`
                 }
+
+                // let results = dest.filter(el => typeof el[prop] !== 'undefined' && el[prop] === val);
+                // if (results.length > 0) {
+                //   console.log('found element to replace, replacing...');
+                //   results[0] = entry;
+                // } else {
+                //   throw `Unable to find element (${addEnd}) to replace.`
+                // }
               } else {
                 throw 'Unable to parse address for replace operation'
               }

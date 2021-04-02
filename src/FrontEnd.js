@@ -2345,6 +2345,7 @@ class MynDetails extends React.Component {
     super(props)
 
     this.render = this.render.bind(this);
+    this.saveVideo = this.saveVideo.bind(this);
     this.scrollBtn = React.createRef();
   }
 
@@ -2436,6 +2437,23 @@ class MynDetails extends React.Component {
     )});
   }
 
+  // called just by any edit widgets in the details pane
+  // not used by the video editor or anywhere else
+  saveVideo(...args) {
+    let changes = {};
+    if (args.length === 2) {
+      changes[args[0]] = args[1];
+    } else if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
+      changes = {...args[0]};
+    } else {
+      console.error('Bad arguments supplied to saveVideo in MynDetails: ' + JSON.stringify(args));
+      return;
+    }
+
+    let updated = {...this.props.video, ...changes};
+    library.replace(`media.id=${this.props.video.id}`,updated);
+  }
+
   componentDidUpdate(oldProps) {
     // this.setTitleMarquee();
     if (!_.isEqual(oldProps.video, this.props.video)) {
@@ -2475,7 +2493,7 @@ class MynDetails extends React.Component {
         <ul>
           <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
-          <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} /></li>
+          <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
           <li className="detail" id="detail-ratings">{this.displayRatings()}</li>
           <li className="detail" id="detail-director"><span className="label">Director:</span> {video.director}</li>
@@ -7052,7 +7070,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
         <div className="position-outer"
           onMouseMove={(e) => this.updatePosition(e)}
           onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
-          onClick={(e) => this.updateValue(position,e)} >
+          onClick={(e) => this.updateValue(Math.round(position * 10)/10,e)} >
             <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
         </div>
         <div className="position-text">
