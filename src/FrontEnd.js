@@ -2796,7 +2796,9 @@ class MynOpenablePane extends React.Component {
 
     this.render = this.render.bind(this);
 
-    ipcRenderer.on('MynOpenablePane-confirm-exit', (event, response, id, checked) => {
+    ipcRenderer.on('MynOpenablePane-confirm-exit', (event, response, data, checked) => {
+      let id = data.id;
+      let cb = data.cb;
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
       if (checked) {
@@ -2811,6 +2813,9 @@ class MynOpenablePane extends React.Component {
 
       if (response === 0) { // yes
         // close pane
+        try {
+          cb();
+        } catch(err) {}
         this.props.hideFunction(id);
       } else {
         console.log('Exit pane canceled by user')
@@ -2818,7 +2823,7 @@ class MynOpenablePane extends React.Component {
     });
   }
 
-  closePane(id,confirm,msg) {
+  closePane(id,confirm,msg,cb) {
     try {
       // in case confirm is a function instead of just a boolean
       confirm = confirm();
@@ -2836,9 +2841,14 @@ class MynOpenablePane extends React.Component {
           message: msg || 'Are you sure you want to exit?',
           checkboxLabel: `Don't show this dialog again`
         },
-        id
+        {id:id,cb:cb}
       );
     } else {
+      try {
+        cb();
+      } catch(err) {
+        console.error(err);
+      }
       this.props.hideFunction(id);
     }
   }
@@ -2851,7 +2861,7 @@ class MynOpenablePane extends React.Component {
 
     return (
       <div id={this.state.paneID} className="pane openable-pane">
-        <div className="openable-close-btn" onClick={() => this.closePane(this.state.paneID,content.confirmExit,content.confirmMsg)}>{"\u2715"}</div>
+        <div className="openable-close-btn" onClick={() => this.closePane(this.state.paneID,content.confirmExit,content.confirmMsg,content.exitCB)}>{"\u2715"}</div>
         {content.jsx}
       </div>
     );
@@ -2864,6 +2874,7 @@ class MynPlayer extends MynOpenablePane {
     super(props)
 
     this.state = {
+      video: props.video,
       paneID: 'player-pane',
       // startedMuxing: false,
       errorMessage: null,
@@ -2908,8 +2919,108 @@ class MynPlayer extends MynOpenablePane {
     }
 
     this.render = this.render.bind(this);
+    this.onplay = this.onplay.bind(this);
+    this.onpause = this.onpause.bind(this);
+    this.onseeked = this.onseeked.bind(this);
+    this.ontimeupdate = this.ontimeupdate.bind(this);
     this.player = React.createRef();
   }
+
+  // ========================================== //
+  // ========== VIDEO EVENT HANDLERS ========== //
+  // ========================================== //
+
+  onplay(e) {
+    console.log("PLAYING!!!!!")
+  }
+
+  onpause(e) {
+    console.log("PAUSING!!!!!");
+    this.updatePosition(e.target.currentTime);
+  }
+
+  onseeked(e) {
+    console.log(`SOUGHT to ${e.target.currentTime} !!!!!`);
+    this.updatePosition(e.target.currentTime);
+
+  }
+
+  ontimeupdate(e) {
+    if (!this.timeupdateTimeout) {
+      let target = e.target;
+      this.timeupdateTimeout = setTimeout(()=> {
+        this.updatePosition(target.currentTime);
+      },5000);
+    }
+  }
+
+  updatePosition(time) {
+    clearTimeout(this.timeupdateTimeout);
+    this.timeupdateTimeout = null;
+    this.state.video.position = Math.round(time * 10) / 10;
+    console.log('UPDATING POSITION TO ' + this.state.video.position);
+    library.replace(`media.id=${this.state.video.id}`,this.state.video);
+  }
+
+  // called when exiting MynPlayer
+  onExit() {
+    console.log('EXIT CALLBACK');
+    let position;
+    try {
+      position = this.player.current.currentTime;
+    } catch(err) {
+      position = this.state.video.position;
+    }
+    let duration = this.state.video.metadata.duration; // we don't try to get this from the video element, in case of an ffmpeg stream that isn't finished, the duration won't be correct
+    console.log(`position: ${position}, duration: ${duration}`);
+    // if (!duration) return;
+
+    // if the position is close to the beginning or close enough to the end
+    // that we estimate the user is done watching it, we reset to 0
+    if (position < Math.min(duration*.005,30)) {
+      // if < 30 seconds or 0.5%, whichever is smaller, reset to 0
+      // (0.5% of 45 minutes is 13.5 seconds; 0.5% of 2 hours is 36 seconds)
+      position = 0;
+      console.log('POSITION close to beginning, resetting to 0');
+    } else if (position > Math.max(duration*.97, duration - 300)) {
+      // if 5 minutes or less from the end, or 3% or less from the end, which ever is later, reset to 0 ()
+      // (3% of 45 min is 1:21; 3% of 2 hours is 3:36)
+      position = 0;
+      console.log('POSITION close to END, resetting to 0');
+    }
+
+    // save the position
+    this.updatePosition(position);
+  }
+
+  // key commands for the video player;
+  // spacebar already works natively,
+  // as does escape to exit fullscreen;
+  keyCommand(e) {
+    let isFullscreen = document.fullscreenElement !== null;
+
+    // ESC
+    if (e.keyCode === 27 && !isFullscreen) {
+      // while not in fullscreen, use escape to close the video;
+      // don't do anything while in fullscreen, because escape already exits fullscreen natively
+      this.props.hideFunction();
+    }
+  }
+
+  seekVideoTo(time) {
+    let vid = this.player.current;
+    if (vid) {
+      time = Math.max(Math.min(time,vid.duration),0);
+      vid.currentTime = time;
+    } else {
+      console.error('Tried to seek, but could not find video');
+    }
+  }
+
+
+  // ========================================== //
+  // =========== CREATING THE VIDEO =========== //
+  // ========================================== //
 
   showLoadingIndicator() {
     console.log('Setting timeout for loading indicator...');
@@ -2933,7 +3044,7 @@ class MynPlayer extends MynOpenablePane {
     fs.stat(playlist, (err, stat) => {
       if(err == null) {
         console.log('File exists');
-        this.createVideo(playlist);
+        this.createFFmpegVideo(playlist);
       } else if(err.code === 'ENOENT') {
         // file does not exist, wait a second and check again
         if (this.state.tries < 15) {
@@ -2964,7 +3075,7 @@ class MynPlayer extends MynOpenablePane {
 
   }
 
-  createVideo(streamPath) {
+  createFFmpegVideo(streamPath) {
     this.setState({showLoadingIndicator:false});
 
     console.log('Connecting video element to ffmpeg stream');
@@ -3014,15 +3125,15 @@ class MynPlayer extends MynOpenablePane {
 
   createFFmpegStream() {
     this.state.errorMessage = null;
-    // console.log('MynPlayer video: ' + JSON.stringify(this.props.video));
+    // console.log('MynPlayer video: ' + JSON.stringify(this.state.video));
     this.stream = new Stream();
-    this.stream.createStream(this.props.video.filename,this.props.video.id,this.callbacks);
+    this.stream.createStream(this.state.video.filename,this.state.video.id,this.callbacks);
   }
 
   setUpVideo() {
     let promise;
     if (this.player.current) {
-      this.player.current.src = this.props.video.filename;
+      this.player.current.src = this.state.video.filename;
       this.player.current.focus(); // so that the key commands will work
       promise = this.player.current.play();
     } else {
@@ -3032,6 +3143,7 @@ class MynPlayer extends MynOpenablePane {
     if (typeof promise !== "undefined") {
       promise.then(() => {
         console.log('Browser can play video natively!');
+        this.seekVideoTo(this.state.video.position);
         this.setState({showLoadingIndicator:false});
       }).catch((err) => {
         console.error(`Browser could not play video natively, using HLS fallback: ${err}`);
@@ -3043,12 +3155,16 @@ class MynPlayer extends MynOpenablePane {
 
   }
 
+  // ========== HANDLING SUBTITLES =========== //
+
   subtitleTracks() {
+    if (!this.state.video) return null;
+
     const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
 
-    return this.props.video.subtitles.map((sub,index) => {
+    return this.state.video.subtitles.map((sub,index) => {
       // create a unique filename for each converted subtitle file based on the video id and a hash of the original filename
-      let vttFilename = `${this.props.video.id}-${crypto.createHash('sha1').update(sub).digest('hex')}.vtt`
+      let vttFilename = `${this.state.video.id}-${crypto.createHash('sha1').update(sub).digest('hex')}.vtt`
       let vttFilePath = path.join(tempFolder,vttFilename)
 
       fs.createReadStream(sub)
@@ -3065,22 +3181,17 @@ class MynPlayer extends MynOpenablePane {
     });
   }
 
-  // key commands for the video player;
-  // spacebar already works natively,
-  // as does escape to exit fullscreen;
-  keyCommand(e) {
-    let isFullscreen = document.fullscreenElement !== null;
-
-    // ESC
-    if (e.keyCode === 27 && !isFullscreen) {
-      // while not in fullscreen, use escape to close the video;
-      // don't do anything while in fullscreen, because escape already exits fullscreen natively
-      this.props.hideFunction();
-    }
-  }
+  // ============== UPDATE AND RENDER =============== //
 
   componentDidUpdate(oldProps) {
+    // the component should update if props.video changes, BUT
+    // ONLY IF the pane was also just opened.
+    // (we will be continually updating the position of the video
+    // as it's playing, and we don't want the component to re-render
+    // every time we do that)
     if (!oldProps.show && this.props.show) {
+      console.log('NOW SHOWING');
+      this.state.video = this.props.video;
       this.setState({showLoadingIndicator:true});
       this.setUpVideo();
     }
@@ -3092,7 +3203,6 @@ class MynPlayer extends MynOpenablePane {
     }
 
   }
-
 
   render() {
     let jsx = null;
@@ -3113,9 +3223,9 @@ class MynPlayer extends MynOpenablePane {
       // let height = 600;
 
       // get dimensions from the metadata
-      if (this.props.video.metadata) {
-        let probedWidth = this.props.video.metadata.width;
-        let probedHeight = this.props.video.metadata.height;
+      if (this.state.video && this.state.video.metadata) {
+        let probedWidth = this.state.video.metadata.width;
+        let probedHeight = this.state.video.metadata.height;
         console.log(`width: ${probedWidth}, height: ${probedHeight}`);
         if (!isNaN(probedWidth) && probedWidth > 0) {
           width = probedWidth;
@@ -3134,7 +3244,17 @@ class MynPlayer extends MynOpenablePane {
 
       jsx = (
         <div id="video-container" style={{width:width + 'px'}} onKeyUp={(e) => this.keyCommand(e)}>
-          <video controls id="video-player" ref={this.player} width={width} height={height}>
+          <video
+            controls
+            id="video-player"
+            ref={this.player}
+            width={width}
+            height={height}
+            onPlay={this.onplay}
+            onPause={this.onpause}
+            onSeeked={this.onseeked}
+            onTimeUpdate={this.ontimeupdate}
+          >
             {this.subtitleTracks()}
           </video>
           {this.state.loadingIndicator}
@@ -3143,7 +3263,7 @@ class MynPlayer extends MynOpenablePane {
       );
     }
 
-    return super.render({jsx:jsx});
+    return super.render({jsx:jsx,exitCB:() => this.onExit()});
   }
 }
 
