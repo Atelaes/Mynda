@@ -222,6 +222,14 @@ img.ratings-icon {
   overflow:visible;
 }
 
+/* subtitles */
+::cue {
+  color: white;
+  background: none;
+  text-shadow: -.05em .05em .03em black, 0 0 2px rgba(0,0,0,.6);
+  /* -webkit-text-stroke: 1px black; */
+}
+
 /*************************************/
 /*######## MAIN GRID LAYOUT #########*/
 /*************************************/
