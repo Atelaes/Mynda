@@ -20,6 +20,8 @@ const { DragDropContext, Droppable, Draggable } = require('react-beautiful-dnd')
 const hashObject = require('object-hash');
 const Hls = require('hls.js');
 const Stream = require('./Stream.js');
+const subtitle = require('subtitle');
+const crypto = require('crypto');
 
 // let savedPing = {};
 
@@ -3041,6 +3043,28 @@ class MynPlayer extends MynOpenablePane {
 
   }
 
+  subtitleTracks() {
+    const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+
+    return this.props.video.subtitles.map((sub,index) => {
+      // create a unique filename for each converted subtitle file based on the video id and a hash of the original filename
+      let vttFilename = `${this.props.video.id}-${crypto.createHash('sha1').update(sub).digest('hex')}.vtt`
+      let vttFilePath = path.join(tempFolder,vttFilename)
+
+      fs.createReadStream(sub)
+        .pipe(subtitle.parse())
+        // .pipe(subtitle.resync(-100))
+        .pipe(subtitle.stringify({ format: 'WebVTT' }))
+        .pipe(fs.createWriteStream(vttFilePath));
+
+      let trackLabel = `Track ${index+1}`;
+
+      return (
+        <track key={vttFilename} label={trackLabel} kind="subtitles" srcLang="en" src={vttFilePath} />
+      );
+    });
+  }
+
   // key commands for the video player;
   // spacebar already works natively,
   // as does escape to exit fullscreen;
@@ -3111,6 +3135,7 @@ class MynPlayer extends MynOpenablePane {
       jsx = (
         <div id="video-container" style={{width:width + 'px'}} onKeyUp={(e) => this.keyCommand(e)}>
           <video controls id="video-player" ref={this.player} width={width} height={height}>
+            {this.subtitleTracks()}
           </video>
           {this.state.loadingIndicator}
           {this.state.errorMessage}
@@ -6739,7 +6764,7 @@ class MynEditArtwork extends MynEdit {
     this.dlMsg.current.style.display = 'block';
 
     // download
-    this._isMounted && ipcRenderer.send('download', url);
+    this._isMounted && ipcRenderer.send('download', url, );
   }
 
   handleLocalFile(path) {
