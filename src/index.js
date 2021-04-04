@@ -601,7 +601,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
       if (err) {
         console.log(err);
       } else {
-        // remove video's id from its watchfolder's manifest
+        // add video's id to its watchfolder's manifest
         library.settings.watchfolders.map((folder,index) => {
           if (!folder) return;
           if (folder.path === rootWatchFolder) {

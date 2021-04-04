@@ -22,6 +22,11 @@ const Hls = require('hls.js');
 const Stream = require('./Stream.js');
 const subtitle = require('subtitle');
 const crypto = require('crypto');
+const ffmpeg = require('fluent-ffmpeg');
+const ffprobe = require('ffprobe');
+const ffprobeStatic = require('ffprobe-static');
+
+
 
 // let savedPing = {};
 
@@ -2847,7 +2852,7 @@ class MynOpenablePane extends React.Component {
       try {
         cb();
       } catch(err) {
-        console.error(err);
+        // console.error(err);
       }
       this.props.hideFunction(id);
     }
@@ -2875,6 +2880,7 @@ class MynPlayer extends MynOpenablePane {
 
     this.state = {
       video: props.video,
+      subtitleTracks: null,
       paneID: 'player-pane',
       // startedMuxing: false,
       errorMessage: null,
@@ -3131,6 +3137,8 @@ class MynPlayer extends MynOpenablePane {
   }
 
   setUpVideo() {
+    this.createSubtitleTracks();
+
     let promise;
     if (this.player.current) {
       this.player.current.src = this.state.video.filename;
@@ -3157,14 +3165,17 @@ class MynPlayer extends MynOpenablePane {
 
   // ========== HANDLING SUBTITLES =========== //
 
-  subtitleTracks() {
+  async createSubtitleTracks() {
     if (!this.state.video) return null;
 
     const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+    const createFilename = (origName) => `${this.state.video.id}-${crypto.createHash('sha1').update(origName).digest('hex')}.vtt`;
+    let subtitles = [];
 
-    return this.state.video.subtitles.map((sub,index) => {
+    // Convert external subs
+    this.state.video.subtitles.map((sub,index) => {
       // create a unique filename for each converted subtitle file based on the video id and a hash of the original filename
-      let vttFilename = `${this.state.video.id}-${crypto.createHash('sha1').update(sub).digest('hex')}.vtt`
+      let vttFilename = createFilename(sub);
       let vttFilePath = path.join(tempFolder,vttFilename)
 
       fs.createReadStream(sub)
@@ -3173,12 +3184,73 @@ class MynPlayer extends MynOpenablePane {
         .pipe(subtitle.stringify({ format: 'WebVTT' }))
         .pipe(fs.createWriteStream(vttFilePath));
 
-      let trackLabel = `Track ${index+1}`;
+      // let trackLabel = `Track ${index+1}`;
+      let subObj = {
+        path: vttFilePath,
+        name: `Track ${index+1}`,
+        lang: 'English'
+      }
+      subtitles.push(subObj);
 
-      return (
-        <track key={vttFilename} label={trackLabel} kind="subtitles" srcLang="en" src={vttFilePath} />
-      );
+      // return (
+      //   <track key={vttFilename} label={trackLabel} kind="subtitles" srcLang="en" src={vttFilePath} />
+      // );
     });
+
+    // extract and convert internal subs
+    let vidInfo;
+    try {
+      vidInfo = await ffprobe(this.state.video.filename, { path: ffprobeStatic.path });
+      console.log(vidInfo);
+    } catch(err) {
+      console.error(err);
+    }
+
+    // loop over the various data streams that ffprobe found in the video;
+    // if any of these are subtitle streams, extract them as external files;
+    vidInfo.streams.map(stream => {
+      if (stream.codec_type === 'subtitle') {
+        let filepath = path.join(tempFolder,`internal${stream.index}.vtt`);
+
+        let subObj = {
+          path: filepath,
+          name: stream.tags.title || `Track ${subtitles.length+1}`,
+          lang: stream.tags.language
+        }
+        subtitles.push(subObj);
+
+        let cmd = ffmpeg(this.state.video.filename, {
+          // timeout:600
+        }).outputOptions([
+          `-map 0:${stream.index}`
+        ]).on('codecData', (data) => {
+          console.log('==== FFMPEG codecData ====');
+          console.log(data);
+          console.log(JSON.stringify(data));
+
+          // setTimeout(()=>cmd.kill(),15000);
+
+
+        }).on('end', (stdout, stderr) => {
+          console.log('==== FFMPEG end ====');
+          console.log(stdout);
+
+        }).on('error', (err) => {
+          console.log('==== FFMPEG error ====');
+          console.log(err.message);
+          // fs.unlink(tempFile, () => {
+          //   console.log('deleted temp file used by ffmpeg');
+          // });
+        }).save(filepath);
+      }
+
+    });
+
+    // create track tags and set them in state to be rendered
+    let tracks = subtitles.map((sub, index) =>
+      (<track key={sub.path} label={sub.name} kind="subtitles" srcLang="en" src={sub.path} />)
+    );
+    this.setState({subtitleTracks:tracks});
   }
 
   // ============== UPDATE AND RENDER =============== //
@@ -3255,7 +3327,7 @@ class MynPlayer extends MynOpenablePane {
             onSeeked={this.onseeked}
             onTimeUpdate={this.ontimeupdate}
           >
-            {this.subtitleTracks()}
+            {this.state.subtitleTracks}
           </video>
           {this.state.loadingIndicator}
           {this.state.errorMessage}
@@ -7850,7 +7922,6 @@ function validateVideo(video) {
     'tags':'array',
     'seen':'boolean',
     'position':'integer',
-    // 'duration':'integer',
     'ratings':'object',
     'dateadded':'integer',
     'lastseen':'integer',
