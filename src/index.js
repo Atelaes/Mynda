@@ -52,7 +52,7 @@ function eraseTempImages() {
     // loop over all the files in the temp folder and delete them
     files.forEach(file => {
       // Do whatever you want to do with the file
-      console.log(`trying to delete ${file}`);
+      //console.log(`trying to delete ${file}`);
       try {
         fs.unlink(path.join(folderPath, file), (err) => {
           if (err) {
@@ -94,6 +94,7 @@ function checkWatchFolders() {
   // reset libFileTree
   libFileTree = {name:'root', folders:[]};
 
+  /*
   // first, search library for videos whose files are gone (whether moved, renamed, or deleted)
   // if any are missing, move the video object from library.media to library.inactive_media,
   // where it can be recovered if the file is added back or rediscovered (in the case that it was moved or renamed)
@@ -122,7 +123,7 @@ function checkWatchFolders() {
       });
     }
   });
-  console.log(`Done checking for removed files (${numRemovedVids} found).`);
+  console.log(`Done checking for removed files (${numRemovedVids} found).`);*/
 
   // next, search watchfolders for new files and add any new videos to the library
   console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
@@ -180,11 +181,15 @@ function findVideosFromFolder(folderNode) {
           folderNode.folders.push({path:compAddress, kind:kind, folders:[], videos:[], subtitles:[]});
           findVideosFromFolder(folderNode.folders[folderNode.folders.length-1]);
         }
-      } else {
+      } else if (!/^\./.test(component.name)) {
+        //If it's a hidden file, as evidenced by a filename starting with a dot
+        //Then skip it
+        //console.log(`We came across ${component.name}.`);
         // otherwise, it must be a file
         let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
 
         if (videoExtensions.includes(fileExt)) {
+          //console.log(`We're about to add ${component.name} to libTree.`);
           // if it's a video file, add it as a video
           // console.log(`${compAddress} is a regular video file`);
           folderNode.videos.push(compAddress); // add the video to this node of the libFileTree
@@ -204,7 +209,7 @@ function findVideosFromFolder(folderNode) {
         break;
       }
     }
-    if (!stillGoing) addVideosToLibrary();
+    if (!stillGoing) confirmCurrentVideos();
   });
 }
 
@@ -374,11 +379,68 @@ let videoTemplate =   {
     }
   }
 
+
+function confirmCurrentVideos() {
+  //Once libFileTree is built, check videos in library and make sure they're
+  // all there, removing from libFileTree as we go
+  console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
+  for (let h=0; h<library.media.length; h++) {
+    let video = library.media[h];
+    let filename = video.filename;
+    try {
+      let problem = true;
+      let conWatchFolder;
+      for (let i=0; i<library.settings.watchfolders.length; i++) {
+        let watchfolder = library.settings.watchfolders[i];
+        if (filename.includes(watchfolder.path)) {
+          conWatchFolder = watchfolder.path;
+          problem = false;
+          break;
+        }
+      }
+      if (problem) {throw true}
+      let libTreeLoc = libFileTree
+      let pathComps = [conWatchFolder].concat(filename.replace(conWatchFolder + path.sep, '').split(path.sep));
+      let pathComp = '';
+      for (let j=0; j<pathComps.length; j++) {
+        problem = true;
+        let pathAdd =  (j===0) ? pathComps[j] : path.sep + pathComps[j];
+        pathComp = pathComp + pathAdd
+        let lastOne =  (j === pathComps.length - 1) ? true : false;
+        if (!lastOne) {
+          for (let k=0; k<libTreeLoc.folders.length; k++) {
+            if (libTreeLoc.folders[k].path === pathComp) {
+              libTreeLoc = libTreeLoc.folders[k];
+              problem = false
+              break;
+            }
+          }
+        } else {
+          for (let k=0; k<libTreeLoc.videos.length; k++) {
+            if (libTreeLoc.videos[k] === filename || libTreeLoc.videos[k].dvd && libTreeLoc.videos[k].dvd === filename) {
+              libTreeLoc.videos.splice(k, 1);
+              problem = false;
+              break;
+            }
+          }
+        }
+        if (problem) {throw true}
+      }
+
+    } catch {
+      console.log(`${filename} appears to have disappeared, moving to inactive media.`)
+      removeVideo(video);
+    }
+  }
+  console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
+  addVideosToLibrary();
+}
+
 function addVideosToLibrary() {
   clearTimeout(addVideoTimeout);
   addVideoTimeout = setTimeout(() => {
     console.log("Parsing done, checking parsed tree for new videos/subtitles...");
-    console.log(JSON.stringify(libFileTree));
+    //console.log(JSON.stringify(libFileTree));
 
     // walk through libFileTree, adding all the videos to the library
     // (and making our best guess as to which subtitles go with which videos)
@@ -412,16 +474,18 @@ function addVideosFromFolder(folderNode, rootFolder) {
 //    isDVD : boolean, is this video a DVD (as opposed to a video file, such as an .mp4)
 //    numSisters : for files (not DVD folders), how many other videos are in this same folder (helpful for determining which subtitles may belong to this video)
 async function addVideoFile(folderNode, file, rootWatchFolder) {
-  let isDVD;
+  let isDVD = false;
   if (file.dvd) {
     isDVD = true;
     file = file.dvd;
+  } else {
+    //console.log(`addVideoFile called on ${file} and it's not a DVD.`)
   }
   let fileBasename = path.basename(file,path.extname(file));
 
   // first create the id for this file
   let id = await createVideoID(file);
-
+  //console.log(`Got past hashing on ${file}`)
   // then check for subtitles
   let allSubs = getSubs(folderNode); // get all subtitles from this clade
   let subtitles = [];
@@ -545,7 +609,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
       // vidObj.metadata = await getVideoMetadata(file);
       let data = await ffprobe(file, { path: ffprobeStatic.path });
 
-      console.log(data);
+      //console.log(data);
 
       for (const stream of data.streams) {
         try {
@@ -606,7 +670,7 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
           if (!folder) return;
           if (folder.path === rootWatchFolder) {
             folder.videos.push(vidObj.id);
-            console.log('index is ' + index);
+            //console.log('index is ' + index);
             library.replace('settings.watchfolders.' + index, folder);
           }
         });
@@ -620,35 +684,47 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
 }
 
 // create a uuid based on a hash of the video file; this will be the video's id in the library
-function createVideoID(filepath) {
+async function createVideoID(filepath) {
   return new Promise((resolve,reject) => {
-    fs.lstat(filepath, (err, stats) => {
-      if (err) {
-        reject(`Error when trying to create id for ${filepath}, could not read path to determine if it was a directory or a file. Not adding video.\n${err}`);
-      }
+    let baseStats;
+    try {
+      baseStats = fs.lstatSync(filepath)
+    } catch (e) {
+      reject(`Error when trying to create id for ${filepath}, could not read path to determine if it was a directory or a file. Not adding video.\n${err}`);
+    }
+    let hashPath = filepath;
 
-      // if filepath is not a folder
-      if(!stats.isDirectory()) {
-        fs.createReadStream(filepath).
-          pipe(crypto.createHash('sha1').setEncoding('hex')).
-          on('finish', function () {
-            filehash = this.read();
-            console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
-            const id = uuidv5(filehash, library.id);
-            console.log(`UUID of the hash is ${id}`);
-
-            resolve(id);
-            // callback(id);
-          }).
-          on('error', (err) => {
-            reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
-          })
-      } else {
-        // filepath is a folder (which happens when it's a DVD rip);
-        // eventually we need to somehow hash the directory here
-        reject(`${filepath} is a directory, cannot create hash; not adding video`);
+    // If the path points to a directory, we're dealing with a DVD rip
+    // Find the appropriate file and hash it
+    if(baseStats.isDirectory()) {
+      try {
+        if (fs.existsSync(path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO'))) {
+          hashPath = path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO');
+        } else if (fs.existsSync(path.join(filepath, 'VIDEO_TS', 'VTS_01_1.VOB'))) {
+          hashPath = path.join(filepath, 'VIDEO_TS', 'VTS_01_1.VOB');
+        } else if (fs.existsSync(path.join(filepath, 'VTS_01_1.VOB'))) {
+          hashPath = path.join(filepath, 'VTS_01_1.VOB');
+        } else {
+          reject(`DVD folder ${filepath} does not have the correct file to hash.`)
+        }
+      } catch (e) {
+        reject(`Error when trying to create id for DVD rip ${filepath}.\n${e}`);
       }
-    });
+    }
+
+    fs.createReadStream(hashPath, { end: 65535 }).
+      pipe(crypto.createHash('sha1').setEncoding('hex')).
+      on('finish', function () {
+        filehash = this.read();
+        // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
+        const id = uuidv5(filehash, library.id);
+
+        resolve(id);
+        // callback(id);
+      }).
+      on('error', (err) => {
+        reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
+      })
   });
 }
 
@@ -691,8 +767,8 @@ function getFileBirthtime(file) {
       if (err) {
         reject(`Error. Could not retrieve file stats for ${file} : ${err}`);
       } else {
-        console.log(`GOT STATS FOR ${file}`);
-        console.log(JSON.stringify(stats));
+        //console.log(`GOT STATS FOR ${file}`);
+        //console.log(JSON.stringify(stats));
 
         let dateadded;
         try {
@@ -711,8 +787,8 @@ function getFileBirthtime(file) {
 
 function getDurationFromFFmpeg(filepath,id) {
   try {
-    console.log('Could not find duration with ffprobe, trying with ffmpeg...');
-    console.log(filepath);
+    //console.log('Could not find duration with ffprobe, trying with ffmpeg...');
+    //console.log(filepath);
 
     let tempFile = `temp-${uuidv4()}.mkv`;
 
@@ -723,8 +799,8 @@ function getDurationFromFFmpeg(filepath,id) {
     }).on('codecData', (data) => {
       cmd.kill();
 
-      console.log('==== FFMPEG codecData ====');
-      console.log(JSON.stringify(data));
+      //console.log('==== FFMPEG codecData ====');
+      //console.log(JSON.stringify(data));
       if (data.duration) {
         let timeArr = data.duration.split(':');
         let seconds = 0;
@@ -739,7 +815,7 @@ function getDurationFromFFmpeg(filepath,id) {
         // update video in library with new duration.
         for (let i=0; i<library.media.length; i++) {
           if (library.media[i].id === id) {
-            console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
+            //console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
             library.replace(`media.${i}.metadata.duration`,seconds);
             break;
           }
@@ -747,13 +823,13 @@ function getDurationFromFFmpeg(filepath,id) {
 
       }
     }).on('end', (stdout, stderr) => {
-      console.log('==== FFMPEG end ====');
-      console.log(stdout);
+      //console.log('==== FFMPEG end ====');
+      //console.log(stdout);
     }).on('error', (err) => {
       // console.log('==== FFMPEG error ====');
       console.log(err.message);
       fs.unlink(tempFile, () => {
-        console.log('deleted temp file used by ffmpeg');
+        //console.log('deleted temp file used by ffmpeg');
       });
     }).save(tempFile);
 
@@ -888,7 +964,7 @@ ipcMain.on('download', (event, url, destination) => {
 })
 
 ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
-  console.log('save-video-confirm!!!');
+  //console.log('save-video-confirm!!!');
   // create message
   let message = 'Are you sure you want to ';
   if (Object.keys(changes).length === 1) { // changing only one property

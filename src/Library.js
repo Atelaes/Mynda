@@ -51,7 +51,7 @@ class Library {
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
   alter({opType=null, address=null, entry=null, sync=false, origin=null, cb=(err)=>{if (err) console.log(err)}} = {}) {
-    console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
+    //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     try {
       //Start with some basic validation
       if (!['add', 'replace', 'remove'].includes(opType)) {
