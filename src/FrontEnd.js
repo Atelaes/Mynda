@@ -3172,11 +3172,17 @@ class MynPlayer extends MynOpenablePane {
     const createFilename = (origName) => `${this.state.video.id}-${crypto.createHash('sha1').update(origName).digest('hex')}.vtt`;
     let subtitles = [];
 
-    // Convert external subs
+    // ======= Convert external subs ======= //
     this.state.video.subtitles.map((sub,index) => {
       // create a unique filename for each converted subtitle file based on the video id and a hash of the original filename
       let vttFilename = createFilename(sub);
       let vttFilePath = path.join(tempFolder,vttFilename)
+
+      let subName = '';
+      try {
+        subName = path.basename(sub,path.extname(sub)).toLowerCase().replace(path.basename(this.state.video.filename,path.extname(this.props.video.filename)).toLowerCase(),'').replace(/\b\w/g,(l) => l.toUpperCase());
+      } catch(err) {console.error(err)}
+      if (subName === '') subName = `Track ${index+1}`;
 
       fs.createReadStream(sub)
         .pipe(subtitle.parse())
@@ -3187,7 +3193,7 @@ class MynPlayer extends MynOpenablePane {
       // let trackLabel = `Track ${index+1}`;
       let subObj = {
         path: vttFilePath,
-        name: `Track ${index+1}`,
+        name: subName,
         lang: 'English'
       }
       subtitles.push(subObj);
@@ -3197,7 +3203,7 @@ class MynPlayer extends MynOpenablePane {
       // );
     });
 
-    // extract and convert internal subs
+    // ======= Extract and convert internal subs ======= //
     let vidInfo;
     try {
       vidInfo = await ffprobe(this.state.video.filename, { path: ffprobeStatic.path });
@@ -3205,22 +3211,22 @@ class MynPlayer extends MynOpenablePane {
     } catch(err) {
       console.error(err);
     }
-
-    // loop over the various data streams that ffprobe found in the video;
-    // if any of these are subtitle streams, extract them as external files;
     vidInfo.streams.map(stream => {
+      // loop over the various data streams that ffprobe found in the video;
+      // if any of these are subtitle streams, extract them as external files;
+
       if (stream.codec_type === 'subtitle') {
         let filepath = path.join(tempFolder,`internal${stream.index}.vtt`);
 
         let subObj = {
           path: filepath,
-          name: stream.tags.title || `Track ${subtitles.length+1}`,
-          lang: stream.tags.language
+          name: stream.tags && stream.tags.title ? stream.tags.title : `Track ${subtitles.length+1}`,
+          lang: stream.tags ? stream.tags.language : ''
         }
         subtitles.push(subObj);
 
         let cmd = ffmpeg(this.state.video.filename, {
-          // timeout:600
+          timeout:60
         }).outputOptions([
           `-map 0:${stream.index}`
         ]).on('codecData', (data) => {
@@ -4960,6 +4966,16 @@ class MynEditor extends MynOpenablePane {
     }
   }
 
+  // switch editor to previous video in playlist
+  goToPrevious() {
+    console.log('Editor switching to PREVIOUS video')
+  }
+
+  // switch editor to next video in playlist
+  goToNext() {
+    console.log('Editor switching to NEXT video')
+  }
+
   componentDidMount() {
     this._isMounted = true;
   }
@@ -4981,6 +4997,16 @@ class MynEditor extends MynOpenablePane {
           placeholderImage={this.state.placeholderImage}
           handleChange={this.handleChange}
         />
+
+        <div className='editor-next-prev-btns'>
+          <div className='btn editor-prev-btn' onClick={()=>this.goToPrevious()}>
+            <div style={{display:"inline-block",transform:"scaleX(-1)"}}>{'\u25B8'}</div> Previous
+          </div>
+          <div className='separator'>|</div>
+          <div className='btn editor-next-btn' onClick={()=>this.goToNext()}>
+            Next <div style={{display:"inline-block"}}>{'\u25B8'}</div>
+          </div>
+        </div>
 
         <MynEditorEdit
           show={this.props.show}
@@ -5497,6 +5523,16 @@ class MynEditorEdit extends React.Component {
     //   );
     // }
 
+    /* FILENAME */
+    // the user won't be able to edit the filename, but we need to display it
+    let filename = (
+      <div className='edit-field filename'>
+        <div className="edit-field-editor">
+          <MynOverflowTextMarquee text={this.props.video.filename} direction='left' ellipsis='fade' fadeSize='2em' />
+        </div>
+      </div>
+    );
+
     /* TITLE */
     let title = (
       <div className='edit-field title'>
@@ -5969,6 +6005,7 @@ class MynEditorEdit extends React.Component {
       <div id="edit-container">
         {batchNotification}
         <form onSubmit={this.props.saveChanges}>
+          {filename}
           {title}
           {imdbID}
           {description}

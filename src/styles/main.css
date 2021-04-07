@@ -232,6 +232,37 @@ img.ratings-icon {
   /* -webkit-text-stroke: 1px black; */
 }
 
+/* default marquee animation */
+/* may be overridden in theme css */
+.marquee-container:hover .overflow {
+    /* marquee effect */
+    animation: scroll-left 4s cubic-bezier(.2, 0, .8, 1) infinite;
+    animation-delay: .3s;
+    animation-direction: alternate;
+    animation-fill-mode: both;
+}
+.marquee-container:hover .overflow.left {
+  /* marquee effect */
+  animation-name: scroll-right;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(calc(-100% - 1.5em));
+  }
+}
+@keyframes scroll-right {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(calc(100% + 1.5em));
+  }
+}
+
 /*************************************/
 /*######## MAIN GRID LAYOUT #########*/
 /*************************************/
@@ -1459,6 +1490,35 @@ th, tr, td {
   padding: var(--editor-select-padding);
 }
 
+#editor-pane .editor-next-prev-btns {
+  position:absolute;
+  right:0;
+  top:0;
+  display:flex;
+  flex-wrap: nowrap;
+  font-size:.7em;
+  z-index: calc(var(--openablepane-zindex) + 4);
+  user-select: none;
+}
+#editor-pane .editor-next-prev-btns > div {
+  margin-left:.5em;
+  opacity:.8;
+}
+#editor-pane .editor-next-prev-btns .btn {
+  cursor:pointer;
+}
+#editor-pane .editor-next-prev-btns .btn:hover {
+  opacity:1;
+  color: var(--bright-text);
+}
+#editor-pane .editor-next-prev-btns .btn.grayed-out,
+#editor-pane .editor-next-prev-btns .btn.grayed-out:hover {
+  cursor:default;
+  opacity:.5;
+}
+
+
+
 .edit-field {
   margin: var(--editfield-margin);
 }
@@ -1493,6 +1553,12 @@ th, tr, td {
 /* .edit-field.genre input[type=text], */
 .edit-field.kind select {
   text-transform: capitalize;
+}
+
+.edit-field.filename {
+  z-index: calc(var(--openablepane-zindex) + 2);
+  font-size:.6em;
+  font-style: italic;
 }
 
 /* .edit-field.new .edit-field-editor {
