@@ -5152,14 +5152,16 @@ class MynEditor extends MynOpenablePane {
 
   goToPrevious() {
     if (this.props.detailRowBoundaryFlag !== 'first') {
-      this.saveChanges();
+      if (this.state.changed.size > 0)
+        this.saveChanges();
       this.props.goToPrevious();
     }
   }
 
   goToNext() {
     if (this.props.detailRowBoundaryFlag !== 'last') {
-      this.saveChanges();
+      if (this.state.changed.size > 0)
+        this.saveChanges();
       this.props.goToNext();
     }
   }
