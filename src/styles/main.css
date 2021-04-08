@@ -1511,10 +1511,14 @@ th, tr, td {
   opacity:1;
   color: var(--bright-text);
 }
-#editor-pane .editor-next-prev-btns .btn.grayed-out,
-#editor-pane .editor-next-prev-btns .btn.grayed-out:hover {
+/* gray out the appropriate buttons if we're at the end or beginning */
+#editor-pane .editor-next-prev-btns.first .editor-prev-btn,
+#editor-pane .editor-next-prev-btns.first .editor-prev-btn:hover,
+#editor-pane .editor-next-prev-btns.last .editor-next-btn,
+#editor-pane .editor-next-prev-btns.last .editor-next-btn:hover {
   cursor:default;
-  opacity:.5;
+  opacity:.3;
+  color:inherit;
 }
 
 
