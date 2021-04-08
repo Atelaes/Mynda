@@ -1203,6 +1203,7 @@ class MynLibrary extends React.Component {
             onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
           >
             {name}
+            {object.id === 'uncategorized' ? (<MynTooltip shade='dark' tip={`Videos in this playlist that are not part of any collection appear here. Use the dropdown below to add them to an existing collection, or drag and drop them to any collections above, or you can add them to collections from the video editor (by clicking on the Edit button in the details pane). To view and edit the entire collections structure, go to Settings ${'\u279E'} Collections.`} />) : null}
           </h1>
             {this.deleteBtn(object)}
             {this.addBtn(object)}
@@ -4619,7 +4620,7 @@ class MynSettingsCollections extends React.Component {
 
             return (
               <div key={vidToken.order} className='video'>
-                {vidToken.order}: {video.title}
+                <div className='order'>{vidToken.order}</div> {video.title}
               </div>
             );
           } catch(err) {
@@ -4629,7 +4630,7 @@ class MynSettingsCollections extends React.Component {
         });
 
         children = (
-          <div style={{ display : (this.state.dragging ? 'none' : 'block') }}>
+          <div className='videos' style={{ display : (this.state.dragging ? 'none' : 'block') }}>
             {childrenEls}
           </div>
         );
@@ -8089,6 +8090,8 @@ class MynTooltip extends React.Component {
   }
 
   toggleTip(e) {
+    e.stopPropagation();
+
     if (this.state.shown) {
       this.hideTip();
     } else {
@@ -8120,7 +8123,7 @@ class MynTooltip extends React.Component {
     return (
       <div
         ref={this.iconDiv}
-        className='tooltip-icon'
+        className={`tooltip-icon ${this.props.shade ? this.props.shade : ''}`}
         onMouseEnter={(e) => {let x = e.pageX; let y = e.pageY; this.state.timeout = setTimeout(() => this.showTip(x,y),200)}}
         onMouseLeave={this.hideTip}
         onClick={(e) => this.toggleTip(e)}

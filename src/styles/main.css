@@ -221,6 +221,14 @@ img.ratings-icon {
   background-repeat: no-repeat;
   overflow:visible;
 }
+.tooltip-icon.light {
+  background-image: url('../../images/tooltip-icon_white.png');
+}
+.tooltip-icon.dark {
+  background-image: url('../../images/tooltip-icon_black.png');
+}
+
+
 
 /* subtitles */
 ::cue {
@@ -1370,10 +1378,28 @@ th, tr, td {
   font-weight: bold;
 }
 
+#settings-collections .collection .videos {
+  margin-bottom:.2em;
+}
 #settings-collections .collection .video {
   font-size: var(--settings-collectionvideo-font-size);
   margin-left: var(--collection-marginleft);
 }
+#settings-collections .collection .video .order {
+  display:inline-block;
+  text-align: center;
+  box-sizing: border-box;
+  padding: .1em .4em .1em .4em;
+  /* padding: .1em; */
+  line-height: 1.2em;
+  min-width: 1.2em;
+  border-radius: 1.2em; /*0 1em 1em 0;*/
+  border: 1px solid var(--medlight-bg);
+  color: var(--dim-text);
+  background-color: var(--dark-bg);
+  /* background: linear-gradient(to left, var(--med-bg) 0, var(--med-bg-rgba0) 150%); */
+}
+
 
 #settings-collections .collection-btn {
   margin-left: var(--collection-marginleft);
