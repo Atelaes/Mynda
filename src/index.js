@@ -387,8 +387,15 @@ function confirmCurrentVideos() {
   for (let h=0; h<library.media.length; h++) {
     let video = library.media[h];
     let filename = video.filename;
+    // We put the whole thing in a try block, as we'll be traversing
+    // nodes that aren't guaranteed to exist, and are expected not to if the
+    // video has moved or been removed.
     try {
+      // A number of these steps will fail gracefully by nature, but we don't
+      // want them to, the problem variable lets us throw errors when things
+      // don't work the way they should.
       let problem = true;
+      // Start by figuring out which watchfolder the video is in
       let conWatchFolder;
       for (let i=0; i<library.settings.watchfolders.length; i++) {
         let watchfolder = library.settings.watchfolders[i];
@@ -399,6 +406,7 @@ function confirmCurrentVideos() {
         }
       }
       if (problem) {throw true}
+      // Then traverse the libFileTree nodes based on the video's filepath.
       let libTreeLoc = libFileTree
       let pathComps = [conWatchFolder].concat(filename.replace(conWatchFolder + path.sep, '').split(path.sep));
       let pathComp = '';
@@ -418,8 +426,18 @@ function confirmCurrentVideos() {
         } else {
           for (let k=0; k<libTreeLoc.videos.length; k++) {
             if (libTreeLoc.videos[k] === filename || libTreeLoc.videos[k].dvd && libTreeLoc.videos[k].dvd === filename) {
+              // If we've gotten here, then we have confirmed the video exists,
+              // so delete it from libFileTree
               libTreeLoc.videos.splice(k, 1);
               problem = false;
+              // Let's also check its subtitles (it would probably be faster)
+              // to find these in libFileTree, but that's just too much to code.
+              for (let l=0; l<video.subtitles.length; l++) {
+                let subAddress = video.subtitles[l];
+                if (!fs.existsSync(subAddress)) {
+                  library.remove(`media.${h}.subtitles.${l}`);
+                }
+              }
               break;
             }
           }
@@ -428,6 +446,8 @@ function confirmCurrentVideos() {
       }
 
     } catch {
+      // A thrown error means we didn't find the video where we expected to,
+      // so move it to inactive media.
       console.log(`${filename} appears to have disappeared, moving to inactive media.`)
       removeVideo(video);
     }
