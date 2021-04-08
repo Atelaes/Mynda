@@ -68,6 +68,7 @@ class Mynda extends React.Component {
     this.playVideo = this.playVideo.bind(this);
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
+    this.reportSortedManifest = this.reportSortedManifest.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     // this.showSettings = this.showSettings.bind(this);
     // this.hideSettings = this.hideSettings.bind(this);
@@ -151,11 +152,22 @@ class Mynda extends React.Component {
     }
   }
 
+  forceRowHover(vidID, rowID) {
+    this.state.selectedRows = {};
+    this.handleHoveredRow(vidID,rowID);
+  }
+
+  // selectedVids should be an array of video ids
+  // or a single video id
   handleSelectedRows(selectedVids, highestRow, tableID, overwrite) {
     // console.log("Overwrite ? " + overwrite);
     // overwrite is a boolean telling us whether to deselect all previously
     // selected rows in all tables before adding the new selections
     if (overwrite) this.state.selectedRows = {};
+
+    if (typeof selectedVids === 'string') {
+      selectedVids = [selectedVids];
+    }
 
     // if any videos were selected in this table, add them to the object;
     // we don't want to add an empty list of rows to the object, because that may
@@ -191,32 +203,59 @@ class Mynda extends React.Component {
   }
 
   getAllSelected() {
-    let highestRow = '9999999999999999999999999999999999999999'; // after the transformation below, this will become 1, which will be higher than any of the actual rows, which are all between 0 and 1
+    let highestRow = '' + Number.MAX_SAFE_INTEGER;
     let selected = [];
     Object.keys(this.state.selectedRows).map(tableID => {
       // add the selected videos from this table
       selected = [...selected, ...this.state.selectedRows[tableID].rows];
 
-      // if this table's highest row is higher than the highest so far,
-      // save this table's highest row as highestRow;
-      // the comparison itself is a little cutesy; since the row ID is what we have,
-      // and the row id takes the form ${videoID}_${collectionID}, where the collection id
-      // is an ordered series of indices describing where the collection is in the structure
-      // (e.g. '0-3-1' being the 2nd child of the 4th child of the 1st collection),
-      // we can take advantage of this by converting the string to a number and doing a simple
-      // numerical comparison: for instance, '0-3-1' becomes 0.031, and is smaller than '1-3-1' (0.131);
-      // the only wrinkle being that if we're in a flat playlist that only contains one table,
-      // there is no collection ID appended to the video ID, the row ID is just identical to the video ID;
-      // so we have to test for that before doing the comparison
-      if (/_/.test(this.state.selectedRows[tableID].highestRow)) {
-        let thisRowCompare = Number(this.state.selectedRows[tableID].highestRow.replace(/^.*_/,'').replace(/\D+/g,'').replace(/^/,'.'));
-        let highestRowCompare = Number(highestRow.replace(/^.*_/,'').replace(/\D+/g,'').replace(/^/,'.'));
-        if (thisRowCompare < highestRowCompare) {
-          highestRow = this.state.selectedRows[tableID].highestRow;
-        }
-      } else {
+      // // if this table's highest row is higher than the highest so far,
+      // // save this table's highest row as highestRow;
+      // // the comparison itself is a little cutesy; since the row ID is what we have,
+      // // and the row id takes the form ${videoID}_${collectionID}, where the collection id
+      // // is an ordered series of indices describing where the collection is in the structure
+      // // (e.g. '0-3-1' being the 2nd child of the 4th child of the 1st collection),
+      // // we can take advantage of this by converting the string to a number and doing a simple
+      // // numerical comparison: for instance, '0-3-1' becomes 0.031, and is smaller than '1-3-1' (0.131);
+      // // the only wrinkle being that if we're in a flat playlist that only contains one table,
+      // // there is no collection ID appended to the video ID, the row ID is just identical to the video ID;
+      // // so we have to test for that before doing the comparison
+      // if (/_/.test(this.state.selectedRows[tableID].highestRow)) {
+      //   let thisRowCompare = Number(this.state.selectedRows[tableID].highestRow.replace(/^.*_/,'').replace(/\D+/g,'').replace(/^/,'.'));
+      //   let highestRowCompare = Number(highestRow.replace(/^.*_/,'').replace(/\D+/g,'').replace(/^/,'.'));
+      //   if (thisRowCompare < highestRowCompare) {
+      //     highestRow = this.state.selectedRows[tableID].highestRow;
+      //   }
+      // } else {
+      //   highestRow = this.state.selectedRows[tableID].highestRow;
+      // }
+
+      // if there is no underscore, then this should be the only table,
+      // so this table's highest row is the overall highest row
+      if (!/_/.test(this.state.selectedRows[tableID].highestRow)) {
         highestRow = this.state.selectedRows[tableID].highestRow;
+      } else {
+        // otherwise, store what was after the underscore (which will either be
+        // a collection id like '0-3-1', or 'uncategorized') so that
+        // we can compare it to the overall highest row so far to see which is higher on the page
+        // (keeping in mind that lower numbers are higher on the page)
+
+        let thisRowCompare = this.state.selectedRows[tableID].highestRow.replace(/^.*_/,'').replace('uncategorized',(Number.MAX_SAFE_INTEGER - 1) + '').split('-')
+        let highestRowCompare = highestRow.replace(/^.*_/,'').replace('uncategorized',(Number.MAX_SAFE_INTEGER - 1) + '').split('-');
+
+        // now compare each element, hierarchically
+        for (let i=0; i<thisRowCompare.length; i++) {
+          if (i >= highestRowCompare.length) break; // if b ran out, but we were equal up to this point, a should be later than b, so we leave highest row as highest row
+          // if (thisRowCompare[i] > highestRowCompare[i]) return 1;
+          if (Number(thisRowCompare[i]) < Number(highestRowCompare[i])) {
+            highestRow = this.state.selectedRows[tableID].highestRow;
+            break;
+          }
+          // if the value at this array index was equal for both rows, we loop to the next one,
+          // and so on, until we find the earliest index where the values are not equal
+        }
       }
+
     });
 
     if (selected.length === 0) {
@@ -229,6 +268,10 @@ class Mynda extends React.Component {
     }
 
     return results;
+  }
+
+  reportSortedManifest(manifest) {
+    this.state.playlistRowManifest = manifest;
   }
 
   showDetails(id, rowID) {
@@ -302,7 +345,45 @@ class Mynda extends React.Component {
     } catch(error) {
       console.log("Error: could not find video " + id)
     }
-    this.setState({detailRowID: rowID, detailVideo: detailVideo});
+
+    // note if the video is the first or last video in the playlist (as currently sorted)
+    // so that in the video editor, we can gray out the 'next' or 'previous' button
+    let boundaryFlag = '';
+    if (this.state.playlistRowManifest[0].rowID === rowID) boundaryFlag = 'first';
+    if (this.state.playlistRowManifest[this.state.playlistRowManifest.length-1].rowID === rowID) boundaryFlag = 'last';
+
+    this.setState({detailRowID: rowID, detailVideo: detailVideo, detailRowBoundaryFlag: boundaryFlag});
+  }
+
+  // activated from a button in the editor pane,
+  // moves to earlier/later video in playlist (depending on the amount param),
+  // highlighting that row and showing it in the details pane,
+  // and if the video editor is open, changing the video there too
+  incrementDetailVid(amount) {
+    console.log(`Going to ${amount == 1 ? 'NEXT' :( amount == -1 ? 'PREVIOUS' : 'SOME OTHER')} video`);
+
+    console.log('******** playlistRowManifest: ');
+    console.log(this.state.playlistRowManifest);
+    console.log(`Current detail vid rowID: ${this.state.detailRowID}`);
+
+    // first find index of the current detail vid in the playlistRowManifest
+    let index;
+    this.state.playlistRowManifest.map((row,i) => {
+      if (row.rowID === this.state.detailRowID) index = i;
+    });
+    if (typeof index === "undefined") return console.error('Could not find current detail vid in manifest');
+
+    this.goToRow(this.state.playlistRowManifest[index + amount]);
+  }
+
+  goToRow(row) {
+    if (!row) return console.error('Could not find row to move to');
+
+    // select the row that we are going to (instead of just hovering it)
+    this.handleSelectedRows(row.vidID, row.rowID, row.tableID, true);
+
+    // we could use the following line instead if we just wanted to hover it
+    // this.forceRowHover(row.vidID, row.rowID);
   }
 
   scrollToVideo(rowID) {
@@ -699,6 +780,7 @@ class Mynda extends React.Component {
           handleSelectedRows={this.handleSelectedRows}
           handleHoveredRow={this.handleHoveredRow}
           selectedRows={this.state.selectedRows}
+          reportSortedManifest={this.reportSortedManifest}
         />
         <MynDetails
           video={this.state.detailVideo}
@@ -725,6 +807,9 @@ class Mynda extends React.Component {
           collections={this.state.collections}
           settings={this.state.settings}
           hideFunction={() => {this.hideOpenablePane('editorPane')}}
+          goToPrevious={() => this.incrementDetailVid(-1)}
+          goToNext={() => this.incrementDetailVid(1)}
+          detailRowBoundaryFlag={this.state.detailRowBoundaryFlag}
         />
         <MynPlayer
           show={this.state.show.playerPane}
@@ -828,7 +913,8 @@ class MynLibrary extends React.Component {
       vidsInHierarchy : [],
       sortReport : {},
       dragging : false,
-      addToExistingColID : ''
+      addToExistingColID : '',
+      manifest: {}
     }
 
     this.deleteBtn = object => {
@@ -860,6 +946,8 @@ class MynLibrary extends React.Component {
     this.onDragEnd = this.onDragEnd.bind(this);
     this.onDragStart = this.onDragStart.bind(this);
     this.reportSort = this.reportSort.bind(this);
+    this.reportSortedManifest = this.reportSortedManifest.bind(this);
+
     // this.findCollections = this.findCollections.bind(this);
 
     ipcRenderer.on('delete-collection-confirm', (event, response, collectionID) => {
@@ -912,22 +1000,36 @@ class MynLibrary extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
+    let videos = false;
+    let collections = false;
+    let playlist = false;
+
     if (!_.isEqual(oldProps.videos,this.props.videos)) {
       console.log('MynLibrary videos was changed!');
-      this.setState({videos:_.cloneDeep(this.props.videos)});
+      videos = true;
     }
     if (!_.isEqual(oldProps.collections,this.props.collections)) {
       console.log('MynLibrary collections was changed!');
-      this.setState({collections:_.cloneDeep(this.props.collections)});
+      collections = true;
     }
     if (!_.isEqual(oldProps.columns,this.props.columns)) {
       console.log('MynLibrary columns was changed!');
-      this.setState({videos:_.cloneDeep(this.props.videos)});
+      videos = true;
     }
     if (oldProps.settings.preferences.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
       console.log('MynLibrary include_user_rating_in_avg was changed!');
-      this.setState({videos:_.cloneDeep(this.props.videos)});
+      videos = true;
     }
+
+    if (oldProps.playlistID !== this.props.playlistID) {
+      console.log('MynLibrary playlist was changed!');
+      playlist = true;
+    }
+
+    if (videos) this.setState({videos:_.cloneDeep(this.props.videos)});
+    if (collections) this.setState({collections:_.cloneDeep(this.props.collections)});
+
+    if (collections || playlist) this.state.manifest = {};
   }
 
   componentDidMount() {
@@ -1085,6 +1187,9 @@ class MynLibrary extends React.Component {
          );
         }
 
+        let tableID = 'table-' + object.id;
+        // if (!this.state.manifest[tableID]) this.state.manifest[tableID] = [];
+
         // console.log('Creating table for collection: ' + JSON.stringify(object));
         // console.log(JSON.stringify(colVidsInPlaylist));
         // wrap the videos in the last collection div,
@@ -1118,6 +1223,7 @@ class MynLibrary extends React.Component {
               <Droppable droppableId={object.id}>
                 {(provided) => (
                   <MynLibTable
+                    tableID={tableID}
                     movies={colVidsInPlaylist}
                     collections={_.cloneDeep(this.state.collections)}
                     settings={this.props.settings}
@@ -1135,6 +1241,7 @@ class MynLibrary extends React.Component {
                     handleHoveredRow={this.props.handleHoveredRow}
                     selectedRows={this.props.selectedRows}
                     reportSort={this.reportSort}
+                    reportSortedManifest={this.reportSortedManifest}
                     provided={provided}
                   />
                 )}
@@ -1395,9 +1502,69 @@ class MynLibrary extends React.Component {
     ipcRenderer.send('delete-collection-confirm', object);
   }
 
+  reportSortedManifest(tableID, rows) {
+    // console.log(rows);
+
+    // if (rows.length > 0) this.state.sortedManifest.push(rows);
+    if (rows.length === 0) {
+      delete this.state.manifest[tableID];
+    } else {
+      this.state.manifest[tableID] = rows;
+    }
+
+    let sortedManifest = [];
+    Object.keys(this.state.manifest).map(key => {
+      sortedManifest.push(this.state.manifest[key])
+    });
+
+    sortedManifest.sort((a,b) => {
+      // a_col and b_col should be the collection id of that table,
+      // or if in a flat playlist, they will be undefined
+      // (in which case there should only be one table anyway)
+      try {
+        let a_col = a[0].rowID.split('_')[1];
+        let b_col = b[0].rowID.split('_')[1];
+      } catch(err) {
+        console.log(err);
+        return 0;
+      }
+
+      // if either one is undefined, we shouldn't even be here, but return 0 anyway just in case;
+      if (typeof a_col === "undefined" || typeof b_col === "undefined") return 0;
+
+      // ensure 'uncategorized' ends up at the end;
+      a_col = a_col.replace('uncategorized',Number.MAX_SAFE_INTEGER);
+      b_col = b_col.replace('uncategorized',Number.MAX_SAFE_INTEGER);
+
+      // split the collection id into an array
+      a_col = a_col.split('-');
+      b_col = b_col.split('-');
+
+      // now sort by each element, hierarchically
+      for (let i=0; i<a_col.length; i++) {
+        if (i >= b_col.length) return 1; // if b ran out, but we were equal up to this point, a should be later than b
+        if (a_col[i] > b_col[i]) return 1;
+        if (a_col[i] < b_col[i]) return -1;
+      }
+      return 0; // if we made it all the way through the loop, that means the collection id's were identical
+    });
+
+    // now that it's sorted, create a single array of every row
+    // in the playlist to be passed to up to Mynda
+    let sortedManifestFlat = [];
+    sortedManifest.map(table => {
+      sortedManifestFlat = [...sortedManifestFlat, ...table];
+    })
+
+    // console.log('==== sortedManifestFlat ====');
+    // console.log(sortedManifestFlat);
+    this.props.reportSortedManifest(sortedManifestFlat);
+  }
+
   render() {
     // console.log('----MynLibrary RENDER----');
     let content = null;
+    this.state.manifest = {};
 
     // if the playlist view is hierarchical, create multiple tables
     // in a hierarchy based on the collections that the videos in this
@@ -1416,8 +1583,12 @@ class MynLibrary extends React.Component {
     // if the playlist view is flat, we only need to display one table
     } else if (this.props.view === "flat") {
 
+      let tableID = 'table';
+      // this.state.manifest[tableID] = [];
+
       content = (
         <MynLibTable
+          tableID={tableID}
           movies={this.state.videos}
           settings={this.props.settings}
           playlistID={this.props.playlistID}
@@ -1431,6 +1602,7 @@ class MynLibrary extends React.Component {
           handleSelectedRows={this.props.handleSelectedRows}
           handleHoveredRow={this.props.handleHoveredRow}
           selectedRows={this.props.selectedRows}
+          reportSortedManifest={this.reportSortedManifest}
         />
       )
 
@@ -1453,9 +1625,13 @@ class MynLibTable extends React.Component {
     // if it appears within a heirarchical playlist,
     // there could be multiple tables (one for each collection that appears in the playlist),
     // so in a hierarchical playlist, we append the collection id
-    this.tableID = 'table';
-    if (props.view === 'hierarchical' && props.collectionID) {
-      this.tableID = 'table-' + props.collectionID;
+    if (this.props.tableID) {
+      this.tableID = this.props.tableID;
+    } else {
+      this.tableID = 'table';
+      if (props.view === 'hierarchical' && props.collectionID) {
+        this.tableID = 'table-' + props.collectionID;
+      }
     }
 
     this.clickTimer = null;
@@ -1835,6 +2011,7 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
+    // console.log('SORTING TABLE ' + this.tableID)
     // console.log(key);
     if (key === undefined) {
       throw "Error: key was undefined; must supply a key to sort by";
@@ -1972,7 +2149,8 @@ class MynLibTable extends React.Component {
         index:index,
         rowID:rowID,
         vidID:movie.id,
-        vidTitle:movie.title
+        vidTitle:movie.title,
+        tableID:this.tableID
       };
 
       // THE BELOW MAY NOT BE NECESSARY
@@ -2028,6 +2206,7 @@ class MynLibTable extends React.Component {
     if (this.props.reportSort) {
       this.props.reportSort(this.props.collectionID,key,ascending);
     }
+
   }
 
   // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
@@ -2088,6 +2267,7 @@ class MynLibTable extends React.Component {
       // console.log("Sort key is not null?: " + this.state.sortKey);
       this.requestSort(this.state.sortKey, this.state.sortAscending);
     }
+
   }
 
   removeArticle(string) {
@@ -2209,6 +2389,7 @@ class MynLibTable extends React.Component {
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
     // populate and sort the table (by initial values)
     this.reset(true);
+
   }
 
   componentWillMount() {
@@ -2225,6 +2406,9 @@ class MynLibTable extends React.Component {
 
   render() {
     // console.log('----MynLibTable RENDER----');
+
+    // report the sorted rows to MynLibrary
+    this.props.reportSortedManifest(this.tableID,this.state.sortedRows);
 
     // if this table is part of a hierarchical playlist,
     // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
@@ -3172,11 +3356,17 @@ class MynPlayer extends MynOpenablePane {
     const createFilename = (origName) => `${this.state.video.id}-${crypto.createHash('sha1').update(origName).digest('hex')}.vtt`;
     let subtitles = [];
 
-    // Convert external subs
+    // ======= Convert external subs ======= //
     this.state.video.subtitles.map((sub,index) => {
       // create a unique filename for each converted subtitle file based on the video id and a hash of the original filename
       let vttFilename = createFilename(sub);
       let vttFilePath = path.join(tempFolder,vttFilename)
+
+      let subName = '';
+      try {
+        subName = path.basename(sub,path.extname(sub)).toLowerCase().replace(path.basename(this.state.video.filename,path.extname(this.props.video.filename)).toLowerCase(),'').replace(/\b\w/g,(l) => l.toUpperCase());
+      } catch(err) {console.error(err)}
+      if (subName === '') subName = `Track ${index+1}`;
 
       fs.createReadStream(sub)
         .pipe(subtitle.parse())
@@ -3187,7 +3377,7 @@ class MynPlayer extends MynOpenablePane {
       // let trackLabel = `Track ${index+1}`;
       let subObj = {
         path: vttFilePath,
-        name: `Track ${index+1}`,
+        name: subName,
         lang: 'English'
       }
       subtitles.push(subObj);
@@ -3197,7 +3387,7 @@ class MynPlayer extends MynOpenablePane {
       // );
     });
 
-    // extract and convert internal subs
+    // ======= Extract and convert internal subs ======= //
     let vidInfo;
     try {
       vidInfo = await ffprobe(this.state.video.filename, { path: ffprobeStatic.path });
@@ -3205,22 +3395,22 @@ class MynPlayer extends MynOpenablePane {
     } catch(err) {
       console.error(err);
     }
-
-    // loop over the various data streams that ffprobe found in the video;
-    // if any of these are subtitle streams, extract them as external files;
     vidInfo.streams.map(stream => {
+      // loop over the various data streams that ffprobe found in the video;
+      // if any of these are subtitle streams, extract them as external files;
+
       if (stream.codec_type === 'subtitle') {
         let filepath = path.join(tempFolder,`internal${stream.index}.vtt`);
 
         let subObj = {
           path: filepath,
-          name: stream.tags.title || `Track ${subtitles.length+1}`,
-          lang: stream.tags.language
+          name: stream.tags && stream.tags.title ? stream.tags.title : `Track ${subtitles.length+1}`,
+          lang: stream.tags ? stream.tags.language : ''
         }
         subtitles.push(subObj);
 
         let cmd = ffmpeg(this.state.video.filename, {
-          // timeout:600
+          timeout:60
         }).outputOptions([
           `-map 0:${stream.index}`
         ]).on('codecData', (data) => {
@@ -4960,6 +5150,21 @@ class MynEditor extends MynOpenablePane {
     }
   }
 
+  goToPrevious() {
+    if (this.props.detailRowBoundaryFlag !== 'first') {
+      this.saveChanges();
+      this.props.goToPrevious();
+    }
+  }
+
+  goToNext() {
+    if (this.props.detailRowBoundaryFlag !== 'last') {
+      this.saveChanges();
+      this.props.goToNext();
+    }
+  }
+
+
   componentDidMount() {
     this._isMounted = true;
   }
@@ -4981,6 +5186,16 @@ class MynEditor extends MynOpenablePane {
           placeholderImage={this.state.placeholderImage}
           handleChange={this.handleChange}
         />
+
+        <div className={'editor-next-prev-btns ' + this.props.detailRowBoundaryFlag}>
+          <div className='btn editor-prev-btn' onClick={()=>this.goToPrevious()}>
+            <div style={{display:"inline-block",transform:"scaleX(-1)"}}>{'\u25B8'}</div> Previous
+          </div>
+          <div className='separator'>|</div>
+          <div className='btn editor-next-btn' onClick={()=>this.goToNext()}>
+            Next <div style={{display:"inline-block"}}>{'\u25B8'}</div>
+          </div>
+        </div>
 
         <MynEditorEdit
           show={this.props.show}
@@ -5469,7 +5684,7 @@ class MynEditorEdit extends React.Component {
     // and also, if any changes were made (i.e. broken values fixed)
     // save the changes
     if (validateVideo(this.props.video) !== true) {
-      this.props.saveChanges();
+      // this.props.saveChanges();
     }
   }
 
@@ -5496,6 +5711,16 @@ class MynEditorEdit extends React.Component {
     //     <div className="error-message">Error: Invalid video object</div>
     //   );
     // }
+
+    /* FILENAME */
+    // the user won't be able to edit the filename, but we need to display it
+    let filename = (
+      <div className='edit-field filename'>
+        <div className="edit-field-editor">
+          <MynOverflowTextMarquee text={this.props.video.filename} direction='left' ellipsis='fade' fadeSize='2em' />
+        </div>
+      </div>
+    );
 
     /* TITLE */
     let title = (
@@ -5969,6 +6194,7 @@ class MynEditorEdit extends React.Component {
       <div id="edit-container">
         {batchNotification}
         <form onSubmit={this.props.saveChanges}>
+          {filename}
           {title}
           {imdbID}
           {description}
@@ -6007,6 +6233,8 @@ class MynEdit extends React.Component {
   }
 
   handleValidity(valid, property, element, tip) {
+    if (!element) return;
+
     if (valid) {
       if (this.props.reportValid) {
         this.props.reportValid(property,true);

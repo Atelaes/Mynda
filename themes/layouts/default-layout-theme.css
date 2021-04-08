@@ -184,56 +184,60 @@
   grid-row: 1 / span 2;
   grid-column: 1 / span 2;
 }
-.edit-field.description {
+.edit-field.filename {
   grid-row: 3;
   grid-column: 1 / span 2;
 }
-.edit-field.year {
+.edit-field.description {
   grid-row: 4;
+  grid-column: 1 / span 2;
+}
+.edit-field.year {
+  grid-row: 5;
   grid-column: 1;
 }
 .edit-field.imdbID {
-  grid-row: 4;
+  grid-row: 5;
   grid-column: 2;
 }
 .edit-field.director {
-  grid-row: 5;
+  grid-row: 6;
   grid-column: 1;
 }
 .edit-field.directorsort {
-  grid-row: 5;
+  grid-row: 6;
   grid-column: 2;
 }
 .edit-field.genre {
-  grid-row: 6;
+  grid-row: 7;
   grid-column: 1;
 }
 .edit-field.kind {
-  grid-row: 6;
+  grid-row: 7;
   grid-column: 2;
 }
 .edit-field.rated {
-  grid-row: 7;
+  grid-row: 8;
   grid-column: 1;
 }
 .edit-field.boxoffice {
-  grid-row: 7;
+  grid-row: 8;
   grid-column: 2;
 }
 .edit-field.cast {
-  grid-row: 8 / span 2;
+  grid-row: 9 / span 2;
   grid-column: 1 / span 2;
 }
 .edit-field.tags {
-  grid-row: 10;
+  grid-row: 11;
   grid-column: 1 / span 2;
 }
 .edit-field.subtitles {
-  grid-row: 11 / span 2;
+  grid-row: 12 / span 2;
   grid-column: 1 / span 2;
 }
 .edit-field.collections {
-  grid-row: 13 / span 10;
+  grid-row: 14 / span 10;
   grid-column: 1 / span 2;
 }
 
@@ -247,43 +251,43 @@
   grid-column: 3 / span 2;
 }
 .edit-field.artwork {
-  grid-row: 3 / span 4;
+  grid-row: 3 / span 5;
   grid-column: 3 / span 2;
 }
 .edit-field.rating {
-  grid-row: 7;
+  grid-row: 8;
   grid-column: 3;
 }
 .edit-field.seen {
-  grid-row: 7;
+  grid-row: 8;
   grid-column: 4;
 }
 .edit-field.position {
-  grid-row: 8;
-  grid-column: 3 / span 2;
-}
-.edit-field.lastseen {
   grid-row: 9;
   grid-column: 3 / span 2;
 }
-.edit-field.dateadded {
+.edit-field.lastseen {
   grid-row: 10;
   grid-column: 3 / span 2;
 }
-.edit-field.ratings {
+.edit-field.dateadded {
   grid-row: 11;
   grid-column: 3 / span 2;
 }
-.edit-field.country {
+.edit-field.ratings {
   grid-row: 12;
   grid-column: 3 / span 2;
 }
-.edit-field.languages {
+.edit-field.country {
   grid-row: 13;
   grid-column: 3 / span 2;
 }
-.edit-field.new {
+.edit-field.languages {
   grid-row: 14;
+  grid-column: 3 / span 2;
+}
+.edit-field.new {
+  grid-row: 15;
   grid-column: 3 / span 2;
 }
 
