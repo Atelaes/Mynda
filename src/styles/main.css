@@ -233,8 +233,8 @@ img.ratings-icon {
 /* subtitles */
 ::cue {
   color: white;
-  color: magenta;
-  font-family: 'Comic Sans MS';
+  /* color: magenta;
+  font-family: 'Comic Sans MS'; */
   background: none;
   text-shadow: -.05em .05em .03em black, 0 0 2px rgba(0,0,0,.6);
   /* -webkit-text-stroke: 1px black; */
@@ -1387,11 +1387,15 @@ th, tr, td {
 }
 #settings-collections .collection .video .order {
   display:inline-block;
+  /* font-family:var(--alt-font); */
   text-align: center;
   box-sizing: border-box;
   padding: .1em .4em .1em .4em;
+  /* padding: .1em .3em .1em .3em; */
   /* padding: .1em; */
   line-height: 1.2em;
+  vertical-align: middle;
+  /* height: 1.2em; */
   min-width: 1.2em;
   border-radius: 1.2em; /*0 1em 1em 0;*/
   border: 1px solid var(--medlight-bg);
@@ -1993,6 +1997,8 @@ th, tr, td {
   font-size:.8em;
 }
 #editor-pane #batch-videos-table {
+  table-layout:fixed;
+  width: 100%;
   /* max-width:100%; */
 }
 #editor-pane #batch-videos-table th {
@@ -2004,9 +2010,18 @@ th, tr, td {
   white-space: nowrap;
   overflow-x:scroll;
 }
-#editor-pane #batch-videos-table .filename {
+#editor-pane #batch-videos-table td.filename {
   font-size:.8em;
   opacity:.8;
+}
+#editor-pane #batch-videos-table th.title {
+  /* width:40%; */
+}
+#editor-pane #batch-videos-table th.year {
+  width: 3em;
+}
+#editor-pane #batch-videos-table th.filename {
+  /* width:40%; */
 }
 
 #edit-field-artwork-dl-msg {

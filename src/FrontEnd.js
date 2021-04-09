@@ -284,6 +284,7 @@ class Mynda extends React.Component {
     if (Array.isArray(id)) {
       const vidIDs = id;
       console.log('SHOWING BATCH DETAILS PANE')
+      // console.log(vidIDs);
 
       // store a list of videos to display to the user
       // in the details pane and the editor
@@ -294,8 +295,11 @@ class Mynda extends React.Component {
         }
       });
 
+      // console.log(batchVids);
+
       // get an array of the videos themselves
       let videos = this.state.videos.filter(v => vidIDs.includes(v.id));
+      // console.log(videos);
 
       // create the batch object
       let batchObject = {}
@@ -303,10 +307,11 @@ class Mynda extends React.Component {
       batchObject.id = 'batch'; // but set the id to 'batch' so that the editor knows what we're doing
       delete batchObject.metadata; // and delete metadata, since that is derived from the files themselves and is uneditable
       Object.keys(batchObject).map(key => {
-        if (key === 'id' || key === 'metadata') return;
+        if (key === 'id' || key === 'metadata' || key === 'collections') return;
         // test each video's value for this key against that of the first video
         let testValue = videos[0][key];
         // loop through and test all the videos against that value
+        // console.log('Testing ' + key);
         for (let i=1; i<videos.length; i++) {
           const value = videos[i][key];
           // if any one of them is different, return;
@@ -315,9 +320,9 @@ class Mynda extends React.Component {
           // we want to compare individual elements of the array
           // and keep only the ones that are in common,
           // even if the whole array isn't identical
-          if (Array.isArray(testValue)) {
+          if (Array.isArray(testValue) && Array.isArray(value)) {
             testValue = testValue.filter(el => value.includes(el));
-          } else if (typeof testValue === 'object' && testValue !== null) {
+          } else if (typeof testValue === 'object' && testValue !== null && typeof value === 'object' && value !== null) {
             // if (!_.isEqual(value,testValue)) return;
             Object.keys(testValue).map(subProp => {
               if (value[subProp] !== testValue[subProp]) {
@@ -1203,7 +1208,7 @@ class MynLibrary extends React.Component {
             onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
           >
             {name}
-            {object.id === 'uncategorized' ? (<MynTooltip shade='dark' tip={`Videos in this playlist that are not part of any collection appear here. Use the dropdown below to add them to an existing collection, or drag and drop them to any collections above, or you can add them to collections from the video editor (by clicking on the Edit button in the details pane). To view and edit the entire collections structure, go to Settings ${'\u279E'} Collections.`} />) : null}
+            {object.id === 'uncategorized' ? (<MynTooltip shade='dark' tip={`Videos in this playlist that are not part of any collection appear here. Use the dropdown below to add them to an existing collection, or drag and drop them to any collections above, or you can add a video to collections from the video editor (by clicking on the Edit button in the details pane). To view and edit the entire collections structure, go to Settings ${'\u279E'} Collections.`} />) : null}
           </h1>
             {this.deleteBtn(object)}
             {this.addBtn(object)}
@@ -2750,7 +2755,6 @@ class MynOverflowTextMarquee extends React.Component {
       // width: '1em'
     }
 
-
     this.state = {
       ellipsisStyle: {...this.ellipsisBaseStyle},
       direction: props.direction ? props.direction : 'right',
@@ -2936,6 +2940,8 @@ class MynOverflowTextMarquee extends React.Component {
 
   componentDidMount() {
     this.initialize();
+
+    window.addEventListener('resize', () => this.initialize());
   }
 
   componentDidUpdate(oldProps) {
@@ -6025,6 +6031,7 @@ class MynEditorEdit extends React.Component {
             validator={this.state.validators.number.exp}
             validatorTip={this.state.validators.number.tip}
             reportValid={this.props.reportValid}
+            batch={!!this.props.batch}
           />
         </div>
       </div>
@@ -6165,17 +6172,17 @@ class MynEditorEdit extends React.Component {
           <table id='batch-videos-table'>
             <thead>
               <tr>
-                <th>Title</th>
-                <th>Year</th>
-                <th>Filename</th>
+                <th className='title'>Title</th>
+                <th className='year'>Year</th>
+                <th className='filename'>Filename</th>
               </tr>
             </thead>
             <tbody>
              {this.props.batch.map(v => (
                  <tr key={v.id}>
-                  <td className='title'>{v.title}</td>
+                  <td className='title'><MynOverflowTextMarquee text={v.title} ellipsis='fade' /></td>
                   <td className='year'>{v.year}</td>
-                  <td className='filename'>{v.filename}</td>
+                  <td className='filename'><MynOverflowTextMarquee text={v.filename} direction='left' ellipsis='fade' /></td>
                  </tr>
              ))}
             </tbody>
@@ -6191,6 +6198,7 @@ class MynEditorEdit extends React.Component {
           keepEllipsis={true}
         />
       );
+
     }
 
     return (
@@ -6215,7 +6223,7 @@ class MynEditorEdit extends React.Component {
           {dateadded}
           {artwork}
           {subtitles}
-          {!this.props.batch ? collections : null}
+          {collections}
           {ratings}
           {boxoffice}
           {rated}
@@ -6710,7 +6718,7 @@ class MynEditCollections extends MynEdit {
           // the order will be undefined (we display an empty string), but nothing will be shown anyway
           contents = (
             <div key={'terminal-' + collection.id} className="collection-terminal-node">
-              <div className="collection-order">Order: <input type="text" className="filled" value={this.props.video.collections[collection.id] || ''} onChange={(e) => this.updateOrder(e.target.value, e.target, collection)} /><div className="input-clear-button always" onClick={(e) => this.clearOrder(e, collection)}></div></div>
+              {!this.props.batch ? (<div className="collection-order">Order: <input type="text" className="filled" value={this.props.video.collections[collection.id] || ''} onChange={(e) => this.updateOrder(e.target.value, e.target, collection)} /><div className="input-clear-button always" onClick={(e) => this.clearOrder(e, collection)}></div></div>) : null }
               <div className="inline-delete-button clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
             </div>
           );
