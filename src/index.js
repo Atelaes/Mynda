@@ -209,7 +209,7 @@ function findVideosFromFolder(folderNode) {
         break;
       }
     }
-    if (!stillGoing) confirmCurrentVideos();
+    if (!stillGoing) divineCollections(libFileTree, []);
   });
 }
 
@@ -379,6 +379,35 @@ let videoTemplate =   {
     }
   }
 
+  //Recursive function which takes a built libFileTree and figures out collections
+  // for videos based on file structure.
+  function divineCollections(node, pathStack) {
+    if (pathStack.length === 0) {
+      //If we're here, then we're looking at root, this should only happen once.
+      console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
+    }
+    let toDivine = true;
+    let count = 0;
+    if (toDivine) {
+      for (let i=0; i<node.folders.length; i++) {
+        let folder = node.folders[i];
+        let parentFolder = (node.path) ? node.path + path.sep : '';
+        let stackAppend = folder.path.replace(parentFolder, '');
+        count += divineCollections(folder, pathStack.concat(stackAppend));
+      }
+      count += (node.videos) ? node.videos.length : 0;
+      if (count > 1 && pathStack.length > 1) {
+        node.collection = pathStack.slice(1).join('.');
+      }
+    }
+    if (pathStack.length === 0) {
+      //Again, we're on root.
+      console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
+      confirmCurrentVideos();
+    } else {
+      return count;
+    }
+  }
 
 function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
