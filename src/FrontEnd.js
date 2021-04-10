@@ -1214,7 +1214,7 @@ class MynLibrary extends React.Component {
             {this.addBtn(object)}
             <div className="container hidden">
               {object.id === 'uncategorized' ? (
-                <Droppable droppableId={this.state.addToExistingColID}>
+                <Droppable droppableId={this.state.addToExistingColID ? this.state.addToExistingColID : 'dummy'}>
                   {(provided, snapshot) => (
                     <MynLibAddExistingCollection
                       collections={this.state.collections}
@@ -1351,86 +1351,101 @@ class MynLibrary extends React.Component {
       }
 
 
-      // get video id
-      let videoID = draggableId.split('_')[0];
-      let newOrder, newIndex;
+      let rows = [];
+
+      // if multiple videos were selected, and the dragged video was one of them,
+      // we need to move them all; if the dragged video was not one of them,
+      // we just need to move that one, but then also deselect the others
+      // to make that clearer to the user
+      if (this.props.selectedRows) {
+        let selectedFlag = false;
+        Object.keys(this.props.selectedRows).map(key => {
+          if (this.props.selectedRows[key].rows) {
+            this.props.selectedRows[key].rows.map(vidID => {
+              let row = `${vidID}_${key.replace(/^table-/,'')}`;
+              console.log(`Row: ${row}, draggableId: ${draggableId}`)
+              rows.push(row);
+              if (row === draggableId) selectedFlag = true;
+            });
+          }
+        });
+
+        // if the dragged row was NOT among the selected,
+        // empty the rows array and just put the one video into it
+        if (!selectedFlag) {
+          rows = [];
+          rows.push(draggableId);
+        }
+        // either way, we now have an array of rows to move
+      }
+      console.log('ROWS ********* ')
+      console.log(rows);
 
       // make a deep copy of the whole collections object for modification, which we'll save when we're done
       let colsCopy = new Collections(_.cloneDeep(this.state.collections));
 
-      // get source collection and destination collection
-      let srcCol, destCol;
-      let oldOrder = 0;
-      if (destination.droppableId !== 'uncategorized') {
-        destCol = colsCopy.get(destination.droppableId);
-      }
-      if (source.droppableId !== 'uncategorized') {
-        srcCol = colsCopy.get(source.droppableId);
-        oldOrder = colsCopy.get(source.droppableId).videos.filter(v => v && v.id === videoID)[0].order;
-      }
-      // console.log('old order: ' + oldOrder);
+      // loop through all selected rows and move them
+      rows.map((row,addedIndex) => {
+        // get video id
+        let videoID = row.split('_')[0];
+        let srcID = row.split('_')[1];
 
-      // only do anything if
-      if (
-        // the video was moved to a different collection that doesn't already contain it (or destCol doesn't exist, i.e. the video was moved to 'uncategorized')
-        (destination.droppableId !== source.droppableId && (!destCol || !colsCopy.containsVideo(destCol,videoID)))
-        ||
-        // or the video was moved to a different position within the same collection
-        (destination.index !== source.index && destination.droppableId === source.droppableId)
-      ) {
+        let newOrder, newIndex;
 
-        // remove video from original position
-        if (srcCol) {
-          colsCopy.removeVideo(srcCol,videoID);
+        // get source collection and destination collection
+        let srcCol, destCol;
+        let oldOrder = 0;
+        if (destination.droppableId !== 'uncategorized') {
+          destCol = colsCopy.get(destination.droppableId);
         }
+        // if (source.droppableId !== 'uncategorized') {
+        if (srcID && srcID !== 'uncategorized') {
+          srcCol = colsCopy.get(srcID);
+          oldOrder = colsCopy.get(srcID).videos.filter(v => v && v.id === videoID)[0].order;
+        }
+        // console.log('old order: ' + oldOrder);
 
-        // add video to new position
-        if (destCol) {
+        // only do anything if
+        if (
+          // the video was moved to a different collection that doesn't already contain it (or destCol doesn't exist, i.e. the video was moved to 'uncategorized')
+          (destination.droppableId !== srcID && (!destCol || !colsCopy.containsVideo(destCol,videoID)))
+          ||
+          // or the video was moved to a different position within the same collection
+          (destination.index !== source.index && destination.droppableId === srcID)
+        ) {
 
-          // first we must find the proper index where the video was dropped
-          newIndex = destination.index;
-          // if (destination.droppableId === source.droppableId && source.index < destination.index) {
-          //   // for the special case that we're dropping the video later in the same collection, the index must be adjusted
-          //   newIndex = destination.index + 1;
-          // }
-          // apparently not anymore???
-
-          // and then create an order based on the order of the previous video
-          if (newIndex > 0) {
-            let prevOrder = destCol.videos[newIndex - 1].order;
-            // if the video is being dropped between two decimal orders of the same integer value
-            if (destCol.videos[newIndex] && Math.floor(prevOrder) === Math.floor(destCol.videos[newIndex].order)) {
-              // set the new order to 0.1 higher than the previous video
-              newOrder = prevOrder + 0.1;
-
-              // otherwise if the old order is not an integer, we want to try to preserve its decimal value
-            } else if (!Number.isInteger(oldOrder)) {
-              // set the new order either to the integer part of the previous video plus the decimal part of the old order of this video,
-              // or to 0.1 higher than the previous video, whichever is higher
-              newOrder = Math.max(prevOrder + 0.1,oldOrder - Math.floor(oldOrder) + Math.floor(prevOrder));
-            } else {
-                // set the video to 1 higher than the previous video
-                newOrder = Math.floor(destCol.videos[newIndex - 1].order) + 1;
-            }
-          } else {
-            newOrder = 1;
+          // remove video from original position
+          if (srcCol) {
+            colsCopy.removeVideo(srcCol,videoID);
           }
 
-          // add the video
-          colsCopy.addVideo(destCol, videoID, newOrder, newIndex);
+          // add video to new position
+          if (destCol) {
+
+            // first we must find the proper index where the video was dropped
+            newIndex = destination.index + addedIndex;
+            // if (destination.droppableId === source.droppableId && source.index < destination.index) {
+            //   // for the special case that we're dropping the video later in the same collection, the index must be adjusted
+            //   newIndex = destination.index + 1;
+            // }
+            // apparently not anymore???
+
+            // add the video (the addVideo method will figure out the correct order property,
+            // so we just pass it null and let it figure it out)
+            colsCopy.addVideo(destCol, videoID, null, newIndex, oldOrder);
+          }
         }
+      });
 
+      // prior to saving, we'll update the state variables;
+      // saving will cause a re-render, but it's slow, so we want
+      // to force one before then
+      // this.state.videos.splice(vidIndex,1,video);
+      this.setState({videos:this.state.videos,collections:colsCopy.getAll()});
 
-        // prior to saving, we'll update the state variables;
-        // saving will cause a re-render, but it's slow, so we want
-        // to force one before then
-        // this.state.videos.splice(vidIndex,1,video);
-        this.setState({videos:this.state.videos,collections:colsCopy.getAll()});
-
-        // save the updated video and collections object
-        // library.replace("media." + vidIndex, video);
-        library.replace("collections", colsCopy.getAll());
-      }
+      // save the updated video and collections object
+      // library.replace("media." + vidIndex, video);
+      library.replace("collections", colsCopy.getAll());
     }
   }
 
@@ -3116,6 +3131,7 @@ class MynPlayer extends MynOpenablePane {
     }
 
     this.render = this.render.bind(this);
+    this.onblur = this.onblur.bind(this);
     this.onplay = this.onplay.bind(this);
     this.onpause = this.onpause.bind(this);
     this.onseeked = this.onseeked.bind(this);
@@ -3212,6 +3228,11 @@ class MynPlayer extends MynOpenablePane {
     } else {
       console.error('Tried to seek, but could not find video');
     }
+  }
+
+  // keep focus on the video element
+  onblur(e) {
+    e.target.focus();
   }
 
 
@@ -3519,6 +3540,7 @@ class MynPlayer extends MynOpenablePane {
             ref={this.player}
             width={width}
             height={height}
+            onBlur={this.onblur}
             onPlay={this.onplay}
             onPause={this.onpause}
             onSeeked={this.onseeked}

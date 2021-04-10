@@ -343,11 +343,15 @@ class Collections {
     return false;
   }
 
-  // index being optional;
+  // index and order and oldOrder are all optional;
   // in the case of a user drag-n-drop action, we want to respect the index that
   // the user dropped the video at, and adjust the order accordingly
   // (of both the video added and the subsequent videos in the array)
-  addVideo(c, id, order, index) {
+  //
+  // if there's no order and no index, we make an order and index by just sticking the video on the end
+  // if there's an index but no order, create an order by looking at the surrounding videos (and if there's an oldOrder, we use info from that too, to preserve decimal information where possible)
+  // if there's an order but no index, find the index based on the order and the order of the surrounding videos
+  addVideo(c, id, order, index, oldOrder) {
     if (!c) return;
 
     if (!c.videos) {
@@ -363,12 +367,9 @@ class Collections {
       }
     }
 
-    if (order) {
-      order = Math.round(Number(order) * 10) / 10;
-    }
-
-    // if we don't have an order, make it (an integer) 1 greater than the highest ordered video
-    if (order === undefined) {
+    // if we don't have an order or an index, we'll stick it on the end,
+    // so make the order (an integer) 1 greater than the highest ordered video
+    if (!order && (typeof index === 'undefined' || index === null)) {
       let highest = 0;
       c.videos.map(v => {
         if (v.order > highest) {
@@ -376,23 +377,53 @@ class Collections {
         }
       });
       order = Math.floor(highest + 1);
+    } else if (!order) {
+      // if we have an index but NOT an order, make an order based on index
+
+      // if there's a video before this one (that has an order)
+      // we'll base it off that
+      if (index > 0 && c.videos[index - 1] && c.videos[index - 1].order) {
+        let prevOrder = c.videos[index - 1].order;
+
+        // if the video is being dropped between two decimal orders of the same integer value
+        if (c.videos[index] && Math.floor(prevOrder) === Math.floor(c.videos[index].order)) {
+          // set the new order to 0.1 higher than the previous video
+          order = prevOrder + 0.1;
+
+          // otherwise if we have an oldOrder and the old order is not an integer, we want to try to preserve its decimal value
+        } else if (oldOrder && !Number.isInteger(oldOrder)) {
+          // set the new order either to the integer part of the previous video plus the decimal part of the old order of this video,
+          // or to 0.1 higher than the previous video, whichever is higher
+          order = Math.max(prevOrder + 0.1,oldOrder - Math.floor(oldOrder) + Math.floor(prevOrder));
+        } else {
+          // set the video to 1 higher than the previous video
+          order = Math.floor(prevOrder) + 1;
+        }
+      } else {
+        // we could not find an order for any previous video, so set the order to 1
+        order = 1;
+      }
     }
 
-    let video = {
-      id:id,
-      order:order
-    };
+    order = Math.round(Number(order) * 10) / 10;
 
-    // if we don't have an index, find one based on order
-    if (index === undefined) {
+    // now we should definitely have an order, but we may not have an index,
+    // so if we don't, find one based on order
+    if (typeof index === 'undefined' || index === null) {
       index = c.videos.length;
       for (let i=0; i<c.videos.length; i++) {
-        if (c.videos[i].order > order) {
+        if (c.videos[i] && c.videos[i].order > order) {
           index = i;
           break;
         }
       }
     }
+
+    // create video object
+    let video = {
+      id:id,
+      order:order
+    };
 
     // place the video at the index
     c.videos.splice(index,0,video);
