@@ -2073,38 +2073,55 @@ class MynLibTable extends React.Component {
         'N/A':      13
       };
 
-    let sortFunctions = {
-     title: (a, b) => this.removeArticle(a.title).toLowerCase() > this.removeArticle(b.title).toLowerCase(),
-     year: (a, b) => a.year > b.year,
-     director: (a, b) => {let a_ds = a.directorsort === '' ? a.director : a.directorsort; let b_ds = b.directorsort === '' ? b.director : b.directorsort; return a_ds.toLowerCase() > b_ds.toLowerCase()},
-     genre: (a, b) => a.genre.toLowerCase() > b.genre.toLowerCase(),
-     seen: (a, b) => a.seen > b.seen,
-     ratings_user: (a, b) => {let a_r = a.ratings.user || -1; let b_r = b.ratings.user || -1; return a_r > b_r;},
-     dateadded: (a, b) => {let a_added = isNaN(parseInt(a.dateadded)) ? -1 : parseInt(a.dateadded); let b_added = isNaN(parseInt(b.dateadded)) ? -1 : parseInt(b.dateadded); return a_added > b_added;},
-     order: (a, b) => a.order > b.order,
-     kind: (a, b) => a.kind.toLowerCase() > b.kind.toLowerCase(),
-     lastseen: (a, b) => {let a_ls = isNaN(parseInt(a.lastseen)) ? -1 : parseInt(a.lastseen); let b_ls = isNaN(parseInt(b.lastseen)) ? -1 : parseInt(b.lastseen); return a_ls > b_ls;},
-     ratings_rt: (a, b) => {let a_r = a.ratings.rt ? a.ratings.rt : -1; let b_r = b.ratings.rt ? b.ratings.rt : -1; return a_r > b_r},
-     ratings_imdb: (a, b) => {let a_r = a.ratings.imdb ? a.ratings.imdb : -1; let b_r = b.ratings.imdb ? b.ratings.imdb : -1; return a_r > b_r},
-     ratings_mc: (a, b) => {let a_r = a.ratings.mc ? a.ratings.mc : -1; let b_r = b.ratings.mc ? b.ratings.mc : -1; return a_r > b_r},
-     ratings_avg: (a, b) => this.props.calcAvgRatings(a.ratings,'sort') > this.props.calcAvgRatings(b.ratings,'sort'),
-     boxoffice: (a, b) => a.boxoffice > b.boxoffice,
-     rated: (a, b) => ratedOrder[a.rated.toUpperCase()] > ratedOrder[b.rated.toUpperCase()],
-     country: (a, b) => a.country.toLowerCase() > b.country.toLowerCase(),
-     languages: (a, b) => a.languages[0].toLowerCase() > b.languages[0].toLowerCase(),
-     duration: (a, b) => parseInt(a.metadata.duration) > parseInt(b.metadata.duration)
+    let sortItems = {
+     title: (a, b) => [this.removeArticle(a.title).toLowerCase(),this.removeArticle(b.title).toLowerCase()],
+     year: (a, b) => [a.year,b.year],
+     director: (a, b) => {let a_ds = a.directorsort === '' ? a.director : a.directorsort; let b_ds = b.directorsort === '' ? b.director : b.directorsort; return [a_ds.toLowerCase(), b_ds.toLowerCase()]},
+     genre: (a, b) => [a.genre.toLowerCase(), b.genre.toLowerCase()],
+     seen: (a, b) => [a.seen, b.seen],
+     ratings_user: (a, b) => {let a_r = a.ratings.user || -1; let b_r = b.ratings.user || -1; return [a_r, b_r];},
+     dateadded: (a, b) => {let a_added = isNaN(parseInt(a.dateadded)) ? -1 : parseInt(a.dateadded); let b_added = isNaN(parseInt(b.dateadded)) ? -1 : parseInt(b.dateadded); return [a_added, b_added];},
+     order: (a, b) => [a.order, b.order],
+     kind: (a, b) => [a.kind.toLowerCase(), b.kind.toLowerCase()],
+     lastseen: (a, b) => {let a_ls = isNaN(parseInt(a.lastseen)) ? -1 : parseInt(a.lastseen); let b_ls = isNaN(parseInt(b.lastseen)) ? -1 : parseInt(b.lastseen); return [a_ls, b_ls];},
+     ratings_rt: (a, b) => {let a_r = a.ratings.rt ? a.ratings.rt : -1; let b_r = b.ratings.rt ? b.ratings.rt : -1; return [a_r, b_r]},
+     ratings_imdb: (a, b) => {let a_r = a.ratings.imdb ? a.ratings.imdb : -1; let b_r = b.ratings.imdb ? b.ratings.imdb : -1; return [a_r, b_r]},
+     ratings_mc: (a, b) => {let a_r = a.ratings.mc ? a.ratings.mc : -1; let b_r = b.ratings.mc ? b.ratings.mc : -1; return [a_r, b_r]},
+     ratings_avg: (a, b) => [this.props.calcAvgRatings(a.ratings,'sort'), this.props.calcAvgRatings(b.ratings,'sort')],
+     boxoffice: (a, b) => [a.boxoffice === 0 ? -1 : a.boxoffice, b.boxoffice === 0 ? -1 : b.boxoffice],
+     rated: (a, b) => [ratedOrder[a.rated.toUpperCase()], ratedOrder[b.rated.toUpperCase()]],
+     country: (a, b) => [a.country.toLowerCase(), b.country.toLowerCase()],
+     languages: (a, b) => [(a.languages[0] || '').toLowerCase(), (b.languages[0] || '').toLowerCase()],
+     duration: (a, b) => [a.metadata ? parseInt(a.metadata.duration)-1 : null, b.metadata ? parseInt(b.metadata.duration)-1 : null] // - 1 because we use 0 when we don't have a duration, but the sort function doesn't treat 0 as empty (it does treat -1 as empty);
     }
 
-    let rows = this.props.movies.sort((a, b) => {
-      let compare;
+    let rows = this.props.movies.sort((vid_a, vid_b) => {
+
+      // get the video attributes to sort by
+      let a,b;
       try {
-        compare = sortFunctions[key](a, b);
+        [a,b] = sortItems[key](vid_a, vid_b);
       } catch(err) {
-        compare = a[key] > b[key];
+        a = vid_a[key];
+        b = vid_b[key];
       }
 
-      let result = compare ? 1 : -1;
+      // we want empty values to always appear at the bottom,
+      // whether we're sorting by ascending or descending
+      // so if a or b is empty, send it to the bottom, ignoring sort direction
+      let isEmpty = n => n === -1 || n === '' || n === null || (typeof n === 'number' && isNaN(n)) || typeof n === 'undefined';
+      if (isEmpty(a) && !isEmpty(b)) {
+        return 1;
+      } else if (!isEmpty(a) && isEmpty(b)) {
+        return -1;
+      } else if (isEmpty(a) && isEmpty(b)) {
+        return 0;
+      }
+
+      // otherwise, do a normal comparison, and respect sort direction
+      let result = a > b ? 1 : (a < b ? -1 : 0);
       result *= ascending ? 1 : -1;
+
 
       return result;
     }).map((movie, index) => {
@@ -2150,7 +2167,7 @@ class MynLibTable extends React.Component {
         ratings_mc: (<td key="ratings_mc" className="ratings_mc ratings centered">{movie.ratings.mc ? movie.ratings.mc : ''}</td>),
         ratings_avg: (<td key="ratings_avg" className="ratings_avg ratings centered">{this.props.calcAvgRatings(movie.ratings)}</td>),
         boxoffice: (<td key="boxoffice" className="boxoffice">{movie.boxoffice === 0 ? '' : accounting.formatMoney(Number(movie.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}B` : 'B')}</td>),
-        rated: (<td key="rated" className="rated">{movie.rated}</td>),
+        rated: (<td key="rated" className="rated centered">{movie.rated}</td>),
         country: (<td key="country" className="country">{movie.country}</td>),
         languages: (<td key="languages" className="languages">{movie.languages[0]}</td>),
         duration: (<td key="duration" className="duration">{movie.metadata.duration !== 0 && movie.metadata.duration !== null ? `${Math.round(Number(movie.metadata.duration)/60)} min` : ''}</td>)
@@ -2292,6 +2309,7 @@ class MynLibTable extends React.Component {
   }
 
   removeArticle(string) {
+    if (typeof string !== 'string') return string;
     return string.replace(/^(?:a\s|the\s)/i,"")
   }
 
@@ -2703,7 +2721,7 @@ class MynDetails extends React.Component {
       const video = this.props.video
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img src={video.artwork || '../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${video.artwork || ''}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
@@ -2964,8 +2982,8 @@ class MynOverflowTextMarquee extends React.Component {
   }
 
   componentDidMount() {
-    // this.initialize();
-    this.reinit();
+    this.initialize();
+    // this.reinit();
 
     this.theDiv.current.addEventListener('resize', this.reinit);
   }

@@ -431,6 +431,7 @@ th, tr, td {
   color: var(--th-text);
   font-family: var(--th-font);
   font-size: var(--th-font-size);
+  white-space: nowrap;
 }
 .movie-table th:hover {
   background-color:var(--th-bg-hover);
@@ -775,13 +776,37 @@ th, tr, td {
   background: var(--detailtitle-bg);
 }
 #detail-artwork {
+  position:relative;
   max-height:50vh;
   overflow:hidden;
   margin-left:0px;
   margin-right:0px;
+  text-align: center;
 }
-#detail-artwork img {
+#detail-artwork #detail-artwork-img {
   width:100%;
+  max-width: 20em;
+  position:relative;
+  /* position:relative;
+  left: 50%;
+  transform: translateX(-50%); */
+}
+#detail-artwork .optional-artwork-duplicate {
+  --blursize: .7em;
+  --offset: calc(-1 * var(--blursize));
+  --left: var(--offset);
+  --top: calc(var(--offset) - 15%);
+
+  position:absolute;
+  left: var(--left);
+  top: var(--top);
+  width:calc(100% + (var(--blursize) * 2));
+  height: calc(100% - var(--top));
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
+  filter: blur(var(--blursize));
+  overflow:hidden;
 }
 #detail-position .edit-widget.over {
   /* override the general edit-widget opacity if desired */

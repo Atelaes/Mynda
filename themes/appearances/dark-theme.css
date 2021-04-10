@@ -957,6 +957,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
   padding: .3em .5em .3em .5em;
   background-color: var(--darker-bg);
   border-radius: 0 0 .6em 0;
+  z-index:100;
 }
 
 #details-pane #details-scroll-btn:hover {
