@@ -519,7 +519,7 @@ th, tr, td {
 }
 
 
-.movie-row .title {
+.movie-row td {
   overflow:hidden;
   max-width:15em;
   position: relative; /* necessary for the positioning of the ellipsis gradient */

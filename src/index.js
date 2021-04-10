@@ -31,6 +31,7 @@ let libFileTree; // where we store video and subtitle information we find in the
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
 let numNewVids = 0; // the number of new videos found whenever we check the watchfolders
+let newIDs = [];
 
 app.whenReady().then(start);
 
@@ -541,6 +542,11 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
     return;
   }
 
+  // If we have another new video with the same id, just skip it for now.
+  //Long term we want to mention to user and figure out which to use.
+  if (newIDs.includes(id)) {return}
+  newIDs.push(id);
+
   //########### VIDEO IS ** NOT ** ALREADY IN LIBRARY ###########//
 
   let vidObj;
@@ -705,27 +711,80 @@ async function createVideoID(filepath) {
         } else if (fs.existsSync(path.join(filepath, 'VTS_01_1.VOB'))) {
           hashPath = path.join(filepath, 'VTS_01_1.VOB');
         } else {
-          reject(`DVD folder ${filepath} does not have the correct file to hash.`)
+          let files = getFilesRecursive(filepath);
+          let biggestSize = 0;
+          let biggestFile;
+          for (let file of files) {
+            let size = 0;
+            try {
+              size = fs.statSync(file).size;
+            } catch(err) {
+              console.log(err);
+            }
+            if (size > biggestSize) {
+              biggestSize = size;
+              biggestFile = file;
+            }
+          }
+          if (biggestFile) {
+            hashPath = biggestFile;
+          } else {
+            reject(`DVD folder ${filepath} does not have the correct file to hash.`)
+          }
         }
       } catch (e) {
         reject(`Error when trying to create id for DVD rip ${filepath}.\n${e}`);
       }
     }
 
-    fs.createReadStream(hashPath, { end: 65535 }).
-      pipe(crypto.createHash('sha1').setEncoding('hex')).
-      on('finish', function () {
-        filehash = this.read();
-        // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
-        const id = uuidv5(filehash, library.id);
+    try {
+      fs.createReadStream(hashPath, { end: 65535 }).
+        pipe(crypto.createHash('sha1').setEncoding('hex')).
+        on('finish', function () {
+          try {
+            filehash = this.read();
+            // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
+            const id = uuidv5(filehash, library.id);
 
-        resolve(id);
-        // callback(id);
-      }).
-      on('error', (err) => {
-        reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
-      })
+            resolve(id);
+            // callback(id);
+          } catch(err) {
+            reject(err);
+          }
+        }).
+        on('error', (err) => {
+          reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
+        })
+    } catch(err) {
+      reject(err);
+    }
+
+
   });
+}
+
+function getFilesRecursive(folder) {
+  console.log(folder);
+  let files = [];
+  let contents = [];
+  try {
+    contents = fs.readdirSync(folder);
+  } catch(err) {
+    console.log(err);
+  }
+  for (let content of contents) {
+    let fullPath = path.join(folder, content);
+    try {
+      if (fs.lstatSync(fullPath).isDirectory()) {
+        files = [...files,...getFilesRecursive(fullPath)];
+      } else {
+        files.push(fullPath);
+      }
+    } catch(err) {
+      console.log(err);
+    }
+  }
+  return files;
 }
 
 function getSubs(folderNode) {

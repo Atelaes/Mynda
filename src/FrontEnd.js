@@ -2820,6 +2820,9 @@ class MynOverflowTextMarquee extends React.Component {
     // this.switchDir = this.switchDir.bind(this);
     this.theDiv = React.createRef();
     this.render = this.render.bind(this);
+    this.reinit = this.reinit.bind(this);
+    this.componentDidMount = this.componentDidMount.bind(this);
+    this.componentWillUnmount = this.componentWillUnmount.bind(this);
   }
 
   // initialize() {
@@ -2953,11 +2956,24 @@ class MynOverflowTextMarquee extends React.Component {
   //   this.theDiv.current.removeEventListener('transitionend', this.switchDir);
   // }
 
-  componentDidMount() {
-    this.initialize();
-
-    window.addEventListener('resize', () => this.initialize());
+  reinit() {
+    clearTimeout(this.reinitTimer);
+    this.reinitTimer = setTimeout(() => {
+      this.initialize();
+    },500);
   }
+
+  componentDidMount() {
+    // this.initialize();
+    this.reinit();
+
+    this.theDiv.current.addEventListener('resize', this.reinit);
+  }
+
+  componentWillUnmount() {
+    this.theDiv.current.removeEventListener('resize', this.reinit);
+  }
+
 
   componentDidUpdate(oldProps) {
     if (oldProps.text !== this.props.text) {
@@ -7168,12 +7184,22 @@ class MynEditArtwork extends MynEdit {
       try {
         this.input.current.style.visibility = 'visible';
       } catch(err) {
-        document.getElementById('edit-field-artwork').style.visibility = 'visible';
+        console.error(err);
+        try {
+          document.getElementById('edit-field-artwork').style.visibility = 'visible';
+        } catch(err1) {
+          console.error(err1);
+        }
       }
       try {
         this.dlMsg.current.style.display = 'none';
       } catch(err) {
-        document.getElementById('edit-field-artwork-dl-msg').style.display = 'none';
+        console.error(err);
+        try {
+          document.getElementById('edit-field-artwork-dl-msg').style.display = 'none';
+        } catch(err1) {
+          console.error(err1);
+        }
       }
 
       this._isMounted && this.setState({message: ""});
