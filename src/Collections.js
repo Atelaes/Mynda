@@ -48,6 +48,34 @@ class Collections {
     return result;
   }
 
+  ensureExists(name) {
+    //console.log(`Collections at start of ensure for ${name}: ${JSON.stringify(this.c)}`);
+    let target = this.c;
+    let address = name.split(':');
+    let topLevel = true;
+    for (let layer of address) {
+      //console.log(`Current target is ${JSON.stringify(target)}`);
+      //console.log(`Current layer is ${layer}`);
+      //console.log(`topLevel is ${topLevel}`);
+      if (topLevel) {
+        if (target.filter(c => c.name === layer).length === 0) {
+          let newCollection = {name: layer};
+          target = this.addCollection(newCollection, this.c);
+        } else {
+          target = target.filter(c => c.name === layer)[0];
+        }
+      } else {
+        if (!target.collections || target.collections.filter(c => c.name === layer).length === 0) {
+          target = this.addChild(target, layer);
+        } else {
+          target = target.collections.filter(c => c.name === layer)[0];
+        }
+      }
+      topLevel = false;
+    }
+    return target;
+  }
+
   // return a flat array of every terminal collection;
   // if includeBarren is true, we also include collections
   // that have neither child collections nor videos
@@ -165,7 +193,7 @@ class Collections {
   }
 
   sort() {
-    console.log('Sorting: ' + this.c.map(col => '\n' + (col ? col.name : String(col))))
+    //console.log('Sorting: ' + this.c.map(col => '\n' + (col ? col.name : String(col))))
     // sort the collections array alphabetically (ignoring leading articles)
     this.c.sort((a,b) => {
       // force null values to the end
@@ -187,7 +215,7 @@ class Collections {
       this.changeID(c,depth,i);
     });
 
-    console.log('Sorted!!!: ' + this.c.map(col => '\n' + (col ? col.name : String(col))))
+    //console.log('Sorted!!!: ' + this.c.map(col => '\n' + (col ? col.name : String(col))))
   }
 
   // sorts recursively

@@ -6,6 +6,7 @@ const path = require('path');
 const {v4: uuidv4, v5: uuidv5} = require('uuid');
 const crypto = require('crypto');
 const Library = require("./Library.js");
+const Collections = require("./Collections.js");
 const dl = require('./download');
 const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
@@ -25,6 +26,7 @@ const subtitleExtensions = [
 
 let win;
 let library = new Library;
+let collections = new Collections(library.collections);
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
@@ -397,7 +399,7 @@ let videoTemplate =   {
       }
       count += (node.videos) ? node.videos.length : 0;
       if (count > 1 && pathStack.length > 1) {
-        node.collection = pathStack.slice(1).join('.');
+        node.collection = pathStack.slice(1).join(':');
       }
     }
     if (pathStack.length === 0) {
@@ -500,6 +502,15 @@ function addVideosToLibrary() {
 }
 
 function addVideosFromFolder(folderNode, rootFolder) {
+  // If there is a collection assigned to this folder, make sure it exists,
+  // and if not, make it.
+  if (folderNode.collection) {
+    if (!collections.ensureExists(folderNode.collection)) {
+      console.log(`We had a problem ensuring collection ${folderNode.collection}.`)
+    } else {
+      library.replace('collections', collections.getAll());
+    }
+  }
   if (folderNode.folders && folderNode.folders.length > 0) {
     for (let childFolder of folderNode.folders) {
       addVideosFromFolder(childFolder, rootFolder);
@@ -549,6 +560,25 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
     for (let sub of allSubs) {
       if (new RegExp('^' + fileBasename).test(path.basename(sub))) {
         subtitles.push(sub);
+      }
+    }
+  }
+
+  // If we've divined a collection for videos in this folder, make sure that this
+  // video is in it.
+  if (folderNode.collection) {
+    let folderAddress = folderNode.collection
+    // If there are subfolders, we need to ensure a terminal collection for this
+    // video to go into named "Other".
+    if (folderNode.folders.length > 0) {
+      folderAddress = folderNode.collection + `:Other`;
+    }
+    //Ensure collection exists, add the video to it if not already there, and update.
+    if (collections.ensureExists(folderAddress)) {
+      let targetCollection = collections.ensureExists(folderAddress);
+      if (!collections.containsVideo(targetCollection, id)) {
+        collections.addVideo(targetCollection, id);
+        library.replace('collections', collections.getAll());
       }
     }
   }
