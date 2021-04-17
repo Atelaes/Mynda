@@ -42,6 +42,7 @@ class Mynda extends React.Component {
 
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
+      playlistLength : {}, // will contain the number of videos in each playlist (playlist id as key)
       view : "flat", // whether to display a flat table or a hierarchical view
       columns : [], // the list of columns to display for the current playlist
       detailVideo : null,
@@ -62,6 +63,7 @@ class Mynda extends React.Component {
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
+    this.getPlaylistLength = this.getPlaylistLength.bind(this);
     this.search = this.search.bind(this);
     this.calcAvgRatings = this.calcAvgRatings.bind(this);
     this.showDetails = this.showDetails.bind(this);
@@ -472,7 +474,19 @@ class Mynda extends React.Component {
       let name = playlist ? playlist.name : 'nonexistent';
       console.error(`Unable to execute filter for ${name} playlist: ${err}`);
     }
+
+    if (playlist.id) {
+      this.state.playlistLength[playlist.id] = filteredVids.length;
+    }
+
     return filteredVids;
+  }
+
+  // this function is passed to MynNav so that it can display each playlist's length
+  getPlaylistLength(id) {
+    if (this.state.playlistLength[id]) return this.state.playlistLength[id];
+
+    return this.playlistFilter(id).length;
   }
 
   // called from the nav component to change the current playlist
@@ -492,7 +506,7 @@ class Mynda extends React.Component {
     let playlist = this.state.playlists.filter(playlist => playlist && playlist.id == id)[0];
     let view = playlist ? playlist.view : null; // set the view state variable to this playlist's view
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
-    let flatDefaultSort = playlist.flatDefaultSort; // default sort column for this playlist, but only applies when viewed in flat view
+    let flatDefaultSort = playlist ? playlist.flatDefaultSort : null; // default sort column for this playlist, but only applies when viewed in flat view
     if (id !== this.state.currentPlaylistID) {
       // only erase the selection if we've switched playlists;
       // if we haven't, we're just trying to refresh this playlist,
@@ -769,6 +783,7 @@ class Mynda extends React.Component {
           setPlaylist={this.setPlaylist}
           search={this.search}
           showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
+          getPlaylistLength={this.getPlaylistLength}
         />
         <MynLibrary
           videos={this.state.filteredVideos}
@@ -882,6 +897,7 @@ class MynNav extends React.Component {
                 <li
                   key={playlist.id}
                   id={"playlist-" + playlist.id}
+                  title={this.props.getPlaylistLength(playlist.id)}
                   style={{zIndex: 100 - index}}
                   className={playlist.view}
                   onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
@@ -2032,8 +2048,8 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
-    // console.log('SORTING TABLE ' + this.tableID)
-    // console.log(key);
+    console.log(`SORTING TABLE ${this.tableID} by ${key}`);
+
     if (key === undefined) {
       throw "Error: key was undefined; must supply a key to sort by";
     }
@@ -2337,18 +2353,28 @@ class MynLibTable extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
-    // console.log('UPDATING MynTable');
+    // let propsDiff = getObjectDiff(oldProps,this.props);
+    // if (propsDiff.length === 0) return;
+    // console.log(Date.now());
+    if (_.isEqual(oldProps,this.props)) {
+      // console.log(Date.now());
+      // console.log('----------------')
+      return;
+    }
+
+    console.log('UPDATING MynTable at ' + Date.now());
+    console.log(getObjectDiff(oldProps,this.props));
 
     // if another table unselected this table's rows, update the state variable
     if (!this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID]) {
-      // console.log('SCENARIO 1')
+      console.log('Rows unselected from outside')
       this.setState({batchSelected:[]},this.handleBatch);
     }
     // if the selection of rows in this table was otherwise changed from the outside
     // (though I don't know when that would happen besides a simple unselection)
     // update the state variable
     if (this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID] && !_.isEqual(this.props.selectedRows[this.tableID],oldProps.selectedRows[this.tableID]) && this.props.selectedRows[this.tableID].rows) {
-      // console.log('SCENARIO 2')
+      console.log('Selected rows otherwise changed from outside');
       this.setState({batchSelected:this.props.selectedRows[this.tableID].rows},this.handleBatch);
     }
 
@@ -2363,8 +2389,10 @@ class MynLibTable extends React.Component {
     // sorting by the table by initial values (props.initialSort if it exists, or flatDefaultSort)
     if (oldProps.playlistID !== this.props.playlistID) {
       console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
+      // setTimeout(() => this.reset(true,true), 1000);
       this.reset(true,true);
     } else {
+      console.log('playlist is the same, checking if any videos changed...');
       // if the playlist was NOT changed, but
       // if any videos in the playlist were changed...
       // (or if the setting to include user ratings in avg was changed)
@@ -2379,11 +2407,12 @@ class MynLibTable extends React.Component {
       let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
       if (!_.isEqual(tempOld,tempNew) || this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
         console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
-        // let diff = getObjectDiff(tempOld,tempNew);
+        let diff = getArrayDiff(tempOld,tempNew);
+        console.log(diff);
         // diff.map(key => {
         //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
         // });
-
+        console.log(`old rating_in_avg: ${this.state.include_user_rating_in_avg}, new rating_in_avg: ${this.props.settings.preferences.include_user_rating_in_avg}`);
         // for some reason, comparing oldProps did not work for this, because oldProps and this.props were always the same; I have no idea why; so we just use a state variable to compare
         this.state.include_user_rating_in_avg = this.props.settings.preferences.include_user_rating_in_avg;
 
@@ -2749,7 +2778,7 @@ class MynDetails extends React.Component {
       // dummy details as a visual placeholder when no video is hovered/selected
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img src={'../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><img id="detail-artwork-img" src={'../images/qmark-details.png'} /></li>
           <li className="detail dummy" id="detail-title"><div className="detail-title-text">A Movie Title</div></li>
           <li className="detail dummy first"><div className="dummy-field"></div></li>
           <li className="detail dummy second"><div className="dummy-field"></div></li>
@@ -2982,20 +3011,20 @@ class MynOverflowTextMarquee extends React.Component {
   }
 
   componentDidMount() {
-    this.initialize();
+    // this.initialize();
     // this.reinit();
 
-    this.theDiv.current.addEventListener('resize', this.reinit);
+    // this.theDiv.current.addEventListener('resize', this.reinit);
   }
 
   componentWillUnmount() {
-    this.theDiv.current.removeEventListener('resize', this.reinit);
+    // this.theDiv.current.removeEventListener('resize', this.reinit);
   }
 
 
   componentDidUpdate(oldProps) {
     if (oldProps.text !== this.props.text) {
-      this.initialize();
+      // this.initialize();
     }
   }
 
@@ -3729,8 +3758,9 @@ class MynSettings extends MynOpenablePane {
 
   componentDidUpdate(oldProps) {
     // console.log('MynSettings: component has updated');
-    if (!_.isEqual(oldProps,this.props)) {
-      // console.log('MynSettings: PROPS HAVE CHANGED:\n' + JSON.stringify(this.props.show));
+
+    if (!isEqualIgnoreFuncs(oldProps,this.props)) {
+      console.log('MynSettings: PROPS HAVE CHANGED:\n' + getObjectDiff(oldProps,this.props));
 
       // if the view was changed from outside, call up that view;
       // OR, whenever the pane is closed, also set to props.view
@@ -4119,6 +4149,7 @@ class MynSettingsPrefs extends React.Component {
         unused : _.cloneDeep(props.settings.preferences.defaultcolumns.unused)
       },
       hide_description : props.settings.preferences.hide_description,
+      include_new_vids_in_playlists : props.settings.preferences.include_new_vids_in_playlists,
       include_user_rating_in_avg : props.settings.preferences.include_user_rating_in_avg,
       kinds : props.settings.used.kinds.filter(kind => !!kind),
       override_dialogs : props.settings.preferences.override_dialogs
@@ -4216,7 +4247,7 @@ class MynSettingsPrefs extends React.Component {
               onChange={(e) => this.update('include-new',e.target.checked)}
             />
             Include new videos in playlists
-            <MynTooltip tip="If unchecked, newly added videos will only appear in the 'New' playlist until edited/tagged" />
+            <MynTooltip tip="If unchecked, newly added videos will appear only in the 'New' playlist until edited/tagged" />
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
             <h2>Hide Descriptions:</h2>
@@ -6068,7 +6099,7 @@ class MynEditorEdit extends React.Component {
       <div className='edit-field rating'>
         <label className="edit-field-name" htmlFor="rating">Rating: </label>
         <div className="edit-field-editor">
-          <MynEditRatingWidget movie={this.props.video} update={this.props.handleChange} />
+          <MynEditRatingWidget movie={this.props.video} update={this.props.handleChange} cancelBtn={true} />
         </div>
       </div>
     );
@@ -7520,7 +7551,17 @@ class MynEditRatingWidget extends MynEditGraphicalWidget {
     let char = "";
     for (let i=1; i<=5; i++) {
       let starClass = "star ";
-      if (i <= rating) {
+
+      // if (i === 0 && this.props.cancelBtn) {
+      //   // char = "\u2298";
+      //   // char="\u2205";
+      //   // char="\u2715";
+      //   // for some reason all these characters produce a weird bug where the stars get smaller????
+      //
+      //   starClass += "cancel";
+      // } else if (i === 0 && !this.props.cancelBtn) {
+      //   continue;
+      /* } else*/ if (i <= rating) {
         char="\u2605";
         starClass += "filled";
       } else {
@@ -8390,17 +8431,59 @@ function getCollectionObject(id, collectionsRoot, copy) {
 
 // https://stackoverflow.com/a/40610459
 function getObjectDiff(obj1, obj2) {
-    const diff = Object.keys(obj1).reduce((result, key) => {
-        if (!obj2.hasOwnProperty(key)) {
-            result.push(key);
-        } else if (_.isEqual(obj1[key], obj2[key])) {
-            const resultKeyIndex = result.indexOf(key);
-            result.splice(resultKeyIndex, 1);
-        }
-        return result;
-    }, Object.keys(obj2));
+  const diff = Object.keys(obj1).reduce((result, key) => {
+    if (!obj2.hasOwnProperty(key)) {
+      result.push(key);
+    } else if (_.isEqual(obj1[key], obj2[key])) {
+      const resultKeyIndex = result.indexOf(key);
+      result.splice(resultKeyIndex, 1);
+    }
+    return result;
+  }, Object.keys(obj2));
 
-    return diff;
+  return diff;
+}
+
+function getArrayDiff(arr1,arr2) {
+  arr1 = _.cloneDeep(arr1);
+  arr2 = _.cloneDeep(arr2);
+  let diff = [];
+
+  arr1.map((el,index) => {
+    let found = false;
+    for (let i=0; i<arr2.length; i++) {
+      if (_.isEqual(el,arr2[i])) {
+        arr2.splice(i, 1);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      diff.push(el);
+    }
+  });
+
+  diff = [...diff,...arr2];
+  return diff;
+}
+
+function isEqualIgnoreFuncs(obj1,obj2) {
+  // console.log('-----isEqualIgnoreFuncs----');
+
+  const shallowCloneNoFunc = (obj) => {
+    let copy = {}
+    Object.keys(obj).map((key) => {
+      if (!_.isFunction(obj[key]))
+        copy[key] = obj[key];
+    });
+    return copy;
+  };
+
+  let new1 = _.cloneWith(obj1,shallowCloneNoFunc);
+  let new2 = _.cloneWith(obj2,shallowCloneNoFunc);
+  // console.log(new1);
+  // console.log(new2);
+  return _.isEqual(new1,new2);
 }
 
 const library = new Library;
