@@ -25,6 +25,7 @@ const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
+const { lsDevices } = require('fs-hard-drive');
 
 
 
@@ -3551,7 +3552,9 @@ class MynSettings extends MynOpenablePane {
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
       collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} settings={this.props.settings} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
-      preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />)
+      preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />),
+      sync : (<MynSettingsSync                save={this.save} settings={this.props.settings} />)
+
     }
     this.setState({views:views},callback);
   }
@@ -4754,6 +4757,58 @@ class MynSettingsCollections extends React.Component {
       </div>
     );
   }
+}
+
+class MynSettingsSync extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {driveList : []}
+    this.findDrives();
+    this.render = this.render.bind(this);
+    this.findDrives = this.findDrives.bind(this);
+  }
+
+  findDrives() {
+    lsDevices()
+    .then((drives) => {
+      console.log(drives);
+      let currentDriveList = [];
+      for (let i=0; i<drives.length; i++) {
+        let drive = drives[i];
+        currentDriveList.push(<option key={i}>{drive.caption} {drive.so.VolumeName}</option>);
+        //console.log(`Drive letter is ${drive.caption}, name is ${drive.so.VolumeName} and free space is ${drive.free_space}`);
+      }
+      this.setState({driveList : currentDriveList});
+    })
+    .catch((err) => {
+        console.log(err);
+    });
+  }
+
+  exportFiles(e) {
+
+  }
+
+  plantManifest(e) {
+    }
+  }
+
+  render() {
+    return (<div>
+      <div style={{float:'left', width: '50%'}}>
+        <h1>Import</h1>
+        <div>Drive: <select>{this.state.driveList}</select></div>
+        <div><button onClick={(e) => this.plantManifest(e)}>Go!</button></div>
+      </div>
+        <div style={{float:'right', width: '50%'}}>
+          <h1>Export</h1>
+          <div>Drive: <select>{this.state.driveList}</select></div>
+          <div>Amount to Transfer: <input type="number"></input>GB</div>
+          <div><button onClick={(e) => this.exportFiles(e)}>Go!</button></div>
+        </div>
+    </div>)
+  }
+
 }
 
 

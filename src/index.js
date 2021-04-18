@@ -12,7 +12,9 @@ const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
+const test = require('./test.js');
 
+const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const videoExtensions = [
   '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
   'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
@@ -22,7 +24,6 @@ const videoExtensions = [
 const subtitleExtensions = [
   'srt', 'ass', 'ssa', 'vtt', 'usf', 'ttml'
 ];
-
 
 let win;
 let library = new Library;
@@ -386,7 +387,7 @@ let videoTemplate =   {
   function divineCollections(node, pathStack) {
     if (pathStack.length === 0) {
       //If we're here, then we're looking at root, this should only happen once.
-      console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
+      //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
     }
     let toDivine = true;
     let count = 0;
@@ -404,7 +405,7 @@ let videoTemplate =   {
     }
     if (pathStack.length === 0) {
       //Again, we're on root.
-      console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
+      //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
       confirmCurrentVideos();
     } else {
       return count;
@@ -414,7 +415,7 @@ let videoTemplate =   {
 function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
   // all there, removing from libFileTree as we go
-  console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
+  //console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
   for (let h=0; h<library.media.length; h++) {
     let video = library.media[h];
     let filename = video.filename;
@@ -483,7 +484,7 @@ function confirmCurrentVideos() {
       removeVideo(video);
     }
   }
-  console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
+  //console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
   addVideosToLibrary();
 }
 
@@ -791,12 +792,12 @@ async function createVideoID(filepath) {
       }
     }
 
-    fs.createReadStream(hashPath, { end: 65535 }).
+    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex'}).
       pipe(crypto.createHash('sha1').setEncoding('hex')).
       on('finish', function () {
         filehash = this.read();
         // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
-        const id = uuidv5(filehash, library.id);
+        const id = uuidv5(filehash, appID);
 
         resolve(id);
         // callback(id);
