@@ -6,12 +6,15 @@ const path = require('path');
 const {v4: uuidv4, v5: uuidv5} = require('uuid');
 const crypto = require('crypto');
 const Library = require("./Library.js");
+const Collections = require("./Collections.js");
 const dl = require('./download');
 const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
+const test = require('./test.js');
 
+const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const videoExtensions = [
   '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
   'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
@@ -22,9 +25,9 @@ const subtitleExtensions = [
   'srt', 'ass', 'ssa', 'vtt', 'usf', 'ttml'
 ];
 
-
 let win;
 let library = new Library;
+let collections = new Collections(library.collections);
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
@@ -210,7 +213,7 @@ function findVideosFromFolder(folderNode) {
         break;
       }
     }
-    if (!stillGoing) confirmCurrentVideos();
+    if (!stillGoing) divineCollections(libFileTree, []);
   });
 }
 
@@ -380,16 +383,52 @@ let videoTemplate =   {
     }
   }
 
+  //Recursive function which takes a built libFileTree and figures out collections
+  // for videos based on file structure.
+  function divineCollections(node, pathStack) {
+    if (pathStack.length === 0) {
+      //If we're here, then we're looking at root, this should only happen once.
+      //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
+    }
+    let toDivine = true;
+    let count = 0;
+    if (toDivine) {
+      for (let i=0; i<node.folders.length; i++) {
+        let folder = node.folders[i];
+        let parentFolder = (node.path) ? node.path + path.sep : '';
+        let stackAppend = folder.path.replace(parentFolder, '');
+        count += divineCollections(folder, pathStack.concat(stackAppend));
+      }
+      count += (node.videos) ? node.videos.length : 0;
+      if (count > 1 && pathStack.length > 1) {
+        node.collection = pathStack.slice(1).join(':');
+      }
+    }
+    if (pathStack.length === 0) {
+      //Again, we're on root.
+      //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
+      confirmCurrentVideos();
+    } else {
+      return count;
+    }
+  }
 
 function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
   // all there, removing from libFileTree as we go
-  console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
+  //console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
   for (let h=0; h<library.media.length; h++) {
     let video = library.media[h];
     let filename = video.filename;
+    // We put the whole thing in a try block, as we'll be traversing
+    // nodes that aren't guaranteed to exist, and are expected not to if the
+    // video has moved or been removed.
     try {
+      // A number of these steps will fail gracefully by nature, but we don't
+      // want them to, the problem variable lets us throw errors when things
+      // don't work the way they should.
       let problem = true;
+      // Start by figuring out which watchfolder the video is in
       let conWatchFolder;
       for (let i=0; i<library.settings.watchfolders.length; i++) {
         let watchfolder = library.settings.watchfolders[i];
@@ -400,6 +439,7 @@ function confirmCurrentVideos() {
         }
       }
       if (problem) {throw true}
+      // Then traverse the libFileTree nodes based on the video's filepath.
       let libTreeLoc = libFileTree
       let pathComps = [conWatchFolder].concat(filename.replace(conWatchFolder + path.sep, '').split(path.sep));
       let pathComp = '';
@@ -419,8 +459,18 @@ function confirmCurrentVideos() {
         } else {
           for (let k=0; k<libTreeLoc.videos.length; k++) {
             if (libTreeLoc.videos[k] === filename || libTreeLoc.videos[k].dvd && libTreeLoc.videos[k].dvd === filename) {
+              // If we've gotten here, then we have confirmed the video exists,
+              // so delete it from libFileTree
               libTreeLoc.videos.splice(k, 1);
               problem = false;
+              // Let's also check its subtitles (it would probably be faster)
+              // to find these in libFileTree, but that's just too much to code.
+              for (let l=0; l<video.subtitles.length; l++) {
+                let subAddress = video.subtitles[l];
+                if (!fs.existsSync(subAddress)) {
+                  library.remove(`media.${h}.subtitles.${l}`);
+                }
+              }
               break;
             }
           }
@@ -429,11 +479,13 @@ function confirmCurrentVideos() {
       }
 
     } catch {
+      // A thrown error means we didn't find the video where we expected to,
+      // so move it to inactive media.
       console.log(`${filename} appears to have disappeared, moving to inactive media.`)
       removeVideo(video);
     }
   }
-  console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
+  //console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
   addVideosToLibrary();
 }
 
@@ -452,6 +504,15 @@ function addVideosToLibrary() {
 }
 
 function addVideosFromFolder(folderNode, rootFolder) {
+  // If there is a collection assigned to this folder, make sure it exists,
+  // and if not, make it.
+  if (folderNode.collection) {
+    if (!collections.ensureExists(folderNode.collection)) {
+      console.log(`We had a problem ensuring collection ${folderNode.collection}.`)
+    } else {
+      library.replace('collections', collections.getAll());
+    }
+  }
   if (folderNode.folders && folderNode.folders.length > 0) {
     for (let childFolder of folderNode.folders) {
       addVideosFromFolder(childFolder, rootFolder);
@@ -501,6 +562,25 @@ async function addVideoFile(folderNode, file, rootWatchFolder) {
     for (let sub of allSubs) {
       if (new RegExp('^' + fileBasename).test(path.basename(sub))) {
         subtitles.push(sub);
+      }
+    }
+  }
+
+  // If we've divined a collection for videos in this folder, make sure that this
+  // video is in it.
+  if (folderNode.collection) {
+    let folderAddress = folderNode.collection
+    // If there are subfolders, we need to ensure a terminal collection for this
+    // video to go into named "Other".
+    if (folderNode.folders.length > 0) {
+      folderAddress = folderNode.collection + `:Other`;
+    }
+    //Ensure collection exists, add the video to it if not already there, and update.
+    if (collections.ensureExists(folderAddress)) {
+      let targetCollection = collections.ensureExists(folderAddress);
+      if (!collections.containsVideo(targetCollection, id)) {
+        collections.addVideo(targetCollection, id);
+        library.replace('collections', collections.getAll());
       }
     }
   }
@@ -737,29 +817,19 @@ async function createVideoID(filepath) {
       }
     }
 
-    try {
-      fs.createReadStream(hashPath, { end: 65535 }).
-        pipe(crypto.createHash('sha1').setEncoding('hex')).
-        on('finish', function () {
-          try {
-            filehash = this.read();
-            // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
-            const id = uuidv5(filehash, library.id);
+    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex'}).
+      pipe(crypto.createHash('sha1').setEncoding('hex')).
+      on('finish', function () {
+        filehash = this.read();
+        // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
+        const id = uuidv5(filehash, appID);
 
-            resolve(id);
-            // callback(id);
-          } catch(err) {
-            reject(err);
-          }
-        }).
-        on('error', (err) => {
-          reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
-        })
-    } catch(err) {
-      reject(err);
-    }
-
-
+        resolve(id);
+        // callback(id);
+      }).
+      on('error', (err) => {
+        reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
+      })
   });
 }
 
