@@ -12,7 +12,6 @@ const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
-const test = require('./test.js');
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const videoExtensions = [
