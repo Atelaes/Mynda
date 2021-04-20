@@ -136,7 +136,7 @@ function checkWatchFolders() {
     let thisFolder = folders[i];
     if (thisFolder) {
       let thisNode;
-      let filtered = libFileTree.folders.filter(folder => folder.name === thisFolder.path);
+      let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
       if (filtered.length === 0) {
         let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
         libFileTree.folders.push(child);
@@ -915,8 +915,8 @@ function getFileBirthtime(file) {
 
 function getDurationFromFFmpeg(filepath,id) {
   try {
-    //console.log('Could not find duration with ffprobe, trying with ffmpeg...');
-    //console.log(filepath);
+    console.log('Could not find duration with ffprobe, trying with ffmpeg...');
+    console.log(filepath);
 
     let tempFile = `temp-${uuidv4()}.mkv`;
 
@@ -943,7 +943,7 @@ function getDurationFromFFmpeg(filepath,id) {
         // update video in library with new duration.
         for (let i=0; i<library.media.length; i++) {
           if (library.media[i].id === id) {
-            //console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
+            console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
             library.replace(`media.${i}.metadata.duration`,seconds);
             break;
           }

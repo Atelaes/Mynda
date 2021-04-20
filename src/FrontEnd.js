@@ -4884,7 +4884,6 @@ class MynSettingsSync extends React.Component {
   }
 
   plantManifest(e) {
-    }
   }
 
   render() {
