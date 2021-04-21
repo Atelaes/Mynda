@@ -5,7 +5,7 @@ const { ipcRenderer } = require('electron');
 const os = require('os');
 const _ = require('lodash');
 const DateJS = require('datejs');
-const URL = require("url").URL;
+const URL = require("url");
 const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
@@ -2751,7 +2751,7 @@ class MynDetails extends React.Component {
       const video = this.props.video
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${video.artwork || ''}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${URL.pathToFileURL(video.artwork) || ''}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
@@ -8434,7 +8434,7 @@ function validateVideo(video) {
 // helper function to determine if a string is a valid URL
 function isValidURL(s) {
   try {
-    let url = new URL(s);
+    let url = new URL.URL(s);
     return url.host !== '';
   } catch (error) {
     return false;
