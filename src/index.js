@@ -95,7 +95,7 @@ function cleanLibrary() {
 
 function checkWatchFolders() {
   // reset libFileTree
-  libFileTree = {name:'root', folders:[]};
+  libFileTree = {folders:[]};
 
   /*
   // first, search library for videos whose files are gone (whether moved, renamed, or deleted)
@@ -154,6 +154,7 @@ function checkWatchFolders() {
 // storing the whole thing in libFolderTree;
 // once this is done, we'll traverse the tree, adding all the videos to the library
 function findVideosFromFolder(folderNode) {
+  // console.log('Finding videos from folder: ' + folderNode.path);
   const id = uuidv4();
   parsing[id] = true;
 
@@ -164,6 +165,7 @@ function findVideosFromFolder(folderNode) {
   fs.readdir(folder, {withFileTypes : true}, function (err, components) {
     // handling error
     if (err) {
+        parsing[id] = false;
         return console.log('Unable to scan directory: ' + err);
     }
 
@@ -187,12 +189,12 @@ function findVideosFromFolder(folderNode) {
       } else if (!/^\./.test(component.name)) {
         //If it's a hidden file, as evidenced by a filename starting with a dot
         //Then skip it
-        //console.log(`We came across ${component.name}.`);
+        // console.log(`We came across ${component.name}.`);
         // otherwise, it must be a file
         let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
 
         if (videoExtensions.includes(fileExt)) {
-          //console.log(`We're about to add ${component.name} to libTree.`);
+          // console.log(`We're about to add ${component.name} to libTree.`);
           // if it's a video file, add it as a video
           // console.log(`${compAddress} is a regular video file`);
           folderNode.videos.push(compAddress); // add the video to this node of the libFileTree
@@ -385,9 +387,11 @@ let videoTemplate =   {
   //Recursive function which takes a built libFileTree and figures out collections
   // for videos based on file structure.
   function divineCollections(node, pathStack) {
+    console.log('pathStack:');
+    console.log(pathStack);
     if (pathStack.length === 0) {
       //If we're here, then we're looking at root, this should only happen once.
-      //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
+      console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
     }
     let toDivine = true;
     let count = 0;
@@ -416,7 +420,8 @@ function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
   // all there, removing from libFileTree as we go
   //console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
-  for (let h=0; h<library.media.length; h++) {
+
+  for (let h=library.media.length-1; h>=0; h--) {
     let video = library.media[h];
     let filename = video.filename;
     // We put the whole thing in a try block, as we'll be traversing
@@ -445,19 +450,19 @@ function confirmCurrentVideos() {
       for (let j=0; j<pathComps.length; j++) {
         problem = true;
         let pathAdd =  (j===0) ? pathComps[j] : path.sep + pathComps[j];
-        pathComp = pathComp + pathAdd
-        let lastOne =  (j === pathComps.length - 1) ? true : false;
+        pathComp = pathComp + pathAdd;
+        let lastOne = j === (pathComps.length - 1);
         if (!lastOne) {
           for (let k=0; k<libTreeLoc.folders.length; k++) {
             if (libTreeLoc.folders[k].path === pathComp) {
               libTreeLoc = libTreeLoc.folders[k];
-              problem = false
+              problem = false;
               break;
             }
           }
         } else {
           for (let k=0; k<libTreeLoc.videos.length; k++) {
-            if (libTreeLoc.videos[k] === filename || libTreeLoc.videos[k].dvd && libTreeLoc.videos[k].dvd === filename) {
+            if (libTreeLoc.videos[k] === filename || (libTreeLoc.videos[k].dvd && libTreeLoc.videos[k].dvd === filename)) {
               // If we've gotten here, then we have confirmed the video exists,
               // so delete it from libFileTree
               libTreeLoc.videos.splice(k, 1);

@@ -781,6 +781,7 @@ class Mynda extends React.Component {
       <div id='grid-container'>
         <MynNav
           playlists={this.state.playlists}
+          currentPlaylistID={this.state.currentPlaylistID}
           setPlaylist={this.setPlaylist}
           search={this.search}
           showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
@@ -865,6 +866,10 @@ class MynNav extends React.Component {
     input.dispatchEvent(new Event('input', { bubbles: true })); // necessary to trigger the search function
   }
 
+  componentDidUpdate(oldProps) {
+
+  }
+
   render() {
     return (
       <div id="nav-pane" className="pane">
@@ -904,6 +909,7 @@ class MynNav extends React.Component {
                   onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
+                  {playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null}
                   {newVidAlert}
                 </li>
               );
@@ -922,6 +928,16 @@ class MynNav extends React.Component {
   }
 }
 
+class MynNavPlaylistMiniEdit extends React.Component {
+  constructor(props) {
+    super(props)
+
+  }
+
+  render() {
+    return null;
+  }
+}
 
 // ###### Library Pane: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
 class MynLibrary extends React.Component {
