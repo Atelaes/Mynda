@@ -50,6 +50,7 @@ class Mynda extends React.Component {
       currentPlaylistID : null,
       prevQuery : '',
       selectedRows : {},
+      recentWatched : [], // a list of the id's of the n most-recently-watched videos
 
       // openablePane: null
       show : {
@@ -72,6 +73,7 @@ class Mynda extends React.Component {
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
+    this.logPlayed = this.logPlayed.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     // this.showSettings = this.showSettings.bind(this);
     // this.hideSettings = this.hideSettings.bind(this);
@@ -609,6 +611,15 @@ class Mynda extends React.Component {
     this.showOpenablePane('playerPane');
   }
 
+  // store the 5 most recently played videos
+  logPlayed(id) {
+    let recent = this.state.recentWatched;
+    recent = recent.filter(v_id => v_id !== id); // delete this id if it's already in the array
+    recent.unshift(id); // then add this id to the top of the list
+    recent = recent.slice(0,10); // if the list is longer than 10 elements, clip it at 10
+    this.setState({recentWatched:recent});
+  }
+
   showOpenablePane(name,view) {
     // the view parameter may be passed to us to tell us which tab to display in panes with tabs (only 'settings' for now)
     if (view && name === 'settingsPane') {
@@ -803,6 +814,7 @@ class Mynda extends React.Component {
           handleHoveredRow={this.handleHoveredRow}
           selectedRows={this.state.selectedRows}
           reportSortedManifest={this.reportSortedManifest}
+          recentWatched={this.state.recentWatched}
         />
         <MynDetails
           video={this.state.detailVideo}
@@ -836,6 +848,7 @@ class Mynda extends React.Component {
         <MynPlayer
           show={this.state.show.playerPane}
           video={this.state.detailVideo}
+          logPlayed={this.logPlayed}
           hideFunction={() => {this.hideOpenablePane('playerPane')}}
         />
       </div>
@@ -1617,7 +1630,7 @@ class MynLibrary extends React.Component {
 
   render() {
     // console.log('----MynLibrary RENDER----');
-    let content = null;
+    let videos = null;
     this.state.manifest = {};
 
     // if the playlist view is hierarchical, create multiple tables
@@ -1626,7 +1639,7 @@ class MynLibrary extends React.Component {
     if (this.props.view === "hierarchical") {
       this.createCollectionsMap();
 
-      content = (
+      videos = (
         <DragDropContext onDragEnd={this.onDragEnd} onDragStart={this.onDragStart}>
           <div id="collections-container">
             {this.state.hierarchy}
@@ -1640,7 +1653,7 @@ class MynLibrary extends React.Component {
       let tableID = 'table';
       // this.state.manifest[tableID] = [];
 
-      content = (
+      videos = (
         <MynLibTable
           tableID={tableID}
           movies={this.state.videos}
@@ -1664,7 +1677,36 @@ class MynLibrary extends React.Component {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
       return null
     }
-    return (<div id="library-pane" className="pane">{content}</div>);
+    return (
+      <div id="library-pane" className="pane">
+        <MynPlaylistBar
+          playlistID={this.props.playlistID}
+          view={this.props.view}
+          recentWatched={this.props.recentWatched}
+        />
+        {videos}
+      </div>
+    );
+  }
+}
+
+class MynPlaylistBar extends React.Component {
+  constructor(props) {
+    super(props)
+
+  }
+
+  autotag(e) {
+    console.log('autotag!');
+  }
+
+  render() {
+    return (
+      <div className="playlist-bar">
+        <div className="pb-recent">Recently Viewed: <MynDropdown list={this.props.recentWatched.map(id => library.media.filter(v => v.id === id)[0] ? library.media.filter(v => v.id === id)[0].title : `unknown video ${id}`)} /></div>
+        <button className="pb-autotag" onClick={this.autotag.bind(this)}>Auto-tag</button>
+      </div>
+    );
   }
 }
 
@@ -3225,11 +3267,15 @@ class MynPlayer extends MynOpenablePane {
 
   onplay(e) {
     console.log("PLAYING!!!!!")
+
+    // log that we played the video, but only after 10 seconds
+    this.logPlayTimeout = setTimeout(() => {console.log('Logging that we played ' + this.state.video.title); this.props.logPlayed(this.state.video.id)},10000);
   }
 
   onpause(e) {
     console.log("PAUSING!!!!!");
     this.updatePosition(e.target.currentTime);
+    clearTimeout(this.logPlayTimeout);
   }
 
   onseeked(e) {
@@ -3258,6 +3304,9 @@ class MynPlayer extends MynOpenablePane {
   // called when exiting MynPlayer
   onExit() {
     console.log('EXIT CALLBACK');
+
+    clearTimeout(this.logPlayTimeout);
+
     let position;
     try {
       position = this.player.current.currentTime;
@@ -3446,8 +3495,17 @@ class MynPlayer extends MynOpenablePane {
         this.seekVideoTo(this.state.video.position);
         this.setState({showLoadingIndicator:false});
       }).catch((err) => {
-        console.error(`Browser could not play video natively, using HLS fallback: ${err}`);
-        this.createFFmpegStream();
+        // for now, don't try to make an ffmpeg stream, it's too buggy. We'll figure it out later
+        console.error(`Browser could not play video natively`);
+        this.setState({errorMessage:(
+          <div className='error-message'>
+            <div className='header'>Error Loading Video</div>
+            This video format cannot be played natively
+          </div>
+        ), showLoadingIndicator:false});
+
+        // console.error(`Browser could not play video natively, using HLS fallback: ${err}`);
+        // this.createFFmpegStream();
       });
     } else {
       console.error('Video player promise was undefined');
@@ -8189,6 +8247,23 @@ class MynEditDateWidget extends MynEditWidget {
       <div className={"date-widget " + this.props.property}>
         <input ref={this.input} type="text" value={this.state.inputValue} placeholder={this.props.property} onChange={(e) => this.handleInput(e)} />
       </div>
+    );
+  }
+}
+
+class MynDropdown extends React.Component {
+  constructor(props) {
+    super(props)
+
+  }
+
+  render() {
+    return (
+      <ul>
+        {this.props.list.map(item => (
+          <li key={String(item)}>{item}</li>
+        ))}
+      </ul>
     );
   }
 }
