@@ -315,12 +315,13 @@ class Library {
   }
 
   //Loads all data into an object and saves that object to file location.
-  save() {
+  //Takes an optional location to save, otherwise saves to appData.
+  save(loc=this.path) {
     try {
       let saveObj = {};
       Object.keys(defaultLibrary).map((key) => {saveObj[key] = this[key]});
       // console.log(`\n==== SAVING ====\n\n\n${JSON.stringify(saveObj)}\n\n\n`);
-      fs.writeFileSync(this.path, JSON.stringify(saveObj));
+      fs.writeFileSync(loc, JSON.stringify(saveObj));
     } catch(e) {
       console.log("Error writing to file: " + e.toString());
     }

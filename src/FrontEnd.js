@@ -5,7 +5,7 @@ const { ipcRenderer } = require('electron');
 const os = require('os');
 const _ = require('lodash');
 const DateJS = require('datejs');
-const URL = require("url").URL;
+const URL = require("url");
 const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
@@ -2767,7 +2767,7 @@ class MynDetails extends React.Component {
       const video = this.props.video
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${video.artwork || ''}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${URL.pathToFileURL(video.artwork) || ''}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
@@ -4872,23 +4872,27 @@ class MynSettingsCollections extends React.Component {
 class MynSettingsSync extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {driveList : []}
+    this.state = {driveList : [],
+      driveInfo : [],
+      selectedDrive : ''}
     this.findDrives();
     this.render = this.render.bind(this);
     this.findDrives = this.findDrives.bind(this);
+    this.selectDrive = this.selectDrive.bind(this);
+    this.plantManifest = this.plantManifest.bind(this);
+    this.exportFiles = this.exportFiles.bind(this);
   }
 
   findDrives() {
     lsDevices()
     .then((drives) => {
-      console.log(drives);
-      let currentDriveList = [];
+      let currentDriveList = [<option key={-1} disabled selected value> -- select an option -- </option>];
       for (let i=0; i<drives.length; i++) {
         let drive = drives[i];
-        currentDriveList.push(<option key={i}>{drive.caption} {drive.so.VolumeName}</option>);
-        //console.log(`Drive letter is ${drive.caption}, name is ${drive.so.VolumeName} and free space is ${drive.free_space}`);
+        currentDriveList.push( <option key={i} value={drive.caption}>{drive.caption} {drive.so.VolumeName}</option>);
       }
-      this.setState({driveList : currentDriveList});
+      this.setState({driveList : currentDriveList, driveInfo : drives});
+      console.log(currentDriveList);
     })
     .catch((err) => {
         console.log(err);
@@ -4896,25 +4900,65 @@ class MynSettingsSync extends React.Component {
   }
 
   exportFiles(e) {
-
+    if (!this.state.selectedDrive) {
+      console.log("Can't do this without selecting a drive first.");
+      return;
+    }
+    let fileLocation = path.join(this.state.selectedDrive, "Mynda Manifest.json");
+    let manifest;
+    if (fs.existsSync(fileLocation)) {
+      manifest = JSON.parse(fs.readFileSync(fileLocation));
+      console.log('Loaded manifest.')
+    } else {
+      manifest = {media: []};
+      console.log("Couldn't load manifest, assuming all new.")
+    }
+    let matchedMedia = [];
+    let unmatchedMedia = [];
+    for (let i=0; i<library.media.length; i++) {
+      let homeVideo = library.media[i];
+      let match = null;
+      for (let j=0; j<manifest.media.length; j++) {
+        let awayVideo = manifest.media[j];
+        if (homeVideo.id === awayVideo.id) {
+          match = {id : homeVideo.id, file : homeVideo.filename}
+          matchedMedia.push(match);
+          break;
+        }
+      }
+      if (match === null) {
+        unmatchedMedia.push(homeVideo.id);
+      }
+    }
+    console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
+    console.log(matchedMedia);
   }
 
   plantManifest(e) {
+    if (!this.state.selectedDrive) {
+      alert('You have to select a drive, you silly goose!');
+      return;
+    }
+    let location = path.join(this.state.selectedDrive, "Mynda Manifest.json");
+    library.save(location);
+  }
+
+  importFiles(e) {
+    console.log('Import');
+  }
+
+  selectDrive(e) {
+    this.setState({selectedDrive : e.target.value});
   }
 
   render() {
     return (<div>
-      <div style={{float:'left', width: '50%'}}>
-        <h1>Import</h1>
-        <div>Drive: <select>{this.state.driveList}</select></div>
-        <div><button onClick={(e) => this.plantManifest(e)}>Go!</button></div>
+      <div>Drive: <select id="mynSyncDriveSelect" onChange={value => this.selectDrive(value)}>{this.state.driveList}</select></div>
+      <div>
+        <span style={{width: '33%'}}><button onClick={this.plantManifest}>Request</button></span>
+        <span style={{width: '33%'}}><button onClick={this.exportFiles}>Export</button></span>
+        <span style={{width: '33%'}}><button onClick={this.importFiles}>Import</button></span>
       </div>
-        <div style={{float:'right', width: '50%'}}>
-          <h1>Export</h1>
-          <div>Drive: <select>{this.state.driveList}</select></div>
-          <div>Amount to Transfer: <input type="number"></input>GB</div>
-          <div><button onClick={(e) => this.exportFiles(e)}>Go!</button></div>
-        </div>
     </div>)
   }
 
@@ -8449,7 +8493,7 @@ function validateVideo(video) {
 // helper function to determine if a string is a valid URL
 function isValidURL(s) {
   try {
-    let url = new URL(s);
+    let url = new URL.URL(s);
     return url.host !== '';
   } catch (error) {
     return false;
