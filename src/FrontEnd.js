@@ -26,7 +26,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
 const { lsDevices } = require('fs-hard-drive');
-
+const placeholderImage = "../images/qmark.png";
 
 
 // let savedPing = {};
@@ -34,7 +34,9 @@ const { lsDevices } = require('fs-hard-drive');
 class Mynda extends React.Component {
   constructor(props) {
     super(props)
+
     let library = this.props.library;
+
     this.state = {
       videos : library.media,
       playlists : library.playlists,
@@ -50,7 +52,7 @@ class Mynda extends React.Component {
       currentPlaylistID : null,
       prevQuery : '',
       selectedRows : {},
-      recentWatched : [], // a list of the id's of the n most-recently-watched videos
+      recentlyWatched : ["a14fdec2-97db-5d2f-b537-f001493f0c48","f7fb6360-d4d9-582e-b162-f35c5fe1d406","72b9f3a0-aafe-50c6-8411-c0598b7cded8","d487a789-1799-5ed4-b2a9-786ddc474cf5","dd6d32e1-4427-5c9a-8a62-be284ea7ae00"], // a list of the id's of the n most-recently-watched videos
 
       // openablePane: null
       show : {
@@ -613,11 +615,11 @@ class Mynda extends React.Component {
 
   // store the 5 most recently played videos
   logPlayed(id) {
-    let recent = this.state.recentWatched;
+    let recent = this.state.recentlyWatched;
     recent = recent.filter(v_id => v_id !== id); // delete this id if it's already in the array
     recent.unshift(id); // then add this id to the top of the list
     recent = recent.slice(0,10); // if the list is longer than 10 elements, clip it at 10
-    this.setState({recentWatched:recent});
+    this.setState({recentlyWatched:recent});
   }
 
   showOpenablePane(name,view) {
@@ -814,7 +816,7 @@ class Mynda extends React.Component {
           handleHoveredRow={this.handleHoveredRow}
           selectedRows={this.state.selectedRows}
           reportSortedManifest={this.reportSortedManifest}
-          recentWatched={this.state.recentWatched}
+          recentlyWatched={this.state.recentlyWatched}
         />
         <MynDetails
           video={this.state.detailVideo}
@@ -1682,7 +1684,7 @@ class MynLibrary extends React.Component {
         <MynPlaylistBar
           playlistID={this.props.playlistID}
           view={this.props.view}
-          recentWatched={this.props.recentWatched}
+          recentlyWatched={this.props.recentlyWatched}
         />
         {videos}
       </div>
@@ -1703,8 +1705,15 @@ class MynPlaylistBar extends React.Component {
   render() {
     return (
       <div className="playlist-bar">
-        <div className="pb-recent">Recently Viewed: <MynDropdown list={this.props.recentWatched.map(id => library.media.filter(v => v.id === id)[0] ? library.media.filter(v => v.id === id)[0].title : `unknown video ${id}`)} /></div>
-        <button className="pb-autotag" onClick={this.autotag.bind(this)}>Auto-tag</button>
+        <div className="pb-element recent"><div className="pb-text">Recently Viewed:</div><MynRecentlyWatched list={this.props.recentlyWatched} selected={0} /></div>
+        <div className="pb-element view">
+          <div className="pb-text">View:</div>
+          <select value={this.props.playlist ? this.props.playlist.view : ''} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
+            <option value='flat'>Flat</option>
+            <option value='hierarchical'>Hierarchical</option>
+          </select>
+        </div>
+        <button className="pb-element autotag" onClick={this.autotag.bind(this)}>Auto-tag</button>
       </div>
     );
   }
@@ -2926,7 +2935,7 @@ class MynOverflowTextMarquee extends React.Component {
     // this.switchDir = this.switchDir.bind(this);
     this.theDiv = React.createRef();
     this.render = this.render.bind(this);
-    this.reinit = this.reinit.bind(this);
+    this.timeDelayInit = this.timeDelayInit.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentWillUnmount = this.componentWillUnmount.bind(this);
   }
@@ -2998,34 +3007,20 @@ class MynOverflowTextMarquee extends React.Component {
         this.theDiv.current.classList.add('overflow');
         this.theDiv.current.classList.add(this.state.direction);
 
-        if (this.props.ellipsis === 'fade') {
-          // console.log('fade');
-          let fade = {
-            WebkitMaskImage: `linear-gradient(to ${this.state.oppositeDir}, transparent 0, rgba(0, 0, 0, 1.0) ${this.state.fadeSize})`,
-            WebkitMaskPosition: '0 0',
-            WebkitMaskRepeat: 'repeat-y'
-          }
-          ellipsisStyle = {...this.ellipsisBaseStyle,...fade};
-        }
+        this.setEllipsis();
+
       } else {
         // console.log('NOT OVERFLOWING');
         this.theDiv.current.style.width = null;
         this.theDiv.current.style.marginRight = null;
 
-        ellipsisStyle = {...this.ellipsisBaseStyle};
-
         // the text is not overflowing, so we don't need to do anything special
         this.theDiv.current.classList.remove('overflow');
         this.theDiv.current.classList.remove(this.state.direction);
+
+        this.unsetEllipsis();
       }
 
-      // when we're overflowing left, this.theDiv is set to absolute,
-      // which means the container will have a height of 0, so we have to compensate for that
-      if (this.state.direction === 'left') {
-        ellipsisStyle.height = this.theDiv.current.offsetHeight + 'px';
-      }
-
-      this.setState({ellipsisStyle:ellipsisStyle});
 
 
       // console.log('new width: ' + this.theDiv.current.style.width);
@@ -3033,6 +3028,33 @@ class MynOverflowTextMarquee extends React.Component {
       console.error(`Could not apply overflow styles: ${err}`);
     }
   }
+
+  setEllipsis() {
+    let ellipsis = {};
+    if (this.props.ellipsis === 'fade' || !this.props.ellipsis) {
+      // console.log('fade');
+      ellipsis = {
+        WebkitMaskImage: `linear-gradient(to ${this.state.oppositeDir}, transparent 0, rgba(0, 0, 0, 1.0) ${this.state.fadeSize})`,
+        WebkitMaskPosition: '0 0',
+        WebkitMaskRepeat: 'repeat-y'
+      }
+    }
+
+    let ellipsisStyle = {...this.ellipsisBaseStyle,...ellipsis};
+
+    // when we're overflowing left, this.theDiv is set to absolute,
+    // which means the container will have a height of 0, so we have to compensate for that
+    // if (this.state.direction === 'left') {
+      ellipsisStyle.height = this.theDiv.current.offsetHeight + 'px';
+    // }
+
+    this.setState({ellipsisStyle:ellipsisStyle});
+  }
+
+  unsetEllipsis() {
+    this.setState({ellipsisStyle: {...this.ellipsisBaseStyle}});
+  }
+
 
   // switchDir() {
   //   // if this.state.reverse === true NOW, then we're currently reversing, so we want to switch to forward
@@ -3062,28 +3084,29 @@ class MynOverflowTextMarquee extends React.Component {
   //   this.theDiv.current.removeEventListener('transitionend', this.switchDir);
   // }
 
-  reinit() {
-    clearTimeout(this.reinitTimer);
-    this.reinitTimer = setTimeout(() => {
+  timeDelayInit() {
+    clearTimeout(this.initTimer);
+    this.initTimer = setTimeout(() => {
       this.initialize();
     },500);
   }
 
   componentDidMount() {
-    // this.initialize();
-    // this.reinit();
+    this.initialize();
 
-    // this.theDiv.current.addEventListener('resize', this.reinit);
+    // this.timeDelayInit();
+
+    // this.theDiv.current.addEventListener('resize', this.timeDelayInit);
   }
 
   componentWillUnmount() {
-    // this.theDiv.current.removeEventListener('resize', this.reinit);
+    // this.theDiv.current.removeEventListener('resize', this.timeDelayInit);
   }
 
 
   componentDidUpdate(oldProps) {
     if (oldProps.text !== this.props.text) {
-      // this.initialize();
+      this.initialize();
     }
   }
 
@@ -3107,7 +3130,7 @@ class MynOverflowTextMarquee extends React.Component {
     }
 
     return (
-      <div className='marquee-container' style={this.state.ellipsisStyle}>
+      <div className='marquee-container' style={this.state.ellipsisStyle} onMouseEnter={this.timeDelayInit}>
         <div ref={this.theDiv} className={this.props.class} style={style}>
           {this.props.text}
         </div>
@@ -5049,7 +5072,7 @@ class MynEditor extends MynOpenablePane {
       paneID: 'editor-pane',
       // video: /_.cloneDeep(videoWithCols), // add collections to video object during editing, so we can use the validation machinery (and the hash, to see if the user has made a change)
       collections: collections,
-      placeholderImage: "../images/qmark.png",
+      placeholderImage: placeholderImage,
       valid: {},
       // saveHash: hashObject(videoWithCols),
       changed: new Set()
@@ -7849,6 +7872,31 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   }
 }
 
+class MynShowPositionWidget extends React.Component {
+  constructor(props) {
+    super(props)
+
+  }
+
+  render() {
+    const duration = this.props.video.metadata ? Number(this.props.video.metadata.duration) : null;
+    if (!duration) return null;
+    let position = Number(Math.min(Math.max(this.props.video.position,0),duration));
+
+    return (
+      <div className="position-widget">
+        <div className="position-outer">
+            <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
+        </div>
+        <div className="position-text" style={{display:(this.props.showText ? 'block' : 'none')}}>
+          {position / duration > .01 ? `${Math.floor(position / 60)}:${(position % 60) < 10 ? '0' : ''}${Math.floor(position % 60)} \u2022 ` : null}
+          {duration ? (duration >= 60 ? `${Math.round(duration / 60)} min` : `${Math.round(duration)} sec`) : null}
+        </div>
+      </div>
+    );
+  }
+}
+
 // ######  ###### //
 class MynEditListWidget extends MynEditWidget {
   constructor(props) {
@@ -8255,18 +8303,91 @@ class MynDropdown extends React.Component {
   constructor(props) {
     super(props)
 
+    this.state = {
+      list : props.list
+    }
+
+    this.showList = this.showList.bind(this);
+    this.hideList = this.hideList.bind(this);
+    this.list = React.createRef();
+  }
+
+  showList(e) {
+    clearTimeout(this.mouseTimer);
+    this.mouseTimer = setTimeout(() => {
+      this.list.current.style.overflowY = 'visible';
+      this.list.current.classList.add('expanded');
+    },100);
+  }
+
+  hideList(e) {
+    clearTimeout(this.mouseTimer);
+    this.mouseTimer = setTimeout(() => {
+      this.list.current.style.overflowY = 'hidden';
+      this.list.current.classList.remove('expanded');
+    },200);
+  }
+
+
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(oldProps.list,this.props.list)) {
+      this.setState({list:this.props.list});
+    }
   }
 
   render() {
     return (
-      <ul>
-        {this.props.list.map(item => (
-          <li key={String(item)}>{item}</li>
+      <ul ref={this.list} className='dropdown-list'>
+        {this.state.list.map((item,i) => (
+          <li
+            key={i}
+            className={`dropdown-item${this.props.selected === i ? ' selected' : ' unselected'}${i === 0 ? ' first' : ''}${i === this.state.list.length-1 ? ' last' : ''}`}
+            onMouseOver={this.showList}
+            onMouseOut={this.hideList}
+          >
+            {item}
+          </li>
         ))}
       </ul>
     );
   }
 }
+
+class MynRecentlyWatched extends MynDropdown {
+  constructor(props) {
+    super(props)
+
+  }
+
+  createListItems() {
+    if (this.props.list && Array.isArray(this.props.list)) {
+      this.state.list = this.props.list.map(id => {
+        let video = library.media.filter(v => v.id === id);
+        if (video.length > 0) {
+          video = video[0];
+        } else {
+          return null;
+        }
+
+        return (
+          <div className='video'>
+            <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
+            <div className='title-position-container'>
+              <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
+              {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
+            </div>
+          </div>
+        );
+      });
+    }
+  }
+
+  render() {
+    this.createListItems();
+    return super.render();
+  }
+}
+
 
 // accepts a 'lede' prop and a 'paragraph' prop;
 // displays only the lede
