@@ -1632,7 +1632,7 @@ class MynLibrary extends React.Component {
 
   render() {
     // console.log('----MynLibrary RENDER----');
-    let videos = null;
+    let tables = null;
     this.state.manifest = {};
 
     // if the playlist view is hierarchical, create multiple tables
@@ -1641,7 +1641,7 @@ class MynLibrary extends React.Component {
     if (this.props.view === "hierarchical") {
       this.createCollectionsMap();
 
-      videos = (
+      tables = (
         <DragDropContext onDragEnd={this.onDragEnd} onDragStart={this.onDragStart}>
           <div id="collections-container">
             {this.state.hierarchy}
@@ -1655,7 +1655,7 @@ class MynLibrary extends React.Component {
       let tableID = 'table';
       // this.state.manifest[tableID] = [];
 
-      videos = (
+      tables = (
         <MynLibTable
           tableID={tableID}
           movies={this.state.videos}
@@ -1679,14 +1679,23 @@ class MynLibrary extends React.Component {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
       return null
     }
+
+    let playlist;
+    try {
+      playlist = library.playlists.filter(p => p.id === this.props.playlistID)[0];
+    } catch(err) {}
+    let playlistBar = (
+      <MynPlaylistBar
+        playlist={playlist}
+        recentlyWatched={this.props.recentlyWatched}
+      />
+    );
+
+
     return (
       <div id="library-pane" className="pane">
-        <MynPlaylistBar
-          playlistID={this.props.playlistID}
-          view={this.props.view}
-          recentlyWatched={this.props.recentlyWatched}
-        />
-        {videos}
+        {playlistBar}
+        {tables}
       </div>
     );
   }
@@ -1702,17 +1711,31 @@ class MynPlaylistBar extends React.Component {
     console.log('autotag!');
   }
 
+  changeView(view) {
+    library.replace(`playlists.id=${this.props.playlist.id}`,{...this.props.playlist,view:view});
+  }
+
   render() {
+    if (typeof this.props.playlist === "undefined") return null;
+
     return (
       <div className="playlist-bar">
-        <div className="pb-element recent"><div className="pb-text">Recently Viewed:</div><MynRecentlyWatched list={this.props.recentlyWatched} selected={0} /></div>
+
+        <div className="pb-element recent">
+          <div className="pb-text">Recently Viewed:</div>
+          <MynRecentlyWatched list={this.props.recentlyWatched} selected={0} />
+        </div>
+
         <div className="pb-element view">
           <div className="pb-text">View:</div>
-          <select value={this.props.playlist ? this.props.playlist.view : ''} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
-            <option value='flat'>Flat</option>
-            <option value='hierarchical'>Hierarchical</option>
-          </select>
+          <div className="select-container select-alwaysicon">
+            <select value={this.props.playlist.view} onChange={(e) => this.changeView(e.target.value)}>
+              <option value='flat'>Flat</option>
+              <option value='hierarchical'>Hierarchical</option>
+            </select>
+          </div>
         </div>
+
         <button className="pb-element autotag" onClick={this.autotag.bind(this)}>Auto-tag</button>
       </div>
     );
@@ -8370,12 +8393,15 @@ class MynRecentlyWatched extends MynDropdown {
         }
 
         return (
-          <div className='video'>
-            <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
-            <div className='title-position-container'>
-              <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
-              {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
+          <div className='container'>
+            <div className='video'>
+              <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
+              <div className='title-position-container'>
+                <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
+                {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
+              </div>
             </div>
+            <div className='next-btn'><img src='../images/ff-icon_white.png' title='Play next video in collection' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
           </div>
         );
       });
