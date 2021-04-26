@@ -42,6 +42,8 @@ class Mynda extends React.Component {
       playlists : library.playlists,
       collections : library.collections,
       settings: library.settings,
+      recentlyWatched: library.recently_watched, // a list of the id's of the x most-recently-watched videos
+      // recentlyWatched : ["a14fdec2-97db-5d2f-b537-f001493f0c48","f7fb6360-d4d9-582e-b162-f35c5fe1d406","72b9f3a0-aafe-50c6-8411-c0598b7cded8","d487a789-1799-5ed4-b2a9-786ddc474cf5","dd6d32e1-4427-5c9a-8a62-be284ea7ae00"],
 
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
@@ -52,7 +54,6 @@ class Mynda extends React.Component {
       currentPlaylistID : null,
       prevQuery : '',
       selectedRows : {},
-      recentlyWatched : ["a14fdec2-97db-5d2f-b537-f001493f0c48","f7fb6360-d4d9-582e-b162-f35c5fe1d406","72b9f3a0-aafe-50c6-8411-c0598b7cded8","d487a789-1799-5ed4-b2a9-786ddc474cf5","dd6d32e1-4427-5c9a-8a62-be284ea7ae00"], // a list of the id's of the n most-recently-watched videos
 
       // openablePane: null
       show : {
@@ -619,7 +620,10 @@ class Mynda extends React.Component {
     recent = recent.filter(v_id => v_id !== id); // delete this id if it's already in the array
     recent.unshift(id); // then add this id to the top of the list
     recent = recent.slice(0,10); // if the list is longer than 10 elements, clip it at 10
-    this.setState({recentlyWatched:recent});
+    this.setState({recentlyWatched:recent},() => {
+      // then save to the library
+      library.replace('recently_watched',recent);
+    });
   }
 
   showOpenablePane(name,view) {
@@ -1688,6 +1692,7 @@ class MynLibrary extends React.Component {
       <MynPlaylistBar
         playlist={playlist}
         recentlyWatched={this.props.recentlyWatched}
+        collections={this.state.collections}
       />
     );
 
@@ -1723,7 +1728,7 @@ class MynPlaylistBar extends React.Component {
 
         <div className="pb-element recent">
           <div className="pb-text">Recently Viewed:</div>
-          <MynRecentlyWatched list={this.props.recentlyWatched} selected={0} />
+          <MynRecentlyWatched list={this.props.recentlyWatched} collections={this.props.collections} selected={0} />
         </div>
 
         <div className="pb-element view">
@@ -3304,6 +3309,7 @@ class MynPlayer extends MynOpenablePane {
     this.onpause = this.onpause.bind(this);
     this.onseeked = this.onseeked.bind(this);
     this.ontimeupdate = this.ontimeupdate.bind(this);
+    this.onended = this.onended.bind(this);
     this.player = React.createRef();
   }
 
@@ -3337,6 +3343,14 @@ class MynPlayer extends MynOpenablePane {
         this.updatePosition(target.currentTime);
       },5000);
     }
+  }
+
+  onended(e) {
+    // in case the video was shorter than the 10 seconds or whatever,
+    // or was started less than 10 seconds from the end,
+    // we want to log that we played the video here.
+    clearTimeout(this.logPlayTimeout);
+    this.props.logPlayed(this.state.video.id);
   }
 
   updatePosition(time) {
@@ -3729,6 +3743,7 @@ class MynPlayer extends MynOpenablePane {
             onPause={this.onpause}
             onSeeked={this.onseeked}
             onTimeUpdate={this.ontimeupdate}
+            onEnded={this.onended}
           >
             {this.state.subtitleTracks}
           </video>
@@ -8385,12 +8400,16 @@ class MynRecentlyWatched extends MynDropdown {
   createListItems() {
     if (this.props.list && Array.isArray(this.props.list)) {
       this.state.list = this.props.list.map(id => {
+
         let video = library.media.filter(v => v.id === id);
         if (video.length > 0) {
           video = video[0];
         } else {
           return null;
         }
+
+        console.log(`Videos after ${video.title}`);
+        console.log(this.findNextVideoInCollection(id));
 
         return (
           <div className='container'>
@@ -8406,6 +8425,34 @@ class MynRecentlyWatched extends MynDropdown {
         );
       });
     }
+  }
+
+  // given a video id,
+  // find the next video (by order) in all of its collections;
+  // return an array of objects, where each object is of the form
+  // {
+  //   v_id: next_video_id,
+  //   c_id: collection_id,
+  //   order: next_video_order
+  // }
+  findNextVideoInCollection(id) {
+    let allCols = new Collections(this.props.collections);
+    let ourVidCols = allCols.getVideoCollections(id);
+    return Object.keys(ourVidCols).map(c_id => {
+      let c = allCols.get(c_id);
+      if (c) {
+        let nextVidID = allCols.findNextVideoInCollection(c,ourVidCols[c_id]);
+
+        // if we found a video and it exists in media (because it could be in inactive_media)
+        if (nextVidID && library.media.filter(v => v.id === nextVidID).length > 0) {
+          return {
+            v_id:nextVidID,
+            c_id:c_id,
+            order: allCols.getVidOrder(c,nextVidID)
+          }
+        }
+      }
+    });
   }
 
   render() {

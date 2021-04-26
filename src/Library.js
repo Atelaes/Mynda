@@ -497,6 +497,7 @@ const defaultLibrary = {
     }
   ],
   "collections" : [],
+  "recently_watched" : [],
   "media" : [],
   "inactive_media": []
 };

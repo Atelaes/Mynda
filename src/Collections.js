@@ -518,6 +518,42 @@ class Collections {
     return true;
   }
 
+  // param should either be an order or a video id
+  getNextVideo(c,param) {
+    if (!c || !c.videos) return;
+
+    let order;
+
+    if (typeof param === 'string') {
+      // then we were given an id
+      order = this.getVidOrder(c,param);
+      if (typeof order === 'undefined') {
+        console.log(`Could not find order of video with id ${param} in ${c.name}`);
+        return false;
+      }
+    } else if (Number.isFinite(param) && param > 0) {
+      // then we were given an order
+      // in this case we actually don't care if there is a video
+      // with that exact order or not; we just want to find and return
+      // the id of the video with the next greatest order, if there is one,
+      order = param;
+    } else {
+      console.log('2nd parameter must either be a video id or an order (number > 0)')
+      return false;
+    }
+
+    let sorted = this._sortVidsByOrder(c);
+
+    for (let video in sorted) {
+      if (video.order > order) {
+        return video.id;
+      }
+    }
+
+    console.log(`No videos were found with an order greater than ${order}`)
+    return false;
+  }
+
   convertToNonTerminal(c) {
     if (!c) return;
 
