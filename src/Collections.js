@@ -544,7 +544,7 @@ class Collections {
 
     let sorted = this._sortVidsByOrder(c);
 
-    for (let video in sorted) {
+    for (let video of sorted) {
       if (video.order > order) {
         return video.id;
       }

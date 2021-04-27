@@ -638,7 +638,6 @@ async function addVideoFile() {
       library.remove(`inactive_media.${inactiveVidIndex}`,(err) => {
         if (err) {
           throw err;
-          console.log(err);
         }
       });
 

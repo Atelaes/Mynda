@@ -2458,8 +2458,8 @@ class MynLibTable extends React.Component {
       return;
     }
 
-    console.log('UPDATING MynTable at ' + Date.now());
-    console.log(getObjectDiff(oldProps,this.props));
+    // console.log('UPDATING MynTable at ' + Date.now());
+    // console.log(getObjectDiff(oldProps,this.props));
 
     // if another table unselected this table's rows, update the state variable
     if (!this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID]) {
@@ -2488,7 +2488,7 @@ class MynLibTable extends React.Component {
       // setTimeout(() => this.reset(true,true), 1000);
       this.reset(true,true);
     } else {
-      console.log('playlist is the same, checking if any videos changed...');
+      // console.log('playlist is the same, checking if any videos changed...');
       // if the playlist was NOT changed, but
       // if any videos in the playlist were changed...
       // (or if the setting to include user ratings in avg was changed)
@@ -2502,13 +2502,13 @@ class MynLibTable extends React.Component {
       let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
       let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
       if (!_.isEqual(tempOld,tempNew) || this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
-        console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
+        // console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
         let diff = getArrayDiff(tempOld,tempNew);
-        console.log(diff);
+        // console.log(diff);
         // diff.map(key => {
         //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
         // });
-        console.log(`old rating_in_avg: ${this.state.include_user_rating_in_avg}, new rating_in_avg: ${this.props.settings.preferences.include_user_rating_in_avg}`);
+        // console.log(`old rating_in_avg: ${this.state.include_user_rating_in_avg}, new rating_in_avg: ${this.props.settings.preferences.include_user_rating_in_avg}`);
         // for some reason, comparing oldProps did not work for this, because oldProps and this.props were always the same; I have no idea why; so we just use a state variable to compare
         this.state.include_user_rating_in_avg = this.props.settings.preferences.include_user_rating_in_avg;
 
@@ -8441,7 +8441,7 @@ class MynRecentlyWatched extends MynDropdown {
     return Object.keys(ourVidCols).map(c_id => {
       let c = allCols.get(c_id);
       if (c) {
-        let nextVidID = allCols.findNextVideoInCollection(c,ourVidCols[c_id]);
+        let nextVidID = allCols.getNextVideo(c,ourVidCols[c_id]);
 
         // if we found a video and it exists in media (because it could be in inactive_media)
         if (nextVidID && library.media.filter(v => v.id === nextVidID).length > 0) {
@@ -8452,11 +8452,21 @@ class MynRecentlyWatched extends MynDropdown {
           }
         }
       }
+      return null;
     });
   }
 
-  render() {
+  componentDidMount() {
     this.createListItems();
+  }
+
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(oldProps.list,this.props.list)) {
+      this.createListItems();
+    }
+  }
+
+  render() {
     return super.render();
   }
 }
