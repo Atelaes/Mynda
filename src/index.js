@@ -545,12 +545,6 @@ function mulchVideoTree(folderNode) {
 }
 
 async function addVideoController() {
-  let objectMedia = {};
-  if (!library.objectMedia) {
-    library.add('objectMedia', {});
-  } else {
-    objectMedia = library.objectMedia;
-  }
   let newMedia = [];
   let numNewVids = 0;
   for (let i=0; i<libMulch.length; i++) {
@@ -558,39 +552,30 @@ async function addVideoController() {
     let procVideo = await addVideoFile(video);
     if (procVideo) {
       newMedia.push(procVideo);
-      objectMedia[procVideo.id] = procVideo;
       numNewVids++;
     }
-    //console.log(`${i}. ${(procVideo) ? 'Got a ' : 'Did not get a '} response from ${video.filename}`);
   }
   let combinedMedia = library.media.concat(newMedia);
   library.replace('media', combinedMedia);
   library.replace('collections', collections.getAll());
-  library.replace('objectMedia', objectMedia);
   win.webContents.send('videos_added',numNewVids);
+  //Now let's try and get some metadata.
+  for (let j=0; j<library.media.length; j++) {
+    let metVideo = library.media[j];
+    if (!metVideo.metadata.checked) {
+      await getMetaData(metVideo);
+    }
+  }
 }
 
-
-
-
-// Takes a full file address and adds it to library
-//    folderNode : the node of libFileTree of the folder enclosing this video;
-//                 e.g. {name:'/shows/firefly/season01/', folders: [], videos:[...some videos including this one], subtitles:[...any subtitle files in this folder]}
-//                 (DVD folders should be in the videos array, not the folders array)
-//    rootWatchFolder : the watch folder in which this video was found
-//    file : the path to this file/DVD folder
-//    kind : the media kind (e.g. movie, show) determined by the watch folder default
-//    isDVD : boolean, is this video a DVD (as opposed to a video file, such as an .mp4)
-//    numSisters : for files (not DVD folders), how many other videos are in this same folder (helpful for determining which subtitles may belong to this video)
+// Takes a video object and fills it out
 async function addVideoFile(video) {
-  // first create the id for this file
-  //let startTime = new Date();
   let file = video.filename;
   let fileBasename = path.basename(file,path.extname(file));
   let id = await createVideoID(video.filename);
-  //console.log(`Got past hashing on ${file}`)
+
   if (video.collection) {
-    //Ensure collection exists, add the video to it if not already there, and update.
+    //Ensure collection exists, add the video to it if not already there
     if (collections.ensureExists(video.collection)) {
       let targetCollection = collections.ensureExists(video.collection);
       if (!collections.containsVideo(targetCollection, id)) {
@@ -720,8 +705,10 @@ async function addVideoFile(video) {
     }
 }
 
-async function getMetaData() {
+async function getMetaData(video) {
   // get video data from the file itself (duration, codec, dimensions, whatever)
+  let file = video.filename;
+  video.metadata.checked = true;
   try {
     // vidObj.metadata = await getVideoMetadata(file);
     let data = await ffprobe(file, { path: ffprobeStatic.path });
@@ -731,18 +718,18 @@ async function getMetaData() {
     for (const stream of data.streams) {
       try {
         if (stream.codec_type === 'video') {
-          vidObj.metadata.codec = stream.codec_name;
-          vidObj.metadata.duration = Number(stream.duration);
-          vidObj.metadata.width = stream.width;
-          vidObj.metadata.height = stream.height;
-          vidObj.metadata.aspect_ratio = stream.display_aspect_ratio;
+          video.metadata.codec = stream.codec_name;
+          video.metadata.duration = Number(stream.duration);
+          video.metadata.width = stream.width;
+          video.metadata.height = stream.height;
+          video.metadata.aspect_ratio = stream.display_aspect_ratio;
           let f = stream.avg_frame_rate.split('/');
-          vidObj.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
+          video.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
         }
         if (stream.codec_type === 'audio') {
-          vidObj.metadata.audio_codec = stream.codec_name;
-          vidObj.metadata.audio_layout = stream.channel_layout;
-          vidObj.metadata.audio_channels = stream.channels;
+          video.metadata.audio_codec = stream.codec_name;
+          video.metadata.audio_layout = stream.channel_layout;
+          video.metadata.audio_channels = stream.channels;
         }
         // if we didn't get a duration already,
         // grab one from whatever stream has one
@@ -760,14 +747,16 @@ async function getMetaData() {
     // some files (.mkv) will give us metadata, but do not store the duration for some reason;
     // in this case, we analyze the file with ffmpeg to obtain the duration
     // (which will be added to the video object later in a separate library call)
-    if (!vidObj.metadata.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
-      ffMpegQueue.push(vidObj.id);
-      //getDurationFromFFmpeg(file,id);
+    if (!video.metadata.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
+      await getDurationFromFFmpeg(file,video.id);
     }
-
   } catch(err) {
     console.log(`Unable to retrieve metadata for ${file}: ${err}`);
   }
+  //Replace the library entry with our new version.
+  //Even if everything failed, we've set metadata.checked to true, so we don't
+  //waste time trying again.
+  library.replace(`media.id=${video.id}`, video);
 }
 
 
