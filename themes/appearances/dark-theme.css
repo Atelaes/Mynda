@@ -375,7 +375,7 @@
   --th-text: var(--dim-text);
   --th-text-hover: var(--bright-text);
 
-  --movie-row-height: 2.5em;
+  --movie-row-height: 2.5rem;
   --movie-row-bg: var(--library-bg);
   --movie-row-bg-odd: var(--movie-row-bg);
   --movie-row-bg-even: var(--med-bg);

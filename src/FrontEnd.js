@@ -26,7 +26,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
 const { lsDevices } = require('fs-hard-drive');
-
+const placeholderImage = "../images/qmark.png";
 
 
 // let savedPing = {};
@@ -34,12 +34,16 @@ const { lsDevices } = require('fs-hard-drive');
 class Mynda extends React.Component {
   constructor(props) {
     super(props)
+
     let library = this.props.library;
+
     this.state = {
       videos : library.media,
       playlists : library.playlists,
       collections : library.collections,
       settings: library.settings,
+      recentlyWatched: library.recently_watched, // a list of the id's of the x most-recently-watched videos
+      // recentlyWatched : ["a14fdec2-97db-5d2f-b537-f001493f0c48","f7fb6360-d4d9-582e-b162-f35c5fe1d406","72b9f3a0-aafe-50c6-8411-c0598b7cded8","d487a789-1799-5ed4-b2a9-786ddc474cf5","dd6d32e1-4427-5c9a-8a62-be284ea7ae00"],
 
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
@@ -72,6 +76,7 @@ class Mynda extends React.Component {
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
+    this.logPlayed = this.logPlayed.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     // this.showSettings = this.showSettings.bind(this);
     // this.hideSettings = this.hideSettings.bind(this);
@@ -609,6 +614,18 @@ class Mynda extends React.Component {
     this.showOpenablePane('playerPane');
   }
 
+  // store the 5 most recently played videos
+  logPlayed(id) {
+    let recent = this.state.recentlyWatched;
+    recent = recent.filter(v_id => v_id !== id); // delete this id if it's already in the array
+    recent.unshift(id); // then add this id to the top of the list
+    recent = recent.slice(0,10); // if the list is longer than 10 elements, clip it at 10
+    this.setState({recentlyWatched:recent},() => {
+      // then save to the library
+      library.replace('recently_watched',recent);
+    });
+  }
+
   showOpenablePane(name,view) {
     // the view parameter may be passed to us to tell us which tab to display in panes with tabs (only 'settings' for now)
     if (view && name === 'settingsPane') {
@@ -803,6 +820,7 @@ class Mynda extends React.Component {
           handleHoveredRow={this.handleHoveredRow}
           selectedRows={this.state.selectedRows}
           reportSortedManifest={this.reportSortedManifest}
+          recentlyWatched={this.state.recentlyWatched}
         />
         <MynDetails
           video={this.state.detailVideo}
@@ -836,6 +854,7 @@ class Mynda extends React.Component {
         <MynPlayer
           show={this.state.show.playerPane}
           video={this.state.detailVideo}
+          logPlayed={this.logPlayed}
           hideFunction={() => {this.hideOpenablePane('playerPane')}}
         />
       </div>
@@ -1617,7 +1636,7 @@ class MynLibrary extends React.Component {
 
   render() {
     // console.log('----MynLibrary RENDER----');
-    let content = null;
+    let tables = null;
     this.state.manifest = {};
 
     // if the playlist view is hierarchical, create multiple tables
@@ -1626,7 +1645,7 @@ class MynLibrary extends React.Component {
     if (this.props.view === "hierarchical") {
       this.createCollectionsMap();
 
-      content = (
+      tables = (
         <DragDropContext onDragEnd={this.onDragEnd} onDragStart={this.onDragStart}>
           <div id="collections-container">
             {this.state.hierarchy}
@@ -1640,7 +1659,7 @@ class MynLibrary extends React.Component {
       let tableID = 'table';
       // this.state.manifest[tableID] = [];
 
-      content = (
+      tables = (
         <MynLibTable
           tableID={tableID}
           movies={this.state.videos}
@@ -1664,7 +1683,67 @@ class MynLibrary extends React.Component {
       console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
       return null
     }
-    return (<div id="library-pane" className="pane">{content}</div>);
+
+    let playlist;
+    try {
+      playlist = library.playlists.filter(p => p.id === this.props.playlistID)[0];
+    } catch(err) {}
+    let playlistBar = (
+      <MynPlaylistBar
+        playlist={playlist}
+        recentlyWatched={this.props.recentlyWatched}
+        collections={this.state.collections}
+      />
+    );
+
+
+    return (
+      <div id="library-pane" className="pane">
+        {playlistBar}
+        {tables}
+      </div>
+    );
+  }
+}
+
+class MynPlaylistBar extends React.Component {
+  constructor(props) {
+    super(props)
+
+  }
+
+  autotag(e) {
+    console.log('autotag!');
+  }
+
+  changeView(view) {
+    library.replace(`playlists.id=${this.props.playlist.id}`,{...this.props.playlist,view:view});
+  }
+
+  render() {
+    if (typeof this.props.playlist === "undefined") return null;
+
+    return (
+      <div className="playlist-bar">
+
+        <div className="pb-element recent">
+          <div className="pb-text">Recently Viewed:</div>
+          <MynRecentlyWatched list={this.props.recentlyWatched} collections={this.props.collections} selected={0} />
+        </div>
+
+        <div className="pb-element view">
+          <div className="pb-text">View:</div>
+          <div className="select-container select-alwaysicon">
+            <select value={this.props.playlist.view} onChange={(e) => this.changeView(e.target.value)}>
+              <option value='flat'>Flat</option>
+              <option value='hierarchical'>Hierarchical</option>
+            </select>
+          </div>
+        </div>
+
+        <button className="pb-element autotag" onClick={this.autotag.bind(this)}>Auto-tag</button>
+      </div>
+    );
   }
 }
 
@@ -2379,8 +2458,8 @@ class MynLibTable extends React.Component {
       return;
     }
 
-    console.log('UPDATING MynTable at ' + Date.now());
-    console.log(getObjectDiff(oldProps,this.props));
+    // console.log('UPDATING MynTable at ' + Date.now());
+    // console.log(getObjectDiff(oldProps,this.props));
 
     // if another table unselected this table's rows, update the state variable
     if (!this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID]) {
@@ -2409,7 +2488,7 @@ class MynLibTable extends React.Component {
       // setTimeout(() => this.reset(true,true), 1000);
       this.reset(true,true);
     } else {
-      console.log('playlist is the same, checking if any videos changed...');
+      // console.log('playlist is the same, checking if any videos changed...');
       // if the playlist was NOT changed, but
       // if any videos in the playlist were changed...
       // (or if the setting to include user ratings in avg was changed)
@@ -2423,13 +2502,13 @@ class MynLibTable extends React.Component {
       let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
       let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
       if (!_.isEqual(tempOld,tempNew) || this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
-        console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
+        // console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
         let diff = getArrayDiff(tempOld,tempNew);
-        console.log(diff);
+        // console.log(diff);
         // diff.map(key => {
         //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
         // });
-        console.log(`old rating_in_avg: ${this.state.include_user_rating_in_avg}, new rating_in_avg: ${this.props.settings.preferences.include_user_rating_in_avg}`);
+        // console.log(`old rating_in_avg: ${this.state.include_user_rating_in_avg}, new rating_in_avg: ${this.props.settings.preferences.include_user_rating_in_avg}`);
         // for some reason, comparing oldProps did not work for this, because oldProps and this.props were always the same; I have no idea why; so we just use a state variable to compare
         this.state.include_user_rating_in_avg = this.props.settings.preferences.include_user_rating_in_avg;
 
@@ -2884,7 +2963,7 @@ class MynOverflowTextMarquee extends React.Component {
     // this.switchDir = this.switchDir.bind(this);
     this.theDiv = React.createRef();
     this.render = this.render.bind(this);
-    this.reinit = this.reinit.bind(this);
+    this.timeDelayInit = this.timeDelayInit.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentWillUnmount = this.componentWillUnmount.bind(this);
   }
@@ -2956,34 +3035,20 @@ class MynOverflowTextMarquee extends React.Component {
         this.theDiv.current.classList.add('overflow');
         this.theDiv.current.classList.add(this.state.direction);
 
-        if (this.props.ellipsis === 'fade') {
-          // console.log('fade');
-          let fade = {
-            WebkitMaskImage: `linear-gradient(to ${this.state.oppositeDir}, transparent 0, rgba(0, 0, 0, 1.0) ${this.state.fadeSize})`,
-            WebkitMaskPosition: '0 0',
-            WebkitMaskRepeat: 'repeat-y'
-          }
-          ellipsisStyle = {...this.ellipsisBaseStyle,...fade};
-        }
+        this.setEllipsis();
+
       } else {
         // console.log('NOT OVERFLOWING');
         this.theDiv.current.style.width = null;
         this.theDiv.current.style.marginRight = null;
 
-        ellipsisStyle = {...this.ellipsisBaseStyle};
-
         // the text is not overflowing, so we don't need to do anything special
         this.theDiv.current.classList.remove('overflow');
         this.theDiv.current.classList.remove(this.state.direction);
+
+        this.unsetEllipsis();
       }
 
-      // when we're overflowing left, this.theDiv is set to absolute,
-      // which means the container will have a height of 0, so we have to compensate for that
-      if (this.state.direction === 'left') {
-        ellipsisStyle.height = this.theDiv.current.offsetHeight + 'px';
-      }
-
-      this.setState({ellipsisStyle:ellipsisStyle});
 
 
       // console.log('new width: ' + this.theDiv.current.style.width);
@@ -2991,6 +3056,33 @@ class MynOverflowTextMarquee extends React.Component {
       console.error(`Could not apply overflow styles: ${err}`);
     }
   }
+
+  setEllipsis() {
+    let ellipsis = {};
+    if (this.props.ellipsis === 'fade' || !this.props.ellipsis) {
+      // console.log('fade');
+      ellipsis = {
+        WebkitMaskImage: `linear-gradient(to ${this.state.oppositeDir}, transparent 0, rgba(0, 0, 0, 1.0) ${this.state.fadeSize})`,
+        WebkitMaskPosition: '0 0',
+        WebkitMaskRepeat: 'repeat-y'
+      }
+    }
+
+    let ellipsisStyle = {...this.ellipsisBaseStyle,...ellipsis};
+
+    // when we're overflowing left, this.theDiv is set to absolute,
+    // which means the container will have a height of 0, so we have to compensate for that
+    // if (this.state.direction === 'left') {
+      ellipsisStyle.height = this.theDiv.current.offsetHeight + 'px';
+    // }
+
+    this.setState({ellipsisStyle:ellipsisStyle});
+  }
+
+  unsetEllipsis() {
+    this.setState({ellipsisStyle: {...this.ellipsisBaseStyle}});
+  }
+
 
   // switchDir() {
   //   // if this.state.reverse === true NOW, then we're currently reversing, so we want to switch to forward
@@ -3020,28 +3112,29 @@ class MynOverflowTextMarquee extends React.Component {
   //   this.theDiv.current.removeEventListener('transitionend', this.switchDir);
   // }
 
-  reinit() {
-    clearTimeout(this.reinitTimer);
-    this.reinitTimer = setTimeout(() => {
+  timeDelayInit() {
+    clearTimeout(this.initTimer);
+    this.initTimer = setTimeout(() => {
       this.initialize();
     },500);
   }
 
   componentDidMount() {
-    // this.initialize();
-    // this.reinit();
+    this.initialize();
 
-    // this.theDiv.current.addEventListener('resize', this.reinit);
+    // this.timeDelayInit();
+
+    // this.theDiv.current.addEventListener('resize', this.timeDelayInit);
   }
 
   componentWillUnmount() {
-    // this.theDiv.current.removeEventListener('resize', this.reinit);
+    // this.theDiv.current.removeEventListener('resize', this.timeDelayInit);
   }
 
 
   componentDidUpdate(oldProps) {
     if (oldProps.text !== this.props.text) {
-      // this.initialize();
+      this.initialize();
     }
   }
 
@@ -3065,7 +3158,7 @@ class MynOverflowTextMarquee extends React.Component {
     }
 
     return (
-      <div className='marquee-container' style={this.state.ellipsisStyle}>
+      <div className='marquee-container' style={this.state.ellipsisStyle} onMouseEnter={this.timeDelayInit}>
         <div ref={this.theDiv} className={this.props.class} style={style}>
           {this.props.text}
         </div>
@@ -3216,6 +3309,7 @@ class MynPlayer extends MynOpenablePane {
     this.onpause = this.onpause.bind(this);
     this.onseeked = this.onseeked.bind(this);
     this.ontimeupdate = this.ontimeupdate.bind(this);
+    this.onended = this.onended.bind(this);
     this.player = React.createRef();
   }
 
@@ -3225,11 +3319,15 @@ class MynPlayer extends MynOpenablePane {
 
   onplay(e) {
     console.log("PLAYING!!!!!")
+
+    // log that we played the video, but only after 10 seconds
+    this.logPlayTimeout = setTimeout(() => {console.log('Logging that we played ' + this.state.video.title); this.props.logPlayed(this.state.video.id)},10000);
   }
 
   onpause(e) {
     console.log("PAUSING!!!!!");
     this.updatePosition(e.target.currentTime);
+    clearTimeout(this.logPlayTimeout);
   }
 
   onseeked(e) {
@@ -3247,6 +3345,14 @@ class MynPlayer extends MynOpenablePane {
     }
   }
 
+  onended(e) {
+    // in case the video was shorter than the 10 seconds or whatever,
+    // or was started less than 10 seconds from the end,
+    // we want to log that we played the video here.
+    clearTimeout(this.logPlayTimeout);
+    this.props.logPlayed(this.state.video.id);
+  }
+
   updatePosition(time) {
     clearTimeout(this.timeupdateTimeout);
     this.timeupdateTimeout = null;
@@ -3258,6 +3364,9 @@ class MynPlayer extends MynOpenablePane {
   // called when exiting MynPlayer
   onExit() {
     console.log('EXIT CALLBACK');
+
+    clearTimeout(this.logPlayTimeout);
+
     let position;
     try {
       position = this.player.current.currentTime;
@@ -3446,8 +3555,17 @@ class MynPlayer extends MynOpenablePane {
         this.seekVideoTo(this.state.video.position);
         this.setState({showLoadingIndicator:false});
       }).catch((err) => {
-        console.error(`Browser could not play video natively, using HLS fallback: ${err}`);
-        this.createFFmpegStream();
+        // for now, don't try to make an ffmpeg stream, it's too buggy. We'll figure it out later
+        console.error(`Browser could not play video natively`);
+        this.setState({errorMessage:(
+          <div className='error-message'>
+            <div className='header'>Error Loading Video</div>
+            This video format cannot be played natively
+          </div>
+        ), showLoadingIndicator:false});
+
+        // console.error(`Browser could not play video natively, using HLS fallback: ${err}`);
+        // this.createFFmpegStream();
       });
     } else {
       console.error('Video player promise was undefined');
@@ -3625,6 +3743,7 @@ class MynPlayer extends MynOpenablePane {
             onPause={this.onpause}
             onSeeked={this.onseeked}
             onTimeUpdate={this.ontimeupdate}
+            onEnded={this.onended}
           >
             {this.state.subtitleTracks}
           </video>
@@ -5016,7 +5135,7 @@ class MynEditor extends MynOpenablePane {
       paneID: 'editor-pane',
       // video: /_.cloneDeep(videoWithCols), // add collections to video object during editing, so we can use the validation machinery (and the hash, to see if the user has made a change)
       collections: collections,
-      placeholderImage: "../images/qmark.png",
+      placeholderImage: placeholderImage,
       valid: {},
       // saveHash: hashObject(videoWithCols),
       changed: new Set()
@@ -7816,6 +7935,31 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
   }
 }
 
+class MynShowPositionWidget extends React.Component {
+  constructor(props) {
+    super(props)
+
+  }
+
+  render() {
+    const duration = this.props.video.metadata ? Number(this.props.video.metadata.duration) : null;
+    if (!duration) return null;
+    let position = Number(Math.min(Math.max(this.props.video.position,0),duration));
+
+    return (
+      <div className="position-widget">
+        <div className="position-outer">
+            <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
+        </div>
+        <div className="position-text" style={{display:(this.props.showText ? 'block' : 'none')}}>
+          {position / duration > .01 ? `${Math.floor(position / 60)}:${(position % 60) < 10 ? '0' : ''}${Math.floor(position % 60)} \u2022 ` : null}
+          {duration ? (duration >= 60 ? `${Math.round(duration / 60)} min` : `${Math.round(duration)} sec`) : null}
+        </div>
+      </div>
+    );
+  }
+}
+
 // ######  ###### //
 class MynEditListWidget extends MynEditWidget {
   constructor(props) {
@@ -8217,6 +8361,141 @@ class MynEditDateWidget extends MynEditWidget {
     );
   }
 }
+
+class MynDropdown extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      list : props.list
+    }
+
+    this.showList = this.showList.bind(this);
+    this.hideList = this.hideList.bind(this);
+    this.list = React.createRef();
+  }
+
+  showList(e) {
+    clearTimeout(this.mouseTimer);
+    this.mouseTimer = setTimeout(() => {
+      this.list.current.style.overflowY = 'visible';
+      this.list.current.classList.add('expanded');
+    },100);
+  }
+
+  hideList(e) {
+    clearTimeout(this.mouseTimer);
+    this.mouseTimer = setTimeout(() => {
+      this.list.current.style.overflowY = 'hidden';
+      this.list.current.classList.remove('expanded');
+    },200);
+  }
+
+
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(oldProps.list,this.props.list)) {
+      this.setState({list:this.props.list});
+    }
+  }
+
+  render() {
+    return (
+      <ul ref={this.list} className='dropdown-list'>
+        {this.state.list.map((item,i) => (
+          <li
+            key={i}
+            className={`dropdown-item${this.props.selected === i ? ' selected' : ' unselected'}${i === 0 ? ' first' : ''}${i === this.state.list.length-1 ? ' last' : ''}`}
+            onMouseOver={this.showList}
+            onMouseOut={this.hideList}
+          >
+            {item}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+}
+
+class MynRecentlyWatched extends MynDropdown {
+  constructor(props) {
+    super(props)
+
+  }
+
+  createListItems() {
+    if (this.props.list && Array.isArray(this.props.list)) {
+      this.state.list = this.props.list.map(id => {
+
+        let video = library.media.filter(v => v.id === id);
+        if (video.length > 0) {
+          video = video[0];
+        } else {
+          return null;
+        }
+
+        console.log(`Videos after ${video.title}`);
+        console.log(this.findNextVideoInCollection(id));
+
+        return (
+          <div className='container'>
+            <div className='video'>
+              <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
+              <div className='title-position-container'>
+                <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
+                {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
+              </div>
+            </div>
+            <div className='next-btn'><img src='../images/ff-icon_white.png' title='Play next video in collection' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
+          </div>
+        );
+      });
+    }
+  }
+
+  // given a video id,
+  // find the next video (by order) in all of its collections;
+  // return an array of objects, where each object is of the form
+  // {
+  //   v_id: next_video_id,
+  //   c_id: collection_id,
+  //   order: next_video_order
+  // }
+  findNextVideoInCollection(id) {
+    let allCols = new Collections(this.props.collections);
+    let ourVidCols = allCols.getVideoCollections(id);
+    return Object.keys(ourVidCols).map(c_id => {
+      let c = allCols.get(c_id);
+      if (c) {
+        let nextVidID = allCols.getNextVideo(c,ourVidCols[c_id]);
+
+        // if we found a video and it exists in media (because it could be in inactive_media)
+        if (nextVidID && library.media.filter(v => v.id === nextVidID).length > 0) {
+          return {
+            v_id:nextVidID,
+            c_id:c_id,
+            order: allCols.getVidOrder(c,nextVidID)
+          }
+        }
+      }
+      return null;
+    });
+  }
+
+  componentDidMount() {
+    this.createListItems();
+  }
+
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(oldProps.list,this.props.list)) {
+      this.createListItems();
+    }
+  }
+
+  render() {
+    return super.render();
+  }
+}
+
 
 // accepts a 'lede' prop and a 'paragraph' prop;
 // displays only the lede

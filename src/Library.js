@@ -500,6 +500,7 @@ const defaultLibrary = {
     }
   ],
   "collections" : [],
+  "recently_watched" : [],
   "media" : [],
   "objectMedia" : {},
   "inactive_media": []
