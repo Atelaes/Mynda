@@ -52,6 +52,7 @@ class Library {
   //sync, whether this was prompted by counterpart library
   alter({opType=null, address=null, entry=null, sync=false, origin=null, cb=(err)=>{if (err) console.log(err)}} = {}) {
     //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
+    //let startTime = new Date();
     try {
       //Start with some basic validation
       if (!['add', 'replace', 'remove'].includes(opType)) {
@@ -175,12 +176,12 @@ class Library {
       // get rid of null placeholders in any array that we've removed something from,
       // but only if the queue is empty
       if (this.Queue.length === 0) {
-        console.log('cleaning up...');
+        //console.log('cleaning up...');
         // console.log(JSON.stringify(this.arrayCleanupHistory));
         Object.keys(this.arrayCleanupHistory).map(key => {
           let cleaned = this.arrayCleanupHistory[key];
           if (Array.isArray(cleaned)) {
-            console.log(`cleaning ${key}`);
+            //console.log(`cleaning ${key}`);
             cleaned = cleaned.filter(el => el !== null);
             // console.log(`Cleaned: ${JSON.stringify(cleaned)}`);
 
@@ -225,13 +226,15 @@ class Library {
     } catch(e) {
       cb(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
-
+    //let endTime = new Date();
+    //let totalTime = endTime - startTime;
+    //console.log(`alter( ${JSON.stringify(arguments[0])}) took ${totalTime}ms.`)
 
   }
 
   // Takes a string address in dot format, and adds "addition" to that location.
   add(address, addition, cb) {
-    console.log('adding...')
+    //console.log('adding...')
     this.addToQueue({opType: 'add', address: address, entry: addition, sync: false, origin: null, cb:cb});
   }
 
@@ -247,10 +250,10 @@ class Library {
 
   addToQueue(argObj) {
     if (this.waitConfirm) {
-      console.log('Something already in pipeline, adding to queue...')
+      //console.log('Something already in pipeline, adding to queue...')
       this.Queue.push(argObj);
     } else {
-      console.log('Nothing in pipeline, performing operation now...')
+      //console.log('Nothing in pipeline, performing operation now...')
       this.alter(argObj);
     }
   }
@@ -268,14 +271,14 @@ class Library {
     }
     if (this.env === 'server') {
       try {
-        console.log('Sending a mirror request to browser');
+        //console.log('Sending a mirror request to browser');
         this.browser.send('lib-sync-op', argObj);
       } catch(err) {
-        console.log('Browser does not exist yet or did not send beacon. Continuing server operation without sending sync operation.');
+        //console.log('Browser does not exist yet or did not send beacon. Continuing server operation without sending sync operation.');
         this.getConfirm(); // manually call getConfirm to proceed to the next item in queue
       }
     } else {
-      console.log('Sending a mirror request to server');
+      //console.log('Sending a mirror request to server');
       ipcRenderer.send('lib-sync-op', argObj);
     }
     // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
@@ -297,7 +300,7 @@ class Library {
   getConfirm(argObj) {
     // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     if (_.isEqual(argObj, this.waitConfirm)) {
-      console.log("Got a valid confirmation back, sync operation successful!")
+      //console.log("Got a valid confirmation back, sync operation successful!")
     } else if (typeof argObj === "undefined") {
       // sync op was aborted, getConfirm was called manually by the server (from the sync() function) to move to the next queue item
     } else {
@@ -498,6 +501,7 @@ const defaultLibrary = {
   ],
   "collections" : [],
   "media" : [],
+  "objectMedia" : {},
   "inactive_media": []
 };
 

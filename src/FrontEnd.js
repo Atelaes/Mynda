@@ -4944,7 +4944,32 @@ class MynSettingsSync extends React.Component {
   }
 
   importFiles(e) {
-    console.log('Import');
+    let arrMedia = library.media;
+    let objMedia = library.objectMedia;
+    let ranNum = Math.floor(Math.random() * arrMedia.length);
+    let ranID = arrMedia[ranNum].id;
+    let forStart = new Date();
+    for (let i=0; i<arrMedia.length; i++) {
+      if (arrMedia[i].id === ranID) {
+        let forFound = arrMedia[i];
+        break;
+      }
+    }
+    let forEnd = new Date();
+    let forTime = forEnd - forStart;
+    let filterStart = new Date();
+    let filterFound = arrMedia.filter(video => video.id === ranID)[0];
+    let filterEnd = new Date();
+    let filterTime = filterEnd - filterStart;
+    let objStart = new Date();
+    let objFound = objMedia[ranID];
+    let objEnd = new Date();
+    let objTime = objEnd - objStart;
+    let message = `Random id was ${ranID}, ${objFound.title}.
+    For loop took ${forTime} ms.
+    Filter took ${filterTime} ms.
+    Object Library took ${objTime} ms.`;
+    alert(message);
   }
 
   selectDrive(e) {
