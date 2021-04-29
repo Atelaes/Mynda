@@ -278,6 +278,11 @@ class Mynda extends React.Component {
     return results;
   }
 
+  // given video id, return a list of its rows in the current playlist, if any
+  findVideoRows(id) {
+    return this.state.playlistRowManifest.filter(row => row.vidID === id);
+  }
+
   reportSortedManifest(manifest) {
     this.state.playlistRowManifest = manifest;
   }
@@ -387,6 +392,10 @@ class Mynda extends React.Component {
     if (typeof index === "undefined") return console.error('Could not find current detail vid in manifest');
 
     this.goToRow(this.state.playlistRowManifest[index + amount]);
+
+    // we could use the following lines instead of the above if we just wanted to hover it:
+    // let row = this.state.playlistRowManifest[index + amount];
+    // this.forceRowHover(row.vidID, row.rowID);
   }
 
   goToRow(row) {
@@ -395,7 +404,7 @@ class Mynda extends React.Component {
     // select the row that we are going to (instead of just hovering it)
     this.handleSelectedRows(row.vidID, row.rowID, row.tableID, true);
 
-    // we could use the following line instead if we just wanted to hover it
+    // we could use the following line instead if we just wanted to hover it:
     // this.forceRowHover(row.vidID, row.rowID);
   }
 
@@ -610,7 +619,41 @@ class Mynda extends React.Component {
     });
   }
 
-  playVideo() {
+  // id is optional; if not provided, will play the detailVideo
+  // (this is normally what happens, when the user plays a video from a row)
+  // if it is provided, it could either be a video id or a row id;
+  // if it's a row id, select that row and play the video;
+  // if it's a video id, find the highest row featuring that video,
+  // select that row, then play the video;
+  async playVideo(id) {
+    if (id) {
+      let row, vidID;
+      if (/_/.test(id)) {
+        row = this.state.playlistRowManifest.filter(r => r.rowID === id)[0];
+        if (row) vidID = row.vidID;
+      } else {
+        row = this.findVideoRows(id)[0];
+        vidID = id;
+      }
+      if (row) {
+        // we found a row of this video in the current playlist, so select that,
+        // which will make it the detail vid, which will be played
+        this.goToRow(row);
+      } else {
+        // we didn't find a row of this video in the current playlist,
+        // so unselect all the rows in this playlist, and just
+        // force the detail vid to be this video
+        console.log(`Playing video from '${id}', but could not find row in current playlist, so just forcing the detail vid`);
+
+        let video = this.state.videos.filter(v => v.id === vidID)[0];
+        if (video) {
+          await this.setState({detailVideo: video});
+        } else {
+          return console.error(`Could not play video; could not find video from '${id}' in library`);
+        }
+      }
+    }
+
     this.showOpenablePane('playerPane');
   }
 
@@ -1693,6 +1736,7 @@ class MynLibrary extends React.Component {
         playlist={playlist}
         recentlyWatched={this.props.recentlyWatched}
         collections={this.state.collections}
+        playVideo={this.props.playVideo}
       />
     );
 
@@ -1728,7 +1772,7 @@ class MynPlaylistBar extends React.Component {
 
         <div className="pb-element recent">
           <div className="pb-text">Recently Viewed:</div>
-          <MynRecentlyWatched list={this.props.recentlyWatched} collections={this.props.collections} selected={0} />
+          <MynRecentlyWatched list={this.props.recentlyWatched} collections={this.props.collections} selected={0} playVideo={this.props.playVideo} />
         </div>
 
         <div className="pb-element view">
@@ -1886,7 +1930,7 @@ class MynLibTable extends React.Component {
       this.rowSelect(id, rowID, index, target, true); // 'true' forces the row to be selected; otherwise, if it was already (the only row) selected, clicking on it would unselect it
 
       console.log('PLAYING VIDEO!');
-      this.props.playVideo(id);
+      this.props.playVideo();
     }
   }
 
@@ -8374,12 +8418,14 @@ class MynDropdown extends React.Component {
   }
 
   render() {
+    let list = this.state.list.filter(item => typeof item !== "undefined" && item !== null);
+
     return (
       <ul ref={this.list} className='dropdown-list'>
-        {this.state.list.map((item,i) => (
+        {list.map((item,i) => (
           <li
             key={i}
-            className={`dropdown-item${this.props.selected === i ? ' selected' : ' unselected'}${i === 0 ? ' first' : ''}${i === this.state.list.length-1 ? ' last' : ''}`}
+            className={`dropdown-item${this.props.selected === i ? ' selected' : ' unselected'}${i === 0 ? ' first' : ''}${i === list.length-1 ? ' last' : ''}`}
             onMouseOver={this.showList}
             onMouseOut={this.hideList}
           >
@@ -8395,36 +8441,7 @@ class MynRecentlyWatched extends MynDropdown {
   constructor(props) {
     super(props)
 
-  }
-
-  createListItems() {
-    if (this.props.list && Array.isArray(this.props.list)) {
-      this.state.list = this.props.list.map(id => {
-
-        let video = library.media.filter(v => v.id === id);
-        if (video.length > 0) {
-          video = video[0];
-        } else {
-          return null;
-        }
-
-        console.log(`Videos after ${video.title}`);
-        console.log(this.findNextVideoInCollection(id));
-
-        return (
-          <div className='container'>
-            <div className='video'>
-              <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
-              <div className='title-position-container'>
-                <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
-                {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
-              </div>
-            </div>
-            <div className='next-btn'><img src='../images/ff-icon_white.png' title='Play next video in collection' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
-          </div>
-        );
-      });
-    }
+    this.playNextVideo = this.playNextVideo.bind(this);
   }
 
   // given a video id,
@@ -8452,8 +8469,26 @@ class MynRecentlyWatched extends MynDropdown {
           }
         }
       }
-      return null;
     });
+  }
+
+  playNextVideo(vidInfo) {
+    // vidInfo takes the form
+    // {
+    //   v_id: video_id,
+    //   c_id: collection_id,
+    //   order: video_order
+    // }
+
+    if (vidInfo) {
+      console.log('playing next video');
+      console.log(vidInfo);
+
+      this.props.playVideo(vidInfo.v_id);
+
+    } else {
+      console.error('Cannot play next video; none was found');
+    }
   }
 
   componentDidMount() {
@@ -8463,6 +8498,43 @@ class MynRecentlyWatched extends MynDropdown {
   componentDidUpdate(oldProps) {
     if (!_.isEqual(oldProps.list,this.props.list)) {
       this.createListItems();
+    }
+  }
+
+  createListItems() {
+    if (this.props.list && Array.isArray(this.props.list)) {
+      this.state.list = this.props.list.map(id => {
+
+        let video = library.media.filter(v => v.id === id);
+        if (video.length > 0) {
+          video = video[0];
+        } else {
+          return null;
+        }
+
+        // console.log(`Videos after ${video.title}`);
+        // console.log(this.findNextVideoInCollection(id));
+
+        // find the next video after this one in all its collections;
+        // if the video isn't in any collections, or it's the last one in its collections,
+        // we'll get an empty array;
+        // for now, we're just going to link to ONE of the collections;
+        // later, we'll need to offer the user a choice of which one
+        let nextVidID = this.findNextVideoInCollection(id)[0];
+
+        return (
+          <div className='container'>
+            <div className='video'>
+              <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
+              <div className='title-position-container'>
+                <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
+                {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
+              </div>
+            </div>
+            <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../images/ff-icon_white.png' title='Play next video in collection' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
+          </div>
+        );
+      });
     }
   }
 
