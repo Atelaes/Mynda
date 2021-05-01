@@ -5592,7 +5592,7 @@ class MynEditorSearch extends React.Component {
 
     this.state = {
       results: null,
-      searchBaseURL: `http://www.omdbapi.com/?apikey=${omdb.key}`,
+      searchBaseURL: `http://www. api.com/?apikey=${omdb.key}`,
       searching: false
     }
 
