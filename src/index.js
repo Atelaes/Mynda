@@ -99,7 +99,7 @@ function createWindow() {
     }
   })
 
-  //win.webContents.openDevTools();
+  win.webContents.openDevTools();
   win.loadFile('src/index.html');
   // win.loadFile('src/player.html');
 }

@@ -11,6 +11,7 @@ const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const Collections = require('./Collections.js');
+const OmdbHelper = require('./OmdbHelper.js');
 // const { Collection } = require('./Collection.js');
 const dl = require('./download');
 const omdb = require('../omdb');
@@ -5063,32 +5064,8 @@ class MynSettingsSync extends React.Component {
   }
 
   importFiles(e) {
-    let arrMedia = library.media;
-    let objMedia = library.objectMedia;
-    let ranNum = Math.floor(Math.random() * arrMedia.length);
-    let ranID = arrMedia[ranNum].id;
-    let forStart = new Date();
-    for (let i=0; i<arrMedia.length; i++) {
-      if (arrMedia[i].id === ranID) {
-        let forFound = arrMedia[i];
-        break;
-      }
-    }
-    let forEnd = new Date();
-    let forTime = forEnd - forStart;
-    let filterStart = new Date();
-    let filterFound = arrMedia.filter(video => video.id === ranID)[0];
-    let filterEnd = new Date();
-    let filterTime = filterEnd - filterStart;
-    let objStart = new Date();
-    let objFound = objMedia[ranID];
-    let objEnd = new Date();
-    let objTime = objEnd - objStart;
-    let message = `Random id was ${ranID}, ${objFound.title}.
-    For loop took ${forTime} ms.
-    Filter took ${filterTime} ms.
-    Object Library took ${objTime} ms.`;
-    alert(message);
+    let queryVideo = {filename: 'D:\\Serenity', title: 'Serenity', year: '2005'};
+    OmdbHelper.search(queryVideo).then(result => console.log(result));
   }
 
   selectDrive(e) {
@@ -5592,7 +5569,7 @@ class MynEditorSearch extends React.Component {
 
     this.state = {
       results: null,
-      searchBaseURL: `http://www. api.com/?apikey=${omdb.key}`,
+      searchBaseURL: `http://www.omdbapi.com/?apikey=${omdb.key}`,
       searching: false
     }
 
