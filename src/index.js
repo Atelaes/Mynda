@@ -45,12 +45,15 @@ async function start() {
   //Tutorial at https://www.electronjs.org/docs/tutorial/devtools-extension
   //You need to install React Dev tools in Chrome before this will work, also, double-check the location.
   try {
+    let reactToolsLoc;
     if (process.platform === "win32") {
-      let reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
+      console.log('Windows');
+      reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
     } else {
-      let reactToolsLoc = path.join(os.homedir(), '/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
+      console.log('Not Windows');
+      reactToolsLoc = path.join(os.homedir(), '/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
     }
-    await electron.session.defaultSession.loadExtension(reactToolsLoc)
+    //await electron.session.defaultSession.loadExtension(reactToolsLoc)
   } catch (err) {
     console.log(`Couldn't load React tools.`);
     console.log(err);

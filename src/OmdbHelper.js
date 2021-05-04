@@ -1,6 +1,8 @@
 const path = require('path');
 const omdb = require('../omdb');
 const axios = require('axios');
+const _ = require('lodash');
+const accounting = require('accounting');
 
 //Takes a video object with optional parameters (file is required)
 //and returns an array of results or false if none were found
@@ -28,8 +30,17 @@ async function search(video) {
     } else if (response.status !== 200) {
       console.log(response.status + ': ' + response.statusText);
       return false;
-    } else if (response.data.Response) {
-      return response.data;
+    } else if (response.data.Response === 'True') {
+      //If "Search", then it's an array of movie(s) with minimal info
+      if (response.data.Search) {
+        return response.data.Search;
+      } else {
+        //If not, then we have a single entry with full info
+        //Format the new info, merge it into the given video object, and return.
+        video = incorporateMetaData(video, response.data);
+        return video;
+      }
+
     } else if (persisting.title.split(/[\.-–—_,;/\\\s]/).length > 1) {
       // try some modifications on the title
       console.log('nothing found, trying again with modifications');
@@ -131,6 +142,54 @@ function pollOMDB(urlParts) {
         reject({Error:error});
       })
     })
+}
+
+function incorporateMetaData(video, data) {
+  console.log(JSON.stringify(video));
+  video.imdbID = data.imdbID;
+  video.title = data.Title;
+  delete video.Title;
+  video.description = data.Plot;
+  video.artwork = data.Poster, // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
+  delete video.Poster;
+  video.year = data.Year;
+  delete video.Year;
+  video.director = data.Director,
+  video.kind = data.Type === 'episode' ? 'show' : data.Type;
+  delete video.Type;
+  video.country = data.Country;
+  video.rated = data.Rated;
+  try {
+    video.boxoffice = accounting.parse(data.BoxOffice) || 0; //parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+  } catch(err) { console.error(`OMDB parse boxoffice: ${err}`); }
+  try {
+    video.directorsort = /^\w+\s\w+$/.test(data.Director) ? data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : data.Director; // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
+  } catch(err) { console.error(`OMDB parse directorsort: ${err}`); }
+  try {
+    video.cast = data.Actors.split(', ');
+  } catch(err) { console.error(`OMDB parse actors: ${err}`); }
+  try {
+    video.genre = data.Genre.split(', ')[0]; // just pick the first genre for genre, since we only allow one
+  } catch(err) { console.error(`OMDB parse genre: ${err}`); }
+  try {
+    video.languages = data.Language.split(', ');
+  } catch(err) { console.error(`OMDB parse languages: ${err}`); }
+  try {
+    video.tags = video.tags || [];
+    video.tags = Array.from(new Set(data.Genre.split(', ').map((item) => item.toLowerCase()).concat(video.tags))); // add new tags to existing tags, removing duplicates
+  } catch(err) { console.error(`OMDB parse tags: ${err}`); }
+  let ratings = _.cloneDeep(video.ratings) || {};
+  try {
+    ratings.imdb = Number(data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)); // / 10;
+  } catch(err) { console.error(`OMDB parse imdb rating: ${err}`); }
+  try {
+    ratings.rt = Number(data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)); // / 100;
+  } catch(err) { console.error(`OMDB parse rt rating: ${err}`); }
+  try {
+    ratings.mc = Number(data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
+  } catch(err) { console.error(`OMDB parse mc rating: ${err}`); }
+  video.ratings = ratings;
+  return video;
 }
 
 module.exports = {search};
