@@ -3,6 +3,10 @@ const omdb = require('../omdb');
 const axios = require('axios');
 const _ = require('lodash');
 const accounting = require('accounting');
+const fs = require('fs');
+const electron = require('electron');
+const dl = require('./download');
+const { ipcRenderer } = require('electron');
 
 //Takes a video object with optional parameters (file is required)
 //and returns an array of results or false if none were found
@@ -10,10 +14,10 @@ async function search(video) {
   //start by pulling and formatting useful information
   //persisting is the information organized for quick access and modification
   let persisting = extractParts(video);
-  console.log(persisting);
+  //console.log(persisting);
   //urlParts is a joinable array formatted for url
   let urlParts = createURLParts(persisting);
-  console.log(urlParts);
+  //console.log(urlParts);
   //Now that we have everything formatted, enter an infinite loop.
   //Each pass of the loop we poll the database.
   //If we get no response modify the search parameters.
@@ -22,45 +26,53 @@ async function search(video) {
   // 2. We've exhausted all options and give up
   // 3. We got an error
   while (true) {
-    let response = await pollOMDB(urlParts);
-    console.log(`pollOMDB response is ${JSON.stringify(response)}.`)
-    if (response.Error) {
-      console.log(response.Error);
-      return false;
-    } else if (response.status !== 200) {
-      console.log(response.status + ': ' + response.statusText);
-      return false;
-    } else if (response.data.Response === 'True') {
-      //If "Search", then it's an array of movie(s) with minimal info
-      if (response.data.Search) {
-        return response.data.Search;
-      } else {
-        //If not, then we have a single entry with full info
-        //Format the new info, merge it into the given video object, and return.
-        video = incorporateMetaData(video, response.data);
-        return video;
-      }
+    try {
+      let response = await pollOMDB(urlParts);
+      //console.log(`pollOMDB response is ${JSON.stringify(response)}.`)
+      if (response.Error) {
+        console.log(response.Error);
+        return false;
+      } else if (response.status !== 200) {
+        console.log(response.status + ': ' + response.statusText);
+        return false;
+      } else if (response.data.Response === 'True') {
+        //If "Search", then it's an array of movie(s) with minimal info
+        if (response.data.Search) {
+          return response.data.Search;
+        } else {
+          //If not, then we have a single entry with full info
+          //Format the new info, merge it into the given video object, and return.
+          video = incorporateMetaData(video, response.data);
+          if (video.artwork && video.artwork !== 'N/A') {
+            video.artwork = await downloadArt(video.artwork) || video.artwork;
+          }
+          return video;
+        }
 
-    } else if (persisting.title.split(/[\.-–—_,;/\\\s]/).length > 1) {
-      // try some modifications on the title
-      console.log('nothing found, trying again with modifications');
+      } else if (persisting.title.split(/[\.-–—_,;/\\\s]/).length > 1) {
+        // try some modifications on the title
+        console.log('nothing found, trying again with modifications');
 
-      if (/\./.test(persisting.title)) {
-        // if there are periods, replace them all with spaces
-        persisting.title = persisting.title.replace(/\.+/g,' ');
-      } else if (/[-–—_,;/\\]/.test(persisting.title)) {
-        // if that didn't work,
-        // replace most other punctuation with spaces
-        // and try again
-        persisting.title = persisting.title.replace(/[-–—_,;/\\]+/g,' ');
+        if (/\./.test(persisting.title)) {
+          // if there are periods, replace them all with spaces
+          persisting.title = persisting.title.replace(/\.+/g,' ');
+        } else if (/[-–—_,;/\\]/.test(persisting.title)) {
+          // if that didn't work,
+          // replace most other punctuation with spaces
+          // and try again
+          persisting.title = persisting.title.replace(/[-–—_,;/\\]+/g,' ');
+        } else {
+          // if that didn't work, start lopping off the last word
+          // (and recursing until we find some results)
+          persisting.title = persisting.title.split(/\s/).slice(0,-1).join(' ');
+        }
+        urlParts = createURLParts(persisting);
       } else {
-        // if that didn't work, start lopping off the last word
-        // (and recursing until we find some results)
-        persisting.title = persisting.title.split(/\s/).slice(0,-1).join(' ');
+        console.log(`Did not find any results, giving up.`);
+        return false;
       }
-      urlParts = createURLParts(persisting);
-    } else {
-      console.log(`Did not find any results, giving up.`);
+    } catch (e) {
+      console.log(e);
       return false;
     }
   }
@@ -125,15 +137,15 @@ function createURLParts(persisting) {
 
 function pollOMDB(urlParts) {
   return new Promise(function(resolve, reject) {
-    console.log(`Url we're using is ${urlParts.join('&')}`)
+    //console.log(`Url we're using is ${urlParts.join('&')}`)
     axios({
       method: 'get',
       url: urlParts.join('&'),
       timeout: 20000,
     })
       .then((response) => {
-        console.log('Got a response');
-        console.log(urlParts.join('&'));
+        //console.log('Got a response');
+        //console.log(urlParts.join('&'));
         resolve(response);
       })
       .catch((error) => {
@@ -145,7 +157,7 @@ function pollOMDB(urlParts) {
 }
 
 function incorporateMetaData(video, data) {
-  console.log(JSON.stringify(video));
+  //console.log(JSON.stringify(video));
   video.imdbID = data.imdbID;
   video.title = data.Title;
   delete video.Title;
@@ -190,6 +202,99 @@ function incorporateMetaData(video, data) {
   } catch(err) { console.error(`OMDB parse mc rating: ${err}`); }
   video.ratings = ratings;
   return video;
+}
+
+function downloadArt(url) {
+  return new Promise(function(resolve, reject) {
+    let fileExt = path.extname(url)
+    let fileName = path.basename(url, fileExt);
+    fileName = fileName.replaceAll(/[\*\."/\\\[\]:;\|,]/g, '') + fileExt;
+    let filePath = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork', fileName);
+    if (fs.existsSync(filePath)) {
+      resolve(filePath);
+    }
+
+    if (electron.app) {
+      let response = {success:false, message:''};
+      dl.download(url,filePath, (args) => {
+        try {
+          // if successful, we'll receive an object with the path at "path"
+          if (args.hasOwnProperty('path')) {
+            response.success = true;
+            response.message = args.path;
+            resolve(args.path);
+            // console.log("successfully downloaded file");
+          } else {
+            // console.log(JSON.stringify(args));
+            response.success = false;
+            response.message = args;
+            reject(response);
+          }
+        } catch(error) {
+          response.success = false;
+          response.message = error;
+          reject(response);
+          // console.log(error);
+        }
+      });
+    } else {
+      ipcRenderer.on('downloaded', (event, response) => {
+        if (response.success) {
+          console.log('Successfully downloaded artwork');
+          resolve(filePath);
+        } else {
+          console.log("Unable to download file: " + response.message);
+          reject();
+        }
+      });
+      ipcRenderer.send('download', url, filePath);
+    }
+
+
+    /*
+    let file = fs.createWriteStream(filePath);
+    let source = axios.CancelToken.source();
+    axios({
+      method: 'get',
+      url: url,
+      responseType: 'stream',
+      timeout: 30000,
+      cancelToken: source.token
+    })
+      .then(function (response) {
+        /*if (response.status !== 200) {
+          console.log(`OmdbHelper problem downloading artwork: ${response.status} : ${response.statusText}.`)
+          reject();
+        }
+        // pipe data to file
+        response.data.pipe(file);
+      })
+      .catch(function (error) {
+        // delete file
+        fs.unlink(filePath, (errfs) => {
+          if (errfs) console.log(errfs);
+          else {
+            console.log("Deleted file");
+          }
+        });
+        reject(error.message);
+      })
+
+      file.on('finish', () => {
+        file.close();
+        resolve(filePath);
+      });
+
+      file.on('error', (err) => { // Handle errors
+          fs.unlink(filePath, (errfs) => {
+            if (errfs) console.log(errfs);
+            else {
+              console.log("Deleted file");
+            }
+          });
+          reject(err.message);
+      });*/
+  });
 }
 
 module.exports = {search};

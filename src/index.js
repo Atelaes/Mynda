@@ -12,6 +12,7 @@ const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
+const OmdbHelper = require('./OmdbHelper.js');
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
@@ -968,6 +969,57 @@ function getDurationFromFFmpeg(filepath,id) {
   }
 }
 
+function downloadFile(url, destination) {
+  return new Promise(function(resolve, reject) {
+    let response = {success:false, message:''};
+    // event.sender.send('cancel-download', dl.canceller, "hi");
+    dl.download(url,destination, (args) => {
+      try {
+        // if successful, we'll receive an object with the path at "path"
+        if (args.hasOwnProperty('path')) {
+          response.success = true;
+          response.message = args.path;
+          resolve(response);
+          // console.log("successfully downloaded file");
+        } else {
+          // console.log(JSON.stringify(args));
+          response.success = false;
+          response.message = args;
+          reject(response);
+        }
+      } catch(error) {
+        response.success = false;
+        response.message = error;
+        reject(response);
+        // console.log(error);
+      }
+    });
+  });
+}
+
+async function autoTag() {
+  let newMedia = library.media.filter(medium => medium.new);
+  for (let i=0; i<newMedia.length; i++) {
+    let newVideo = newMedia[i];
+    console.log(`Running autotag on ${newVideo.title}.`);
+    let results = await OmdbHelper.search(newVideo);
+    if (results) {
+      if (Array.isArray(results)) {
+        if (results.length === 1) {
+          newVideo.imdbID = results[0].imdbID;
+          results = await OmdbHelper.search(newVideo);
+          if (results && !Array.isArray(results)) {
+            results.new = false;
+            library.replace(`media.id=${newVideo.id}`, results);
+          }
+        }
+      } else {
+        results.new = false;
+        library.replace(`media.id=${newVideo.id}`, results);
+      }
+    }
+  }
+}
 
 ipcMain.on('settings-watchfolder-select', (event) => {
   let options = {properties: ['openDirectory']};
@@ -1031,13 +1083,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
   }).catch(err => {
     console.log(err)
   });
-
-
-
-
 })
-
-
 
 ipcMain.on('editor-artwork-select', (event) => {
   let options = {
@@ -1063,27 +1109,13 @@ ipcMain.on('editor-subtitle-select', (event) => {
 });
 
 ipcMain.on('download', (event, url, destination) => {
-  let response = {success:false, message:''};
-  // event.sender.send('cancel-download', dl.canceller, "hi");
-  dl.download(url,destination, (args) => {
-    try {
-      // if successful, we'll receive an object with the path at "path"
-      if (args.hasOwnProperty('path')) {
-        response.success = true;
-        response.message = args.path;
-        // console.log("successfully downloaded file");
-      } else {
-        // console.log(JSON.stringify(args));
-        response.success = false;
-        response.message = args;
-      }
-    } catch(error) {
-      response.success = false;
-      response.message = error;
-      // console.log(error);
-    }
-    event.sender.send('downloaded', response);
-  });
+    downloadFile(url, destination)
+      .then(response => event.sender.send('downloaded', response))
+      .catch(response => event.sender.send('downloaded', response))
+})
+
+ipcMain.on('autotag', (event) => {
+  autoTag();
 })
 
 ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {

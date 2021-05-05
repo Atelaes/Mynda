@@ -13,7 +13,6 @@ const Library = require("./Library.js");
 const Collections = require('./Collections.js');
 const OmdbHelper = require('./OmdbHelper.js');
 // const { Collection } = require('./Collection.js');
-const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
@@ -1714,7 +1713,7 @@ class MynPlaylistBar extends React.Component {
   }
 
   autotag(e) {
-    console.log('autotag!');
+    ipcRenderer.send('autotag');
   }
 
   changeView(view) {
@@ -5159,9 +5158,9 @@ class MynEditor extends MynOpenablePane {
     // if we were passed one argument, it should be an object, where
     // the keys are video props, and the values are those props' values
     else if (args.length == 1 && typeof args[0] === "object") {
-      console.log(JSON.stringify(args[0]));
+      //console.log(JSON.stringify(args[0]));
       update = { ...this.state.video, ...args[0] };
-      console.log(JSON.stringify(update));
+      //console.log(JSON.stringify(update));
 
       // keep track of which fields have been changed
       Object.keys(args[0]).map(field => {
@@ -5680,7 +5679,7 @@ class MynEditorSearch extends React.Component {
       }
     })
   }
-    
+
   render() {
     let clearBtn = this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
     let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on IMDb ID if present, then title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>);
@@ -7264,7 +7263,7 @@ class MynEditArtwork extends MynEdit {
       }
     });
 
-    ipcRenderer.on('downloaded', (event, response) => {
+    /*ipcRenderer.on('downloaded', (event, response) => {
       if (response.success) {
         this.props.update({'artwork':response.message});
         console.log('Successfully downloaded artwork');
@@ -7298,7 +7297,7 @@ class MynEditArtwork extends MynEdit {
 
       this._isMounted && this.setState({message: ""});
 
-    });
+    });*/
 
     // ipcRenderer.on('cancel-download', (event, cancelFunc, string) => {
     //   this.setState({cancelDownload: cancelFunc});

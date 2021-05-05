@@ -8,9 +8,10 @@ const {v4: uuidv4} = require('uuid');
 (function() {
     let source;
     const download = (url, dest, callback) => {
+      console.log(`download.js started, with destination: ${dest}`);
       // if no destination path is sent, use a default temp folder with a random filename
       if (dest === '' || typeof dest !== 'string') {
-
+        console.log(`download.js did not receive a destination for the donwloaded file.`)
         let ext = '';
         try {
           ext = url.match(/\.\w{3,4}$/g).pop();
