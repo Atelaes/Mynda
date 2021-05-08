@@ -3868,7 +3868,8 @@ class MynSettings extends MynOpenablePane {
     }
 
     // console.log('index: ' + index);
-    this.setState({settingView : this.state.views[view], settingViewName : view});
+    // update all views first, and then switch to the selected view
+    this.setStateViewsFromProps(() => this.setState({settingView : this.state.views[view], settingViewName : view}));
 
     // remove "selected" class from all the tabs
     try {
@@ -4081,6 +4082,11 @@ class MynSettingsFolders extends React.Component {
     this.setState({existingFolders: this.props.folders})
   }
 
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(this.props.kinds,oldProps.kinds)) {
+      console.log('MynSettingsFolders : kinds has changed!!!!!!');
+    }
+  }
 
   render() {
     // console.log(JSON.stringify(this.props.folders));
@@ -8549,7 +8555,7 @@ class MynRecentlyWatched extends MynDropdown {
 
         return (
           <div className='container'>
-            <div className='video'>
+            <div className='video' onClick={() => this.props.playVideo(video.id)}>
               <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
               <div className='title-position-container'>
                 <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
@@ -8960,6 +8966,11 @@ function getArrayDiff(arr1,arr2) {
 function isEqualIgnoreFuncs(obj1,obj2) {
   // console.log('-----isEqualIgnoreFuncs----');
 
+  // console.log('Originals...');
+  // console.log(obj1);
+  // console.log(obj2);
+  // console.log(`isEqual? ${_.isEqual(obj1,obj2)}`);
+
   const shallowCloneNoFunc = (obj) => {
     let copy = {}
     Object.keys(obj).map((key) => {
@@ -8971,8 +8982,12 @@ function isEqualIgnoreFuncs(obj1,obj2) {
 
   let new1 = _.cloneWith(obj1,shallowCloneNoFunc);
   let new2 = _.cloneWith(obj2,shallowCloneNoFunc);
+
+  // console.log('NoFunc Clones...');
   // console.log(new1);
   // console.log(new2);
+  // console.log(`isEqual? ${_.isEqual(new1,new2)}`);
+
   return _.isEqual(new1,new2);
 }
 
