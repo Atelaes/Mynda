@@ -25,33 +25,52 @@ async function search(video) {
   // 1. We got results from OMDB
   // 2. We've exhausted all options and give up
   // 3. We got an error
+  let returnObject = {sucess: false};
+  //In the case of a show, if we don't have the requisite data,
+  //then we've failed right off the bat, give up now.
+  if (Object.keys(persisting).length === 0) {
+    returnObject.failure = 'Not enough data';
+    return returnObject;
+  }
   while (true) {
     try {
       let response = await pollOMDB(urlParts);
       //console.log(`pollOMDB response is ${JSON.stringify(response)}.`)
       if (response.Error) {
-        console.log(response.Error);
-        return false;
+        //console.log(response.Error);
+        returnObject.failure = 'Error';
+        returnObject.data = response.Error;
+        return returnObject;
       } else if (response.status !== 200) {
-        console.log(response.status + ': ' + response.statusText);
-        return false;
+        //console.log(response.status + ': ' + response.statusText);
+        returnObject.failure = response.status;
+        returnObject.data = response.statusText;
+        return returnObject;
       } else if (response.data.Response === 'True') {
         //If "Search", then it's an array of movie(s) with minimal info
         if (response.data.Search) {
-          return response.data.Search;
+          returnObject.success = true;
+          returnObject.data = response.data.Search;
+          return returnObject;
         } else {
           //If not, then we have a single entry with full info
           //Format the new info, merge it into the given video object, and return.
           video = incorporateMetaData(video, response.data);
           if (video.artwork && video.artwork !== 'N/A') {
-            video.artwork = await downloadArt(video.artwork) || video.artwork;
+            try {
+              video.artwork = await downloadArt(video.artwork) || video.artwork;
+            } catch(e) {
+              console.log(e);
+            }
           }
-          return video;
+          returnObject.success = true;
+          returnObject.data = video;
+          return returnObject;
         }
 
-      } else if (persisting.title.split(/[\.-–—_,;/\\\s]/).length > 1) {
+      } else if (persisting.title && persisting.title.split(/[\.-–—_,;/\\\s]/).length > 1) {
         // try some modifications on the title
-        console.log('nothing found, trying again with modifications');
+        //console.log('nothing found, trying again with modifications');
 
         if (/\./.test(persisting.title)) {
           // if there are periods, replace them all with spaces
@@ -68,11 +87,14 @@ async function search(video) {
         }
         urlParts = createURLParts(persisting);
       } else {
-        console.log(`Did not find any results, giving up.`);
-        return false;
+        //console.log(`Did not find any results, giving up.`);
+        returnObject.failure = 'No results';
+        return returnObject;
       }
     } catch (e) {
-      console.log(e);
+      //console.log(e);
+      returnObject.failure = 'Error';
+      returnObject.data = e;
       return false;
     }
   }
@@ -85,6 +107,14 @@ function extractParts(video) {
   if (video.imdbID && video.imdbID !== '') {
     // if they have, then we add that to the search
     persisting.id = video.imdbID;
+  } else if (video.kind === 'show') {
+    //Movies are kind of flexible, but shows are not
+    //If we don't have all the necessary info, we can't do the search.
+    if (video.series && video.season && video.episode) {
+      persisting.series = video.series;
+      persisting.season = video.season;
+      persisting.episode = video.episode;
+    }
   } else {
     // otherwise, we want to query the database using the existing field values
     // of the movie object, if present; OMDB only allows us to search by Title,
@@ -125,8 +155,8 @@ function extractParts(video) {
 
 function createURLParts(persisting) {
   let urlParts = [`http://www.omdbapi.com/?apikey=${omdb.key}`];
-  let possibleParts = ['id', 'title', 'year', 'type'];
-  let prefixes = {id: 'i', title: 's', year: 'y', type: 'type'};
+  let possibleParts = ['id', 'title', 'year', 'type', 'series', 'season', 'episode'];
+  let prefixes = {id: 'i', title: 's', year: 'y', type: 'type', series: 't', season: 'season', episode: 'episode'};
   for (let part of possibleParts) {
     if (persisting[part]) {
       urlParts.push(`${prefixes[part]}=${persisting[part]}`);

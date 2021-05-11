@@ -96,6 +96,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    frame: false,
     webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -103,7 +104,7 @@ function createWindow() {
     }
   })
 
-  win.webContents.openDevTools();
+  //win.webContents.openDevTools();
   win.loadFile('src/index.html');
   // win.loadFile('src/player.html');
 }
@@ -578,17 +579,6 @@ async function addVideoFile(video) {
   let fileBasename = path.basename(file,path.extname(file));
   let id = await createVideoID(video.filename);
 
-  if (video.collection) {
-    //Ensure collection exists, add the video to it if not already there
-    if (collections.ensureExists(video.collection)) {
-      let targetCollection = collections.ensureExists(video.collection);
-      if (!collections.containsVideo(targetCollection, id)) {
-        collections.addVideo(targetCollection, id);
-      }
-    }
-    delete video.collection;
-  }
-
   //There are four major possibilities for this video's situation:
   //1. We already have this video in the library (either because:
     //confirmCurrentVideos missed it or
@@ -700,6 +690,29 @@ async function addVideoFile(video) {
 
       //########### ADD VIDEO TO (ACTIVE) LIBRARY ###########//
       //#### BOTH FOR NEW VIDEOS AND FOR INACTIVE VIDEOS ####//
+
+      //Start by adding (or readding in case 3) video to any relevant collections.
+      if (video.collection) {
+        //Ensure collection exists, add the video to it if not already there
+        if (collections.ensureExists(video.collection)) {
+          let targetCollection = collections.ensureExists(video.collection);
+          if (!collections.containsVideo(targetCollection, id)) {
+            if (video.kind === 'show') {
+              let seasonEpisode = findSeasonEpisode(video);
+              //If we got results from findSeasonEpisode, store info in video object
+              //unless it already has data (case 3).
+              vidObj.season = vidObj.season || seasonEpisode.season || undefined;
+              vidObj.episode = vidObj.season || seasonEpisode.season || undefined;
+            }
+            if (vidObj.episode) {
+              collections.addVideo(targetCollection, id, vidObj.episode);
+            } else {
+              collections.addVideo(targetCollection, id);
+            }
+          }
+        }
+        delete video.collection;
+      }
 
       if (typeof vidObj === 'object' && vidObj !== null) {
         // add any new subtitles, removing duplicates
@@ -969,6 +982,44 @@ function getDurationFromFFmpeg(filepath,id) {
   }
 }
 
+function findSeasonEpisode(video, fileBasename) {
+  let seRegexes = [/[s]?(\d{1,3})(?:[. _]|(?:episode|ep|e)|[. _](?:episode|ep|e))[ _]?(\d{1,3})/i];
+  let eRegexes = [/(?:episode|ep|e)?([0-9]{1,3})/i];
+  let result = {};
+  if (video.collection) {
+    if (video.collection[video.collection.length-1].match(/episode/i)) {
+      if (video.collection[video.collection.length-2].match(/season/i)) {
+        if (video.collection.length > 2) {
+          result.series = video.collection[video.collection.length-3];
+        }
+      } else if (video.collection.length > 1) {
+        result.series = video.collection[video.collection.length-2];
+      }
+    } else if (video.collection[video.collection.length-1].match(/season/i) && video.collection.length > 1) {
+      result.series = video.collection[video.collection.length-2];
+    }
+  }
+  for (let i=0; i<seRegexes.length; i++) {
+    let regex  = seRegexes[i];
+    let match = fileBasename.match(regex);
+    if (match) {
+      result.season = match[1].replace(/^0+/, '');
+      result.episode = match[2].replace(/^0+/, '');
+      return result;
+    }
+  }
+  for (let j=0; j<eRegexes.length; j++) {
+    let regex  = eRegexes[j];
+    let match = fileBasename.match(regex);
+    if (match) {
+      result.season = null;
+      result.episode = match[1].replace(/^0+/, '');
+      return result;
+    }
+  }
+  return result;
+}
+
 function downloadFile(url, destination) {
   return new Promise(function(resolve, reject) {
     let response = {success:false, message:''};
@@ -998,12 +1049,13 @@ function downloadFile(url, destination) {
 }
 
 async function autoTag() {
-  let newMedia = library.media.filter(medium => medium.new);
+  let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried);
   for (let i=0; i<newMedia.length; i++) {
     let newVideo = newMedia[i];
     console.log(`Running autotag on ${newVideo.title}.`);
-    let results = await OmdbHelper.search(newVideo);
-    if (results) {
+    let resultsObject = await OmdbHelper.search(newVideo);
+    if (resultsObject.success) {
+      let results = resultsObject.data;
       if (Array.isArray(results)) {
         if (results.length === 1) {
           newVideo.imdbID = results[0].imdbID;
@@ -1012,11 +1064,24 @@ async function autoTag() {
             results.new = false;
             library.replace(`media.id=${newVideo.id}`, results);
           }
+        } else {
+          //This means we've tried and failed in a predicted manner, let's not try again.
+          newVideo.autotagTried = true;
+          library.replace(`media.id=${newVideo.id}`, newVideo);
         }
       } else {
         results.new = false;
         library.replace(`media.id=${newVideo.id}`, results);
       }
+    } else if (Number.isInteger(resultsObject.failure)) {
+      //If the failure is a number, it's probably a 400 series http code,
+      //which likely means there's some problem with the server, such as being
+      //over our daily limit.  Let's stop here.
+      break;
+    } else if (resultsObject.failure === 'No results') {
+      //This means we've tried and failed in a predicted manner, let's not try again.
+      newVideo.autotagTried = true;
+      library.replace(`media.id=${newVideo.id}`, newVideo);
     }
   }
 }

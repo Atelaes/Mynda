@@ -5603,10 +5603,11 @@ class MynEditorSearch extends React.Component {
   async handleSearch(event) {
     event.preventDefault();
     this.setState({searching:true});
-    let results = await OmdbHelper.search(this.props.video);
+    let resultsObject = await OmdbHelper.search(this.props.video);
     this.setState({searching:false});
     console.log(results);
-    if (results) {
+    if (resultsObject.success) {
+      let results = resultsObject.data;
       if (!Array.isArray(results)) {
         results = [
           {
@@ -5671,11 +5672,11 @@ class MynEditorSearch extends React.Component {
     this.clearSearch();
 
     // next, we have to get the actual movie object from the database
-    OmdbHelper.search(movie).then(response => {
-      if (!response) {
+    OmdbHelper.search(movie).then(responseObject => {
+      if (!responseObject.success) {
         return console.log('Error: no result found: ' + response.data);
-      } else if (response && response){
-        this.props.handleChange(response);
+      } else {
+        this.props.handleChange(responseObject.data);
       }
     })
   }
