@@ -13,6 +13,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
 const OmdbHelper = require('./OmdbHelper.js');
+const { lsDevices } = require('fs-hard-drive');
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
@@ -96,7 +97,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
-    frame: false,
+    //frame: false,
     webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -698,11 +699,12 @@ async function addVideoFile(video) {
           let targetCollection = collections.ensureExists(video.collection);
           if (!collections.containsVideo(targetCollection, id)) {
             if (video.kind === 'show') {
-              let seasonEpisode = findSeasonEpisode(video);
+              let seasonEpisode = findSeasonEpisode(video, fileBasename);
               //If we got results from findSeasonEpisode, store info in video object
               //unless it already has data (case 3).
+              vidObj.series = vidObj.series || seasonEpisode.series || undefined;
               vidObj.season = vidObj.season || seasonEpisode.season || undefined;
-              vidObj.episode = vidObj.season || seasonEpisode.season || undefined;
+              vidObj.episode = vidObj.episode || seasonEpisode.episode || undefined;
             }
             if (vidObj.episode) {
               collections.addVideo(targetCollection, id, vidObj.episode);
@@ -1049,9 +1051,12 @@ function downloadFile(url, destination) {
 }
 
 async function autoTag() {
-  let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried);
+  let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried));
+  let autoStats = {totalVideos: newMedia.length};
+  let autoLog = [];
   for (let i=0; i<newMedia.length; i++) {
     let newVideo = newMedia[i];
+    let disposition = '';
     console.log(`Running autotag on ${newVideo.title}.`);
     let resultsObject = await OmdbHelper.search(newVideo);
     if (resultsObject.success) {
@@ -1059,29 +1064,134 @@ async function autoTag() {
       if (Array.isArray(results)) {
         if (results.length === 1) {
           newVideo.imdbID = results[0].imdbID;
-          results = await OmdbHelper.search(newVideo);
-          if (results && !Array.isArray(results)) {
+          resultsObject = await OmdbHelper.search(newVideo);
+          results = resultsObject.data;
+          if (resultsObject.success && !Array.isArray(results)) {
             results.new = false;
             library.replace(`media.id=${newVideo.id}`, results);
+            disposition = 'Success';
+          } else {
+            disposition = 'Failure after getting imdb id??';
           }
         } else {
           //This means we've tried and failed in a predicted manner, let's not try again.
           newVideo.autotagTried = true;
           library.replace(`media.id=${newVideo.id}`, newVideo);
+          disposition = 'Too many results';
         }
       } else {
         results.new = false;
         library.replace(`media.id=${newVideo.id}`, results);
+        disposition = 'Success';
       }
-    } else if (Number.isInteger(resultsObject.failure)) {
-      //If the failure is a number, it's probably a 400 series http code,
-      //which likely means there's some problem with the server, such as being
-      //over our daily limit.  Let's stop here.
-      break;
     } else if (resultsObject.failure === 'No results') {
       //This means we've tried and failed in a predicted manner, let's not try again.
       newVideo.autotagTried = true;
       library.replace(`media.id=${newVideo.id}`, newVideo);
+      disposition = resultsObject.failure;
+    } else {
+      disposition = resultsObject.failure;
+    }
+    autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
+    autoLog.push(`${newVideo.title}: ${disposition}`);
+  }
+  autoLog.sort();
+  console.log('===AutoTag Finished===');
+  console.log(JSON.stringify(autoStats));
+  console.log(autoLog.join('\n'));
+}
+
+async function exportFiles(drive) {
+  console.log(`Starting exportFiles.`);
+  let fileLocation = path.join(drive, "Mynda Manifest.json");
+  let manifest;
+  if (fs.existsSync(fileLocation)) {
+    manifest = JSON.parse(fs.readFileSync(fileLocation));
+    console.log('Loaded manifest.')
+  } else {
+    manifest = {media: []};
+    console.log("Couldn't load manifest, assuming all new.")
+  }
+  let matchedMedia = [];
+  let unmatchedMedia = [];
+  for (let i=0; i<library.media.length; i++) {
+    let homeVideo = library.media[i];
+    let match = null;
+    for (let j=0; j<manifest.media.length; j++) {
+      let awayVideo = manifest.media[j];
+      if (homeVideo.id === awayVideo.id) {
+        match = {id : homeVideo.id, file : homeVideo.filename}
+        matchedMedia.push(match);
+        break;
+      }
+    }
+    if (match === null) {
+      unmatchedMedia.push(homeVideo);
+    }
+  }
+  console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
+  unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
+  for (let k=0; k<unmatchedMedia.length; k++) {
+    let video = unmatchedMedia[k];
+    console.log(`Starting export process on ${video.title}`);
+    if (video.dvd) {
+      continue;
+    }
+    let filename = video.filename;
+    let conWatchFolder = '';
+    for (let l=0; l<library.settings.watchfolders.length; l++) {
+      let watchfolder = library.settings.watchfolders[l];
+      console.log(`Checking watchfolder ${watchfolder.path}`)
+      if (filename.includes(watchfolder.path)) {
+        conWatchFolder = watchfolder.path;
+        break;
+      }
+    }
+    console.log(`Found watchfolder ${conWatchFolder}.`);
+    if (conWatchFolder === '') {
+      continue;
+    }
+    let filePathTrim = conWatchFolder.replace(path.basename(conWatchFolder), '');
+    let subtitles = video.subtitles;
+    let totalSize = fs.lstatSync(filename).size;
+    for (let m=0; m<subtitles.length; m++) {
+      let subtitle = subtitles[m];
+      totalSize += fs.lstatSync(subtitle).size;
+    }
+    let availableSpace = 0;
+    let availableDrives = await lsDevices();
+    console.log(`Found ${availableDrives.length} drives.`)
+    for (let n=0; n<availableDrives.length; n++) {
+      let availableDrive = availableDrives[n];
+      if (availableDrive.caption === drive) {
+        availableSpace = availableDrive.free_space;
+        break;
+      }
+    }
+
+    if (availableSpace > totalSize) {
+      console.log(`There's ${availableSpace} bytes, and we need ${totalSize} bytes.`);
+
+      try {
+        let destFile = path.join(drive, filename.replace(filePathTrim, ''));
+        console.log(`Going to try copying video to ${destFile}.`);
+        let destDir = destFile.replace(path.basename(destFile), '');
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.copyFileSync(filename, destFile, fs.constants.COPYFILE_EXCL);
+        for (let m=0; m<subtitles.length; m++) {
+          let subtitle = subtitles[m];
+          let subDestFile = path.join(drive, subtitle.replace(filePathTrim, ''));
+          let subDestDir = subDestFile.replace(path.basename(subDestFile), '');
+          fs.mkdirSync(subDestDir, { recursive: true });
+          fs.copyFileSync(subtitle, subDestFile, fs.constants.COPYFILE_EXCL);
+        }
+        console.log(`${video.title} was copied to ${drive} successfully.`);
+      } catch (e) {
+        console.log(`There was a problem copying ${video.title} to ${drive}.`);
+        console.log(e);
+      }
+    } else {
+      break;
     }
   }
 }
@@ -1263,3 +1373,7 @@ ipcMain.on('delete-collection-confirm', (event, collection) => {
 }).catch(err => {
   console.log(err)
 })})
+
+ipcMain.on('exportFiles', (event, drive) => {
+  exportFiles(drive);
+});

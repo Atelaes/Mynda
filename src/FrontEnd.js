@@ -5019,38 +5019,7 @@ class MynSettingsSync extends React.Component {
   }
 
   exportFiles(e) {
-    if (!this.state.selectedDrive) {
-      console.log("Can't do this without selecting a drive first.");
-      return;
-    }
-    let fileLocation = path.join(this.state.selectedDrive, "Mynda Manifest.json");
-    let manifest;
-    if (fs.existsSync(fileLocation)) {
-      manifest = JSON.parse(fs.readFileSync(fileLocation));
-      console.log('Loaded manifest.')
-    } else {
-      manifest = {media: []};
-      console.log("Couldn't load manifest, assuming all new.")
-    }
-    let matchedMedia = [];
-    let unmatchedMedia = [];
-    for (let i=0; i<library.media.length; i++) {
-      let homeVideo = library.media[i];
-      let match = null;
-      for (let j=0; j<manifest.media.length; j++) {
-        let awayVideo = manifest.media[j];
-        if (homeVideo.id === awayVideo.id) {
-          match = {id : homeVideo.id, file : homeVideo.filename}
-          matchedMedia.push(match);
-          break;
-        }
-      }
-      if (match === null) {
-        unmatchedMedia.push(homeVideo.id);
-      }
-    }
-    console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
-    console.log(matchedMedia);
+    ipcRenderer.send('exportFiles', this.state.selectedDrive);
   }
 
   plantManifest(e) {
@@ -5605,7 +5574,7 @@ class MynEditorSearch extends React.Component {
     this.setState({searching:true});
     let resultsObject = await OmdbHelper.search(this.props.video);
     this.setState({searching:false});
-    console.log(results);
+    //console.log(results);
     if (resultsObject.success) {
       let results = resultsObject.data;
       if (!Array.isArray(results)) {
@@ -6068,6 +6037,63 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    /* SERIES */
+    let series = (
+      <div className='edit-field series'>
+        <label className="edit-field-name" htmlFor="series">Series: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="series"
+            className="edit-field-series"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.everything.exp}
+            validatorTip={this.state.validators.everything.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
+    /* SEASON */
+    let season = (
+      <div className='edit-field season'>
+        <label className="edit-field-name" htmlFor="season">Season: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="season"
+            className="edit-field-season"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.posint.exp}
+            validatorTip={this.state.validators.posint.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
+    /* EPISODE */
+    let episode = (
+      <div className='edit-field episode'>
+        <label className="edit-field-name" htmlFor="episode">Episode: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="episode"
+            className="edit-field-episode"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.posint.exp}
+            validatorTip={this.state.validators.posint.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
     /* KIND */
     let options = this.props.settings.used.kinds.map(kind => (
       <option key={kind} value={kind}>{kind}</option>
@@ -6339,6 +6365,9 @@ class MynEditorEdit extends React.Component {
         <form onSubmit={this.props.saveChanges}>
           {filename}
           {title}
+          {series}
+          {season}
+          {episode}
           {imdbID}
           {description}
           {year}
