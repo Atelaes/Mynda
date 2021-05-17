@@ -1107,7 +1107,7 @@ async function exportFiles(drive) {
   let manifest;
   if (fs.existsSync(fileLocation)) {
     manifest = JSON.parse(fs.readFileSync(fileLocation));
-    console.log('Loaded manifest.')
+    //console.log('Loaded manifest.')
   } else {
     manifest = {media: []};
     console.log("Couldn't load manifest, assuming all new.")
@@ -1133,7 +1133,7 @@ async function exportFiles(drive) {
   unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
   for (let k=0; k<unmatchedMedia.length; k++) {
     let video = unmatchedMedia[k];
-    console.log(`Starting export process on ${video.title}`);
+    //console.log(`Starting export process on ${video.title}`);
     if (video.dvd) {
       continue;
     }
@@ -1141,13 +1141,13 @@ async function exportFiles(drive) {
     let conWatchFolder = '';
     for (let l=0; l<library.settings.watchfolders.length; l++) {
       let watchfolder = library.settings.watchfolders[l];
-      console.log(`Checking watchfolder ${watchfolder.path}`)
+      //console.log(`Checking watchfolder ${watchfolder.path}`)
       if (filename.includes(watchfolder.path)) {
         conWatchFolder = watchfolder.path;
         break;
       }
     }
-    console.log(`Found watchfolder ${conWatchFolder}.`);
+    //console.log(`Found watchfolder ${conWatchFolder}.`);
     if (conWatchFolder === '') {
       continue;
     }
@@ -1160,7 +1160,7 @@ async function exportFiles(drive) {
     }
     let availableSpace = 0;
     let availableDrives = await lsDevices();
-    console.log(`Found ${availableDrives.length} drives.`)
+    //console.log(`Found ${availableDrives.length} drives.`)
     for (let n=0; n<availableDrives.length; n++) {
       let availableDrive = availableDrives[n];
       if (availableDrive.caption === drive) {
@@ -1170,11 +1170,11 @@ async function exportFiles(drive) {
     }
 
     if (availableSpace > totalSize) {
-      console.log(`There's ${availableSpace} bytes, and we need ${totalSize} bytes.`);
+      //console.log(`There's ${availableSpace} bytes, and we need ${totalSize} bytes.`);
 
       try {
         let destFile = path.join(drive, filename.replace(filePathTrim, ''));
-        console.log(`Going to try copying video to ${destFile}.`);
+        //console.log(`Going to try copying video to ${destFile}.`);
         let destDir = destFile.replace(path.basename(destFile), '');
         fs.mkdirSync(destDir, { recursive: true });
         fs.copyFileSync(filename, destFile, fs.constants.COPYFILE_EXCL);

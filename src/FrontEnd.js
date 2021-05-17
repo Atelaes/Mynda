@@ -5019,6 +5019,10 @@ class MynSettingsSync extends React.Component {
   }
 
   exportFiles(e) {
+    if (!this.state.selectedDrive) {
+      alert('You have to select a drive, you silly goose!');
+      return;
+    }
     ipcRenderer.send('exportFiles', this.state.selectedDrive);
   }
 
