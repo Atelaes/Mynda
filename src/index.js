@@ -12,6 +12,8 @@ const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
+const OmdbHelper = require('./OmdbHelper.js');
+const { lsDevices } = require('fs-hard-drive');
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
@@ -45,12 +47,15 @@ async function start() {
   //Tutorial at https://www.electronjs.org/docs/tutorial/devtools-extension
   //You need to install React Dev tools in Chrome before this will work, also, double-check the location.
   try {
+    let reactToolsLoc;
     if (process.platform === "win32") {
-      let reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
+      console.log('Windows');
+      reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
     } else {
-      let reactToolsLoc = path.join(os.homedir(), '/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
+      console.log('Not Windows');
+      reactToolsLoc = path.join(os.homedir(), '/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
     }
-    await electron.session.defaultSession.loadExtension(reactToolsLoc)
+    //await electron.session.defaultSession.loadExtension(reactToolsLoc)
   } catch (err) {
     console.log(`Couldn't load React tools.`);
     console.log(err);
@@ -92,6 +97,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    //frame: false,
     webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -574,17 +580,6 @@ async function addVideoFile(video) {
   let fileBasename = path.basename(file,path.extname(file));
   let id = await createVideoID(video.filename);
 
-  if (video.collection) {
-    //Ensure collection exists, add the video to it if not already there
-    if (collections.ensureExists(video.collection)) {
-      let targetCollection = collections.ensureExists(video.collection);
-      if (!collections.containsVideo(targetCollection, id)) {
-        collections.addVideo(targetCollection, id);
-      }
-    }
-    delete video.collection;
-  }
-
   //There are four major possibilities for this video's situation:
   //1. We already have this video in the library (either because:
     //confirmCurrentVideos missed it or
@@ -696,6 +691,30 @@ async function addVideoFile(video) {
 
       //########### ADD VIDEO TO (ACTIVE) LIBRARY ###########//
       //#### BOTH FOR NEW VIDEOS AND FOR INACTIVE VIDEOS ####//
+
+      //Start by adding (or readding in case 3) video to any relevant collections.
+      if (video.collection) {
+        //Ensure collection exists, add the video to it if not already there
+        if (collections.ensureExists(video.collection)) {
+          let targetCollection = collections.ensureExists(video.collection);
+          if (!collections.containsVideo(targetCollection, id)) {
+            if (video.kind === 'show') {
+              let seasonEpisode = findSeasonEpisode(video, fileBasename);
+              //If we got results from findSeasonEpisode, store info in video object
+              //unless it already has data (case 3).
+              vidObj.series = vidObj.series || seasonEpisode.series || undefined;
+              vidObj.season = vidObj.season || seasonEpisode.season || undefined;
+              vidObj.episode = vidObj.episode || seasonEpisode.episode || undefined;
+            }
+            if (vidObj.episode) {
+              collections.addVideo(targetCollection, id, vidObj.episode);
+            } else {
+              collections.addVideo(targetCollection, id);
+            }
+          }
+        }
+        delete video.collection;
+      }
 
       if (typeof vidObj === 'object' && vidObj !== null) {
         // add any new subtitles, removing duplicates
@@ -965,6 +984,217 @@ function getDurationFromFFmpeg(filepath,id) {
   }
 }
 
+function findSeasonEpisode(video, fileBasename) {
+  let seRegexes = [/[s]?(\d{1,3})(?:[. _]|(?:episode|ep|e)|[. _](?:episode|ep|e))[ _]?(\d{1,3})/i];
+  let eRegexes = [/(?:episode|ep|e)?([0-9]{1,3})/i];
+  let result = {};
+  if (video.collection) {
+    if (video.collection[video.collection.length-1].match(/episode/i)) {
+      if (video.collection[video.collection.length-2].match(/season/i)) {
+        if (video.collection.length > 2) {
+          result.series = video.collection[video.collection.length-3];
+        }
+      } else if (video.collection.length > 1) {
+        result.series = video.collection[video.collection.length-2];
+      }
+    } else if (video.collection[video.collection.length-1].match(/season/i) && video.collection.length > 1) {
+      result.series = video.collection[video.collection.length-2];
+    }
+  }
+  for (let i=0; i<seRegexes.length; i++) {
+    let regex  = seRegexes[i];
+    let match = fileBasename.match(regex);
+    if (match) {
+      result.season = match[1].replace(/^0+/, '');
+      result.episode = match[2].replace(/^0+/, '');
+      return result;
+    }
+  }
+  for (let j=0; j<eRegexes.length; j++) {
+    let regex  = eRegexes[j];
+    let match = fileBasename.match(regex);
+    if (match) {
+      result.season = null;
+      result.episode = match[1].replace(/^0+/, '');
+      return result;
+    }
+  }
+  return result;
+}
+
+function downloadFile(url, destination) {
+  return new Promise(function(resolve, reject) {
+    let response = {success:false, message:''};
+    // event.sender.send('cancel-download', dl.canceller, "hi");
+    dl.download(url,destination, (args) => {
+      try {
+        // if successful, we'll receive an object with the path at "path"
+        if (args.hasOwnProperty('path')) {
+          response.success = true;
+          response.message = args.path;
+          resolve(response);
+          // console.log("successfully downloaded file");
+        } else {
+          // console.log(JSON.stringify(args));
+          response.success = false;
+          response.message = args;
+          reject(response);
+        }
+      } catch(error) {
+        response.success = false;
+        response.message = error;
+        reject(response);
+        // console.log(error);
+      }
+    });
+  });
+}
+
+async function autoTag() {
+  let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried));
+  let autoStats = {totalVideos: newMedia.length};
+  let autoLog = [];
+  for (let i=0; i<newMedia.length; i++) {
+    let newVideo = newMedia[i];
+    let disposition = '';
+    console.log(`Running autotag on ${newVideo.title}.`);
+    let resultsObject = await OmdbHelper.search(newVideo);
+    if (resultsObject.success) {
+      let results = resultsObject.data;
+      if (Array.isArray(results)) {
+        if (results.length === 1) {
+          newVideo.imdbID = results[0].imdbID;
+          resultsObject = await OmdbHelper.search(newVideo);
+          results = resultsObject.data;
+          if (resultsObject.success && !Array.isArray(results)) {
+            results.new = false;
+            library.replace(`media.id=${newVideo.id}`, results);
+            disposition = 'Success';
+          } else {
+            disposition = 'Failure after getting imdb id??';
+          }
+        } else {
+          //This means we've tried and failed in a predicted manner, let's not try again.
+          newVideo.autotagTried = true;
+          library.replace(`media.id=${newVideo.id}`, newVideo);
+          disposition = 'Too many results';
+        }
+      } else {
+        results.new = false;
+        library.replace(`media.id=${newVideo.id}`, results);
+        disposition = 'Success';
+      }
+    } else if (resultsObject.failure === 'No results') {
+      //This means we've tried and failed in a predicted manner, let's not try again.
+      newVideo.autotagTried = true;
+      library.replace(`media.id=${newVideo.id}`, newVideo);
+      disposition = resultsObject.failure;
+    } else {
+      disposition = resultsObject.failure;
+    }
+    autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
+    autoLog.push(`${newVideo.title}: ${disposition}`);
+  }
+  autoLog.sort();
+  console.log('===AutoTag Finished===');
+  console.log(JSON.stringify(autoStats));
+  console.log(autoLog.join('\n'));
+}
+
+async function exportFiles(drive) {
+  console.log(`Starting exportFiles.`);
+  let fileLocation = path.join(drive, "Mynda Manifest.json");
+  let manifest;
+  if (fs.existsSync(fileLocation)) {
+    manifest = JSON.parse(fs.readFileSync(fileLocation));
+    //console.log('Loaded manifest.')
+  } else {
+    manifest = {media: []};
+    console.log("Couldn't load manifest, assuming all new.")
+  }
+  let matchedMedia = [];
+  let unmatchedMedia = [];
+  for (let i=0; i<library.media.length; i++) {
+    let homeVideo = library.media[i];
+    let match = null;
+    for (let j=0; j<manifest.media.length; j++) {
+      let awayVideo = manifest.media[j];
+      if (homeVideo.id === awayVideo.id) {
+        match = {id : homeVideo.id, file : homeVideo.filename}
+        matchedMedia.push(match);
+        break;
+      }
+    }
+    if (match === null) {
+      unmatchedMedia.push(homeVideo);
+    }
+  }
+  console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
+  unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
+  for (let k=0; k<unmatchedMedia.length; k++) {
+    let video = unmatchedMedia[k];
+    //console.log(`Starting export process on ${video.title}`);
+    if (video.dvd) {
+      continue;
+    }
+    let filename = video.filename;
+    let conWatchFolder = '';
+    for (let l=0; l<library.settings.watchfolders.length; l++) {
+      let watchfolder = library.settings.watchfolders[l];
+      //console.log(`Checking watchfolder ${watchfolder.path}`)
+      if (filename.includes(watchfolder.path)) {
+        conWatchFolder = watchfolder.path;
+        break;
+      }
+    }
+    //console.log(`Found watchfolder ${conWatchFolder}.`);
+    if (conWatchFolder === '') {
+      continue;
+    }
+    let filePathTrim = conWatchFolder.replace(path.basename(conWatchFolder), '');
+    let subtitles = video.subtitles;
+    let totalSize = fs.lstatSync(filename).size;
+    for (let m=0; m<subtitles.length; m++) {
+      let subtitle = subtitles[m];
+      totalSize += fs.lstatSync(subtitle).size;
+    }
+    let availableSpace = 0;
+    let availableDrives = await lsDevices();
+    //console.log(`Found ${availableDrives.length} drives.`)
+    for (let n=0; n<availableDrives.length; n++) {
+      let availableDrive = availableDrives[n];
+      if (availableDrive.caption === drive) {
+        availableSpace = availableDrive.free_space;
+        break;
+      }
+    }
+
+    if (availableSpace > totalSize) {
+      //console.log(`There's ${availableSpace} bytes, and we need ${totalSize} bytes.`);
+
+      try {
+        let destFile = path.join(drive, filename.replace(filePathTrim, ''));
+        //console.log(`Going to try copying video to ${destFile}.`);
+        let destDir = destFile.replace(path.basename(destFile), '');
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.copyFileSync(filename, destFile, fs.constants.COPYFILE_EXCL);
+        for (let m=0; m<subtitles.length; m++) {
+          let subtitle = subtitles[m];
+          let subDestFile = path.join(drive, subtitle.replace(filePathTrim, ''));
+          let subDestDir = subDestFile.replace(path.basename(subDestFile), '');
+          fs.mkdirSync(subDestDir, { recursive: true });
+          fs.copyFileSync(subtitle, subDestFile, fs.constants.COPYFILE_EXCL);
+        }
+        console.log(`${video.title} was copied to ${drive} successfully.`);
+      } catch (e) {
+        console.log(`There was a problem copying ${video.title} to ${drive}.`);
+        console.log(e);
+      }
+    } else {
+      break;
+    }
+  }
+}
 
 ipcMain.on('settings-watchfolder-select', (event) => {
   let options = {properties: ['openDirectory']};
@@ -1028,13 +1258,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
   }).catch(err => {
     console.log(err)
   });
-
-
-
-
 })
-
-
 
 ipcMain.on('editor-artwork-select', (event) => {
   let options = {
@@ -1060,27 +1284,13 @@ ipcMain.on('editor-subtitle-select', (event) => {
 });
 
 ipcMain.on('download', (event, url, destination) => {
-  let response = {success:false, message:''};
-  // event.sender.send('cancel-download', dl.canceller, "hi");
-  dl.download(url,destination, (args) => {
-    try {
-      // if successful, we'll receive an object with the path at "path"
-      if (args.hasOwnProperty('path')) {
-        response.success = true;
-        response.message = args.path;
-        // console.log("successfully downloaded file");
-      } else {
-        // console.log(JSON.stringify(args));
-        response.success = false;
-        response.message = args;
-      }
-    } catch(error) {
-      response.success = false;
-      response.message = error;
-      // console.log(error);
-    }
-    event.sender.send('downloaded', response);
-  });
+    downloadFile(url, destination)
+      .then(response => event.sender.send('downloaded', response))
+      .catch(response => event.sender.send('downloaded', response))
+})
+
+ipcMain.on('autotag', (event) => {
+  autoTag();
 })
 
 ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
@@ -1163,3 +1373,7 @@ ipcMain.on('delete-collection-confirm', (event, collection) => {
 }).catch(err => {
   console.log(err)
 })})
+
+ipcMain.on('exportFiles', (event, drive) => {
+  exportFiles(drive);
+});

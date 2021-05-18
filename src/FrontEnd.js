@@ -11,8 +11,8 @@ const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const Collections = require('./Collections.js');
+const OmdbHelper = require('./OmdbHelper.js');
 // const { Collection } = require('./Collection.js');
-const dl = require('./download');
 const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
@@ -1757,7 +1757,7 @@ class MynPlaylistBar extends React.Component {
   }
 
   autotag(e) {
-    console.log('autotag!');
+    ipcRenderer.send('autotag');
   }
 
   changeView(view) {
@@ -5070,37 +5070,10 @@ class MynSettingsSync extends React.Component {
 
   exportFiles(e) {
     if (!this.state.selectedDrive) {
-      console.log("Can't do this without selecting a drive first.");
+      alert('You have to select a drive, you silly goose!');
       return;
     }
-    let fileLocation = path.join(this.state.selectedDrive, "Mynda Manifest.json");
-    let manifest;
-    if (fs.existsSync(fileLocation)) {
-      manifest = JSON.parse(fs.readFileSync(fileLocation));
-      console.log('Loaded manifest.')
-    } else {
-      manifest = {media: []};
-      console.log("Couldn't load manifest, assuming all new.")
-    }
-    let matchedMedia = [];
-    let unmatchedMedia = [];
-    for (let i=0; i<library.media.length; i++) {
-      let homeVideo = library.media[i];
-      let match = null;
-      for (let j=0; j<manifest.media.length; j++) {
-        let awayVideo = manifest.media[j];
-        if (homeVideo.id === awayVideo.id) {
-          match = {id : homeVideo.id, file : homeVideo.filename}
-          matchedMedia.push(match);
-          break;
-        }
-      }
-      if (match === null) {
-        unmatchedMedia.push(homeVideo.id);
-      }
-    }
-    console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
-    console.log(matchedMedia);
+    ipcRenderer.send('exportFiles', this.state.selectedDrive);
   }
 
   plantManifest(e) {
@@ -5113,32 +5086,8 @@ class MynSettingsSync extends React.Component {
   }
 
   importFiles(e) {
-    let arrMedia = library.media;
-    let objMedia = library.objectMedia;
-    let ranNum = Math.floor(Math.random() * arrMedia.length);
-    let ranID = arrMedia[ranNum].id;
-    let forStart = new Date();
-    for (let i=0; i<arrMedia.length; i++) {
-      if (arrMedia[i].id === ranID) {
-        let forFound = arrMedia[i];
-        break;
-      }
-    }
-    let forEnd = new Date();
-    let forTime = forEnd - forStart;
-    let filterStart = new Date();
-    let filterFound = arrMedia.filter(video => video.id === ranID)[0];
-    let filterEnd = new Date();
-    let filterTime = filterEnd - filterStart;
-    let objStart = new Date();
-    let objFound = objMedia[ranID];
-    let objEnd = new Date();
-    let objTime = objEnd - objStart;
-    let message = `Random id was ${ranID}, ${objFound.title}.
-    For loop took ${forTime} ms.
-    Filter took ${filterTime} ms.
-    Object Library took ${objTime} ms.`;
-    alert(message);
+    let queryVideo = {filename: 'D:\\Serenity', title: 'Serenity', year: '2005'};
+    OmdbHelper.search(queryVideo).then(result => console.log(result));
   }
 
   selectDrive(e) {
@@ -5232,9 +5181,9 @@ class MynEditor extends MynOpenablePane {
     // if we were passed one argument, it should be an object, where
     // the keys are video props, and the values are those props' values
     else if (args.length == 1 && typeof args[0] === "object") {
-      console.log(JSON.stringify(args[0]));
+      //console.log(JSON.stringify(args[0]));
       update = { ...this.state.video, ...args[0] };
-      console.log(JSON.stringify(update));
+      //console.log(JSON.stringify(update));
 
       // keep track of which fields have been changed
       Object.keys(args[0]).map(field => {
@@ -5642,7 +5591,6 @@ class MynEditorSearch extends React.Component {
 
     this.state = {
       results: null,
-      searchBaseURL: `http://www.omdbapi.com/?apikey=${omdb.key}`,
       searching: false
     }
 
@@ -5675,156 +5623,27 @@ class MynEditorSearch extends React.Component {
   }
 
   // search online movie database to auto-fill fields
-  handleSearch(event) {
+  async handleSearch(event) {
     event.preventDefault();
-    let urlParts = [this.state.searchBaseURL];
-
-    // first check to see if the user has entered an IMDb ID
-    // let imdbSearchID = document.getElementById('editor-search-imdbID').value;
-    let imdbSearchID = this.props.video.imdbID;
-    if (imdbSearchID && imdbSearchID !== '') {
-      // if they have, then we add that to the search
-      urlParts.push(`i=${imdbSearchID}`);
-    } else {
-      // otherwise, we want to query the database using the existing field values
-      // of the movie object, if present; OMDB only allows us to search by Title,
-      // Year, and Type;
-      // if the title field is empty, we will substitute the file name
-      // const filename = this.props.video.filename.match(/[^/]+$/)[0]; // get just the filename from the path // /[^/]+(?=\.\w{2,4}$)/
-      const filename = path.basename(this.props.video.filename,path.extname(this.props.video.filename));
-      console.log('filename: ' + filename);
-      this.titleQuery = this.props.video.title !== '' ? this.props.video.title : filename;
-      this.yearQuery = this.props.video.year !== '' ? this.props.video.year : null;
-      this.typeQuery = this.props.video.kind === 'movie' ? 'movie' : this.props.video.kind === 'show' ? 'episode' : null;
-
-      // if we have no year, see if a year-like string is in the file name or title
-      if (this.yearQuery === null) {
-        let strings = [filename, this.props.video.title];
-        for (let str of strings) {
-          // find any 4 digit strings starting with 19 or 20
-          let results = str.match(/(?:19|20)\d{2}/g);
-          try {
-            // filter the results for years no more than 1 in the future
-            results = results.filter(el => {
-              return Number(el) <= Number(new Date().getFullYear()) + 1;
-            });
-
-            // for now, just pick the first one
-            if (results[0]) {
-              this.yearQuery = results[0];
-              break;
-            }
-          } catch(err) {
-            // there were no results, so we do nothing
-          }
-        }
-      }
-
-      // compose query url
-      urlParts.push(`s=${this.titleQuery}`);
-      if (this.yearQuery) urlParts.push(`y=${this.yearQuery}`);
-      if (this.typeQuery) urlParts.push(`type=${this.typeQuery}`);
-    }
-
-    // execute query
-    this.executeSearchQuery(urlParts);
-  }
-
-  executeSearchQuery(urlParts) {
-    console.log(`Query:`);
-    urlParts.map(el => console.log(`    ${el}`));
-
     this.setState({searching:true});
-    axios({
-      method: 'get',
-      url: urlParts.join('&'),
-      timeout: 20000,
-    })
-      .then((response) => {
-        console.log(urlParts.join('&'));
-
-        if (response.status !== 200) {
-          return console.log(response.status + ': ' + response.statusText);
-        }
-
-        // if we didn't get any results, try again with fewer search parameters
-        if (response.data.Response == "False" && urlParts.length > 2) {
-          console.log('nothing found, trying again with less');
-          this.executeSearchQuery(urlParts.slice(0, -1));
-          return;
-        }
-
-        // if that didn't work, try some modifications on the title
-        if (response.data.Response == "False" && this.titleQuery.split(/[\.-–—_,;/\\\s]/).length > 1) {
-          console.log('nothing found, trying again with modifications');
-
-          if (/\./.test(this.titleQuery)) {
-            // if there are periods, replace them all with spaces
-            this.titleQuery = this.titleQuery.replace(/\.+/g,' ');
-          } else if (/[-–—_,;/\\]/.test(this.titleQuery)) {
-            // if that didn't work,
-            // replace most other punctuation with spaces
-            // and try again
-            this.titleQuery = this.titleQuery.replace(/[-–—_,;/\\]+/g,' ');
-          } else {
-            // if that didn't work, start lopping off the last word
-            // (and recursing until we find some results)
-            this.titleQuery = this.titleQuery.split(/\s/).slice(0,-1).join(' ');
-          }
-          urlParts = urlParts.slice(0, -1); // get rid of the old title
-          urlParts.push(`s=${this.titleQuery}`); // add the modified title
-          if (this.yearQuery) urlParts.push(`y=${this.yearQuery}`); // add back the year, if we have one
-          if (this.typeQuery) urlParts.push(`type=${this.typeQuery}`); // add back the kind, if we have one
-
-          this.executeSearchQuery(urlParts);
-          return;
-        }
-
-        this.handleSearchResults(response.data);
-      })
-      .catch((error) => {
-        this.handleSearchResults({Error:error});
-        return;
-      })
-      .then(() => {
-        // always executed
-      });
-  }
-
-  handleSearchResults(results) {
+    let resultsObject = await OmdbHelper.search(this.props.video);
     this.setState({searching:false});
-    if (!results.hasOwnProperty('Response')) {
-      // then there was an error getting the search results;
-      // during testing, just use an alert to tell the user
-      // and clear the previous results
-      this.clearSearch();
-      alert('Error getting search results: ' + results.Error);
-    } else if (results.Response === 'False') { // || !results.hasOwnProperty('Search')) {
-      // then there were no results found
-      // during testing, just use an alert to tell the user
-      this.setState({results:null});
-      alert('No results found! Try editing the title and searching again, or enter the IMDb ID for an exact match.');
-    } else {
-      // if we're here, we got results
-      console.log(results);
-
-      // if the user entered an IMDb ID, then only one movie object should have been returned
-      // instead of an array of search results; in this case, we'll just package that movie
-      // into an array so that we can display it as though it were a single-hit search result
-      if (!results.hasOwnProperty('Search')) {
-        results.Search = [
+    //console.log(results);
+    if (resultsObject.success) {
+      let results = resultsObject.data;
+      if (!Array.isArray(results)) {
+        results = [
           {
-            Poster: results.Poster,
-            Title: results.Title,
-            Type: results.Type,
-            Year: results.Year,
+            Poster: results.artwork,
+            Title: results.title,
+            Type: results.type,
+            Year: results.year,
             imdbID: results.imdbID
           }
         ];
       }
 
-      // display search results
-      let movies = results.Search.map((movie) => {
+      let movies = results.map((movie) => {
         if (movie.Type === 'series') return; // don't want to display series results
 
         if (!isValidURL(movie.Poster)) {
@@ -5841,6 +5660,8 @@ class MynEditorSearch extends React.Component {
         );
       });
       this.setState({results:movies});
+    } else {
+      alert('No results found! Try editing the title and searching again, or enter the IMDb ID for an exact match.');
     }
   }
 
@@ -5874,74 +5695,13 @@ class MynEditorSearch extends React.Component {
     this.clearSearch();
 
     // next, we have to get the actual movie object from the database
-    axios({
-      method: 'get',
-      url: this.state.searchBaseURL + '&i=' + movie.imdbID,
-      timeout: 20000,
+    OmdbHelper.search(movie).then(responseObject => {
+      if (!responseObject.success) {
+        return console.log('Error: no result found: ' + response.data);
+      } else {
+        this.props.handleChange(responseObject.data);
+      }
     })
-      .then((response) => {
-        if (response.status !== 200) {
-          return console.log(response.status + ': ' + response.statusText);
-        }
-
-        console.log(response.data);
-        if (response.data.Response === 'False') {
-          return console.log('Error: no result found: ' + response.data);
-        } else {
-          // if we're here, we have the movie, so all we have to do is overwrite
-          // the existing values with the new ones;
-          const newData = {
-            imdbID: response.data.imdbID,
-            title: response.data.Title,
-            description: response.data.Plot,
-            artwork: response.data.Poster, // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
-            year: response.data.Year,
-            director: response.data.Director,
-            kind: response.data.Type === 'episode' ? 'show' : response.data.Type,
-            country: response.data.Country,
-            rated: response.data.Rated,
-          };
-          try {
-            newData.boxoffice = accounting.parse(response.data.BoxOffice) || 0; //parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
-          } catch(err) { console.error(`OMDB parse boxoffice: ${err}`); }
-          try {
-            newData.directorsort = /^\w+\s\w+$/.test(response.data.Director) ? response.data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : response.data.Director; // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually
-          } catch(err) { console.error(`OMDB parse directorsort: ${err}`); }
-          try {
-            newData.cast = response.data.Actors.split(', ');
-          } catch(err) { console.error(`OMDB parse actors: ${err}`); }
-          try {
-            newData.genre = response.data.Genre.split(', ')[0]; // just pick the first genre for genre, since we only allow one
-          } catch(err) { console.error(`OMDB parse genre: ${err}`); }
-          try {
-            newData.languages = response.data.Language.split(', ');
-          } catch(err) { console.error(`OMDB parse languages: ${err}`); }
-          try {
-            newData.tags = Array.from(new Set(response.data.Genre.split(', ').map((item) => item.toLowerCase()).concat(this.props.video.tags))); // add new tags to existing tags, removing duplicates
-          } catch(err) { console.error(`OMDB parse tags: ${err}`); }
-          let ratings = _.cloneDeep(this.props.video.ratings);
-          try {
-            ratings.imdb = Number(response.data.Ratings.filter(object => object.Source == "Internet Movie Database")[0].Value.match(/^[\d\.]+(?=\/)/)); // / 10;
-          } catch(err) { console.error(`OMDB parse imdb rating: ${err}`); }
-          try {
-            ratings.rt = Number(response.data.Ratings.filter(object => object.Source == "Rotten Tomatoes")[0].Value.match(/^\d+/)); // / 100;
-          } catch(err) { console.error(`OMDB parse rt rating: ${err}`); }
-          try {
-            ratings.mc = Number(response.data.Ratings.filter(object => object.Source == "Metacritic")[0].Value.match(/^\d+(?=\/)/)); // / 100;
-          } catch(err) { console.error(`OMDB parse mc rating: ${err}`); }
-          newData.ratings = ratings;
-
-          // put the new data into the editor fields
-          console.log(newData);
-          this.props.handleChange(newData);
-        }
-      })
-      .catch((error) => {
-        return console.error(error);
-      })
-      .then(() => {
-        // always executed
-      });
   }
 
   render() {
@@ -6331,6 +6091,63 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    /* SERIES */
+    let series = (
+      <div className='edit-field series'>
+        <label className="edit-field-name" htmlFor="series">Series: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="series"
+            className="edit-field-series"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.everything.exp}
+            validatorTip={this.state.validators.everything.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
+    /* SEASON */
+    let season = (
+      <div className='edit-field season'>
+        <label className="edit-field-name" htmlFor="season">Season: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="season"
+            className="edit-field-season"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.posint.exp}
+            validatorTip={this.state.validators.posint.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
+    /* EPISODE */
+    let episode = (
+      <div className='edit-field episode'>
+        <label className="edit-field-name" htmlFor="episode">Episode: </label>
+        <div className="edit-field-editor">
+          <MynEditText
+            object={this.props.video}
+            property="episode"
+            className="edit-field-episode"
+            update={this.props.handleChange}
+            options={null}
+            validator={this.state.validators.posint.exp}
+            validatorTip={this.state.validators.posint.tip}
+            reportValid={this.props.reportValid}
+          />
+        </div>
+      </div>
+    );
+
     /* KIND */
     let options = this.props.settings.used.kinds.map(kind => (
       <option key={kind} value={kind}>{kind}</option>
@@ -6602,6 +6419,9 @@ class MynEditorEdit extends React.Component {
         <form onSubmit={this.props.saveChanges}>
           {filename}
           {title}
+          {series}
+          {season}
+          {episode}
           {imdbID}
           {description}
           {year}
@@ -7527,7 +7347,7 @@ class MynEditArtwork extends MynEdit {
       }
     });
 
-    ipcRenderer.on('downloaded', (event, response) => {
+    /*ipcRenderer.on('downloaded', (event, response) => {
       if (response.success) {
         this.props.update({'artwork':response.message});
         console.log('Successfully downloaded artwork');
@@ -7561,7 +7381,7 @@ class MynEditArtwork extends MynEdit {
 
       this._isMounted && this.setState({message: ""});
 
-    });
+    });*/
 
     // ipcRenderer.on('cancel-download', (event, cancelFunc, string) => {
     //   this.setState({cancelDownload: cancelFunc});
