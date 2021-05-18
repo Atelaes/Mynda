@@ -3073,6 +3073,7 @@ class MynOverflowTextMarquee extends React.Component {
       if (this.theDiv.current.offsetWidth < this.theDiv.current.scrollWidth) { // text is overflowing
         // console.log('OVERFLOWING')
 
+        this.theDiv.current.style.position = 'absolute';
         this.theDiv.current.style.width = this.theDiv.current.scrollWidth - this.theDiv.current.offsetWidth + 'px';
         if (this.state.direction === 'right') this.theDiv.current.style.marginRight = this.theDiv.current.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
         if (this.state.direction === 'left') this.theDiv.current.style.marginLeft = this.theDiv.current.parentNode.offsetWidth + 'px'; // necessary in some cases to force the parent element to stay wide; for instance, in table rows, if this is the only overflowing row, the <td> will shrink if we don't add this margin
@@ -3083,8 +3084,10 @@ class MynOverflowTextMarquee extends React.Component {
 
       } else {
         // console.log('NOT OVERFLOWING');
+        this.theDiv.current.style.position = 'relative';
         this.theDiv.current.style.width = null;
         this.theDiv.current.style.marginRight = null;
+        this.theDiv.current.style.marginLeft = null;
 
         // the text is not overflowing, so we don't need to do anything special
         this.theDiv.current.classList.remove('overflow');
