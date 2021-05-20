@@ -3818,6 +3818,22 @@ class MynSettings extends MynOpenablePane {
       delaySave: false,
       timer: null
     }
+
+    ipcRenderer.on('settings-watchfolder-added', (event, folderObj) => {
+      console.log('server told us it has added ' + folderObj.path)
+      // update everything
+      this.setStateViewsFromProps(() => this.setView(this.state.settingViewName));
+    });
+
+    ipcRenderer.on('settings-watchfolder-remove', (event, path, removed) => {
+      if (removed) {
+        console.log('REMOVED FOLDER: ' + path);
+        // update everything
+        this.setStateViewsFromProps(() => this.setView(this.state.settingViewName));
+      } else {
+        console.log('DID NOT REMOVE FOLDER: ' + path);
+      }
+    });
   }
 
   setStateViewsFromProps(callback) {
@@ -3944,6 +3960,7 @@ class MynSettings extends MynOpenablePane {
 
   componentDidUpdate(oldProps) {
     // console.log('MynSettings: component has updated');
+    console.log(this.props.settings.watchfolders)
 
     if (!isEqualIgnoreFuncs(oldProps,this.props)) {
       console.log('MynSettings: PROPS HAVE CHANGED:\n' + getObjectDiff(oldProps,this.props));
@@ -3987,15 +4004,6 @@ class MynSettingsFolders extends React.Component {
 
     });
 
-    ipcRenderer.on('settings-watchfolder-remove', (event, path, removed) => {
-      if (removed) {
-        console.log('REMOVED FOLDER: ' + path);
-        // let folders = this.state.existingFolders.filter(folder => folder.path !== path);
-        // this.setState({existingFolders : folders})
-      } else {
-        console.log('DID NOT REMOVE FOLDER: ' + path);
-      }
-    });
 
   }
 
@@ -4054,7 +4062,7 @@ class MynSettingsFolders extends React.Component {
     let folderAddress = document.getElementById("settings-folders-choose-path").value;
     let defaultKind = document.getElementById("settings-folders-choose-kind").value;
     let submitObject = {address: folderAddress, kind: defaultKind};
-    console.log(submitObject);
+    // console.log(submitObject);
     ipcRenderer.send('settings-watchfolder-add', submitObject);
   }
 
@@ -4088,6 +4096,10 @@ class MynSettingsFolders extends React.Component {
   componentDidUpdate(oldProps) {
     if (!_.isEqual(this.props.kinds,oldProps.kinds)) {
       console.log('MynSettingsFolders : kinds has changed!!!!!!');
+    }
+    if (!_.isEqual(this.props.folders,oldProps.folders)) {
+      console.log('MynSettingsFolders : folders has changed!!!!!!');
+      this.setState({existingFolders: this.props.folders})
     }
   }
 
@@ -8803,8 +8815,18 @@ function isEqualIgnoreFuncs(obj1,obj2) {
     return copy;
   };
 
-  let new1 = _.cloneWith(obj1,shallowCloneNoFunc);
-  let new2 = _.cloneWith(obj2,shallowCloneNoFunc);
+  const deepCloneNoFunc = (obj) => {
+    let copy = {}
+    Object.keys(obj).map((key) => {
+      if (!_.isFunction(obj[key]))
+        copy[key] = _.cloneDeep(obj[key]);
+    });
+    return copy;
+  };
+
+
+  let new1 = _.cloneDeepWith(obj1,deepCloneNoFunc);
+  let new2 = _.cloneDeepWith(obj2,deepCloneNoFunc);
 
   // console.log('NoFunc Clones...');
   // console.log(new1);

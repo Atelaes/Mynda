@@ -53,7 +53,7 @@ async function start() {
       reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
     } else {
       console.log('Not Windows');
-      reactToolsLoc = path.join(os.homedir(), '/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
+      reactToolsLoc = path.join('~/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
     }
     //await electron.session.defaultSession.loadExtension(reactToolsLoc)
   } catch (err) {
@@ -118,7 +118,7 @@ function cleanLibrary() {
   });
 }
 
-function removeWatchfolder(path) {
+function removeWatchfolder(path,cb) {
   // in case we're currently adding media, we need to delete the removed
   // watchfolder from libFileTree, otherwise videos may get re-added as they get removed
   libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== path);
@@ -129,20 +129,13 @@ function removeWatchfolder(path) {
   removeWatchfolderVideosFromLibrary(path);
 
   // remove the watchfolder
-  try {
-    let index;
-    library.settings.watchfolders.map((folder,i) => {
-      if (folder && folder.path === path) {
-        index = i;
-      }
-    });
-    library.remove(`settings.watchfolders.${index}`);
-
-    return true;
-  } catch(err) {
-    console.log(err);
-    return false;
-  }
+  let index;
+  library.settings.watchfolders.map((folder,i) => {
+    if (folder && folder.path === path) {
+      index = i;
+    }
+  });
+  library.remove(`settings.watchfolders.${index}`,cb);
 }
 
 
@@ -284,129 +277,129 @@ let videoTemplate =   {
     }
   }
 
-  function checkWatchFolders() {
-    // reset libFileTree
-    libFileTree = {name:'root', folders:[]};
+function checkWatchFolders() {
+  // reset libFileTree
+  libFileTree = {name:'root', folders:[]};
 
-    // Search watchfolders for new files and add any new videos to the library
-    console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
-    numNewVids = 0; // reset the number of new videos found
-    let folders = library.settings.watchfolders;
-    for (let i=0; i<folders.length; i++) {
-      let thisFolder = folders[i];
-      if (thisFolder) {
-        let thisNode;
-        let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
-        if (filtered.length === 0) {
-          let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
-          libFileTree.folders.push(child);
-          thisNode = libFileTree.folders[libFileTree.folders.length-1];
+  // Search watchfolders for new files and add any new videos to the library
+  console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
+  numNewVids = 0; // reset the number of new videos found
+  let folders = library.settings.watchfolders;
+  for (let i=0; i<folders.length; i++) {
+    let thisFolder = folders[i];
+    if (thisFolder) {
+      let thisNode;
+      let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
+      if (filtered.length === 0) {
+        let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
+        libFileTree.folders.push(child);
+        thisNode = libFileTree.folders[libFileTree.folders.length-1];
+      } else {
+        thisNode = filtered[0];
+      }
+      findVideosFromFolder(thisNode);
+    }
+  }
+  if (folders.length === 0) console.log('Done parsing. No watchfolders found.');
+}
+
+// recursively maps out the folder structure and files (only videos/DVDs and subtitle files)
+// storing the whole thing in libFolderTree;
+// once this is done, we'll traverse the tree, adding all the videos to the library
+function findVideosFromFolder(folderNode) {
+  const id = uuidv4();
+  parsing[id] = true;
+
+  const folder = folderNode.path;
+  const kind = folderNode.kind;
+
+  // read the contents of this folder
+  fs.readdir(folder, {withFileTypes : true}, function (err, components) {
+    // handling error
+    if (err) {
+        return console.log('Unable to scan directory: ' + err);
+    }
+
+    // loop through all the folder contents
+    for (let i=0; i<components.length; i++) {
+      let component = components[i];
+      let compAddress = path.join(folder, component.name);
+
+      // if we found a directory, find out if it's a DVD rip or not
+      if (component.isDirectory()) {
+        if (isDVDRip(compAddress)) {
+          // if it is, add it as a video
+          // console.log(`${compAddress} is a DVD rip`);
+          folderNode.videos.push({dvd: true, filename: compAddress, kind: kind}); // add the DVD to libFileTree
         } else {
-          thisNode = filtered[0];
+          // if it's not, recurse on it as a folder
+          recursed = true;
+          folderNode.folders.push({path:compAddress, kind:kind, folders:[], videos:[], subtitles:[]});
+          findVideosFromFolder(folderNode.folders[folderNode.folders.length-1]);
         }
-        findVideosFromFolder(thisNode);
-      }
-    }
-    if (folders.length === 0) console.log('Done parsing. No watchfolders found.');
-  }
+      } else if (!/^\./.test(component.name)) {
+        //If it's a hidden file, as evidenced by a filename starting with a dot
+        //Then skip it
+        //console.log(`We came across ${component.name}.`);
+        // otherwise, it must be a file
+        let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
 
-  // recursively maps out the folder structure and files (only videos/DVDs and subtitle files)
-  // storing the whole thing in libFolderTree;
-  // once this is done, we'll traverse the tree, adding all the videos to the library
-  function findVideosFromFolder(folderNode) {
-    const id = uuidv4();
-    parsing[id] = true;
-
-    const folder = folderNode.path;
-    const kind = folderNode.kind;
-
-    // read the contents of this folder
-    fs.readdir(folder, {withFileTypes : true}, function (err, components) {
-      // handling error
-      if (err) {
-          return console.log('Unable to scan directory: ' + err);
-      }
-
-      // loop through all the folder contents
-      for (let i=0; i<components.length; i++) {
-        let component = components[i];
-        let compAddress = path.join(folder, component.name);
-
-        // if we found a directory, find out if it's a DVD rip or not
-        if (component.isDirectory()) {
-          if (isDVDRip(compAddress)) {
-            // if it is, add it as a video
-            // console.log(`${compAddress} is a DVD rip`);
-            folderNode.videos.push({dvd: true, filename: compAddress, kind: kind}); // add the DVD to libFileTree
-          } else {
-            // if it's not, recurse on it as a folder
-            recursed = true;
-            folderNode.folders.push({path:compAddress, kind:kind, folders:[], videos:[], subtitles:[]});
-            findVideosFromFolder(folderNode.folders[folderNode.folders.length-1]);
-          }
-        } else if (!/^\./.test(component.name)) {
-          //If it's a hidden file, as evidenced by a filename starting with a dot
-          //Then skip it
-          //console.log(`We came across ${component.name}.`);
-          // otherwise, it must be a file
-          let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
-
-          if (videoExtensions.includes(fileExt)) {
-            //console.log(`We're about to add ${component.name} to libTree.`);
-            // if it's a video file, add it as a video
-            // console.log(`${compAddress} is a regular video file`);
-            folderNode.videos.push({filename: compAddress, kind: kind}); // add the video to this node of the libFileTree
-          } else if (subtitleExtensions.includes(fileExt)) {
-            // if it's a subtitle file, add it as a subtitle
-            // console.log(`${compAddress} is a subtitle file`);
-            folderNode.subtitles.push(compAddress); // add the subtitles file to this node of the libFileTree
-          }
+        if (videoExtensions.includes(fileExt)) {
+          //console.log(`We're about to add ${component.name} to libTree.`);
+          // if it's a video file, add it as a video
+          // console.log(`${compAddress} is a regular video file`);
+          folderNode.videos.push({filename: compAddress, kind: kind}); // add the video to this node of the libFileTree
+        } else if (subtitleExtensions.includes(fileExt)) {
+          // if it's a subtitle file, add it as a subtitle
+          // console.log(`${compAddress} is a subtitle file`);
+          folderNode.subtitles.push(compAddress); // add the subtitles file to this node of the libFileTree
         }
       }
+    }
 
-      parsing[id] = false;
-      let stillGoing = false;
-      for (let call of Object.keys(parsing)) {
-        if (parsing[call] === true) {
-          stillGoing = true;
-          break;
-        }
+    parsing[id] = false;
+    let stillGoing = false;
+    for (let call of Object.keys(parsing)) {
+      if (parsing[call] === true) {
+        stillGoing = true;
+        break;
       }
-      if (!stillGoing) divineCollections(libFileTree, []);
-    });
+    }
+    if (!stillGoing) divineCollections(libFileTree, []);
+  });
+}
+
+//Recursive function which takes a built libFileTree and figures out collections
+// for videos based on file structure.
+function divineCollections(node, pathStack) {
+  //console.log('pathStack:');
+  //console.log(pathStack);
+  if (pathStack.length === 0) {
+    //If we're here, then we're looking at root, this should only happen once.
+    //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
   }
-
-  //Recursive function which takes a built libFileTree and figures out collections
-  // for videos based on file structure.
-  function divineCollections(node, pathStack) {
-    //console.log('pathStack:');
-    //console.log(pathStack);
-    if (pathStack.length === 0) {
-      //If we're here, then we're looking at root, this should only happen once.
-      //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
+  let toDivine = true;
+  let count = 0;
+  if (toDivine) {
+    for (let i=0; i<node.folders.length; i++) {
+      let folder = node.folders[i];
+      let parentFolder = (node.path) ? node.path + path.sep : '';
+      let stackAppend = folder.path.replace(parentFolder, '');
+      count += divineCollections(folder, pathStack.concat(stackAppend));
     }
-    let toDivine = true;
-    let count = 0;
-    if (toDivine) {
-      for (let i=0; i<node.folders.length; i++) {
-        let folder = node.folders[i];
-        let parentFolder = (node.path) ? node.path + path.sep : '';
-        let stackAppend = folder.path.replace(parentFolder, '');
-        count += divineCollections(folder, pathStack.concat(stackAppend));
-      }
-      count += (node.videos) ? node.videos.length : 0;
-      if (count > 1 && pathStack.length > 1) {
-        node.collection = pathStack.slice(1).join(':');
-      }
-    }
-    if (pathStack.length === 0) {
-      //Again, we're on root.
-      //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
-      confirmCurrentVideos();
-    } else {
-      return count;
+    count += (node.videos) ? node.videos.length : 0;
+    if (count > 1 && pathStack.length > 1) {
+      node.collection = pathStack.slice(1).join(':');
     }
   }
+  if (pathStack.length === 0) {
+    //Again, we're on root.
+    //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
+    confirmCurrentVideos();
+  } else {
+    return count;
+  }
+}
 
 function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
@@ -1205,23 +1198,35 @@ ipcMain.on('settings-watchfolder-select', (event) => {
 })})
 
 ipcMain.on('settings-watchfolder-add', (event, args) => {
-  const path = args['address'];
+  const folder = args['address'];
   const kind = args['kind'].toLowerCase();
 
   // check if path exists and is a folder, not a file
-  fs.lstat(path, (err, stats) => {
+  fs.lstat(folder, (err, stats) => {
     // if path exists and is a folder
     if(!err && stats.isDirectory()) {
-      // add to library
-      let folderObject = {"path" : path, "kind" : kind, "videos" : []};
-      library.add('settings.watchfolders.push', folderObject, () => {
-        checkWatchFolders();
-        // tell the client side what happened
-        // event.sender.send('settings-watchfolder-added', _.cloneDeep(folderObject), numNewVids);
-      });
-      // findVideosFromFolder(path, path, kind);
+
+      // if we don't already have this watchfolder, add it
+      if (library.settings.watchfolders.filter(wf => path.resolve(wf.path) === path.resolve(folder)).length === 0) {
+        // add to library
+        let folderObject = {"path" : folder, "kind" : kind, "videos" : []};
+        library.add('settings.watchfolders.push', folderObject, () => {
+          checkWatchFolders();
+
+          // tell the client side what happened
+          event.sender.send('settings-watchfolder-added', _.cloneDeep(folderObject));
+        });
+      } else {
+        // if this folder is already a watchfolder, display a dialog
+        dialog.showMessageBox({
+          type : 'warning',
+          buttons : ['Ok'],
+          message : 'This directory is already a watchfolder!'
+        });
+      }
+
     } else {
-      // if not, display an error dialog
+      // if not a directory or we got an error, display an error dialog
       dialog.showMessageBox({
         type : 'error',
         buttons : ['Ok'],
@@ -1240,21 +1245,25 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
     buttons : ['Cancel','Remove Folder'],
     message : 'Are you sure you want to remove following folder from the library?\n\n' +
               path + '\n\n' +
-              'This will remove all videos in this folder from the library (but will save the video information in case you decide to add the folder again)'
+              'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
   };
   dialog.showMessageBox(options).then(result => {
-    let removed = false;
-
     // if the user said okay
     if (result.response === 1) {
-      removed = removeWatchfolder(path);
+      removeWatchfolder(path,(err) => {
+        let removed = !err;
+
+        // tell the client side what happened
+        event.sender.send('settings-watchfolder-remove', path, removed);
+
+        if (err) console.log(err);
+      });
     } else {
       // if the user canceled
       console.log('User canceled the folder removal');
+      event.sender.send('settings-watchfolder-remove', path, false);
     }
 
-    // tell the client side what happened
-    event.sender.send('settings-watchfolder-remove', path, removed);
   }).catch(err => {
     console.log(err)
   });
