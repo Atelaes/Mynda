@@ -868,7 +868,8 @@ class MynNav extends React.Component {
     super(props)
 
     this.state = {
-      numVidsAdded:0
+      numVidsAdded:0,
+      statusText: <div id="status-text"></div>
     }
 
     // sent by index.js when a video is added to the library;
@@ -876,7 +877,10 @@ class MynNav extends React.Component {
       this.setState({numVidsAdded:numVidsAdded});
     });
 
+    ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
+
     this.render = this.render.bind(this);
+    this.statusUpdate = this.statusUpdate.bind(this);
   }
 
   clearSearch(e) {
@@ -887,6 +891,27 @@ class MynNav extends React.Component {
 
   componentDidUpdate(oldProps) {
 
+  }
+
+  statusUpdate(status) {
+    console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
+    switch (status.current) {
+      case '':
+        this.setState({statusText: <div id="status-text"></div>});
+        break;
+      case 'export':
+        this.setState({statusText: <div id="status-text">Exporting</div>});
+        break;
+      case 'add':
+        this.setState({statusText: <div id="status-text">Adding videos</div>});
+        break;
+      case 'metadata':
+        this.setState({statusText: <div id="status-text">Checking metadata</div>});
+        break;
+      case 'autotag':
+        this.setState({statusText: <div id="status-text">Autotagging</div>});
+        break;
+    }
   }
 
   render() {
@@ -939,6 +964,7 @@ class MynNav extends React.Component {
           <li key="add" id="add-playlist" onClick={(e) => this.props.showSettings('playlists')}>{'\uFF0B'}</li>
         </ul>
         <div id="nav-controls">
+          {this.state.statusText}
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
         </div>
@@ -1315,7 +1341,7 @@ class MynLibrary extends React.Component {
 
   // expand or collapse a collection
   toggleExpansion(e) {
-    console.log('TOGGLING!');
+    //console.log('TOGGLING!');
     // 'e' may either be an event or an element
     let element;
     if (e.target) {
@@ -2144,7 +2170,7 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
-    console.log(`SORTING TABLE ${this.tableID} by ${key}`);
+    //console.log(`SORTING TABLE ${this.tableID} by ${key}`);
 
     if (key === undefined) {
       throw "Error: key was undefined; must supply a key to sort by";

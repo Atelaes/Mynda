@@ -48,10 +48,9 @@ class Collections {
     return result;
   }
 
-  ensureExists(name) {
+  ensureExists(address) {
     //console.log(`Collections at start of ensure for ${name}: ${JSON.stringify(this.c)}`);
     let target = this.c;
-    let address = name.split(':');
     let topLevel = true;
     for (let layer of address) {
       //console.log(`Current target is ${JSON.stringify(target)}`);
@@ -80,7 +79,7 @@ class Collections {
   // if includeBarren is true, we also include collections
   // that have neither child collections nor videos
   getAllTerminal(includeBarren) {
-    console.log('GET ALL TERMINAL')
+    //console.log('GET ALL TERMINAL')
     let results = [];
 
     this.c.map(c => {
@@ -97,7 +96,7 @@ class Collections {
       }
     });
 
-    console.log(JSON.stringify(results)/*.map(c => c.name)*/);
+    //console.log(JSON.stringify(results)/*.map(c => c.name)*/);
 
     return results;
   }
