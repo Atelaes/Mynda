@@ -278,6 +278,7 @@ let videoTemplate =   {
   }
 
 function checkWatchFolders() {
+  win.webContents.send('status-update', {current: 'check'});
   // reset libFileTree
   libFileTree = {name:'root', folders:[]};
 
@@ -356,20 +357,6 @@ function findVideosFromFolder(folderNode) {
         }
       }
     }
-<<<<<<< HEAD
-    let toDivine = true;
-    let count = 0;
-    if (toDivine) {
-      for (let i=0; i<node.folders.length; i++) {
-        let folder = node.folders[i];
-        let parentFolder = (node.path) ? node.path + path.sep : '';
-        let stackAppend = folder.path.replace(parentFolder, '');
-        count += divineCollections(folder, pathStack.concat(stackAppend));
-      }
-      count += (node.videos) ? node.videos.length : 0;
-      if (count > 1 && pathStack.length > 1) {
-        node.collection = pathStack.slice(1);
-=======
 
     parsing[id] = false;
     let stillGoing = false;
@@ -377,7 +364,6 @@ function findVideosFromFolder(folderNode) {
       if (parsing[call] === true) {
         stillGoing = true;
         break;
->>>>>>> ac8d031c9ab9e712406e33156539c8f7a027bab8
       }
     }
     if (!stillGoing) divineCollections(libFileTree, []);
@@ -404,7 +390,7 @@ function divineCollections(node, pathStack) {
     }
     count += (node.videos) ? node.videos.length : 0;
     if (count > 1 && pathStack.length > 1) {
-      node.collection = pathStack.slice(1).join(':');
+      node.collection = pathStack.slice(1);
     }
   }
   if (pathStack.length === 0) {
@@ -547,7 +533,7 @@ function mulchVideoTree(folderNode) {
         // If there are subfolders, we need to ensure a terminal collection for this
         // video to go into named "Other".
         if (folderNode.folders.length > 0) {
-          collectionAddress = folderNode.collection + `:Other`;
+          collectionAddress = folderNode.collection.concat(`Other`);
         }
         video.collection = collectionAddress;
       }
@@ -575,7 +561,7 @@ async function addVideoController() {
   library.replace('collections', collections.getAll());
   win.webContents.send('videos_added',numNewVids);
   //Now let's try and get some metadata.
-  win.webContents.send('status-update', {current: 'metadata'});
+   win.webContents.send('status-update', {current: 'metadata'});
   for (let j=0; j<library.media.length; j++) {
     let metVideo = library.media[j];
     if (!metVideo.metadata.checked) {
@@ -1000,7 +986,7 @@ function findSeasonEpisode(video, fileBasename) {
   let eRegexes = [/(?:episode|ep|e)?([0-9]{1,3})/i];
   let result = {};
   if (video.collection) {
-    console.log(`findSeasonEpisode: video collection for ${fileBasename} is ${video.collection}`);
+    //console.log(`findSeasonEpisode: video collection for ${fileBasename} is ${video.collection}`);
     if (video.collection[video.collection.length-1].match(/episode/i)) {
       if (video.collection[video.collection.length-2].match(/season/i)) {
         if (video.collection.length > 2) {
@@ -1019,7 +1005,7 @@ function findSeasonEpisode(video, fileBasename) {
     if (match) {
       result.season = match[1].replace(/^0+/, '');
       result.episode = match[2].replace(/^0+/, '');
-      console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
+      //console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
       return result;
     }
   }
@@ -1032,7 +1018,7 @@ function findSeasonEpisode(video, fileBasename) {
       return result;
     }
   }
-  console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
+  //console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
   return result;
 }
 

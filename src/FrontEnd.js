@@ -954,6 +954,9 @@ class MynNav extends React.Component {
       case 'autotag':
         this.setState({statusText: <div id="status-text">Autotagging</div>});
         break;
+      case 'check':
+        this.setState({statusText: <div id="status-text">Checking for new videos</div>});
+        break;
     }
   }
 
