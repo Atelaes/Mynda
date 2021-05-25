@@ -1250,11 +1250,13 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
   dialog.showMessageBox(options).then(result => {
     // if the user said okay
     if (result.response === 1) {
+      // remove watchfolder, and pass callback function.
+      // the callback function will return only after the watchfolder
+      // has actually been removed from the library, so we can tell the front end
+      // whether we succeeded or not, and it can use the info to update itself
       removeWatchfolder(path,(err) => {
-        let removed = !err;
-
         // tell the client side what happened
-        event.sender.send('settings-watchfolder-remove', path, removed);
+        event.sender.send('settings-watchfolder-remove', path, !err); // <-- pass !err to the front end, which expects a boolean for success or failure
 
         if (err) console.log(err);
       });

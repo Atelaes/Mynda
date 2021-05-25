@@ -3960,7 +3960,7 @@ class MynSettings extends MynOpenablePane {
 
   componentDidUpdate(oldProps) {
     // console.log('MynSettings: component has updated');
-    console.log(this.props.settings.watchfolders)
+    // console.log(this.props.settings.watchfolders)
 
     if (!isEqualIgnoreFuncs(oldProps,this.props)) {
       console.log('MynSettings: PROPS HAVE CHANGED:\n' + getObjectDiff(oldProps,this.props));
@@ -5462,6 +5462,9 @@ class MynEditor extends MynOpenablePane {
       library.replace("settings.used.genres",genres);
     }
 
+    // console.log('object when saving:');
+    // console.log(this.state.video);
+
     // save hash so that later we can check if the video has changed
     // (in order to ask the user if they want to save before exiting)
     // and reset the 'changed' set (which keeps track of which fields
@@ -5505,6 +5508,12 @@ class MynEditor extends MynOpenablePane {
         // set the 'new' property to false, so that when the movie is saved,
         // it will be removed from the 'New' playlist
         videoEditPrepped.new = false;
+
+        // fix any broken properties/values
+        validateVideo(videoEditPrepped);
+
+        // console.log('object when something changed:');
+        // console.log(videoEditPrepped);
 
         this.setState({
           video : videoEditPrepped,
@@ -5591,6 +5600,9 @@ class MynEditor extends MynOpenablePane {
         // console.log('props: ' + JSON.stringify(this.props.video));
         // console.log('state: ' + JSON.stringify(this.state.video));
         // return !_.isEqual(this.props.video,this.state.video);
+        // console.log('object when exiting:');
+        // console.log(this.state.video);
+
         let newHash = this.state.video ? hashObject(this.state.video) : null;
         return this.state.saveHash !== newHash;
       }, // boolean for whether or not to show confirmation dialog upon exiting the pane
@@ -5859,12 +5871,13 @@ class MynEditorEdit extends React.Component {
   componentDidMount() {
     this._isMounted = true;
 
+    // we're now doing the validating in MynEditor before it gets here, to avoid issues with the saveHash
     // validate the video in place (function fixes any broken values)
     // and also, if any changes were made (i.e. broken values fixed)
     // save the changes
-    if (validateVideo(this.props.video) !== true) {
-      // this.props.saveChanges();
-    }
+    // if (validateVideo(this.props.video) !== true) {
+    //   // this.props.saveChanges();
+    // }
   }
 
   componentWillUnmount() {
@@ -8593,6 +8606,9 @@ function validateVideo(video) {
     'id':'string',
     'title':'string',
     'year':'integer',
+    'series':'string',
+    'season':'integer',
+    'episode':'integer',
     'director':'string',
     'directorsort':'string',
     'cast':'array',
@@ -8613,7 +8629,10 @@ function validateVideo(video) {
     'rated':'string',
     'languages':'array',
     'country':'string',
-    'metadata':'object'
+    'metadata':'object',
+    'imdbID':'string',
+    'autotagTried':'boolean',
+    'dvd':'boolean'
   };
 
   let vidProps = Object.keys(video);
@@ -8693,13 +8712,13 @@ function validateVideo(video) {
   // add them on load, but DOES add them on revert-to-saved, making MynEditorEdit think
   // that the video has changed even right after it's reverted)
   const keys = Object.keys(video.ratings);
-  const sources = ['imdb','rt','mc'];
+  const sources = ['imdb','rt','mc','user'];
   sources.map(source => {
     if (!keys.includes(source)) video.ratings[source] = '';
   });
 
   if (!_.isEqual(oldVidCopy,repaired)) {
-    console.log('video had to be repaired: ' + video.title);
+    // console.log('video had to be repaired: ' + video.title);
     // return repaired;
     return false;
   } else {
