@@ -356,6 +356,20 @@ function findVideosFromFolder(folderNode) {
         }
       }
     }
+<<<<<<< HEAD
+    let toDivine = true;
+    let count = 0;
+    if (toDivine) {
+      for (let i=0; i<node.folders.length; i++) {
+        let folder = node.folders[i];
+        let parentFolder = (node.path) ? node.path + path.sep : '';
+        let stackAppend = folder.path.replace(parentFolder, '');
+        count += divineCollections(folder, pathStack.concat(stackAppend));
+      }
+      count += (node.videos) ? node.videos.length : 0;
+      if (count > 1 && pathStack.length > 1) {
+        node.collection = pathStack.slice(1);
+=======
 
     parsing[id] = false;
     let stillGoing = false;
@@ -363,6 +377,7 @@ function findVideosFromFolder(folderNode) {
       if (parsing[call] === true) {
         stillGoing = true;
         break;
+>>>>>>> ac8d031c9ab9e712406e33156539c8f7a027bab8
       }
     }
     if (!stillGoing) divineCollections(libFileTree, []);
@@ -485,6 +500,7 @@ function confirmCurrentVideos() {
 }
 
 function mulchVideoTree(folderNode) {
+  win.webContents.send('status-update', {current: 'add '});
   // If there is a collection assigned to this folder, make sure it exists,
   // and if not, make it.
   if (folderNode.collection) {
@@ -559,12 +575,14 @@ async function addVideoController() {
   library.replace('collections', collections.getAll());
   win.webContents.send('videos_added',numNewVids);
   //Now let's try and get some metadata.
+  win.webContents.send('status-update', {current: 'metadata'});
   for (let j=0; j<library.media.length; j++) {
     let metVideo = library.media[j];
     if (!metVideo.metadata.checked) {
       await getMetaData(metVideo);
     }
   }
+  win.webContents.send('status-update', {current: ''});
 }
 
 // Takes a video object and fills it out
@@ -982,6 +1000,7 @@ function findSeasonEpisode(video, fileBasename) {
   let eRegexes = [/(?:episode|ep|e)?([0-9]{1,3})/i];
   let result = {};
   if (video.collection) {
+    console.log(`findSeasonEpisode: video collection for ${fileBasename} is ${video.collection}`);
     if (video.collection[video.collection.length-1].match(/episode/i)) {
       if (video.collection[video.collection.length-2].match(/season/i)) {
         if (video.collection.length > 2) {
@@ -1000,6 +1019,7 @@ function findSeasonEpisode(video, fileBasename) {
     if (match) {
       result.season = match[1].replace(/^0+/, '');
       result.episode = match[2].replace(/^0+/, '');
+      console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
       return result;
     }
   }
@@ -1012,6 +1032,7 @@ function findSeasonEpisode(video, fileBasename) {
       return result;
     }
   }
+  console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
   return result;
 }
 
@@ -1044,6 +1065,7 @@ function downloadFile(url, destination) {
 }
 
 async function autoTag() {
+  win.webContents.send('status-update', {current: 'autotag'});
   let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried));
   let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
@@ -1092,9 +1114,11 @@ async function autoTag() {
   console.log('===AutoTag Finished===');
   console.log(JSON.stringify(autoStats));
   console.log(autoLog.join('\n'));
+  win.webContents.send('status-update', {current: ''});
 }
 
 async function exportFiles(drive) {
+  win.webContents.send('status-update', {current: 'export'});
   console.log(`Starting exportFiles.`);
   let fileLocation = path.join(drive, "Mynda Manifest.json");
   let manifest;
@@ -1187,6 +1211,7 @@ async function exportFiles(drive) {
       break;
     }
   }
+  win.webContents.send('status-update', {current: ''});
 }
 
 ipcMain.on('settings-watchfolder-select', (event) => {

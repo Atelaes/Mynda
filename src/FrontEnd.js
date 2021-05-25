@@ -911,7 +911,8 @@ class MynNav extends React.Component {
     super(props)
 
     this.state = {
-      numVidsAdded:0
+      numVidsAdded:0,
+      statusText: <div id="status-text"></div>
     }
 
     // sent by index.js when a video is added to the library;
@@ -919,7 +920,10 @@ class MynNav extends React.Component {
       this.setState({numVidsAdded:numVidsAdded});
     });
 
+    ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
+
     this.render = this.render.bind(this);
+    this.statusUpdate = this.statusUpdate.bind(this);
   }
 
   clearSearch(e) {
@@ -930,6 +934,27 @@ class MynNav extends React.Component {
 
   componentDidUpdate(oldProps) {
 
+  }
+
+  statusUpdate(status) {
+    console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
+    switch (status.current) {
+      case '':
+        this.setState({statusText: <div id="status-text"></div>});
+        break;
+      case 'export':
+        this.setState({statusText: <div id="status-text">Exporting</div>});
+        break;
+      case 'add':
+        this.setState({statusText: <div id="status-text">Adding videos</div>});
+        break;
+      case 'metadata':
+        this.setState({statusText: <div id="status-text">Checking metadata</div>});
+        break;
+      case 'autotag':
+        this.setState({statusText: <div id="status-text">Autotagging</div>});
+        break;
+    }
   }
 
   render() {
@@ -982,6 +1007,7 @@ class MynNav extends React.Component {
           <li key="add" id="add-playlist" onClick={(e) => this.props.showSettings('playlists')}>{'\uFF0B'}</li>
         </ul>
         <div id="nav-controls">
+          {this.state.statusText}
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
         </div>
@@ -1050,30 +1076,7 @@ class MynLibrary extends React.Component {
 
     // this.findCollections = this.findCollections.bind(this);
 
-    ipcRenderer.on('delete-collection-confirm', (event, response, collectionID) => {
-      console.log(response);
-      console.log('collectionID == ' + collectionID);
 
-      const collections = new Collections(this.state.collections);
-      const collection = collections.get(collectionID);
-
-      if (response === 0) { // remove videos
-        console.log('Removing videos')
-        this.state.videos.map(v => {
-          collections.removeVideo(collection,v.id);
-        });
-        console.log(JSON.stringify(collection));
-        library.replace("collections", collections.getAll());
-
-      } else if (response === 1) { // delete collection
-        console.log('Deleting collection');
-        collections.deleteCollection(collectionID);
-        library.replace("collections", collections.getAll());
-
-      } else { // cancel, do nothing
-        console.log('Deletion canceled by user')
-      }
-    });
 
     ipcRenderer.on('MynLibrary-confirm-convertTerminalCol', (event, response, dragData, checked) => {
       // console.log('CONFIRMATION OF ADDING A CHILD COLLECTION TO A TERMINAL COLLECTION HAS FIRED')
@@ -1358,7 +1361,7 @@ class MynLibrary extends React.Component {
 
   // expand or collapse a collection
   toggleExpansion(e) {
-    console.log('TOGGLING!');
+    //console.log('TOGGLING!');
     // 'e' may either be an event or an element
     let element;
     if (e.target) {
@@ -1615,6 +1618,31 @@ class MynLibrary extends React.Component {
     console.log("DELETING COLLECTION");
     console.log(JSON.stringify(object));
 
+    ipcRenderer.once('delete-collection-confirm', (event, response, collectionID) => {
+      console.log(response);
+      console.log('collectionID == ' + collectionID);
+
+      const collections = new Collections(this.state.collections);
+      const collection = collections.get(collectionID);
+
+      if (response === 0) { // remove videos
+        console.log('Removing videos')
+        this.state.videos.map(v => {
+          collections.removeVideo(collection,v.id);
+        });
+        console.log(JSON.stringify(collection));
+        library.replace("collections", collections.getAll());
+
+      } else if (response === 1) { // delete collection
+        console.log('Deleting collection');
+        collections.deleteCollection(collectionID);
+        library.replace("collections", collections.getAll());
+
+      } else { // cancel, do nothing
+        console.log('Deletion canceled by user')
+      }
+    });
+
     ipcRenderer.send('delete-collection-confirm', object);
   }
 
@@ -1843,29 +1871,6 @@ class MynLibTable extends React.Component {
     this.render = this.render.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentDidUpdate = this.componentDidUpdate.bind(this);
-
-    ipcRenderer.on('save-video-confirm', (event, response, changes, originalVid, skipDialog) => {
-      if (response === 0) { // yes
-        // save video to library
-        let updated = { ...originalVid, ...changes };
-        let index = library.media.findIndex((video) => video.id === updated.id);
-        library.replace("media." + index, updated);
-      } else {
-        console.log('Edit canceled by user')
-      }
-
-      // if the user checked the checkbox to override the confirmation dialog,
-      // set that preference in the settings
-      if (skipDialog) {
-        // console.log('option to override dialog was checked!');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs[`MynLibTable-confirm-inlineEdit`] = true;
-        library.replace("settings.preferences",prefs);
-      }
-    });
   }
 
   keyDown(e) {
@@ -2188,7 +2193,7 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
-    console.log(`SORTING TABLE ${this.tableID} by ${key}`);
+    //console.log(`SORTING TABLE ${this.tableID} by ${key}`);
 
     if (key === undefined) {
       throw "Error: key was undefined; must supply a key to sort by";
@@ -2480,6 +2485,30 @@ class MynLibTable extends React.Component {
       throw 'Incorrect parameters passed to saveEdited in MynLibTable';
     }
     // console.log('changes == ' + JSON.stringify(changes));
+
+
+    ipcRenderer.once('save-video-confirm', (event, response, changes, originalVid, skipDialog) => {
+      if (response === 0) { // yes
+        // save video to library
+        let updated = { ...originalVid, ...changes };
+        let index = library.media.findIndex((video) => video.id === updated.id);
+        library.replace("media." + index, updated);
+      } else {
+        console.log('Edit canceled by user')
+      }
+
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (skipDialog) {
+        // console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
+        }
+        prefs.override_dialogs[`MynLibTable-confirm-inlineEdit`] = true;
+        library.replace("settings.preferences",prefs);
+      }
+    });
 
     // user confirmation dialog
     if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibTable-confirm-inlineEdit']) {
@@ -3226,32 +3255,6 @@ class MynOpenablePane extends React.Component {
     }
 
     this.render = this.render.bind(this);
-
-    ipcRenderer.on('MynOpenablePane-confirm-exit', (event, response, data, checked) => {
-      let id = data.id;
-      let cb = data.cb;
-      // if the user checked the checkbox to override the confirmation dialog,
-      // set that preference in the settings
-      if (checked) {
-        console.log('option to override dialog was checked!');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`] = true;
-        library.replace("settings.preferences",prefs);
-      }
-
-      if (response === 0) { // yes
-        // close pane
-        try {
-          cb();
-        } catch(err) {}
-        this.props.hideFunction(id);
-      } else {
-        console.log('Exit pane canceled by user')
-      }
-    });
   }
 
   closePane(id,confirm,msg,cb) {
@@ -3265,6 +3268,32 @@ class MynOpenablePane extends React.Component {
     // but that can be overridden by the user preference to override the confirmation dialog,
     // hence the rest of the conditional here
     if (confirm && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`])) {
+      ipcRenderer.once('MynOpenablePane-confirm-exit', (event, response, data, checked) => {
+        let id = data.id;
+        let cb = data.cb;
+        // if the user checked the checkbox to override the confirmation dialog,
+        // set that preference in the settings
+        if (checked) {
+          console.log('option to override dialog was checked!');
+          let prefs = _.cloneDeep(this.props.settings.preferences);
+          if (!prefs.override_dialogs) {
+            prefs.override_dialogs = {};
+          }
+          prefs.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`] = true;
+          library.replace("settings.preferences",prefs);
+        }
+
+        if (response === 0) { // yes
+          // close pane
+          try {
+            cb();
+          } catch(err) {}
+          this.props.hideFunction(id);
+        } else {
+          console.log('Exit pane canceled by user')
+        }
+      });
+
       ipcRenderer.send(
         'generic-confirm',
         'MynOpenablePane-confirm-exit',
@@ -7867,15 +7896,6 @@ class MynEditListWidget extends MynEditWidget {
       list: []
     }
 
-    ipcRenderer.on('MynEditListWidget-confirm-delete-item', (event, response, index) => {
-      if (response === 0) { // yes
-        // delete item (pass 'true' so as not to prompt another dialog)
-        this.deleteItem(index, true);
-      } else {
-        console.log('Deletion canceled by user')
-      }
-    });
-
     this.render = this.render.bind(this);
     this.updateList = this.updateList.bind(this);
   }
@@ -7888,6 +7908,15 @@ class MynEditListWidget extends MynEditWidget {
 
   deleteItem(index, skipDialog) {
     if (this.props.deleteDialog && !skipDialog) {
+      ipcRenderer.once('MynEditListWidget-confirm-delete-item', (event, response, index) => {
+        if (response === 0) { // yes
+          // delete item (pass 'true' so as not to prompt another dialog)
+          this.deleteItem(index, true);
+        } else {
+          console.log('Deletion canceled by user')
+        }
+      });
+
       ipcRenderer.send('generic-confirm', 'MynEditListWidget-confirm-delete-item', `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`, index);
       return;
     }
