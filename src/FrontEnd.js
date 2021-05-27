@@ -873,6 +873,9 @@ class Mynda extends React.Component {
           scrollToVideo={this.scrollToVideo}
           isRowVisible={this.isRowVisible}
         />
+        <MynNotify
+          settings={this.state.settings}
+        />
         <MynSettings
           show={this.state.show.settingsPane}
           view={this.state.settingsView}
@@ -912,7 +915,6 @@ class MynNav extends React.Component {
 
     this.state = {
       numVidsAdded:0,
-      statusText: <div id="status-text"></div>
     }
 
     // sent by index.js when a video is added to the library;
@@ -920,10 +922,7 @@ class MynNav extends React.Component {
       this.setState({numVidsAdded:numVidsAdded});
     });
 
-    ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
-
     this.render = this.render.bind(this);
-    this.statusUpdate = this.statusUpdate.bind(this);
   }
 
   clearSearch(e) {
@@ -936,29 +935,6 @@ class MynNav extends React.Component {
 
   }
 
-  statusUpdate(status) {
-    console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
-    switch (status.current) {
-      case '':
-        this.setState({statusText: <div id="status-text"></div>});
-        break;
-      case 'export':
-        this.setState({statusText: <div id="status-text">Exporting</div>});
-        break;
-      case 'add':
-        this.setState({statusText: <div id="status-text">Adding videos</div>});
-        break;
-      case 'metadata':
-        this.setState({statusText: <div id="status-text">Checking metadata</div>});
-        break;
-      case 'autotag':
-        this.setState({statusText: <div id="status-text">Autotagging</div>});
-        break;
-      case 'check':
-        this.setState({statusText: <div id="status-text">Checking for new videos</div>});
-        break;
-    }
-  }
 
   render() {
     return (
@@ -1010,7 +986,6 @@ class MynNav extends React.Component {
           <li key="add" id="add-playlist" onClick={(e) => this.props.showSettings('playlists')}>{'\uFF0B'}</li>
         </ul>
         <div id="nav-controls">
-          {this.state.statusText}
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
         </div>
@@ -2973,6 +2948,83 @@ class MynDetails extends React.Component {
         {details}
       </aside>
     )
+  }
+}
+
+class MynNotify extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      show: false
+    }
+
+    ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
+
+    this.render = this.render.bind(this);
+    this.statusUpdate = this.statusUpdate.bind(this);
+  }
+
+  statusUpdate(status) {
+    console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
+    if (status.current === '') {
+      this.setState({show:false, statusText: ''})
+      this.deAnimateEllipsis();
+    } else {
+      this.setState({show:true})
+      this.animateEllipsis();
+
+      switch (status.current) {
+        case 'export':
+          this.setState({statusText: 'Exporting'});
+          break;
+        case 'add':
+          this.setState({statusText: 'Adding videos'});
+          break;
+        case 'metadata':
+          this.setState({statusText: 'Checking metadata'});
+          break;
+        case 'autotag':
+          this.setState({statusText: 'Autotagging'});
+          break;
+        case 'check':
+          this.setState({statusText: 'Checking for new videos'});
+          break;
+      }
+    }
+
+  }
+
+  animateEllipsis() {
+    this.setState({ellipsis:""});
+    this.ellipsisAnimation = setInterval(() => {
+      this.setState({ellipsis:".".repeat((this.state.ellipsis.length+1)%4)})
+    },400);
+  }
+
+  deAnimateEllipsis() {
+    this.setState({ellipsis:""});
+    clearInterval(this.ellipsisAnimation);
+  }
+
+  componentDidMount() {
+    this.statusUpdate({current:'add'});
+  }
+
+  render() {
+    if (this.state.show) {
+      // <div className="ellipsis animation" style={{display:'inline-block', width:'1em'}}>
+      // </div>
+
+      return (
+        <div id="notify-status-text" style={{textAlign:'center'}}>
+          {this.state.statusText}
+          <div className="ellipsis animation" style={{display:'inline-block', width:'1em', textAlign:'left'}}>{this.state.ellipsis}</div>
+        </div>
+      );
+    } else {
+      return null;
+    }
   }
 }
 

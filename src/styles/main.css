@@ -298,6 +298,10 @@ img.ratings-icon {
   grid-area: details;
   background-color: var(--details-bg);
 }
+#notify-pane {
+  grid-area: notify;
+  background-color: var(--notify-bg);
+}
 
 /*************************************/
 /*############# NAV PANE ############*/
@@ -945,6 +949,15 @@ th, tr, td {
   padding-bottom:.1em;
 }
 
+/************************************/
+/*########## NOTIFY PANE ###########*/
+/************************************/
+
+#notify-status-text {
+  color: var(--darker-bg);
+  background-color: var(--lighter-colorful-bg);
+  text-align: center;
+}
 
 /*************************************/
 /*######### OPENABLE PANES ##########*/

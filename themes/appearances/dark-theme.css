@@ -158,6 +158,7 @@
   --lighter-bg: #464c59;
   --lightest-bg: #656d80;
   --light-colorful-bg: rgba(74,79,120,1);
+  --lighter-colorful-bg: rgba(90,125,155,1);
 
   --darker-bg-rgba0: rgba(24,26,30,0);
   --dark-bg-rgba0: rgba(30,33,38,0);
@@ -166,6 +167,7 @@
   --light-bg-rgba0: rgba(54,59,69,0);
   --lighter-bg-rgba0: rgba(70,76,89,0);
   --light-colorful-bg-rgba0: rgba(74,79,120,0);
+  --lighter-colorful-bg-rgba0: rgba(90,125,155,0);
 
   /* text colors */
   --main-text: #b6b9bf; /*#a1a9b7;*/
@@ -188,6 +190,7 @@
   --nav-bg: var(--pane-bg-1);
   --library-bg: var(--main-bg);
   --details-bg: var(--pane-bg-1);
+  --notify-bg: var(--pane-bg-1);
 
   --textinput-font-size: 1rem; /*calc(var(--main-font-size));/* * 3 / 4);*/
   --textinput-font-weight: 300;
