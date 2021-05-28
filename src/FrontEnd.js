@@ -3020,7 +3020,7 @@ class MynNotify extends React.Component {
   }
 
   componentDidMount() {
-    this.statusUpdate({current:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)]});
+    // this.statusUpdate({current:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)]});
   }
 
   render() {
