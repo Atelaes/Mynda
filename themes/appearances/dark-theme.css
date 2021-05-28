@@ -437,6 +437,9 @@
   --editbutton-text-hover: var(--button-text-hover);
   --editbutton-border-hover: var(--button-border-hover);
 
+/* notify banner */
+  --notify-height: 1.5rem;
+
 /* openable panes */
   --openable-bgcolor: rgba(30,30,30,.9);
 

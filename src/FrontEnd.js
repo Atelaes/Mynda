@@ -2965,34 +2965,46 @@ class MynNotify extends React.Component {
     this.statusUpdate = this.statusUpdate.bind(this);
   }
 
+  on(statusText) {
+    if (!statusText) {
+      this.off();
+      return console.error('Error: invalid status');
+    }
+
+    this.setState({show:true, statusText:statusText});
+    this.animateEllipsis();
+
+    // give the 'notify-on' class to all the panes
+    // to allow for any css manipulation
+    Array.from(document.getElementsByClassName('pane')).map(el => {
+      el.classList.add('notify-on');
+    })
+  }
+
+  off() {
+    this.setState({show:false, statusText: ''});
+    this.deAnimateEllipsis();
+
+    // remove the 'notify-on' class from all the panes
+    Array.from(document.getElementsByClassName('pane')).map(el => {
+      el.classList.remove('notify-on');
+    })
+  }
+
   statusUpdate(status) {
     console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
     if (status.current === '') {
-      this.setState({show:false, statusText: ''})
-      this.deAnimateEllipsis();
+      this.off();
     } else {
-      this.setState({show:true})
-      this.animateEllipsis();
-
-      switch (status.current) {
-        case 'export':
-          this.setState({statusText: 'Exporting'});
-          break;
-        case 'add':
-          this.setState({statusText: 'Adding videos'});
-          break;
-        case 'metadata':
-          this.setState({statusText: 'Checking metadata'});
-          break;
-        case 'autotag':
-          this.setState({statusText: 'Autotagging'});
-          break;
-        case 'check':
-          this.setState({statusText: 'Checking for new videos'});
-          break;
+      let statusText = {
+        'export'    : 'Exporting',
+        'add'       : 'Adding videos',
+        'metadata'  : 'Checking metadata',
+        'autotag'   : 'Autotagging',
+        'check'     : 'Checking for new videos'
       }
+      this.on(statusText[status.current]);
     }
-
   }
 
   animateEllipsis() {
@@ -3008,7 +3020,7 @@ class MynNotify extends React.Component {
   }
 
   componentDidMount() {
-    this.statusUpdate({current:'add'});
+    this.statusUpdate({current:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)]});
   }
 
   render() {
@@ -3017,7 +3029,7 @@ class MynNotify extends React.Component {
       // </div>
 
       return (
-        <div id="notify-status-text" style={{textAlign:'center'}}>
+        <div id="notify-banner">
           {this.state.statusText}
           <div className="ellipsis animation" style={{display:'inline-block', width:'1em', textAlign:'left'}}>{this.state.ellipsis}</div>
         </div>

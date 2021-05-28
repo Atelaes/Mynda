@@ -1,7 +1,7 @@
 :root {
   --header-row-size: 2.5em; /* 1fr */
-  --libnotify-row-size: 1.5em;
-  --libdetail-row-size: calc(100vh - var(--header-row-size) - var(--libnotify-row-size)); /* 11fr */
+  /* --libnotify-row-size: 1.5em; */
+  --libdetail-row-size: calc(100vh - var(--header-row-size));/* - var(--libnotify-row-size)); /* 11fr */
   --lib-col-size: 70%;
   --details-col-size: 30%;
 
@@ -22,7 +22,7 @@
 #grid-container {
   grid-template:  "header  header"  var(--header-row-size)
                   "library details" var(--libdetail-row-size)
-                  "library notify"  var(--libnotify-row-size)
+                  /* "library notify"  var(--libnotify-row-size) */
                 / var(--lib-col-size) var(--details-col-size);
   justify-content: stretch;
   gap: 0px;
