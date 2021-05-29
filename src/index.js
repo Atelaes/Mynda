@@ -278,7 +278,7 @@ let videoTemplate =   {
   }
 
 function checkWatchFolders() {
-  win.webContents.send('status-update', {current: 'check'});
+  win.webContents.send('status-update', {action: 'check'});
   // reset libFileTree
   libFileTree = {name:'root', folders:[]};
 
@@ -486,7 +486,7 @@ function confirmCurrentVideos() {
 }
 
 function mulchVideoTree(folderNode) {
-  win.webContents.send('status-update', {current: 'add '});
+  win.webContents.send('status-update', {action: 'add'});
   // If there is a collection assigned to this folder, make sure it exists,
   // and if not, make it.
   if (folderNode.collection) {
@@ -549,6 +549,7 @@ async function addVideoController() {
   let newMedia = [];
   let numNewVids = 0;
   for (let i=0; i<libMulch.length; i++) {
+    win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {
@@ -561,14 +562,20 @@ async function addVideoController() {
   library.replace('collections', collections.getAll());
   win.webContents.send('videos_added',numNewVids);
   //Now let's try and get some metadata.
-   win.webContents.send('status-update', {current: 'metadata'});
-  for (let j=0; j<library.media.length; j++) {
-    let metVideo = library.media[j];
-    if (!metVideo.metadata.checked) {
-      await getMetaData(metVideo);
-    }
+   // win.webContents.send('status-update', {action: 'metadata'});
+  // for (let j=0; j<library.media.length; j++) {
+  //   let metVideo = library.media[j];
+  //   if (!metVideo.metadata.checked) {
+  //     await getMetaData(metVideo);
+  //   }
+  // }
+  let unchecked = library.media.filter(v => !v.metadata.checked);
+  for (let i=0; i<unchecked.length; i++) {
+    win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: unchecked.length});
+    await getMetaData(unchecked[i]);
   }
-  win.webContents.send('status-update', {current: ''});
+
+  win.webContents.send('status-update', {action: ''});
 }
 
 // Takes a video object and fills it out
@@ -1051,11 +1058,12 @@ function downloadFile(url, destination) {
 }
 
 async function autoTag() {
-  win.webContents.send('status-update', {current: 'autotag'});
+  win.webContents.send('status-update', {action: 'autotag'});
   let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried));
   let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
   for (let i=0; i<newMedia.length; i++) {
+    win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
     let newVideo = newMedia[i];
     let disposition = '';
     console.log(`Running autotag on ${newVideo.title}.`);
@@ -1100,11 +1108,11 @@ async function autoTag() {
   console.log('===AutoTag Finished===');
   console.log(JSON.stringify(autoStats));
   console.log(autoLog.join('\n'));
-  win.webContents.send('status-update', {current: ''});
+  win.webContents.send('status-update', {action: ''});
 }
 
 async function exportFiles(drive) {
-  win.webContents.send('status-update', {current: 'export'});
+  win.webContents.send('status-update', {action: 'export'});
   console.log(`Starting exportFiles.`);
   let fileLocation = path.join(drive, "Mynda Manifest.json");
   let manifest;
@@ -1197,7 +1205,7 @@ async function exportFiles(drive) {
       break;
     }
   }
-  win.webContents.send('status-update', {current: ''});
+  win.webContents.send('status-update', {action: ''});
 }
 
 ipcMain.on('settings-watchfolder-select', (event) => {

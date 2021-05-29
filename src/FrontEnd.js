@@ -931,6 +931,13 @@ class MynNav extends React.Component {
     input.dispatchEvent(new Event('input', { bubbles: true })); // necessary to trigger the search function
   }
 
+  setPlaylist(playlistID,target) {
+    // reset numVidsAdded to zero when the user clicks on the 'new' playlist
+    // if (playlistID === 'new') this.state.numVidsAdded = 0;
+
+    this.props.setPlaylist(playlistID,target);
+  }
+
   componentDidUpdate(oldProps) {
 
   }
@@ -958,7 +965,7 @@ class MynNav extends React.Component {
 
               if (this.state.numVidsAdded > 0) {
                 newVidAlert = (
-                  <div id='nav-message'>({this.state.numVidsAdded})</div>
+                  <div id='nav-message'>(+{this.state.numVidsAdded})</div>
                 );
               }
             }
@@ -972,7 +979,7 @@ class MynNav extends React.Component {
                   title={this.props.getPlaylistLength(playlist.id)}
                   style={{zIndex: 100 - index}}
                   className={playlist.view}
-                  onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
+                  onClick={(e) => this.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
                   {playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null}
@@ -2956,7 +2963,7 @@ class MynNotify extends React.Component {
     super(props)
 
     this.state = {
-      show: false
+      on: false
     }
 
     ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
@@ -2965,14 +2972,22 @@ class MynNotify extends React.Component {
     this.statusUpdate = this.statusUpdate.bind(this);
   }
 
-  on(statusText) {
-    if (!statusText) {
+  on(status) {
+    if (!status.action) {
       this.off();
       return console.error('Error: invalid status');
     }
 
-    this.setState({show:true, statusText:statusText});
-    this.animateEllipsis();
+    // if it's not already on, turn on ellipsis animation and set the state to on
+    if (!this.state.on) {
+      this.setState({on:true});
+      this.animateEllipsis();
+    }
+    // if the status has changed, update the status in state
+    // if (!_.isEqual(status,this.state.status)) {
+    //   this.setState({status:status});
+    // }
+    this.setState({statusMessage:this.messageFor(status)})
 
     // give the 'notify-on' class to all the panes
     // to allow for any css manipulation
@@ -2982,7 +2997,7 @@ class MynNotify extends React.Component {
   }
 
   off() {
-    this.setState({show:false, statusText: ''});
+    this.setState({on:false, status: {}});
     this.deAnimateEllipsis();
 
     // remove the 'notify-on' class from all the panes
@@ -2993,21 +3008,35 @@ class MynNotify extends React.Component {
 
   statusUpdate(status) {
     console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
-    if (status.current === '') {
+    if (status.action === '') {
       this.off();
     } else {
-      let statusText = {
-        'export'    : 'Exporting',
-        'add'       : 'Adding videos',
-        'metadata'  : 'Checking metadata',
-        'autotag'   : 'Autotagging',
-        'check'     : 'Checking for new videos'
-      }
-      this.on(statusText[status.current]);
+      this.on(status);
     }
   }
 
+  messageFor(status) {
+    let _c = '';
+    let _t = '';
+    let _of = '';
+    if (status.numCurrent) _c = ` ${status.numCurrent}`;
+    if (status.numCurrent && status.numTotal) _of = ' of';
+    if (status.numTotal) _t = ` ${status.numTotal}`;
+
+    let textFor = {
+      'export'    : `Exporting${_c}${_of}${_t} videos`,
+      'add'       : `Adding${_c}${_of}${_t} videos`,
+      'metadata'  : `Checking metadata${status.numCurrent || status.numTotal ? ` for ${_c}${_of}${_t} videos` : ''}`,
+      'autotag'   : `Auto-tagging${_c}${_of}${_t} videos`,
+      'check'     : 'Checking for new videos'
+    }
+
+    return textFor[status.action];
+  }
+
   animateEllipsis() {
+    if (this.ellipsisAnimation) return;
+
     this.setState({ellipsis:""});
     this.ellipsisAnimation = setInterval(() => {
       this.setState({ellipsis:".".repeat((this.state.ellipsis.length+1)%4)})
@@ -3020,17 +3049,17 @@ class MynNotify extends React.Component {
   }
 
   componentDidMount() {
-    // this.statusUpdate({current:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)]});
+    // this.statusUpdate({action:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)], numCurrent:1, numTotal:85});
   }
 
   render() {
-    if (this.state.show) {
+    if (this.state.on) {
       // <div className="ellipsis animation" style={{display:'inline-block', width:'1em'}}>
       // </div>
 
       return (
         <div id="notify-banner">
-          {this.state.statusText}
+          {this.state.statusMessage}
           <div className="ellipsis animation" style={{display:'inline-block', width:'1em', textAlign:'left'}}>{this.state.ellipsis}</div>
         </div>
       );
