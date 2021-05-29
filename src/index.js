@@ -144,12 +144,12 @@ async function removeWatchfolderVideosFromLibrary(folder) {
   console.log('REMOVING videos from library in ' + folder);
 
   let vidIDs;
-  try {
-    vidIDs = library.settings.watchfolders.filter(wf => wf && wf.path === folder)[0].videos;
-  } catch(err) {
-    console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
+  // try {
+  //   vidIDs = library.settings.watchfolders.filter(wf => wf && wf.path === folder)[0].videos;
+  // } catch(err) {
+  //   console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
     vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
-  }
+  // }
 
   let removedMedia = [];
   let keptMedia = library.media.filter(v => {
@@ -569,7 +569,7 @@ async function addVideoController() {
   //     await getMetaData(metVideo);
   //   }
   // }
-  let unchecked = library.media.filter(v => !v.metadata.checked);
+  let unchecked = library.media.filter(v => v !== null && !v.metadata.checked);
   for (let i=0; i<unchecked.length; i++) {
     win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: unchecked.length});
     await getMetaData(unchecked[i]);
@@ -580,6 +580,7 @@ async function addVideoController() {
 
 // Takes a video object and fills it out
 async function addVideoFile(video) {
+  // console.log(video)
   let file = video.filename;
   let fileBasename = path.basename(file,path.extname(file));
   let id = await createVideoID(video.filename);
@@ -652,7 +653,8 @@ async function addVideoFile(video) {
           try {
             // update the video's kind based on the watchfolder's default kind;
             // in case the user has changed the default kind, we want to update it when re-adding the video
-            vidObj.kind = library.settings.watchfolders.filter(wf => wf && wf.path === rootWatchFolder)[0].kind;
+            // vidObj.kind = library.settings.watchfolders.filter(wf => wf && wf.path === rootWatchFolder)[0].kind;
+            vidObj.kind = video.kind;
           } catch(err) {
             console.log('Could not update kind based on watchfolder default kind: ' + err);
           }

@@ -502,7 +502,7 @@ const defaultLibrary = {
   "collections" : [],
   "recently_watched" : [],
   "media" : [],
-  "objectMedia" : {},
+  "object_media" : {},
   "inactive_media": []
 };
 
