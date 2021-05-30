@@ -831,14 +831,16 @@ th, tr, td {
   margin-top:.2em;
   margin-bottom:.8em;
 }
-#detail-position .position-outer {
+#detail-position .position-container {
   width:60%;
-  height:.3em;
+  height: calc(.3em + (var(--positionwidget-borderwidth)*2));
   margin-bottom:.2em;
+}
+#detail-position .position-bar {
   /* override the general position edit-widget border if desired */
   border: var(--detailposition-outer-border);
 }
-#detail-position .position-inner {
+#detail-position .position-bar.filled {
   /* override the general position edit-widget interior bg if desired */
   background-color: var(--detailposition-inner-bgcolor);
 }
@@ -1705,19 +1707,58 @@ th, tr, td {
   display: inline;
 }
 
-.position-outer {
+/* .position-outer {
+  position:relative;
   width: var(--positionwidget-width);
   height: var(--positionwidget-height);
   border: var(--positionwidget-border);
   background-color: var(--positionwidget-bg);
   border-radius:999px;
-  overflow:hidden;
+  overflow:visible;
   margin: auto;
+  box-sizing: border-box;
 }
 .position-inner {
-  height:100%;
+  height: inherit;
+  border: inherit;
+  border-radius: 999px 0 0 999px;
+  background-color: var(--positionwidgetinner-bg);
+  box-sizing: border-box;
+  height:inherit;
+  position:absolute;
+  left:0;
+  top:50%;
+  transform: translateY(-50%);
+} */
+.position-container {
+  position:relative;
+  left:50%;
+  transform: translateX(-50%);
+  width: var(--positionwidget-width);
+  height: var(--positionwidget-height);
+  background-color: var(--positionwidget-bg);
+  border-radius:999px;
+  overflow:hidden;
+}
+.position-bar {
+  position:absolute;
+  left:0;
+  right:0;
+  height: 100%;
+  /* width: var(--positionwidget-width); */
+  border: var(--positionwidget-border);
+  border-radius:999px;
+  box-sizing: border-box;
+}
+.position-bar.filled {
+  left:0;
   background-color: var(--positionwidgetinner-bg);
 }
+.position-bar.empty {
+  left:0;
+  right:0;
+}
+
 .position-text {
   font-style:italic;
   text-align:center;
@@ -2398,9 +2439,12 @@ th, tr, td {
   width:100%;
   max-width:10em;
 }
-.pb-element.recent .dropdown-item .position-outer {
+.pb-element.recent .dropdown-item .position-container {
   width:100%;
-  height: .2em;
+  height: .25em;
+  border-width: .05em;
+}
+.pb-element.recent .dropdown-item .position-bar {
   border-width: .05em;
 }
 .pb-element.view .select-container {

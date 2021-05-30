@@ -7879,7 +7879,7 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
     const duration = this.props.movie.metadata ? this.props.movie.metadata.duration : null;
 
     try {
-      let target = findNearestOfClass(event.target,'position-outer');
+      let target = findNearestOfClass(event.target,'position-container');
       let widgetX = window.scrollX + target.getBoundingClientRect().left;
       let widgetWidth = target.clientWidth;
       let mouseX = event.clientX;
@@ -7911,12 +7911,22 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
     position = Number(Math.min(Math.max(position,0),duration));
     let graphic = (
       <div className="position-widget">
-        <div className="position-outer"
+        {/*<div className="position-outer"
           onMouseMove={(e) => this.updatePosition(e)}
           onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-outer').parentElement,e)}
-          onClick={(e) => this.updateValue(Math.round(position * 10)/10,e)} >
-            <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
+          onClick={(e) => this.updateValue(Math.round(position * 10)/10,e)}>
+            {<div className="position-inner" style={{width:(position / duration * 100) + "%"}} />}
+        </div>*/}
+
+        <div className="position-container"
+          onMouseMove={(e) => this.updatePosition(e)}
+          onMouseLeave={(e) => this.mouseOut(findNearestOfClass(event.target,'position-widget'),e)}
+          onClick={(e) => this.updateValue(Math.round(position * 10)/10,e)}
+        >
+          <div className="position-bar filled" style={{width:(position / duration * 100) + "%"}}/>
+          <div className="position-bar empty" />
         </div>
+
         <div className="position-text">
           {position / duration > .01 ? `${Math.floor(position / 60)}:${(position % 60) < 10 ? '0' : ''}${Math.floor(position % 60)} \u2022 ` : null}
           {duration ? (duration >= 60 ? `${Math.round(duration / 60)} min` : `${Math.round(duration)} sec`) : null}
@@ -7971,8 +7981,9 @@ class MynShowPositionWidget extends React.Component {
 
     return (
       <div className="position-widget">
-        <div className="position-outer">
-            <div className="position-inner" style={{width:(position / duration * 100) + "%"}} />
+        <div className="position-container">
+          <div className="position-bar filled" style={{width:(position / duration * 100) + "%"}}/>
+          <div className="position-bar empty" />
         </div>
         <div className="position-text" style={{display:(this.props.showText ? 'block' : 'none')}}>
           {position / duration > .01 ? `${Math.floor(position / 60)}:${(position % 60) < 10 ? '0' : ''}${Math.floor(position % 60)} \u2022 ` : null}
