@@ -972,18 +972,21 @@ class MynNav extends React.Component {
 
             // if playlist is selected to be displayed in as a tab in the navbar
             if (playlist.tab) {
+              let numVids = this.props.getPlaylistLength(playlist.id);
+
               return (
                 <li
                   key={playlist.id}
                   id={"playlist-" + playlist.id}
-                  title={this.props.getPlaylistLength(playlist.id)}
+                  title={numVids}
                   style={{zIndex: 100 - index}}
                   className={playlist.view}
                   onClick={(e) => this.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
+                  {playlist.id === 'new' && numVids > 0 ? <div id='nav-message'>({numVids})</div> : null}
                   {playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null}
-                  {newVidAlert}
+                  {/*newVidAlert*/}
                 </li>
               );
             } else {
