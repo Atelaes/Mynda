@@ -548,9 +548,8 @@ function mulchVideoTree(folderNode) {
 async function addVideoController() {
   let newMedia = [];
   let numNewVids = 0;
+  win.webContents.send('status-update', {action: 'add', numTotal: libMulch.length});
   for (let i=0; i<libMulch.length; i++) {
-    if (i%50 === 0)
-      win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {
@@ -571,8 +570,8 @@ async function addVideoController() {
   //   }
   // }
   let unchecked = library.media.filter(v => v !== null && !v.metadata.checked);
+  win.webContents.send('status-update', {action: 'metadata', numTotal: unchecked.length});
   for (let i=0; i<unchecked.length; i++) {
-    win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: unchecked.length});
     await getMetaData(unchecked[i]);
   }
 

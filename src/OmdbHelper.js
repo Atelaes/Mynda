@@ -238,7 +238,9 @@ function downloadArt(url) {
   return new Promise(function(resolve, reject) {
     let fileExt = path.extname(url)
     let fileName = path.basename(url, fileExt);
-    fileName = fileName.replaceAll(/[\*\."/\\\[\]:;\|,]/g, '') + fileExt;
+    console.log(fileName);
+    fileName = fileName.replace(/[\*\."/\\\[\]:;\|,]/g, '') + fileExt;
+    console.log(fileName);
     let filePath = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork', fileName);
     if (fs.existsSync(filePath)) {
       resolve(filePath);
