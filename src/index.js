@@ -549,7 +549,8 @@ async function addVideoController() {
   let newMedia = [];
   let numNewVids = 0;
   for (let i=0; i<libMulch.length; i++) {
-    win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
+    if (i%50 === 0)
+      win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {

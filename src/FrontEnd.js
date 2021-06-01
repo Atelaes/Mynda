@@ -2901,10 +2901,11 @@ class MynDetails extends React.Component {
     let scrollBtn = null;
 
     try {
-      const video = this.props.video
+      const video = this.props.video;
+      let imageURL = video.artwork ? URL.pathToFileURL(video.artwork).pathname : URL.pathToFileURL('./images/qmark-details.png').pathname;
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${URL.pathToFileURL(video.artwork) || ''}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
@@ -3026,7 +3027,7 @@ class MynNotify extends React.Component {
     let textFor = {
       'export'    : `Exporting${_c}${_of}${_t} videos`,
       'add'       : `Adding${_c}${_of}${_t} videos`,
-      'metadata'  : `Checking metadata${status.numCurrent || status.numTotal ? ` for ${_c}${_of}${_t} videos` : ''}`,
+      'metadata'  : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
       'autotag'   : `Auto-tagging${_c}${_of}${_t} videos`,
       'check'     : 'Checking for new videos'
     }
