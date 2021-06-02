@@ -546,10 +546,11 @@ function mulchVideoTree(folderNode) {
 }
 
 async function addVideoController() {
+  let addStart = new Date();
   let newMedia = [];
   let numNewVids = 0;
   for (let i=0; i<libMulch.length; i++) {
-    if (i%50 === 0)
+    if (i%5 === 0)
       win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
@@ -558,6 +559,8 @@ async function addVideoController() {
       numNewVids++;
     }
   }
+  let addEnd = new Date();
+  console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
   library.replace('media', combinedMedia);
   library.replace('collections', collections.getAll());
@@ -570,12 +573,24 @@ async function addVideoController() {
   //     await getMetaData(metVideo);
   //   }
   // }
+  let metaStart = new Date();
   let unchecked = library.media.filter(v => v !== null && !v.metadata.checked);
+  let allMeta = {};
   for (let i=0; i<unchecked.length; i++) {
-    win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: unchecked.length});
-    await getMetaData(unchecked[i]);
+    let metaVideo = unchecked[i];
+    if (i%5 === 0)
+      win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: libMulch.length});
+    allMeta[metaVideo.id] = await getMetaData(metaVideo);
   }
-
+  let toBeMeta = library.media;
+  let secondMetaStart = new Date();
+  for (let i=0; i<unchecked.length; i++) {
+    let metaVideo = toBeMeta[i];
+    if (allMeta[metaVideo.id]) {
+      metaVideo.metadata = allMeta[metaVideo.id];
+    }
+  }
+  library.replace('media', toBeMeta);
   win.webContents.send('status-update', {action: ''});
 }
 
@@ -734,7 +749,8 @@ async function addVideoFile(video) {
 async function getMetaData(video) {
   // get video data from the file itself (duration, codec, dimensions, whatever)
   let file = video.filename;
-  video.metadata.checked = true;
+  let returnObj = {};
+  returnObj.checked = true;
   try {
     // vidObj.metadata = await getVideoMetadata(file);
     let data = await ffprobe(file, { path: ffprobeStatic.path });
@@ -744,18 +760,18 @@ async function getMetaData(video) {
     for (const stream of data.streams) {
       try {
         if (stream.codec_type === 'video') {
-          video.metadata.codec = stream.codec_name;
-          video.metadata.duration = Number(stream.duration);
-          video.metadata.width = stream.width;
-          video.metadata.height = stream.height;
-          video.metadata.aspect_ratio = stream.display_aspect_ratio;
+          returnObj.codec = stream.codec_name;
+          returnObj.duration = Number(stream.duration);
+          returnObj.width = stream.width;
+          returnObj.height = stream.height;
+          returnObj.aspect_ratio = stream.display_aspect_ratio;
           let f = stream.avg_frame_rate.split('/');
-          video.metadata.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
+          returnObj.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
         }
         if (stream.codec_type === 'audio') {
-          video.metadata.audio_codec = stream.codec_name;
-          video.metadata.audio_layout = stream.channel_layout;
-          video.metadata.audio_channels = stream.channels;
+          returnObj.audio_codec = stream.codec_name;
+          returnObj.audio_layout = stream.channel_layout;
+          returnObj.audio_channels = stream.channels;
         }
         // if we didn't get a duration already,
         // grab one from whatever stream has one
@@ -773,8 +789,8 @@ async function getMetaData(video) {
     // some files (.mkv) will give us metadata, but do not store the duration for some reason;
     // in this case, we analyze the file with ffmpeg to obtain the duration
     // (which will be added to the video object later in a separate library call)
-    if (!video.metadata.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
-      await getDurationFromFFmpeg(file,video.id);
+    if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
+      returnObj.duration = await getDurationFromFFmpeg(file,video.id);
     }
   } catch(err) {
     console.log(`Unable to retrieve metadata for ${file}: ${err}`);
@@ -782,7 +798,8 @@ async function getMetaData(video) {
   //Replace the library entry with our new version.
   //Even if everything failed, we've set metadata.checked to true, so we don't
   //waste time trying again.
-  library.replace(`media.id=${video.id}`, video);
+  //library.replace(`media.id=${video.id}`, video);
+  return returnObj;
 }
 
 
@@ -933,8 +950,8 @@ function getFileBirthtime(file) {
 
 function getDurationFromFFmpeg(filepath,id) {
   try {
-    console.log('Could not find duration with ffprobe, trying with ffmpeg...');
-    console.log(filepath);
+    //console.log('Could not find duration with ffprobe, trying with ffmpeg...');
+    //console.log(filepath);
 
     let tempFile = `temp-${uuidv4()}.mkv`;
 
@@ -958,14 +975,16 @@ function getDurationFromFFmpeg(filepath,id) {
           seconds = Number(data.duration);
         }
 
+        return seconds;
+        /*
         // update video in library with new duration.
         for (let i=0; i<library.media.length; i++) {
           if (library.media[i].id === id) {
-            console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
+            //console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
             library.replace(`media.${i}.metadata.duration`,seconds);
             break;
           }
-        }
+        }*/
 
       }
     }).on('end', (stdout, stderr) => {
