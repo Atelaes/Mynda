@@ -68,7 +68,6 @@ class Mynda extends React.Component {
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
-    this.getPlaylistLength = this.getPlaylistLength.bind(this);
     this.search = this.search.bind(this);
     this.calcAvgRatings = this.calcAvgRatings.bind(this);
     this.showDetails = this.showDetails.bind(this);
@@ -473,14 +472,16 @@ class Mynda extends React.Component {
     try {
       playlist = this.state.playlists.filter(playlist => playlist.id == id)[0]
     } catch(error) {
-      console.log("Error: could not find playlist " + id + ", displaying first playlist")
+      console.error("Error: could not find playlist " + id + ", displaying first playlist")
       try {
         playlist = this.state.playlists[0] // display the first one
       } catch(error) {
-        console.log("Error: no playlists found, displaying nothing")
+        console.error("Error: no playlists found, displaying nothing")
         playlist = { "filter_function" : "false" } // just display nothing
       }
     }
+    // console.log('playlistFilter() ' + playlist.name)
+
     let filteredVids = [];
     let showNew = playlist.id === 'new' || this.state.settings.preferences.include_new_vids_in_playlists;
     try {
@@ -491,17 +492,13 @@ class Mynda extends React.Component {
     }
 
     if (playlist.id) {
+      // update playlist length to trigger any components using this.state.playlistLength
+      // (e.g. MynNav uses it to display the lengths of the playlists on the tabs)
       this.state.playlistLength[playlist.id] = filteredVids.length;
+      this.setState({playlistLength:this.state.playlistLength});
     }
 
     return filteredVids;
-  }
-
-  // this function is passed to MynNav so that it can display each playlist's length
-  getPlaylistLength(id) {
-    if (this.state.playlistLength[id]) return this.state.playlistLength[id];
-
-    return this.playlistFilter(id).length;
   }
 
   // called from the nav component to change the current playlist
@@ -558,6 +555,19 @@ class Mynda extends React.Component {
       // if the field is empty, reset to the full playlist
       this.setPlaylist(this.state.currentPlaylistID);
     }
+  }
+
+  // set the lengths of all the playlists
+  setPlaylistLengths(shy) {
+    // if shy == true, then we only save the playlist lengths for ones we haven't saved already;
+    // if it's falsy, then we overwrite all of them
+    this.state.playlists.map(pl => {
+      if (pl.id && (!shy || typeof this.state.playlistLength[pl.id] === "undefined")) {
+        // running the playlistFilter function will set the
+        // value in this.state.playlistLength for that playlist
+        this.playlistFilter(pl.id);
+      }
+    });
   }
 
   // filter videos in current playlist to match search query
@@ -728,6 +738,10 @@ class Mynda extends React.Component {
       console.log("Error displaying first playlist: no playlists found? " + e.toString());
     }
 
+    // set the lengths of all the playlists
+    // (pass true to only set the ones that don't have values already)
+    this.setPlaylistLengths(true);
+
     // used as a delay timer in savedPing the case of multiple saves,
     // where we want to wait until they're all done before doing something
     let timeout;
@@ -769,6 +783,13 @@ class Mynda extends React.Component {
       // if a movie was changed
       if (address.includes('media')) {
         console.log('a video was edited');
+        // // change the videoEditFlag, which components can listen for to find out if a video was edited
+        // // (if they don't care which one or what the change was)
+        // this.setState({videoEditFlag:uuidv4()});
+
+        // check all the playlist lengths
+        this.setPlaylistLengths();
+
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
@@ -777,6 +798,10 @@ class Mynda extends React.Component {
 
       // if a playlist was changed
       if (address.includes('playlists')) {
+        // // change the playlistEditFlag, which components can listen for to find out if a video was edited
+        // // (if they don't care which one or what the change was)
+        // this.setState({playlistEditFlag:uuidv4()});
+
         console.log('a playlist was edited');
         // reload the playlists, and then re-render the current playlist
         this.setState({playlists:this.props.library.playlists}, () => {
@@ -805,6 +830,10 @@ class Mynda extends React.Component {
           //     this.setPlaylist(this.state.currentPlaylistID);
           //   }
           // }
+
+          if (address === 'settings.preferences.include_new_vids_in_playlists'){
+            this.setPlaylistLengths();
+          }
         });
       }
     };
@@ -845,7 +874,7 @@ class Mynda extends React.Component {
           setPlaylist={this.setPlaylist}
           search={this.search}
           showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
-          getPlaylistLength={this.getPlaylistLength}
+          playlistLength={this.state.playlistLength}
         />
         <MynLibrary
           videos={this.state.filteredVideos}
@@ -931,15 +960,20 @@ class MynNav extends React.Component {
     input.dispatchEvent(new Event('input', { bubbles: true })); // necessary to trigger the search function
   }
 
-  setPlaylist(playlistID,target) {
-    // reset numVidsAdded to zero when the user clicks on the 'new' playlist
-    // if (playlistID === 'new') this.state.numVidsAdded = 0;
-
-    this.props.setPlaylist(playlistID,target);
-  }
+  // setPlaylist(playlistID,target) {
+  //   // reset numVidsAdded to zero when the user clicks on the 'new' playlist
+  //   // if (playlistID === 'new') this.state.numVidsAdded = 0;
+  //
+  //   this.props.setPlaylist(playlistID,target);
+  // }
 
   componentDidUpdate(oldProps) {
-
+    // if (oldProps.videoEditFlag !== this.props.videoEditFlag || oldProps.playlistEditFlag !== this.props.playlistEditFlag) {
+    //   // a video was changed, so we want to recalculate the number of videos
+    //   // in each playlist to update the displays
+    //   // console.log('videoEditFlag was altered, updating MynNav')
+    //   this.setState({}); // force component to re-render
+    // }
   }
 
 
@@ -963,16 +997,16 @@ class MynNav extends React.Component {
               }
               if (!anyNew) return;
 
-              if (this.state.numVidsAdded > 0) {
-                newVidAlert = (
-                  <div id='nav-message'>(+{this.state.numVidsAdded})</div>
-                );
-              }
+              // if (this.state.numVidsAdded > 0) {
+              //   newVidAlert = (
+              //     <div id='nav-message'>(+{this.state.numVidsAdded})</div>
+              //   );
+              // }
             }
 
             // if playlist is selected to be displayed in as a tab in the navbar
             if (playlist.tab) {
-              let numVids = this.props.getPlaylistLength(playlist.id);
+              let numVids = this.props.playlistLength[playlist.id]
 
               return (
                 <li
@@ -981,7 +1015,7 @@ class MynNav extends React.Component {
                   title={numVids}
                   style={{zIndex: 100 - index}}
                   className={playlist.view}
-                  onClick={(e) => this.setPlaylist(playlist.id,e.target)}
+                  onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
                   {playlist.id === 'new' && numVids > 0 ? <div id='nav-message'>({numVids})</div> : null}
@@ -5567,6 +5601,7 @@ class MynEditor extends MynOpenablePane {
       // we don't want to save this)
       let temp = _.cloneDeep(this.state.video);
       delete temp.collections;
+      temp.autotagTried = false; // reset this flag whenever a video is saved
       let index = library.media.findIndex((video) => video && video.id === this.props.video.id);
       library.replace("media." + index, temp);
     }
