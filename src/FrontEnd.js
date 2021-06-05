@@ -1049,7 +1049,7 @@ class MynNavPlaylistMiniEdit extends React.Component {
   }
 }
 
-// ###### Library Pane: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the heirarchical view) ###### //
+// ###### Library Pane: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the hierarchical view) ###### //
 class MynLibrary extends React.Component {
   constructor(props) {
     super(props)
@@ -1062,7 +1062,8 @@ class MynLibrary extends React.Component {
       sortReport : {},
       dragging : false,
       addToExistingColID : '',
-      manifest: {}
+      manifest: {},
+      isExpanded: {}
     }
 
     this.deleteBtn = object => {
@@ -1203,12 +1204,14 @@ class MynLibrary extends React.Component {
       if (results.length > 0) {
         let editColNameValid;
 
+        let colContainerID = `collection-${object.id}`;
+
         return (
           <div className="collection collapsed" key={object.name}>
             <h1
               className="collection-header"
-              onClick={(e) => this.toggleExpansion(e)}
-              onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.parentNode.classList.add('drag-over')}}
+              onClick={(e) => this.toggleExpansion(e,colContainerID)}
+              onMouseOver={(e) => {this.expandOnDragOver(e,colContainerID); if (this.state.dragging) e.target.parentNode.classList.add('drag-over')}}
               onMouseOut={(e) => {e.target.parentNode.classList.remove('drag-over')}}
             >
               <MynClickToEditText
@@ -1313,6 +1316,7 @@ class MynLibrary extends React.Component {
         }
 
         let tableID = 'table-' + object.id;
+        let colContainerID = `collection-${object.id}`;
         // if (!this.state.manifest[tableID]) this.state.manifest[tableID] = [];
 
         // console.log('Creating table for collection: ' + JSON.stringify(object));
@@ -1323,8 +1327,8 @@ class MynLibrary extends React.Component {
           <div className="collection collapsed" key={object.name}>
           <h1
             className="collection-header"
-            onClick={(e) => this.toggleExpansion(e)}
-            onMouseOver={(e) => {this.expandOnDragOver(e); if (this.state.dragging) e.target.classList.add('drag-over')}}
+            onClick={(e) => this.toggleExpansion(e,colContainerID)}
+            onMouseOver={(e) => {this.expandOnDragOver(e,colContainerID); if (this.state.dragging) e.target.classList.add('drag-over')}}
             onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
           >
             {name}
@@ -1355,6 +1359,7 @@ class MynLibrary extends React.Component {
                     settings={this.props.settings}
                     playlistID={this.props.playlistID}
                     view={this.props.view}
+                    isExpanded={this.state.isExpanded[colContainerID]}
                     initialSort={this.state.sortReport[object.id] ? this.state.sortReport[object.id].key : "order"}
                     initialSortAscending={this.state.sortReport[object.id] ? this.state.sortReport[object.id].ascending : true}
                     columns={this.props.columns}
@@ -1382,8 +1387,9 @@ class MynLibrary extends React.Component {
   }
 
   // expand or collapse a collection
-  toggleExpansion(e) {
+  toggleExpansion(e,colContainerID) {
     //console.log('TOGGLING!');
+    console.log(colContainerID);
     // 'e' may either be an event or an element
     let element;
     if (e.target) {
@@ -1393,14 +1399,17 @@ class MynLibrary extends React.Component {
     }
     // let siblings = Array.from(element.parentNode.childNodes).filter(node => (node !== e.target));
     // siblings.map(node => (node.classList.toggle("hidden")));
-    let childrenContainer = element.parentNode.getElementsByClassName("container")[0]
+    let childrenContainer = element.parentNode.getElementsByClassName("container")[0];
     childrenContainer.classList.toggle("hidden");
     element.parentNode.classList.toggle("expanded");
     element.parentNode.classList.toggle("collapsed");
+
+    this.state.isExpanded[colContainerID] = !this.state.isExpanded[colContainerID]
+    this.setState({isExpanded:this.state.isExpanded});
   }
 
   // when dragging a video row over a collapsed collection header, expand that collection (after a delay)
-  expandOnDragOver(e) {
+  expandOnDragOver(e,colContainerID) {
     // console.log('OVER!');
     // console.log('this.state.dragging == ' + this.state.dragging);
 
@@ -1412,9 +1421,10 @@ class MynLibrary extends React.Component {
       // we wait a second and then expand it
       let collection = findNearestOfClass(e.target,'collection');
       console.log(collection.className);
+      console.log(collection.key);
       if (collection.classList.contains('collapsed')) {
         console.log('COLLAPSED!');
-        setTimeout(() => this.toggleExpansion(btn),1000);
+        setTimeout(() => this.toggleExpansion(btn,colContainerID),1000);
       }
     }
   }
@@ -1849,7 +1859,7 @@ class MynLibTable extends React.Component {
     this._isMounted = false;
 
     // create an id for this table;
-    // if it appears within a heirarchical playlist,
+    // if it appears within a hierarchical playlist,
     // there could be multiple tables (one for each collection that appears in the playlist),
     // so in a hierarchical playlist, we append the collection id
     if (this.props.tableID) {
@@ -2433,6 +2443,10 @@ class MynLibTable extends React.Component {
   // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
   // rather than the current values)
   reset(initialSort,resetOrder) {
+    // do not render the table if we're in a collapsed collection in a hierarchical playlist
+    if (this.props.view === 'hierarchical' && !this.props.isExpanded)
+      return;
+
     // console.log('RESETTING');
     if (initialSort || resetOrder) {
       // console.log("RESETTING ORDER");
