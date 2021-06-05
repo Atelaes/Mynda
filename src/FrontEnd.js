@@ -2626,6 +2626,8 @@ class MynLibTable extends React.Component {
       }
     }
 
+    if (oldProps.isExpanded !== this.props.isExpanded) this.reset();
+
     // no need for the below anymore, we made a component for it
     // // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
     // // so that when the CSS marquee scrolls to 100%, that means it will scroll just enough to show the end of the text;
