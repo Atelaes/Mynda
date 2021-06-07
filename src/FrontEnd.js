@@ -366,8 +366,8 @@ class Mynda extends React.Component {
     // note if the video is the first or last video in the playlist (as currently sorted)
     // so that in the video editor, we can gray out the 'next' or 'previous' button
     let boundaryFlag = '';
-    if (this.state.playlistRowManifest[0].rowID === rowID) boundaryFlag = 'first';
-    if (this.state.playlistRowManifest[this.state.playlistRowManifest.length-1].rowID === rowID) boundaryFlag = 'last';
+    if (/*this.state.playlistRowManifest.length > 0 && */this.state.playlistRowManifest[0].rowID === rowID) boundaryFlag = 'first';
+    if (/*this.state.playlistRowManifest.length > 0 && */this.state.playlistRowManifest[this.state.playlistRowManifest.length-1].rowID === rowID) boundaryFlag = 'last';
 
     this.setState({detailRowID: rowID, detailVideo: detailVideo, detailRowBoundaryFlag: boundaryFlag});
   }
@@ -1874,6 +1874,7 @@ class MynLibTable extends React.Component {
     this.clickTimer = null;
 
     this.state = {
+      content: null,
       sortKey: null,
       sortAscending: true,
       sortedRows: [],
@@ -2431,13 +2432,73 @@ class MynLibTable extends React.Component {
     });
 
     // set the sort state in state
-    this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
+    // this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
+    this.state = {...this.state, sortKey: key, sortAscending: ascending , sortedRows: rows};
 
     // report the sort state to MynLibrary
     if (this.props.reportSort) {
       this.props.reportSort(this.props.collectionID,key,ascending);
     }
 
+  }
+
+ showHide() {
+    // if in a hierarchical playlist and this table is collapsed, render nothing
+    if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
+      this.setState({content: null});
+
+    // otherwise, whether in an expanded table in a hierarchical playlist,
+    // or in a table in a flat playlist, render the table
+    } else {
+      this.reset();
+
+      // report the sorted rows to MynLibrary
+      this.props.reportSortedManifest(this.tableID,this.state.sortedRows);
+
+      // if this table is part of a hierarchical playlist,
+      // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
+      // in which case MynLibrary will have given us the 'provided' prop,
+      // so if it has, we add the appropriate bits to make the table body droppable
+      console.log(`The sorted rows are ${this.state.sortedRows}.`);
+      let tBody = null;
+      if (this.props.provided) {
+        tBody = (
+          <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
+            {this.state.sortedRows.map(row => row.jsx)}
+            {this.props.provided.placeholder}
+          </tbody>
+        );
+      } else {
+        tBody = (
+          <tbody>
+            {this.state.sortedRows.map(row => row.jsx)}
+          </tbody>
+        );
+      }
+
+      let content = (
+        <div className="movie-table-container">
+          {/*<div style={{position:'absolute'}}>
+            {this.state.shiftDown ? 'SHIFT ' : ''}
+            {this.state.ctrlDown ? 'CTRL' : ''}
+            {this.state.batchSelected}
+          </div>*/}
+          <table className="movie-table" id={this.tableID}>
+            <thead>
+              <tr id="main-table-header-row">
+                <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
+                {this.props.columns.map(col => (
+                  <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
+                ))}
+              </tr>
+            </thead>
+            {tBody}
+          </table>
+        </div>
+      );
+
+      this.setState({content:content});
+    }
   }
 
   // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
@@ -2483,6 +2544,7 @@ class MynLibTable extends React.Component {
       this.state.sortKey = null;
       try {
         this.requestSort(this.props.initialSort, this.props.initialSortAscending);
+        // console.log('sorting by initialSort')
       } catch(e) {
         // console.log("No initial sort parameter")
         // console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
@@ -2626,7 +2688,10 @@ class MynLibTable extends React.Component {
       }
     }
 
-    if (oldProps.isExpanded !== this.props.isExpanded) this.reset();
+    if (oldProps.isExpanded !== this.props.isExpanded) {
+      console.log(`isExpanded change from ${oldProps.isExpanded} to ${this.props.isExpanded}`);
+      this.showHide();
+    }
 
     // no need for the below anymore, we made a component for it
     // // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
@@ -2662,8 +2727,8 @@ class MynLibTable extends React.Component {
     this._isMounted = true;
     // console.log("--MOUNTED--");
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
-    // populate and sort the table (by initial values)
-    this.reset(true);
+    // render the table
+    this.showHide();
 
   }
 
@@ -2682,49 +2747,7 @@ class MynLibTable extends React.Component {
   render() {
     // console.log('----MynLibTable RENDER----');
 
-    // report the sorted rows to MynLibrary
-    this.props.reportSortedManifest(this.tableID,this.state.sortedRows);
-
-    // if this table is part of a hierarchical playlist,
-    // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
-    // in which case MynLibrary will have given us the 'provided' prop,
-    // so if it has, we add the appropriate bits to make the table body droppable
-    let tBody = null;
-    if (this.props.provided) {
-      tBody = (
-        <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
-          {this.state.sortedRows.map(row => row.jsx)}
-          {this.props.provided.placeholder}
-        </tbody>
-      );
-    } else {
-      tBody = (
-        <tbody>
-          {this.state.sortedRows.map(row => row.jsx)}
-        </tbody>
-      );
-    }
-
-    return  (
-      <div className="movie-table-container">
-        {/*<div style={{position:'absolute'}}>
-          {this.state.shiftDown ? 'SHIFT ' : ''}
-          {this.state.ctrlDown ? 'CTRL' : ''}
-          {this.state.batchSelected}
-        </div>*/}
-        <table className="movie-table" id={this.tableID}>
-          <thead>
-            <tr id="main-table-header-row">
-              <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
-              {this.props.columns.map(col => (
-                <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
-              ))}
-            </tr>
-          </thead>
-          {tBody}
-        </table>
-      </div>
-    )
+    return this.state.content;
   }
 }
 
