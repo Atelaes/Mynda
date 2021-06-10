@@ -1158,8 +1158,19 @@ class MynLibrary extends React.Component {
       playlist = true;
     }
 
-    if (videos) this.setState({videos:_.cloneDeep(this.props.videos)});
-    if (collections) this.setState({collections:_.cloneDeep(this.props.collections)});
+    // if (videos) this.setState({videos:_.cloneDeep(this.props.videos)});
+    // if (collections) this.setState({collections:_.cloneDeep(this.props.collections)});
+    // if (videos || collections) this.createCollectionsMap();
+    if (videos && !collections) {
+      this.setState({videos:_.cloneDeep(this.props.videos)},()=>this.createCollectionsMap());
+    } else if (collections && !videos) {
+      this.setState({collections:_.cloneDeep(this.props.collections)},()=>this.createCollectionsMap());
+    } else if (collections && videos) {
+      this.setState({
+        videos:_.cloneDeep(this.props.videos),
+        collections:_.cloneDeep(this.props.collections)
+      },()=>this.createCollectionsMap());
+    }
 
     if (collections || playlist) this.state.manifest = {};
   }
@@ -1171,6 +1182,7 @@ class MynLibrary extends React.Component {
     //   console.log(this.state.videos);
     // });
     //
+    this.createCollectionsMap();
   }
 
   createCollectionsMap() {
@@ -1186,6 +1198,8 @@ class MynLibrary extends React.Component {
     }
     // and add it to the hierarchy
     this.state.hierarchy.push(this.findCollections(uncategorized));
+
+    this.setState({hierarchy:this.state.hierarchy});
   }
 
   // recursive function that walks down the collections and returns each branch
@@ -1410,8 +1424,24 @@ class MynLibrary extends React.Component {
     element.parentNode.classList.toggle("expanded");
     element.parentNode.classList.toggle("collapsed");
 
-    this.state.isExpanded[colContainerID] = !this.state.isExpanded[colContainerID]
-    this.setState({isExpanded:this.state.isExpanded});
+    this.state.isExpanded[colContainerID] = !this.state.isExpanded[colContainerID];
+
+    // this.setState({isExpanded:this.state.isExpanded});
+
+    // So.........
+    // this here (below) is not ideal, but let me explain:
+    // this.createCollectionsMap() used to be called IN the render function,
+    // so it was happening all the fucking time; this is better than that;
+    // since I took that out, when a collection is expanded,
+    // the table within it no longer knows that it has been expanded,
+    // since the JSX for the table is in the state.hierarchy variable, which only gets
+    // updated from this.createCollectionsMap(), so we're calling it here manually;
+    // ultimately, the real solution is to rewrite MynLibrary and MynLibTable
+    // altogether (because we should be toggling whole subsets of collections, not
+    // just the tables at their bottom); a medium-term solution would be to move
+    // the MynLibTable call outside the hierarchy, emptying and replacing it here
+    // when its collection gets toggled; I'm just not interested in doing that now;
+    this.createCollectionsMap();
   }
 
   // when dragging a video row over a collapsed collection header, expand that collection (after a delay)
@@ -1752,7 +1782,7 @@ class MynLibrary extends React.Component {
     // in a hierarchy based on the collections that the videos in this
     // playlist are members of, and display that hierarchy
     if (this.props.view === "hierarchical") {
-      this.createCollectionsMap();
+      // this.createCollectionsMap();
 
       tables = (
         <DragDropContext onDragEnd={this.onDragEnd} onDragStart={this.onDragStart}>
@@ -1880,7 +1910,8 @@ class MynLibTable extends React.Component {
     this.clickTimer = null;
 
     this.state = {
-      content: null,
+      tHeadContent: null,
+      tBodyContent: null,
       sortKey: null,
       sortAscending: true,
       sortedRows: [],
@@ -2459,7 +2490,7 @@ class MynLibTable extends React.Component {
  showHide(initialSort,resetOrder) {
     // if in a hierarchical playlist and this table is collapsed, render nothing
     if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
-      this.setState({content: null});
+      this.setState({tBodyContent:null, tHeadContent:null});
 
     // otherwise, whether in an expanded table in a hierarchical playlist,
     // or in a table in a flat playlist, render the table
@@ -2474,45 +2505,19 @@ class MynLibTable extends React.Component {
       // in which case MynLibrary will have given us the 'provided' prop,
       // so if it has, we add the appropriate bits to make the table body droppable
       // console.log(`The sorted rows are ${this.state.sortedRows}.`);
-      let tBody = null;
-      if (this.props.provided) {
-        console.log("props.provided exists!");
-        tBody = (
-          <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
-            {this.state.sortedRows.map(row => row.jsx)}
-            {this.props.provided.placeholder}
-          </tbody>
-        );
-      } else {
-        tBody = (
-          <tbody>
-            {this.state.sortedRows.map(row => row.jsx)}
-          </tbody>
-        );
-      }
 
-      let content = (
-        <div className="movie-table-container">
-          {/*<div style={{position:'absolute'}}>
-            {this.state.shiftDown ? 'SHIFT ' : ''}
-            {this.state.ctrlDown ? 'CTRL' : ''}
-            {this.state.batchSelected}
-          </div>*/}
-          <table className="movie-table" id={this.tableID}>
-            <thead>
-              <tr id="main-table-header-row">
-                <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
-                {this.props.columns.map(col => (
-                  <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
-                ))}
-              </tr>
-            </thead>
-            {tBody}
-          </table>
-        </div>
+      let tBodyContent = this.state.sortedRows.map(row => row.jsx);
+
+      let tHeadContent = (
+        <tr id="main-table-header-row">
+          <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
+          {this.props.columns.map(col => (
+            <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
+          ))}
+        </tr>
       );
 
-      this.setState({content:content});
+      this.setState({tBodyContent:tBodyContent, tHeadContent:tHeadContent});
     }
   }
 
@@ -2675,7 +2680,7 @@ class MynLibTable extends React.Component {
       console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
       // setTimeout(() => this.reset(true,true), 1000);
       this.showHide(true,true);
-    } else {
+    } else if (this.props.view === 'flat' || this.props.isExpanded) {
       // console.log('playlist is the same, checking if any videos changed...');
       // if the playlist was NOT changed, but
       // if any videos in the playlist were changed...
@@ -2687,11 +2692,13 @@ class MynLibTable extends React.Component {
       // we have to sort the movies array before comparing it,
       // otherwise the conditional fires when the elements change order,
       // whereas we want them to change only when a movie is changed, added, or removed
-      let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id - b.id);
-      let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id - b.id);
+      let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id > b.id ? 1 : (a.id < b.id ? -1 : 0));
+      let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id > b.id ? 1 : (a.id < b.id ? -1 : 0));
+      // console.log(tempOld);
+      // console.log(tempNew);
       if (!_.isEqual(tempOld,tempNew) || this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
-        // console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
-        let diff = getArrayDiff(tempOld,tempNew);
+        console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
+        // let diff = getArrayDiff(tempOld,tempNew);
         // console.log(diff);
         // diff.map(key => {
         //   console.log(`Old[${key}]: ${tempOld[key].title}\nNew[${key}]: ${tempNew[key].title}`);
@@ -2707,7 +2714,7 @@ class MynLibTable extends React.Component {
 
     if (oldProps.isExpanded !== this.props.isExpanded) {
       console.log(`isExpanded change from ${oldProps.isExpanded} to ${this.props.isExpanded}`);
-      this.showHide();
+      this.showHide(false,true);
     }
 
     // no need for the below anymore, we made a component for it
@@ -2745,7 +2752,7 @@ class MynLibTable extends React.Component {
     // console.log("--MOUNTED--");
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
     // render the table
-    this.showHide();
+    this.showHide(true,true);
 
   }
 
@@ -2764,7 +2771,33 @@ class MynLibTable extends React.Component {
   render() {
     // console.log('----MynLibTable RENDER----');
 
-    return this.state.content;
+    // return this.state.content;
+
+    return (
+      <div className="movie-table-container">
+        <table className="movie-table" id={this.tableID}>
+          <thead>
+            {this.state.tHeadContent}
+          </thead>
+          {(() => {
+            if (this.props.provided) {
+              return (
+                <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
+                  {this.state.tBodyContent}
+                  {this.props.provided.placeholder}
+                </tbody>
+              );
+            } else {
+              return (
+                <tbody>
+                  {this.state.tBodyContent}
+                </tbody>
+              );
+            }
+          })()}
+        </table>
+      </div>
+    );
   }
 }
 
