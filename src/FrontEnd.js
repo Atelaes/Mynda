@@ -2441,7 +2441,13 @@ class MynLibTable extends React.Component {
 
     // set the sort state in state
     // this.setState({ sortKey: key, sortAscending: ascending , sortedRows: rows});
-    this.state = {...this.state, sortKey: key, sortAscending: ascending , sortedRows: rows};
+    // since we don't need to trigger a re-render here,
+    // and we need these changes to happen synchronously,
+    // we don't use setState
+    // this.state = {...this.state, sortKey: key, sortAscending: ascending , sortedRows: rows};
+    this.state.sortKey = key;
+    this.state.sortAscending = ascending;
+    this.state.sortedRows = rows;
 
     // report the sort state to MynLibrary
     if (this.props.reportSort) {
