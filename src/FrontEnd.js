@@ -503,15 +503,17 @@ class Mynda extends React.Component {
 
   // called from the nav component to change the current playlist
   setPlaylist(id,element) {
-    if (!element) {
-      element = document.getElementById("playlist-" + id);
-    }
+    // console.log('===== set playlist =====')
+    // if (!element) {
+    //   element = document.getElementById("playlist-" + id);
+    // }
 
-    // if this playlist is one of the tabs, visually bring that tab to the front
-    if (element) {
-      Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
-      element.classList.add('selected');
-    }
+    // // if this playlist is one of the tabs, visually bring that tab to the front
+    // if (element) {
+    //   console.log('setting selected class................')
+    //   Array.from(element.parentNode.children).map((child) => { child.classList.remove('selected') });
+    //   element.classList.add('selected');
+    // }
 
     // set the playlist, and erase any row selection from the previous playlist (only if we actually switched playlists)
     let videos = this.playlistFilter(id);
@@ -560,7 +562,7 @@ class Mynda extends React.Component {
   // set the lengths of all the playlists
   setPlaylistLengths(shy) {
     // if shy == true, then we only save the playlist lengths for ones we haven't saved already;
-    // if it's falsy, then we overwrite all of them
+    // if it's falsy, then we overwrite all of them;
     this.state.playlists.map(pl => {
       if (pl.id && (!shy || typeof this.state.playlistLength[pl.id] === "undefined")) {
         // running the playlistFilter function will set the
@@ -968,6 +970,7 @@ class MynNav extends React.Component {
   // }
 
   componentDidUpdate(oldProps) {
+    // console.log('MYNNAV PLAYLIST ID::::' + this.props.currentPlaylistID);
     // if (oldProps.videoEditFlag !== this.props.videoEditFlag || oldProps.playlistEditFlag !== this.props.playlistEditFlag) {
     //   // a video was changed, so we want to recalculate the number of videos
     //   // in each playlist to update the displays
@@ -1008,18 +1011,21 @@ class MynNav extends React.Component {
             if (playlist.tab) {
               let numVids = this.props.playlistLength[playlist.id]
 
+              let className = playlist.view;
+              if (playlist.id === this.props.currentPlaylistID) className += ' selected';
+
               return (
                 <li
                   key={playlist.id}
                   id={"playlist-" + playlist.id}
                   title={numVids}
                   style={{zIndex: 100 - index}}
-                  className={playlist.view}
+                  className={className}
                   onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
                   {playlist.id === 'new' && numVids > 0 ? <div id='nav-message'>({numVids})</div> : null}
-                  {playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null}
+                  {/*playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null*/}
                   {/*newVidAlert*/}
                 </li>
               );
