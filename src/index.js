@@ -576,18 +576,12 @@ async function addVideoController() {
   // }
   let metaStart = new Date();
   let unchecked = library.media.filter(v => v !== null && !v.metadata.checked);
-<<<<<<< HEAD
-  win.webContents.send('status-update', {action: 'metadata', numTotal: unchecked.length});
-  for (let i=0; i<unchecked.length; i++) {
-    await getMetaData(unchecked[i]);
-=======
   let allMeta = {};
   for (let i=0; i<unchecked.length; i++) {
     let metaVideo = unchecked[i];
     if (i%5 === 0)
       win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: libMulch.length});
     allMeta[metaVideo.id] = await getMetaData(metaVideo);
->>>>>>> Atelaes
   }
   let toBeMeta = library.media;
   let secondMetaStart = new Date();
