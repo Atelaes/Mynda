@@ -600,8 +600,18 @@ async function addVideoController() {
       win.webContents.send('status-update', {action: 'metadata', numCurrent: i, numTotal: libMulch.length});
     allMeta[metaVideo.id] = await getMetaData(metaVideo);
   }
-  win.webContents.send('status-update', {action: 'metadata_save', numTotal: Object.keys(allMeta).length});
-  console.log(`Adding metadata for ${Object.keys(allMeta).length} videos`)
+
+  // just for the purposes of notifying the user (and logging),
+  // find out how many videos we actually got something for
+  let numSuccessful = '[unknown number of]';
+  try {
+    numSuccessful = Object.keys(allMeta).filter(key => allMeta[key].hasOwnProperty('checked') && Object.keys(allMeta[key]).length > 1).length;
+  } catch(err) {
+    console.log(err);
+  }
+
+  win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
+  console.log(`Adding metadata for ${numSuccessful} videos`)
   let toBeMeta = library.media;
   let secondMetaStart = new Date();
   for (let i=0; i<toBeMeta.length; i++) {
@@ -809,7 +819,6 @@ async function getMetaData(video) {
 
     // some files (.mkv) will give us metadata, but do not store the duration for some reason;
     // in this case, we analyze the file with ffmpeg to obtain the duration
-    // (which will be added to the video object later in a separate library call)
     if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
       returnObj.duration = await getDurationFromFFmpeg(file,video.id);
     }
