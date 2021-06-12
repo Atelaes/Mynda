@@ -568,8 +568,7 @@ async function addVideoController() {
   let numNewVids = 0;
   win.webContents.send('status-update', {action: 'add', numTotal: libMulch.length});
   for (let i=0; i<libMulch.length; i++) {
-    if (i%5 === 0)
-      win.webContents.send('status-update', {action: 'add', numCurrent: i, numTotal: libMulch.length});
+    win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {
@@ -596,8 +595,7 @@ async function addVideoController() {
   let allMeta = {};
   for (let i=0; i<unchecked.length; i++) {
     let metaVideo = unchecked[i];
-    if (i%5 === 0)
-      win.webContents.send('status-update', {action: 'metadata', numCurrent: i, numTotal: libMulch.length});
+    win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: libMulch.length});
     allMeta[metaVideo.id] = await getMetaData(metaVideo);
   }
 
