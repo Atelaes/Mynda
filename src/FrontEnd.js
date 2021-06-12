@@ -4665,9 +4665,29 @@ class MynSettingsPrefs extends React.Component {
       'MynEditorSearch-confirm-select' : 'Confirm selection of search result in video editor',
       'MynEditor-confirm-exit' : 'Confirm on exiting video editor without saving',
       'MynEditorEdit-confirm-revert' : 'Confirm on reverting to saved values in video editor',
-      'MynLibrary-confirm-convertTerminalCol' : (<span>{'Confirm on dragging a video to a collection in the library pane'}<br/>{'when it would mean deleting its child collections'}</span>),
-      'MynLibTable-confirm-inlineEdit' : (<span>{'Confirm when editing a video directly from a widget'}<br/>{'in a table row (e.g. the rating stars)'}</span>),
-      'MynSettingsCollections-confirm-convertToNonTerminal' : (<span>{'Confirm adding a child collection in the settings pane'}<br/>{'when it would mean removing the videos from the parent collection'}</span>),
+      'MynLibrary-confirm-convertTerminalCol' : (
+        <span>
+          {'Confirm on dragging a video to a collection in the library pane'}
+          <br/>
+          {'when it would mean deleting its child collections'}
+          <MynTooltip tip={`A collection can either contain other collections or videos, but not both. If it contains videos, it is a 'terminal' collection. If you drag a video into a non-terminal collection, it must remove any child collections from itself (and grandchildren, etc., recursively) in order to convert itself to a terminal collection which can contain the video(s) you want to add to it. This will permanently delete all of its descendant collections (though any videos contained therein will not be affected aside from their participation in the deleted collections).`} />
+        </span>
+      ),
+      'MynLibTable-confirm-inlineEdit' : (
+        <span>
+          {'Confirm when editing a video directly from a widget'}
+          <br/>
+          {'in a table row (e.g. the rating stars)'}
+        </span>
+      ),
+      'MynSettingsCollections-confirm-convertToNonTerminal' : (
+        <span>
+          {'Confirm adding a child collection in the settings pane'}
+          <br/>
+          {'when it would mean removing the videos from the parent collection'}
+          <MynTooltip tip={`A collection can either contain other collections or videos, but not both. If it contains videos, it is a 'terminal' collection. If you add a child collection to a terminal collection (by clicking its ${'\uFF0B'} button in the Settings ${'\u279E'} Collections pane), it must remove any videos from itself in order to convert itself to a non-terminal collection. This will NOT remove the videos from the library itself, nor from any other collections they might be in.`} />
+        </span>
+      ),
       'MynSettingsCollections-confirm-delete' : 'Confirm deletion of collections in the settings pane'
     }
 
@@ -4708,7 +4728,7 @@ class MynSettingsPrefs extends React.Component {
               onChange={(e) => this.update('include-new',e.target.checked)}
             />
             Include new videos in playlists
-            <MynTooltip tip="If unchecked, newly added videos will appear only in the 'New' playlist until edited/tagged" />
+            <MynTooltip tip="If unchecked, newly added videos will appear only in the 'New' playlist until edited (or auto-tagged)" />
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
             <h2>Hide Descriptions:</h2>
@@ -4718,6 +4738,7 @@ class MynSettingsPrefs extends React.Component {
               onChange={(e) => this.update('hide-description',e.target.checked ? "hide" : "show")}
             />
             Hide plot summaries
+            <MynTooltip tip="Hide plot summaries in the Details pane until clicked on" />
           </li>
           <li id='settings-prefs-userratingavg' className='subsection'>
             <h2>Average Rating:</h2>
@@ -4727,6 +4748,7 @@ class MynSettingsPrefs extends React.Component {
               onChange={(e) => this.update('user-rating-avg',e.target.checked)}
             />
             Include user rating in avg rating
+            <MynTooltip tip="If checked, the user rating (i.e. the rating stars) will be included along with the external ratings (Rotten Tomatoes, Metacritic, and IMDb) when calculating the average (though only if you've actually rated it). If unchecked, the average will only be calculated from the external ratings." />
           </li>
           <li id='settings-prefs-showdialogs' className='subsection' style={{display: this.props.settings.preferences.override_dialogs && Object.keys(this.props.settings.preferences.override_dialogs).length > 0 ? 'block' : 'none'}}>
             <h2>Show Confirmation Dialogs:</h2>
