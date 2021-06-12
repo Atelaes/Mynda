@@ -789,11 +789,13 @@ class Mynda extends React.Component {
         // // (if they don't care which one or what the change was)
         // this.setState({videoEditFlag:uuidv4()});
 
-        // check all the playlist lengths
-        this.setPlaylistLengths();
 
         // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
+
+        // check all the playlist lengths (pass true to skip the one we just set above)
+        this.setPlaylistLengths(true);
+
         // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
         this.refreshDetails(timeout);
       }
@@ -807,7 +809,11 @@ class Mynda extends React.Component {
         console.log('a playlist was edited');
         // reload the playlists, and then re-render the current playlist
         this.setState({playlists:this.props.library.playlists}, () => {
+
           this.setPlaylist(this.state.currentPlaylistID);
+
+          // check all the playlist lengths (pass true to skip the one we just set above)
+          this.setPlaylistLengths(true);
         });
       }
 

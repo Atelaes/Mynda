@@ -1094,7 +1094,7 @@ async function autoTag() {
     if (resultsObject.success) {
       let results = resultsObject.data;
       if (Array.isArray(results)) {
-        if (results.length === 1) {
+        if (results.length > 0 && results.length <= 4) {
           newVideo.imdbID = results[0].imdbID;
           resultsObject = await OmdbHelper.search(newVideo);
           results = resultsObject.data;
