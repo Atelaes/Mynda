@@ -60,10 +60,24 @@ async function start() {
     console.log(`Couldn't load React tools.`);
     console.log(err);
   }
-  createWindow();  //createWindow needs to come first else we get a big delay.
+  await createWindow();  //createWindow needs to come first else we get a big delay.
   eraseTempImages();
   await cleanLibrary();
   checkWatchFolders();
+
+  // testNotify(0);
+}
+
+function testNotify(i) {
+  let max = 250;
+  win.webContents.send('status-update', {action: 'add', numCurrent: i, numTotal: max});
+
+  // if (i === 0) win.webContents.send('status-update', {action: 'add'});
+  if (i < max) {
+    setTimeout(() => testNotify(i+1),20);
+  } else {
+    win.webContents.send('status-update', {action: ''});
+  }
 }
 
 function eraseTempImages() {
@@ -93,7 +107,7 @@ function eraseTempImages() {
   });
 }
 
-function createWindow() {
+async function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -105,8 +119,8 @@ function createWindow() {
     }
   })
 
-  //win.webContents.openDevTools();
-  win.loadFile('src/index.html');
+  win.webContents.openDevTools();
+  await win.loadFile('src/index.html');
   // win.loadFile('src/player.html');
 }
 
@@ -301,7 +315,10 @@ function checkWatchFolders() {
       findVideosFromFolder(thisNode);
     }
   }
-  if (folders.length === 0) console.log('Done parsing. No watchfolders found.');
+  if (folders.length === 0) {
+    console.log('Done parsing. No watchfolders found.');
+    win.webContents.send('status-update', {action: ''});
+  }
 }
 
 // recursively maps out the folder structure and files (only videos/DVDs and subtitle files)

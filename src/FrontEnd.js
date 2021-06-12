@@ -3103,6 +3103,7 @@ class MynNotify extends React.Component {
 
     this.render = this.render.bind(this);
     this.statusUpdate = this.statusUpdate.bind(this);
+    this.animateEllipsis = this.animateEllipsis.bind(this);
   }
 
   on(status) {
@@ -3113,25 +3114,27 @@ class MynNotify extends React.Component {
 
     // if it's not already on, turn on ellipsis animation and set the state to on
     if (!this.state.on) {
-      this.setState({on:true});
-      this.animateEllipsis();
+      // this.setState({on:true});
+      this.state.on = true;
+      this.startEllipsis();
+
+      // give the 'notify-on' class to all the panes
+      // to allow for any css manipulation
+      Array.from(document.getElementsByClassName('pane')).map(el => {
+        el.classList.add('notify-on');
+      });
     }
+
     // if the status has changed, update the status in state
     // if (!_.isEqual(status,this.state.status)) {
     //   this.setState({status:status});
     // }
     this.setState({statusMessage:this.messageFor(status)})
-
-    // give the 'notify-on' class to all the panes
-    // to allow for any css manipulation
-    Array.from(document.getElementsByClassName('pane')).map(el => {
-      el.classList.add('notify-on');
-    })
   }
 
   off() {
     this.setState({on:false, status: {}});
-    this.deAnimateEllipsis();
+    this.stopEllipsis();
 
     // remove the 'notify-on' class from all the panes
     Array.from(document.getElementsByClassName('pane')).map(el => {
@@ -3140,8 +3143,11 @@ class MynNotify extends React.Component {
   }
 
   statusUpdate(status) {
-    console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
+    // console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
+    // console.log('this.state.on: ' + this.state.on)
     if (status.action === '') {
+      // console.log('STATUS.ACTION empty, turning off')
+      // console.log(status)
       this.off();
     } else {
       this.on(status);
@@ -3168,18 +3174,40 @@ class MynNotify extends React.Component {
     return textFor[status.action];
   }
 
-  animateEllipsis() {
-    if (this.ellipsisAnimation) return;
+  startEllipsis() {
+    if (this.ellipsisAnimation) {
+      // console.log("trying to start ellipsis, but thinks it's already started: ");
+      // console.log(this.ellipsisAnimation);
+      return;
+    }
 
-    this.setState({ellipsis:""});
-    this.ellipsisAnimation = setInterval(() => {
-      this.setState({ellipsis:".".repeat((this.state.ellipsis.length+1)%4)})
-    },400);
+    // console.log('starting ellipsis........................')
+
+    this.setState({ellipsis:""}, () => {
+      this.animateEllipsis();
+    });
+
+    // this.ellipsisAnimation = setInterval(() => {
+    //   this.state.ellipsis = ".".repeat((this.state.ellipsis.length+1)%4)
+    //   this.setState({ellipsis:this.state.ellipsis});
+    // },400);
+
   }
 
-  deAnimateEllipsis() {
-    this.setState({ellipsis:""});
-    clearInterval(this.ellipsisAnimation);
+  stopEllipsis() {
+    // console.log('stopping ellipsis........................')
+
+    clearTimeout(this.ellipsisAnimation);
+    this.ellipsisAnimation = null; // we have to do this to make sure the check in this.startEllipsis works
+    this.state.ellipsis = "";
+    this.setState({ellipsis:this.state.ellipsis});
+  }
+
+  animateEllipsis() {
+    this.setState({ellipsis:".".repeat((this.state.ellipsis.length+1)%4)}, () => {
+      // console.log('setting timeout for ellipsisAnimation')
+      this.ellipsisAnimation = setTimeout(this.animateEllipsis,400);
+    });
   }
 
   componentDidMount() {
