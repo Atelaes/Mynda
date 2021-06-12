@@ -3157,11 +3157,12 @@ class MynNotify extends React.Component {
     if (status.numTotal) _t = ` ${status.numTotal}`;
 
     let textFor = {
-      'export'    : `Exporting${_c}${_of}${_t} videos`,
-      'add'       : `Adding${_c}${_of}${_t} videos`,
-      'metadata'  : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
-      'autotag'   : `Auto-tagging${_c}${_of}${_t} videos`,
-      'check'     : 'Checking for new videos'
+      'export'        : `Exporting${_c}${_of}${_t} videos`,
+      'add'           : `Adding${_c}${_of}${_t} videos`,
+      'metadata'      : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
+      'metadata_save' : `Saving metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
+      'autotag'       : `Auto-tagging${_c}${_of}${_t} videos`,
+      'check'         : 'Checking for new videos'
     }
 
     return textFor[status.action];

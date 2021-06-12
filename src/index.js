@@ -552,7 +552,7 @@ async function addVideoController() {
   win.webContents.send('status-update', {action: 'add', numTotal: libMulch.length});
   for (let i=0; i<libMulch.length; i++) {
     if (i%5 === 0)
-      win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
+      win.webContents.send('status-update', {action: 'add', numCurrent: i, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {
@@ -580,19 +580,22 @@ async function addVideoController() {
   for (let i=0; i<unchecked.length; i++) {
     let metaVideo = unchecked[i];
     if (i%5 === 0)
-      win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: libMulch.length});
+      win.webContents.send('status-update', {action: 'metadata', numCurrent: i, numTotal: libMulch.length});
     allMeta[metaVideo.id] = await getMetaData(metaVideo);
   }
+  win.webContents.send('status-update', {action: 'metadata_save', numTotal: Object.keys(allMeta).length});
+  console.log(`Adding metadata for ${Object.keys(allMeta).length} videos`)
   let toBeMeta = library.media;
   let secondMetaStart = new Date();
-  for (let i=0; i<unchecked.length; i++) {
+  for (let i=0; i<toBeMeta.length; i++) {
     let metaVideo = toBeMeta[i];
     if (allMeta[metaVideo.id]) {
       metaVideo.metadata = allMeta[metaVideo.id];
     }
   }
-  library.replace('media', toBeMeta);
-  win.webContents.send('status-update', {action: ''});
+  library.replace('media', toBeMeta, (err) => {
+    win.webContents.send('status-update', {action: ''});
+  });
 }
 
 // Takes a video object and fills it out
