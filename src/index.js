@@ -1112,53 +1112,109 @@ async function autoTag() {
   let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried));
   let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
+  let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
+
+  // entire library loop
   for (let i=0; i<newMedia.length; i++) {
+    // tell the user what number we're on
     win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
+
+    // create new video object
     let newVideo = newMedia[i];
-    let disposition = '';
     console.log(`Running autotag on ${newVideo.title}.`);
+
+    // get search results
+    let disposition = '';
     let resultsObject = await OmdbHelper.search(newVideo);
+
+    // check results
     if (resultsObject.success) {
       let results = resultsObject.data;
+      // if we got more than one result (or an empty array of results, I suppose?)
       if (Array.isArray(results)) {
+        // if there were between 1 and 4 results (inclusive), pick the first one
         if (results.length > 0 && results.length <= 4) {
+          // in order to pick the first result, we get the imdbID and search again using that
           newVideo.imdbID = results[0].imdbID;
           resultsObject = await OmdbHelper.search(newVideo);
           results = resultsObject.data;
+          // if successful in picking the first result, save it
           if (resultsObject.success && !Array.isArray(results)) {
             results.new = false;
-            library.replace(`media.id=${newVideo.id}`, results);
+            batchSave.push(results);
+            // library.replace(`media.id=${newVideo.id}`, results);
             disposition = 'Success';
           } else {
             disposition = 'Failure after getting imdb id??';
           }
         } else {
+          // there were too many results (or an empty array of results?)
+          // but we still want to save the video object so we can set autotagTried to true
           //This means we've tried and failed in a predicted manner, let's not try again.
           newVideo.autotagTried = true;
-          library.replace(`media.id=${newVideo.id}`, newVideo);
+          batchSave.push(newVideo);
+          // library.replace(`media.id=${newVideo.id}`, newVideo);
           disposition = 'Too many results';
         }
       } else {
+        // we got just a single result, so save it
         results.new = false;
-        library.replace(`media.id=${newVideo.id}`, results);
+        batchSave.push(results);
+        // library.replace(`media.id=${newVideo.id}`, results);
         disposition = 'Success';
       }
     } else if (resultsObject.failure === 'No results') {
+      // we got no results, but we still want to save the video object so we can set autotagTried to true
       //This means we've tried and failed in a predicted manner, let's not try again.
       newVideo.autotagTried = true;
-      library.replace(`media.id=${newVideo.id}`, newVideo);
+      batchSave.push(newVideo);
+      // library.replace(`media.id=${newVideo.id}`, newVideo);
       disposition = resultsObject.failure;
     } else {
+      // some other failure mode, do not save
       disposition = resultsObject.failure;
     }
+
+    // if we've accumulated enough videos to save, save them
+    if (batchSave.length >= 10) {
+      saveBatch(batchSave);
+      batchSave = []; // empty batchShave for the next batch
+    }
+
+    // some debug logging
     autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
     autoLog.push(`${newVideo.title}: ${disposition}`);
+  } // end library loop
+
+  // save any leftovers at the end
+  if (batchSave.length > 0) {
+    saveBatch(batchSave);
   }
+
   autoLog.sort();
   console.log('===AutoTag Finished===');
   console.log(JSON.stringify(autoStats));
   console.log(autoLog.join('\n'));
+
+  // clear the user notification
   win.webContents.send('status-update', {action: ''});
+}
+
+function saveBatch(batch) {
+  let saveMedia = library.media;
+  batch.map(newVid => {
+    for (let i=0; i<saveMedia.length; i++) {
+      if (saveMedia[i].id === newVid.id) {
+        saveMedia[i] = newVid;
+        break;
+      }
+    }
+  });
+  // I don't THINK the following is necessary, because saveMedia is not cloned,
+  // but we do need to make sure library.media is getting updated as we go,
+  // otherwise queued library saves will overwrite each other's updates
+  library.media = saveMedia;
+  library.replace('media',saveMedia);
 }
 
 async function exportFiles(drive) {

@@ -55,7 +55,7 @@ async function search(video) {
         } else {
           //If not, then we have a single entry with full info
           //Format the new info, merge it into the given video object, and return.
-          video = incorporateMetaData(video, response.data);
+          video = addTagsToVideo(video, response.data);
           if (video.artwork && video.artwork !== 'N/A') {
             try {
               video.artwork = await downloadArt(video.artwork) || video.artwork;
@@ -186,7 +186,7 @@ function pollOMDB(urlParts) {
     })
 }
 
-function incorporateMetaData(video, data) {
+function addTagsToVideo(video, data) {
   //console.log(JSON.stringify(video));
   video.imdbID = data.imdbID;
   video.title = data.Title;
