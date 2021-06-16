@@ -9,9 +9,11 @@ const Library = require("./Library.js");
 const Collections = require("./Collections.js");
 const dl = require('./download');
 const _ = require('lodash');
+const pathToFFmpeg = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(pathToFFmpeg);
 const ffprobe = require('ffprobe');
-const ffprobeStatic = require('ffprobe-static');
+const ffprobeStatic = {};// require('ffprobe-static');
 const OmdbHelper = require('./OmdbHelper.js');
 const { lsDevices } = require('fs-hard-drive');
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
@@ -811,18 +813,24 @@ async function getMetaData(video) {
         //   vidObj.metadata.duration = Number(stream.duration);
         // }
       } catch(err) {
-        console.log(`Error storing metadata for ${file}: ${err}`);
+        console.log(`Error storing ffprobe metadata for ${file}: ${err}`);
       }
     }
+  } catch(err) {
+    console.log(`Unable to retrieve metadata with ffprobe for ${file}: ${err}`);
+  }
 
+  try {
     // some files (.mkv) will give us metadata, but do not store the duration for some reason;
     // in this case, we analyze the file with ffmpeg to obtain the duration
     if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
       returnObj.duration = await getDurationFromFFmpeg(file,video.id);
     }
   } catch(err) {
-    console.log(`Unable to retrieve metadata for ${file}: ${err}`);
+    console.log(`Unable to retrieve metadata with ffmpeg for ${file}: ${err}`);
   }
+
+
   //Replace the library entry with our new version.
   //Even if everything failed, we've set metadata.checked to true, so we don't
   //waste time trying again.

@@ -12,7 +12,6 @@ const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
 const Collections = require('./Collections.js');
 const OmdbHelper = require('./OmdbHelper.js');
-// const { Collection } = require('./Collection.js');
 const omdb = require('../omdb');
 const axios = require('axios');
 const accounting = require('accounting');
@@ -24,7 +23,7 @@ const subtitle = require('subtitle');
 const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
-const ffprobeStatic = require('ffprobe-static');
+const ffprobeStatic = {};//require('ffprobe-static');
 const { lsDevices } = require('fs-hard-drive');
 const placeholderImage = "../images/qmark.png";
 
