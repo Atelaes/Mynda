@@ -13,7 +13,10 @@ const pathToFFmpeg = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(pathToFFmpeg);
 const ffprobe = require('ffprobe');
-const ffprobeStatic = {};// require('ffprobe-static');
+let ffprobeStatic = {};
+try {
+  ffprobeStatic = require('ffprobe-static');
+} catch(err) {console.log('Warning: ffprobe-static not installed')}
 const OmdbHelper = require('./OmdbHelper.js');
 const { lsDevices } = require('fs-hard-drive');
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
@@ -784,6 +787,11 @@ async function getMetaData(video) {
   returnObj.checked = true;
   try {
     // vidObj.metadata = await getVideoMetadata(file);
+    if (typeof ffprobeStatic.path === "undefined") {
+      // then ffprobeStatic did not install ffprobe
+      throw new Error('ffprobe could not be found (not installed by ffprobe-static)');
+    }
+
     let data = await ffprobe(file, { path: ffprobeStatic.path });
 
     //console.log(data);
@@ -820,14 +828,16 @@ async function getMetaData(video) {
     console.log(`Unable to retrieve metadata with ffprobe for ${file}: ${err}`);
   }
 
-  try {
-    // some files (.mkv) will give us metadata, but do not store the duration for some reason;
-    // in this case, we analyze the file with ffmpeg to obtain the duration
-    if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
-      returnObj.duration = await getDurationFromFFmpeg(file,video.id);
+  // some files (.mkv) will give us metadata, but do not store the duration for some reason;
+  // in this case, we analyze the file with ffmpeg to obtain the duration
+  if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
+    try {
+      let ffmpegData = await getMetadataFromFFmpeg(file,video.id);
+      console.log(ffmpegData);
+      returnObj = {...ffmpegData, ...returnObj};
+    } catch(err) {
+      console.log(`Unable to retrieve metadata with ffmpeg for ${file}: ${err}`);
     }
-  } catch(err) {
-    console.log(`Unable to retrieve metadata with ffmpeg for ${file}: ${err}`);
   }
 
 
@@ -984,66 +994,121 @@ function getFileBirthtime(file) {
   });
 }
 
-function getDurationFromFFmpeg(filepath,id) {
-  try {
-    //console.log('Could not find duration with ffprobe, trying with ffmpeg...');
-    //console.log(filepath);
+function getMetadataFromFFmpeg(filepath,id) {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log('Could not find duration with ffprobe, trying with ffmpeg...');
+      console.log(filepath);
 
-    let tempFile = `temp-${uuidv4()}.mkv`;
+      let tempFile = `temp-${uuidv4()}.mkv`;
 
-    // var outStream = fs.createWriteStream('output.mkv');
+      // var outStream = fs.createWriteStream('output.mkv');
 
-    let cmd = ffmpeg(filepath, {
-      // timeout:600
-    }).on('codecData', (data) => {
-      cmd.kill();
+      let cmd = ffmpeg(filepath, {
+        // timeout:600
+      }).on('codecData', (data) => {
+        cmd.kill();
 
-      //console.log('==== FFMPEG codecData ====');
-      //console.log(JSON.stringify(data));
-      if (data.duration) {
-        let timeArr = data.duration.split(':');
-        let seconds = 0;
-        if (timeArr.length >= 3) {
-          seconds += timeArr[0] * 60 * 60;
-          seconds += timeArr[1] * 60;
-          seconds += timeArr[2] * 1;
-        } else if (!isNaN(Number(data.duration))) {
-          seconds = Number(data.duration);
+        console.log('==== FFMPEG codecData ====');
+        console.log(JSON.stringify(data));
+        let metadata = {};
+
+        // get duration
+        if (data.duration) {
+          let timeArr = data.duration.split(':');
+          let seconds = 0;
+          if (timeArr.length >= 3) {
+            seconds += timeArr[0] * 60 * 60;
+            seconds += timeArr[1] * 60;
+            seconds += timeArr[2] * 1;
+          } else if (!isNaN(Number(data.duration))) {
+            seconds = Number(data.duration);
+          }
+          metadata.duration = seconds;
         }
 
-        return seconds;
-        /*
-        // update video in library with new duration.
-        for (let i=0; i<library.media.length; i++) {
-          if (library.media[i].id === id) {
-            //console.log(`Saving duration of ${seconds} seconds to library for ${library.media[i].title}`);
-            library.replace(`media.${i}.metadata.duration`,seconds);
-            break;
-          }
-        }*/
+        // get video codec
+        if (data.video) {
+          metadata.codec = data.video;
+        }
 
-      }
-    }).on('end', (stdout, stderr) => {
-      //console.log('==== FFMPEG end ====');
-      //console.log(stdout);
-    }).on('error', (err) => {
-      // console.log('==== FFMPEG error ====');
-      console.log(err.message);
-      fs.unlink(tempFile, () => {
-        //console.log('deleted temp file used by ffmpeg');
-      });
-    }).save(tempFile);
+        // get other video details
+        if (data.video_details && Array.isArray(data.video_details)) {
+          data.video_details.map(detail => {
+            // width and height
+            let match = detail.match(/\b(\d{2,5})x(\d{2,5})\b/);
+            if (match && match.length >= 3) {
+              metadata.width = match[1];
+              metadata.height = match[2];
+              return;
+            }
+            // framerate
+            match = detail.match(/^(\d+\.?\d*)\sfps$/);
+            if (match && match.length >= 2) {
+              metadata.framerate = Number(match[1]);
+              return;
+            }
+            // aspect ratio
+            match = detail.match(/DAR\s+(\d+:\d+)/);
+            if (match && match.length >= 2) {
+              metadata.aspect_ratio = match[1];
+              return;
+            }
 
-    // .save('~/Documents/Coding/Mynda/sandbox/Mynda Example Watchfolders/temp_output.mkv');
+          });
+        }
 
-    // let stream = cmd.pipe();
-    // stream.on('data', (chunk) => {
-    //   console.log('ffmpeg just wrote ' + chunk.length + ' bytes');
-    // });
+        // get audio codec
+        if (data.audio) {
+          metadata.audio_codec = data.audio;
+        }
 
-  } catch(err) {
-    console.log('----- Error in getDurationFromFFmpeg: ' + err);
-  }
+        // get other audio details
+        if (data.audio_details && Array.isArray(data.audio_details)) {
+          // audio layout and audio channels
+          data.audio_details.map(detail => {
+            let poss_values = {
+              'mono' : 1,
+              'stereo' : 2,
+              '2.0' : 2,
+              '2.1' : 3,
+              '5.1' : 6,
+              '6.1' : 7,
+              '7.1' : 8
+            }
+            if (Object.keys(poss_values).includes(detail)) {
+              metadata.audio_layout = detail;
+              metadata.audio_channels = poss_values[detail];
+            }
+          });
+        }
+
+
+        resolve(metadata);
+
+      }).on('end', (stdout, stderr) => {
+        //console.log('==== FFMPEG end ====');
+        //console.log(stdout);
+      }).on('error', (err) => {
+        console.log('==== FFMPEG error ====');
+        reject(err.message);
+        fs.unlink(tempFile, () => {
+          //console.log('deleted temp file used by ffmpeg');
+        });
+      }).save(tempFile);
+
+      // .save('~/Documents/Coding/Mynda/sandbox/Mynda Example Watchfolders/temp_output.mkv');
+
+      // let stream = cmd.pipe();
+      // stream.on('data', (chunk) => {
+      //   console.log('ffmpeg just wrote ' + chunk.length + ' bytes');
+      // });
+
+    } catch(err) {
+      console.log('----- Error in getMetadataFromFFmpeg -----');
+      reject(err);
+    }
+  });
 }
 
 function findSeasonEpisode(video, fileBasename) {
@@ -1117,7 +1182,7 @@ function downloadFile(url, destination) {
 
 async function autoTag() {
   win.webContents.send('status-update', {action: 'autotag'});
-  let newMedia = library.media.filter(medium => (medium.new && !medium.autotagTried));
+  let newMedia = library.media.filter(medium => (medium.new && !medium.autotag_tried));
   let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
   let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
@@ -1157,9 +1222,9 @@ async function autoTag() {
           }
         } else {
           // there were too many results (or an empty array of results?)
-          // but we still want to save the video object so we can set autotagTried to true
+          // but we still want to save the video object so we can set autotag_tried to true
           //This means we've tried and failed in a predicted manner, let's not try again.
-          newVideo.autotagTried = true;
+          newVideo.autotag_tried = true;
           batchSave.push(newVideo);
           // library.replace(`media.id=${newVideo.id}`, newVideo);
           disposition = 'Too many results';
@@ -1172,9 +1237,9 @@ async function autoTag() {
         disposition = 'Success';
       }
     } else if (resultsObject.failure === 'No results') {
-      // we got no results, but we still want to save the video object so we can set autotagTried to true
+      // we got no results, but we still want to save the video object so we can set autotag_tried to true
       //This means we've tried and failed in a predicted manner, let's not try again.
-      newVideo.autotagTried = true;
+      newVideo.autotag_tried = true;
       batchSave.push(newVideo);
       // library.replace(`media.id=${newVideo.id}`, newVideo);
       disposition = resultsObject.failure;

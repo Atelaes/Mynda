@@ -21,9 +21,14 @@ const Hls = require('hls.js');
 const Stream = require('./Stream.js');
 const subtitle = require('subtitle');
 const crypto = require('crypto');
+const pathToFFmpeg = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(pathToFFmpeg);
 const ffprobe = require('ffprobe');
-const ffprobeStatic = {};//require('ffprobe-static');
+let ffprobeStatic = {};
+try {
+  ffprobeStatic = require('ffprobe-static');
+} catch(err) {console.warn('Warning: ffprobe-static not installed')}
 const { lsDevices } = require('fs-hard-drive');
 const placeholderImage = "../images/qmark.png";
 
@@ -5746,7 +5751,7 @@ class MynEditor extends MynOpenablePane {
       // we don't want to save this)
       let temp = _.cloneDeep(this.state.video);
       delete temp.collections;
-      temp.autotagTried = false; // reset this flag whenever a video is saved
+      temp.autotag_tried = false; // reset this flag whenever a video is saved
       let index = library.media.findIndex((video) => video && video.id === this.props.video.id);
       library.replace("media." + index, temp);
     }
@@ -8951,7 +8956,7 @@ function validateVideo(video) {
     'country':'string',
     'metadata':'object',
     'imdbID':'string',
-    'autotagTried':'boolean',
+    'autotag_tried':'boolean',
     'dvd':'boolean'
   };
 
