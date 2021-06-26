@@ -6716,6 +6716,39 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    let metadata = null;
+    if (this.props.video.metadata) {
+      metadata = (
+        <div className='edit-field metadata'>
+          <label className="edit-field-name" htmlFor="metadata">Metadata: </label>
+          <div className="edit-field-editor">
+            <table>
+              <tbody>
+                {Object.keys(this.props.video.metadata).map(key => {
+                  // don't show the 'checked' boolean field
+                  if (key === 'checked') return;
+                  // format the field name
+                  let formattedKey = key.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+                  // set the value
+                  let value = this.props.video.metadata[key];
+                  let formattedValue = value;
+                  // special case value formatting
+                  if (key === 'duration') formattedValue = value >= 60 ? `${Math.round(value / 60)} min` : `${Math.round(value)} sec`;
+
+                  return (
+                    <tr key={key}>
+                      <td className='field'>{formattedKey}</td>
+                      <td className='value'>{formattedValue}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
     // in the case that we're editing multiple videos, display a banner warning the user
     let batchNotification = null;
     let videoTable = null;
@@ -6787,6 +6820,7 @@ class MynEditorEdit extends React.Component {
           {country}
           {languages}
           {new_}
+          {metadata}
           <button className="edit-field revert-btn" onClick={(e) => this.requestRevert(e)}>Revert to Saved</button>
           <input className="edit-field save-btn" type="submit" value="Save" />
         </form>

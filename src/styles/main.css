@@ -1664,6 +1664,29 @@ th, tr, td {
   font-style: italic;
 }
 
+.edit-field.metadata table {
+  width:100%;
+  font-size:.8em;
+  border-spacing: 0;
+  opacity:.7;
+  border-radius: 1em;
+  background-color: rgba(0,0,0,.06);
+}
+.edit-field.metadata table td {
+  padding: .4em;
+}
+.edit-field.metadata table td.field {
+  white-space: nowrap;
+}
+.edit-field.metadata table tr:nth-of-type(odd) {
+  /* background-color: var(--movie-row-bg-odd); */
+}
+.edit-field.metadata table tr:nth-of-type(even) {
+  background-color: var(--movie-row-bg-even);
+}
+
+
+
 /* .edit-field.new .edit-field-editor {
   display:inline-block;
 } */
