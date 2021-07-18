@@ -95,7 +95,6 @@ function eraseTempImages() {
 
     // loop over all the files in the temp folder and delete them
     files.forEach(file => {
-      // Do whatever you want to do with the file
       //console.log(`trying to delete ${file}`);
       try {
         fs.unlink(path.join(folderPath, file), (err) => {
@@ -199,7 +198,7 @@ function removeVideo(video, index, fromInactive) {
       index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
     }
 
-    // remove from library.media
+    // remove from library.media or library.inactive_media
     library.remove(`${address}.${index}`, (err) => {
       if (err) {
         reject(`Error removing ${video.title} (${video.filename}); given bad index (index === ${index}) or could not find video in library.${address}:\n${err}`);
@@ -330,6 +329,9 @@ function checkWatchFolders() {
 // storing the whole thing in libFolderTree;
 // once this is done, we'll traverse the tree, adding all the videos to the library
 function findVideosFromFolder(folderNode) {
+  // the id here (and the <parsing> object it gets put into)
+  // is just to keep track of all the recursive branches of this function,
+  // so we'll know when they're all finished
   const id = uuidv4();
   parsing[id] = true;
 
@@ -401,20 +403,19 @@ function divineCollections(node, pathStack) {
     //If we're here, then we're looking at root, this should only happen once.
     //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
   }
-  let toDivine = true;
+
+  let parentFolder = node.path ? (node.path + path.sep) : '';
   let count = 0;
-  if (toDivine) {
-    for (let i=0; i<node.folders.length; i++) {
-      let folder = node.folders[i];
-      let parentFolder = (node.path) ? node.path + path.sep : '';
-      let stackAppend = folder.path.replace(parentFolder, '');
-      count += divineCollections(folder, pathStack.concat(stackAppend));
-    }
-    count += (node.videos) ? node.videos.length : 0;
-    if (count > 1 && pathStack.length > 1) {
-      node.collection = pathStack.slice(1);
-    }
+  for (let i=0; i<node.folders.length; i++) {
+    let folder = node.folders[i];
+    let stackAppend = folder.path.replace(parentFolder, '');
+    count += divineCollections(folder, pathStack.concat(stackAppend));
   }
+  count += (node.videos) ? node.videos.length : 0;
+  if (count > 1 && pathStack.length > 1) {
+    node.collection = pathStack.slice(1);
+  }
+
   if (pathStack.length === 0) {
     //Again, we're on root.
     //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
@@ -442,8 +443,7 @@ function confirmCurrentVideos() {
       let problem = true;
       // Start by figuring out which watchfolder the video is in
       let conWatchFolder;
-      for (let i=0; i<library.settings.watchfolders.length; i++) {
-        let watchfolder = library.settings.watchfolders[i];
+      for (let watchfolder of library.settings.watchfolders) {
         if (filename.includes(watchfolder.path)) {
           conWatchFolder = watchfolder.path;
           problem = false;
@@ -584,47 +584,56 @@ async function addVideoController() {
   let addEnd = new Date();
   console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
-  library.replace('media', combinedMedia);
-  library.replace('collections', collections.getAll());
-  win.webContents.send('videos_added',numNewVids);
-  //Now let's try and get some metadata.
-   // win.webContents.send('status-update', {action: 'metadata'});
-  // for (let j=0; j<library.media.length; j++) {
-  //   let metVideo = library.media[j];
-  //   if (!metVideo.metadata.checked) {
-  //     await getMetaData(metVideo);
-  //   }
-  // }
-  let metaStart = new Date();
-  let unchecked = library.media.filter(v => v !== null && !v.metadata.checked);
-  let allMeta = {};
-  for (let i=0; i<unchecked.length; i++) {
-    let metaVideo = unchecked[i];
-    win.webContents.send('status-update', {action: 'metadata', numCurrent: i+1, numTotal: libMulch.length});
-    allMeta[metaVideo.id] = await getMetaData(metaVideo);
-  }
+  library.replace('media', combinedMedia, (err) => {
+    // replace collections with updated version
+    library.replace('collections', collections.getAll());
 
-  // just for the purposes of notifying the user (and logging),
-  // find out how many videos we actually got something for
-  let numSuccessful = '[unknown number of]';
-  try {
-    numSuccessful = Object.keys(allMeta).filter(key => allMeta[key].hasOwnProperty('checked') && Object.keys(allMeta[key]).length > 1).length;
-  } catch(err) {
-    console.log(err);
-  }
+    // tell the user how many videos we added
+    win.webContents.send('videos_added',numNewVids);
 
-  win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
-  console.log(`Adding metadata for ${numSuccessful} videos`)
-  let toBeMeta = library.media;
-  let secondMetaStart = new Date();
-  for (let i=0; i<toBeMeta.length; i++) {
-    let metaVideo = toBeMeta[i];
-    if (allMeta[metaVideo.id]) {
-      metaVideo.metadata = allMeta[metaVideo.id];
-    }
-  }
-  library.replace('media', toBeMeta, (err) => {
-    win.webContents.send('status-update', {action: ''});
+    // now let's try and get some metadata.
+    let metaStart = new Date();
+    let unchecked = library.media.filter(v => v !== null && !v.metadata.checked); // all videos in the library that haven't already been checked for metadata
+    let numTotal = unchecked.length;
+    let numChecked = 0;
+    let numSuccessful = 0;
+
+    // we have to store the metadata in an object (metadataToAdd) instead of just adding it directly to each video as we go,
+    // because getting the metadata takes a while and we don't want to overwrite any other edits the user may make
+    // to the videos during the process; then after we've got all the data, we'll add them all to their
+    // respective videos in the library and update it at once, which should happen quickly enough not to
+    // disturb anything the user is doing
+    let metadataToAdd = {};
+
+    // loop through all the unchecked videos and check them,
+    // storing the metadata in the metadataToAdd object with the video's id as the key
+    unchecked.map(v => {
+      if (v !== null && !v.metadata.checked) {
+        numChecked++;
+        win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
+        let metadata = await getMetaData(v);
+        if (metadata.length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
+        metadataToAdd[v.id] = metadata;
+      }
+    });
+
+    // now update the actual videos with their metadata
+    let updatedMedia = library.media.map(v => {
+      if (v && metadataToAdd[v.id]) {
+        v.metadata = metadataToAdd[v.id];
+      }
+      return v;
+    });
+
+    // save to library
+    library.replace('media', updatedMedia, (err) => {
+      win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
+      console.log(`Added metadata for ${numSuccessful} videos`)
+
+      setTimeout(() => {
+        win.webContents.send('status-update', {action: ''});
+      },3000);
+    });
   });
 }
 
