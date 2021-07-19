@@ -585,55 +585,67 @@ async function addVideoController() {
   console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
   library.replace('media', combinedMedia, (err) => {
-    // replace collections with updated version
-    library.replace('collections', collections.getAll());
+  });
 
-    // tell the user how many videos we added
-    win.webContents.send('videos_added',numNewVids);
+  // replace collections with updated version
+  library.replace('collections', collections.getAll());
 
-    // now let's try and get some metadata.
-    let metaStart = new Date();
-    let unchecked = library.media.filter(v => v !== null && !v.metadata.checked); // all videos in the library that haven't already been checked for metadata
-    let numTotal = unchecked.length;
-    let numChecked = 0;
-    let numSuccessful = 0;
+  // tell the user how many videos we added
+  win.webContents.send('videos_added',numNewVids);
 
-    // we have to store the metadata in an object (metadataToAdd) instead of just adding it directly to each video as we go,
-    // because getting the metadata takes a while and we don't want to overwrite any other edits the user may make
-    // to the videos during the process; then after we've got all the data, we'll add them all to their
-    // respective videos in the library and update it at once, which should happen quickly enough not to
-    // disturb anything the user is doing
-    let metadataToAdd = {};
+  // now let's try and get some metadata.
+  // eventually we want to do all this after the above media replacement library call
+  // has finished; currently we can only accomplish that with a callback, which doesn't
+  // allow us to use await with the getMetadata() call below; the ideal solution is to
+  // modify Library.js to work with promises, but in the meantime, a workable solution is
+  // to use the combinedMedia object we created above to base our metadata search on,
+  // so that even if the library call hasn't finished, we're not using an outdated media object here
+  let metaStart = new Date();
+  let unchecked = combinedMedia.filter(v => v !== null && !v.metadata.checked); // all videos in the library that haven't already been checked for metadata
+  let numTotal = unchecked.length;
+  let numChecked = 0;
+  let numSuccessful = 0;
 
-    // loop through all the unchecked videos and check them,
-    // storing the metadata in the metadataToAdd object with the video's id as the key
-    unchecked.map(v => {
-      if (v !== null && !v.metadata.checked) {
-        numChecked++;
-        win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
-        let metadata = await getMetaData(v);
-        if (metadata.length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
-        metadataToAdd[v.id] = metadata;
-      }
-    });
+  // we have to store the metadata in an object (metadataToAdd) instead of just adding it directly to each video as we go,
+  // because getting the metadata takes a while and we don't want to overwrite any other edits the user may make
+  // to the videos during the process; then after we've got all the data, we'll add them all to their
+  // respective videos in the library and update it at once, which should happen quickly enough not to
+  // disturb anything the user is doing
+  let metadataToAdd = {};
 
-    // now update the actual videos with their metadata
-    let updatedMedia = library.media.map(v => {
-      if (v && metadataToAdd[v.id]) {
-        v.metadata = metadataToAdd[v.id];
-      }
-      return v;
-    });
+  // loop through all the unchecked videos and check them,
+  // storing the metadata in the metadataToAdd object with the video's id as the key
+  for (let v of unchecked) {
+    if (v !== null && !v.metadata.checked) {
+      numChecked++;
+      win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
+      let metadata = await getMetadata(v);
+      if (metadata.hasOwnProperty('checked') && Object.keys(metadata).length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
+      metadataToAdd[v.id] = metadata;
+    }
+  }
 
-    // save to library
-    library.replace('media', updatedMedia, (err) => {
-      win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
-      console.log(`Added metadata for ${numSuccessful} videos`)
+  // now update the actual videos with their metadata
+  // (here we have to use library.media instead of combinedMedia [see comment above],
+  // because the whole idea of waiting to add the metadata all at once is that it will incorporate
+  // any changes the user might have made in the meantime; so until we get Library.js working with
+  // promises so we can await the library save above, we will just hope that that library save
+  // will have finished by this point; not ideal, but it probably has??)
+  let updatedMedia = library.media.map(v => {
+    if (v && metadataToAdd[v.id]) {
+      v.metadata = metadataToAdd[v.id];
+    }
+    return v;
+  });
 
-      setTimeout(() => {
-        win.webContents.send('status-update', {action: ''});
-      },3000);
-    });
+  // save to library
+  library.replace('media', updatedMedia, (err) => {
+    win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
+    console.log(`Added metadata for ${numSuccessful} videos`)
+
+    setTimeout(() => {
+      win.webContents.send('status-update', {action: ''});
+    },3000);
   });
 }
 
@@ -789,7 +801,7 @@ async function addVideoFile(video) {
     }
 }
 
-async function getMetaData(video) {
+async function getMetadata(video) {
   // get video data from the file itself (duration, codec, dimensions, whatever)
   let file = video.filename;
   let returnObj = {};
