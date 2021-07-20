@@ -18,7 +18,8 @@ try {
   ffprobeStatic = require('ffprobe-static');
 } catch(err) {console.log('Warning: ffprobe-static not installed')}
 const OmdbHelper = require('./OmdbHelper.js');
-const { lsDevices } = require('fs-hard-drive');
+//const { lsDevices } = require('fs-hard-drive');
+const checkDiskSpace = require('check-disk-space').default
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
@@ -1369,16 +1370,10 @@ async function exportFiles(drive) {
       let subtitle = subtitles[m];
       totalSize += fs.lstatSync(subtitle).size;
     }
-    let availableSpace = 0;
-    let availableDrives = await lsDevices();
+    let diskSpace = await checkDiskSpace(drive);
+    let availableSpace = diskSpace.free;
+    console.log(availableSpace);
     //console.log(`Found ${availableDrives.length} drives.`)
-    for (let n=0; n<availableDrives.length; n++) {
-      let availableDrive = availableDrives[n];
-      if (availableDrive.caption === drive) {
-        availableSpace = availableDrive.free_space;
-        break;
-      }
-    }
 
     if (availableSpace > totalSize) {
       //console.log(`There's ${availableSpace} bytes, and we need ${totalSize} bytes.`);
@@ -1408,10 +1403,10 @@ async function exportFiles(drive) {
   win.webContents.send('status-update', {action: ''});
 }
 
-ipcMain.on('settings-watchfolder-select', (event) => {
+ipcMain.on('settings-folder-select', (event) => {
   let options = {properties: ['openDirectory']};
   dialog.showOpenDialog(null, options).then(result => {
-  event.sender.send('settings-watchfolder-selected', result.filePaths[0]);
+  event.sender.send('settings-folder-selected', result.filePaths[0]);
 }).catch(err => {
   console.log(err)
 })})
