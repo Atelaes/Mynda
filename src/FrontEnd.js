@@ -25,7 +25,7 @@ const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
-const { lsDevices } = require('fs-hard-drive');
+//const { lsDevices } = require('fs-hard-drive');
 const placeholderImage = "../images/qmark.png";
 
 
@@ -4282,15 +4282,7 @@ class MynSettingsFolders extends React.Component {
       folderToAdd: null
 
     }
-
-    ipcRenderer.on('settings-watchfolder-selected', (event, args) => {
-      this.changeTargetFolder(args);
-    });
-
-    ipcRenderer.on('settings-watchfolder-add-error', (event, args) => {
-
-    });
-
+    this.folderSelect = this.folderSelect.bind(this);
 
   }
 
@@ -4333,7 +4325,7 @@ class MynSettingsFolders extends React.Component {
 
   changeTargetFolder(folder) {
     this.setState({folderToAdd: folder});
-    // console.log('Changed target folder to ' + folder);
+    console.log('Changed target folder to ' + folder);
 
     const inputField = document.getElementById('settings-folders-choose-path');
     if (folder == "") {
@@ -4376,6 +4368,13 @@ class MynSettingsFolders extends React.Component {
     return folders;
   }
 
+  folderSelect() {
+    ipcRenderer.once('settings-folder-selected', (event, args) => {
+      this.changeTargetFolder(args);
+    });
+    ipcRenderer.send('settings-folder-select');
+  }
+
   componentDidMount() {
     this.setState({existingFolders: this.props.folders})
   }
@@ -4413,7 +4412,7 @@ class MynSettingsFolders extends React.Component {
             </div>
           </div>
           <div className="choose-section buttons">
-            <button onClick={() => ipcRenderer.send('settings-watchfolder-select')}>Browse</button>
+            <button onClick={() => this.folderSelect()}>Browse</button>
             <button onClick={this.submitFolderToServer}>Add</button>
           </div>
         </div>
@@ -5368,15 +5367,15 @@ class MynSettingsSync extends React.Component {
     this.state = {driveList : [],
       driveInfo : [],
       selectedDrive : ''}
-    this.findDrives();
+
     this.render = this.render.bind(this);
-    this.findDrives = this.findDrives.bind(this);
+    //this.findDrives = this.findDrives.bind(this);
     this.selectDrive = this.selectDrive.bind(this);
     this.plantManifest = this.plantManifest.bind(this);
     this.exportFiles = this.exportFiles.bind(this);
   }
 
-  findDrives() {
+  /*findDrives() {
     lsDevices()
     .then((drives) => {
       let currentDriveList = [<option key={-1} disabled selected value> -- select an option -- </option>];
@@ -5390,7 +5389,19 @@ class MynSettingsSync extends React.Component {
     .catch((err) => {
         console.log(err);
     });
+  }*/
+
+  folderSelect() {
+    ipcRenderer.once('settings-folder-selected', (event, args) => {
+      this.changeTargetFolder(args);
+    });
+    ipcRenderer.send('settings-folder-select');
   }
+
+  changeTargetFolder(folder) {
+    this.setState({selectedDrive: folder});
+  }
+
 
   exportFiles(e) {
     if (!this.state.selectedDrive) {
@@ -5410,8 +5421,6 @@ class MynSettingsSync extends React.Component {
   }
 
   importFiles(e) {
-    let queryVideo = {filename: 'D:\\Serenity', title: 'Serenity', year: '2005'};
-    OmdbHelper.search(queryVideo).then(result => console.log(result));
   }
 
   selectDrive(e) {
@@ -5420,7 +5429,11 @@ class MynSettingsSync extends React.Component {
 
   render() {
     return (<div>
-      <div>Drive: <select id="mynSyncDriveSelect" onChange={value => this.selectDrive(value)}>{this.state.driveList}</select></div>
+      <div className="input-container">
+        <input type="text" id="settings-sync-choose-path" className="empty" value={this.state.selectedDrive || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
+        <div className="input-clear-button hover" onClick={() => this.changeTargetFolder('')}></div>
+      </div>
+      <div><button onClick={() => this.folderSelect()}>Browse</button></div>
       <div>
         <span style={{width: '33%'}}><button onClick={this.plantManifest}>Request</button></span>
         <span style={{width: '33%'}}><button onClick={this.exportFiles}>Export</button></span>
