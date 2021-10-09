@@ -2367,67 +2367,10 @@ class MynLibTable extends React.Component {
 
       return result;
     }).map((movie, index) => {
-      // this will ensure that we have a unique id for the row
-      // even if we're in a hierarchical playlist in which a video can appear
-      // in more than one table (in different collections)
-      // let rowID = movie.id + (this.props.collectionID ? `_${this.props.collectionID}` : '');
-      let rowID = this.state.rowID(movie.id);
-
-      let displaydate = (date) => {
-        let result;
-        if (date === null || date === "") {
-          result = "";
-        } else {
-          try {
-            result = new Date(date * 1000);
-            result = result.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
-          } catch(err) {
-            result = "";
-          }
-        }
-        return result;
-      }
-      // let seenmark = movie.seen ? "\u2714" : "\u2718"
-
-      // if (movie.order === undefined) {
-      //   movie.order = null;
-      // }
-
-      let cellJSX = {
-        order: (<td key="order" className="order" style={{display:this.state.displayOrderColumn}}>{this.state.vidOrderDisplay[movie.id]}</td>),
-        title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={movie.title} ellipsis='fade' /></td>),
-        year: (<td key="year" className="year centered mono">{movie.year}</td>),
-        director: (<td key="director" className="director">{movie.director}</td>),
-        genre: (<td key="genre" className="genre">{movie.genre}</td>),
-        seen: (<td key="seen" className="seen centered"><MynEditSeenWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>),
-        ratings_user: (<td key="ratings_user" className="ratings_user centered"><MynEditRatingWidget movie={movie} update={(...args) => this.saveEdited(movie, ...args)} /></td>),
-        dateadded: (<td key="dateadded" className="dateadded centered mono">{displaydate(movie.dateadded)}</td>),
-        kind: (<td key="kind" className="kind">{movie.kind ? movie.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase()) : null}</td>),
-        lastseen: (<td key="lastseen" className="lastseen centered mono">{displaydate(movie.lastseen)}</td>),
-        ratings_rt: (<td key="ratings_rt" className="ratings_rt ratings centered">{movie.ratings.rt ? movie.ratings.rt + '%' : ''}</td>),
-        ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb ratings centered">{movie.ratings.imdb ? Number(movie.ratings.imdb).toFixed(1) : ''}</td>),
-        ratings_mc: (<td key="ratings_mc" className="ratings_mc ratings centered">{movie.ratings.mc ? movie.ratings.mc : ''}</td>),
-        ratings_avg: (<td key="ratings_avg" className="ratings_avg ratings centered">{this.props.calcAvgRatings(movie.ratings)}</td>),
-        boxoffice: (<td key="boxoffice" className="boxoffice">{movie.boxoffice === 0 ? '' : accounting.formatMoney(Number(movie.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}B` : 'B')}</td>),
-        rated: (<td key="rated" className="rated centered">{movie.rated}</td>),
-        country: (<td key="country" className="country">{movie.country}</td>),
-        languages: (<td key="languages" className="languages">{movie.languages[0]}</td>),
-        duration: (<td key="duration" className="duration">{movie.metadata.duration !== 0 && movie.metadata.duration !== null ? `${Math.round(Number(movie.metadata.duration)/60)} min` : ''}</td>)
-      };
-
-      let cells = this.props.columns.map(column => {
-        // bespoke row JSX
-        if (cellJSX.hasOwnProperty(column)) {
-          return cellJSX[column];
-        }
-
-        // generic row
-        return (<td key={column} className={column}>{String(movie[column])}</td>)
-      });
 
       let row = {
         index:index,
-        rowID:rowID,
+        rowID:this.state.rowID(movie.id),
         vidID:movie.id,
         vidTitle:movie.title,
         tableID:this.tableID
@@ -2435,22 +2378,25 @@ class MynLibTable extends React.Component {
 
       // THE BELOW MAY NOT BE NECESSARY
       // include the 'selected' class if this row is selected
-      let selected = ''//(this.props.selectedRows[this.tableID] && this.props.selectedRows[this.tableID].rows && this.props.selectedRows[this.tableID].rows.includes(movie.id.toString())) ? ' selected' : '';
-      // console.log(`Row for movie ${movie.id} in table ${this.tableID} class: ${selected}`);
+      // let selected = ''//(this.props.selectedRows[this.tableID] && this.props.selectedRows[this.tableID].rows && this.props.selectedRows[this.tableID].rows.includes(video.id.toString())) ? ' selected' : '';
+      // console.log(`Row for video ${video.id} in table ${this.tableID} class: ${selected}`);
+      let rowID = this.state.rowID(movie.id);
 
       let rowJSX = (
-        <tr
-          className={"movie-row " + rowID + selected}
-          id={rowID}
-          vid_id={movie.id}
+        <MynLibTableRow
           key={movie.id}
-          onMouseOver={(e) => this.rowHovered(movie.id, rowID, e)}
-          onMouseOut={(e) => this.rowOut(movie.id, rowID, e)}
-          onClick={(e) => this.rowClick(movie.id, rowID, index, e)}
-        >
-          {cellJSX.order}
-          {cells}
-        </tr>
+          video={movie}
+          index={index}
+          rowID={rowID}
+          displayOrderColumn={this.state.displayOrderColumn}
+          vidOrderDisplay={this.state.vidOrderDisplay}
+          settings={this.props.settings}
+          calcAvgRatings={this.props.calcAvgRatings}
+          columns={this.props.columns}
+          rowHovered={(...args) => this.rowHovered(...args)}
+          rowOut={(...args) => this.rowOut(...args)}
+          rowClick={(...args) => this.rowClick(...args)}
+        />
       );
 
       if (this.props.provided) {
@@ -2496,7 +2442,7 @@ class MynLibTable extends React.Component {
 
   }
 
- showHide(initialSort,resetOrder) {
+  showHide(initialSort,resetOrder) {
     // if in a hierarchical playlist and this table is collapsed, render nothing
     if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
       this.setState({tBodyContent:null, tHeadContent:null});
@@ -2603,52 +2549,6 @@ class MynLibTable extends React.Component {
     return string.replace(/^(?:a\s|the\s)/i,"")
   }
 
-  saveEdited(originalVid, ...args) {
-    // console.log('save-edited!!!');
-    let changes = {};
-    if (args.length == 2 && typeof args[0] === "string") {
-      changes[args[0]] = args[1];
-    } else if (args.length == 1 && typeof args[0] === "object") {
-      changes = args[0];
-    } else {
-      throw 'Incorrect parameters passed to saveEdited in MynLibTable';
-    }
-    // console.log('changes == ' + JSON.stringify(changes));
-
-
-    ipcRenderer.once('save-video-confirm', (event, response, changes, originalVid, skipDialog) => {
-      if (response === 0) { // yes
-        // save video to library
-        let updated = { ...originalVid, ...changes };
-        let index = library.media.findIndex((video) => video.id === updated.id);
-        library.replace("media." + index, updated);
-      } else {
-        console.log('Edit canceled by user')
-      }
-
-      // if the user checked the checkbox to override the confirmation dialog,
-      // set that preference in the settings
-      if (skipDialog) {
-        // console.log('option to override dialog was checked!');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs[`MynLibTable-confirm-inlineEdit`] = true;
-        library.replace("settings.preferences",prefs);
-      }
-    });
-
-    // user confirmation dialog
-    if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibTable-confirm-inlineEdit']) {
-      ipcRenderer.send('save-video-confirm', changes, originalVid, true); // pass 'true' to show the skip dialog checkbox
-    } else {
-      // save changes without the confirmation dialog
-      let updated = { ...originalVid, ...changes };
-      let index = library.media.findIndex((video) => video.id === updated.id);
-      library.replace("media." + index, updated);
-    }
-  }
 
   componentDidUpdate(oldProps) {
     // let propsDiff = getObjectDiff(oldProps,this.props);
@@ -2806,6 +2706,143 @@ class MynLibTable extends React.Component {
           })()}
         </table>
       </div>
+    );
+  }
+}
+
+class MynLibTableRow extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+    }
+
+    this.render = this.render.bind(this);
+  }
+
+  displaydate(date) {
+    let result;
+    if (date === null || date === "") {
+      result = "";
+    } else {
+      try {
+        result = new Date(date * 1000);
+        result = result.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
+      } catch(err) {
+        result = "";
+      }
+    }
+    return result;
+  }
+
+  saveEdited(originalVid, ...args) {
+    // console.log('save-edited!!!');
+    let changes = {};
+    if (args.length == 2 && typeof args[0] === "string") {
+      changes[args[0]] = args[1];
+    } else if (args.length == 1 && typeof args[0] === "object") {
+      changes = args[0];
+    } else {
+      throw 'Incorrect parameters passed to saveEdited in MynLibTableRow';
+    }
+    // console.log('changes == ' + JSON.stringify(changes));
+
+
+    ipcRenderer.once('save-video-confirm', (event, response, changes, originalVid, skipDialog) => {
+      if (response === 0) { // yes
+        // save video to library
+        let updated = { ...originalVid, ...changes };
+        let index = library.media.findIndex((video) => video.id === updated.id);
+        library.replace("media." + index, updated);
+      } else {
+        console.log('Edit canceled by user')
+      }
+
+      // if the user checked the checkbox to override the confirmation dialog,
+      // set that preference in the settings
+      if (skipDialog) {
+        // console.log('option to override dialog was checked!');
+        let prefs = _.cloneDeep(this.props.settings.preferences);
+        if (!prefs.override_dialogs) {
+          prefs.override_dialogs = {};
+        }
+        prefs.override_dialogs[`MynLibTable-confirm-inlineEdit`] = true;
+        library.replace("settings.preferences",prefs);
+      }
+    });
+
+    // user confirmation dialog
+    if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibTable-confirm-inlineEdit']) {
+      ipcRenderer.send('save-video-confirm', changes, originalVid, true); // pass 'true' to show the skip dialog checkbox
+    } else {
+      // save changes without the confirmation dialog
+      let updated = { ...originalVid, ...changes };
+      let index = library.media.findIndex((video) => video.id === updated.id);
+      library.replace("media." + index, updated);
+    }
+  }
+
+
+  render() {
+    // this will ensure that we have a unique id for the row
+    // even if we're in a hierarchical playlist in which a video can appear
+    // in more than one table (in different collections)
+    // let rowID = video.id + (this.props.collectionID ? `_${this.props.collectionID}` : '');
+    // let rowID = this.state.rowID(video.id);
+    let rowID = this.props.rowID;
+    let video = this.props.video;
+    let index = this.props.index;
+
+    // let seenmark = video.seen ? "\u2714" : "\u2718"
+
+    // if (video.order === undefined) {
+    //   video.order = null;
+    // }
+
+    let cellJSX = {
+      order: (<td key="order" className="order" style={{display:this.props.displayOrderColumn}}>{this.props.vidOrderDisplay[video.id]}</td>),
+      title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={video.title} ellipsis='fade' /></td>),
+      year: (<td key="year" className="year centered mono">{video.year}</td>),
+      director: (<td key="director" className="director">{video.director}</td>),
+      genre: (<td key="genre" className="genre">{video.genre}</td>),
+      seen: (<td key="seen" className="seen centered"><MynEditSeenWidget movie={video} update={(...args) => this.saveEdited(video, ...args)} /></td>),
+      ratings_user: (<td key="ratings_user" className="ratings_user centered"><MynEditRatingWidget movie={video} update={(...args) => this.saveEdited(video, ...args)} /></td>),
+      dateadded: (<td key="dateadded" className="dateadded centered mono">{this.displaydate(video.dateadded)}</td>),
+      kind: (<td key="kind" className="kind">{video.kind ? video.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase()) : null}</td>),
+      lastseen: (<td key="lastseen" className="lastseen centered mono">{this.displaydate(video.lastseen)}</td>),
+      ratings_rt: (<td key="ratings_rt" className="ratings_rt ratings centered">{video.ratings.rt ? video.ratings.rt + '%' : ''}</td>),
+      ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb ratings centered">{video.ratings.imdb ? Number(video.ratings.imdb).toFixed(1) : ''}</td>),
+      ratings_mc: (<td key="ratings_mc" className="ratings_mc ratings centered">{video.ratings.mc ? video.ratings.mc : ''}</td>),
+      ratings_avg: (<td key="ratings_avg" className="ratings_avg ratings centered">{this.props.calcAvgRatings(video.ratings)}</td>),
+      boxoffice: (<td key="boxoffice" className="boxoffice">{video.boxoffice === 0 ? '' : accounting.formatMoney(Number(video.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}B` : 'B')}</td>),
+      rated: (<td key="rated" className="rated centered">{video.rated}</td>),
+      country: (<td key="country" className="country">{video.country}</td>),
+      languages: (<td key="languages" className="languages">{video.languages[0]}</td>),
+      duration: (<td key="duration" className="duration">{video.metadata.duration !== 0 && video.metadata.duration !== null ? `${Math.round(Number(video.metadata.duration)/60)} min` : ''}</td>)
+    };
+
+    let cells = this.props.columns.map(column => {
+      // bespoke row JSX
+      if (cellJSX.hasOwnProperty(column)) {
+        return cellJSX[column];
+      }
+
+      // generic row
+      return (<td key={column} className={column}>{String(video[column])}</td>)
+    });
+
+    return (
+      <tr
+        className={"movie-row " + rowID}
+        id={rowID}
+        vid_id={video.id}
+        onMouseOver={(e) => this.props.rowHovered(video.id, rowID, e)}
+        onMouseOut={(e) => this.props.rowOut(video.id, rowID, e)}
+        onClick={(e) => this.props.rowClick(video.id, rowID, index, e)}
+      >
+        {cellJSX.order}
+        {cells}
+      </tr>
     );
   }
 }
