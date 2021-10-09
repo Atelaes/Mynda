@@ -2411,9 +2411,9 @@ class MynLibTable extends React.Component {
 
               return React.cloneElement(rowJSX,
                 {
-                  ref: provided.innerRef,
-                  ...draggableProps,
-                  ...provided.dragHandleProps,
+                  innerInnerRef: provided.innerRef,
+                  innerDragP: draggableProps,
+                  innerDragHP: provided.dragHandleProps
                 });
             }}
           </Draggable>
@@ -2831,10 +2831,15 @@ class MynLibTableRow extends React.Component {
       return (<td key={column} className={column}>{String(video[column])}</td>)
     });
 
+
+
     return (
       <tr
         className={"movie-row " + rowID}
         id={rowID}
+        ref={this.props.innerInnerRef}
+        {...this.props.innerDragP}
+        {...this.props.innerDragHP}
         vid_id={video.id}
         onMouseOver={(e) => this.props.rowHovered(video.id, rowID, e)}
         onMouseOut={(e) => this.props.rowOut(video.id, rowID, e)}
