@@ -343,7 +343,8 @@ function findVideosFromFolder(folderNode) {
   fs.readdir(folder, {withFileTypes : true}, function (err, components) {
     // handling error
     if (err) {
-        return console.log('Unable to scan directory: ' + err);
+        console.log('Unable to scan directory: ' + err);
+        components = []; // in case of error, components will be undefined, so we make it an empty array instead
     }
 
     // loop through all the folder contents
@@ -586,6 +587,7 @@ async function addVideoController() {
   console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
   library.replace('media', combinedMedia, (err) => {
+
   });
 
   // replace collections with updated version
