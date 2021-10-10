@@ -18,6 +18,10 @@ class Collections {
 
   // finds and returns a collection object from its id
   get(id) {
+    if (typeof id === "undefined") {
+      throw new Error("No collection id supplied to Collections.get()");
+    }
+
     // initially set collections to the root of the master collections array
     // then we'll walk down the tree using the id, which is descriptive of the tree structure
     let collections = this.c;

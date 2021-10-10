@@ -2391,6 +2391,8 @@ class MynLibTable extends React.Component {
           displayOrderColumn={this.state.displayOrderColumn}
           vidOrderDisplay={this.state.vidOrderDisplay}
           settings={this.props.settings}
+          collections={this.props.collections}
+          collectionID={this.props.collectionID}
           calcAvgRatings={this.props.calcAvgRatings}
           columns={this.props.columns}
           rowHovered={(...args) => this.rowHovered(...args)}
@@ -2784,23 +2786,51 @@ class MynLibTableRow extends React.Component {
 
 
   render() {
-    // this will ensure that we have a unique id for the row
-    // even if we're in a hierarchical playlist in which a video can appear
-    // in more than one table (in different collections)
-    // let rowID = video.id + (this.props.collectionID ? `_${this.props.collectionID}` : '');
-    // let rowID = this.state.rowID(video.id);
     let rowID = this.props.rowID;
     let video = this.props.video;
     let index = this.props.index;
 
-    // let seenmark = video.seen ? "\u2714" : "\u2718"
+    // set the JSX for the 'order' column (which is only displayed in a hierarchical playlist) separately,
+    // because it's rather wordy. It's editable by double clicking, so we need to use MynClickToEditText
+    let order;
+    let orderJSX = (
+      <td key="order" className="order" style={{display:this.props.displayOrderColumn}}>
+        <MynClickToEditText
+          object={video}
+          property='order'
+          update={(prop,value) => { console.log(value); /*if (valid)*/ order = value}}
+          options={null}
+          storeTransform={v => {v = v.replace(/\s+/g,''); if (v === '') {return v} else {return Math.round(Number(v) * 10) / 10}}}
+          validator={{test:v => !isNaN(Number(v))}}
+          validatorTip={'#'}
+          allowedEmpty={true}
+          reportValid={(prop,value) => {/*valid = value;*/}}
+          noClear={true}
+          setFocus={true}
+          doubleClick={true}
+          save={() => {
+            console.log('Saving order as ' + order);
 
-    // if (video.order === undefined) {
-    //   video.order = null;
-    // }
+            // update the order and save to library
+            if (order && this.props.collections) {
+              let cols = new Collections(this.props.collections);
+              let col = cols.get(this.props.collectionID);
+              cols.removeVideo(col,video.id);
+              cols.addVideo(col,video.id,order);
+              library.replace("collections", cols.getAll());
+            } else {
+              // if 'order' is falsy (e.g. null will be passed if the user hits escape)
+              // then we just keep the old order
+              order = video.order;
+            }
+          }}
+      />
+      </td>
+    );
 
     let cellJSX = {
-      order: (<td key="order" className="order" style={{display:this.props.displayOrderColumn}}>{this.props.vidOrderDisplay[video.id]}</td>),
+      // order: (<td key="order" className="order" style={{display:this.props.displayOrderColumn}}>{this.props.vidOrderDisplay[video.id]}</td>),
+      order: orderJSX,
       title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={video.title} ellipsis='fade' /></td>),
       year: (<td key="year" className="year centered mono">{video.year}</td>),
       director: (<td key="director" className="director">{video.director}</td>),
