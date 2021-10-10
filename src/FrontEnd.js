@@ -1925,17 +1925,7 @@ class MynLibTable extends React.Component {
       sortAscending: true,
       sortedRows: [],
       displayOrderColumn: "table-cell",
-      /*lockedRow: null,*/
       batchSelected: [],
-      vidOrderDisplay: {},
-      vidOrderDisplayTemplate: (video,order) => {
-          let rowID = this.state.rowID(video.id);
-          return (
-            <div style={{cursor:'text'}} onClick={(e) => this.orderClick(video, rowID, e)}>
-              {order}
-            </div>
-          );
-        },
       rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : ''),
       idFromRowID: (rowID) => (this.props.collectionID ? rowID.replace(new RegExp('_' + this.props.collectionID + '$'),'') : rowID),
       shiftDown: false,
@@ -2025,24 +2015,8 @@ class MynLibTable extends React.Component {
     // console.log(`TABLE ${this.tableID} REGISTERED A CLICK`);
     const row = findNearestOfClass(target,'movie-row');
 
-    // (THERE IS NO LONGER SUCH A THING AS A 'LOCKED' ROW, ONLY A SELECTED ROW (clicked) OR A HOVERED ROW)
-    // first remove the 'locked' class from any currently locked row
-    // if (this.state.lockedRow !== null) {
-    //   try {
-    //     document.getElementById(this.state.lockedRow).classList.remove('locked');
-    //   } catch(err) {
-    //     console.error(`Could not find and unlock previous locked row (${this.state.lockedRow}): ${err}`);
-    //   }
-    // }
-
-    // then remove the 'batch' class from all the rows
-    // (we'll re-add it to any that are still selected at the end of the function)
-    // Array.from(document.getElementsByClassName('movie-row')).map(row => {
-    //   row.classList.remove('selected');
-    // });
-
-      // if the user clicks on a row with a modifier key pressed
-      // (either shift or ctrl/cmd), we create/modify the selection of multiple videos
+    // if the user clicks on a row with a modifier key pressed
+    // (either shift or ctrl/cmd), we create/modify the selection of multiple videos
     if (this.state.shiftDown || this.state.ctrlDown) {
 
       // if shift is pressed, then we want to select all the videos between
@@ -2115,20 +2089,6 @@ class MynLibTable extends React.Component {
 
       // no modifier keys were pressed
     } else {
-      // if the user clicked on the currently locked row, unlock it
-      // and erase all batch selections
-      // if (this.state.lockedRow === rowID) {
-      //   this.setState({lockedRow : null});
-      //   row.classList.remove('locked');
-      //   setTimeout(() => {
-      //     row.classList.add('unlocking');
-      //     setTimeout(() => {
-      //       row.classList.remove('unlocking');
-      //     },1000);
-      //   },50);
-      // console.log('Batch Selected: ' + JSON.stringify(this.state.batchSelected));
-      // console.log('rowID: ' + rowID);
-
       // if there is only one video selected and this is the one we've clicked on,
       // we actually want to unselect it, UNLESS forceSelect is true
       if (!forceSelect && this.state.batchSelected.length === 1 && this.state.batchSelected[0] === id) {
@@ -2156,14 +2116,6 @@ class MynLibTable extends React.Component {
     }
 
   }
-
-  // lockRow(rowID, id) {
-  //   let row = document.getElementById(rowID);
-  //   if (!id) id = this.state.idFromRowID(rowID);
-  //   this.setState({lockedRow : rowID});
-  //   row.classList.add('locked');
-  //   this.props.showDetails(id, rowID); // this is necessary in case we go from one locked row to another without unlocking in between
-  // }
 
   // called when the selection is changed;
   // if 'overwrite' is true, then we tell the Mynda component
@@ -2202,73 +2154,6 @@ class MynLibTable extends React.Component {
 
     // then we pass upwards the list of selected videos
     this.props.handleSelectedRows(_.cloneDeep(this.state.batchSelected),firstRow,this.tableID,overwrite);
-  }
-
-  // called when the user clicks on the 'order' cell of a row
-  // brings up an inline editor to change the order
-  orderClick(video, rowID, e) {
-    // don't trigger a click on the whole row
-    e.stopPropagation();
-
-    // add listener for the Enter key, to save the value
-    const cell = findNearestOfClass(e.target,'order');
-    cell.addEventListener('keyup', (e) => { /* 13 is Enter */ if (e.keyCode === 13) this.orderSave(e,order,video); /* 27 is Esc */ if (e.keyCode === 27) this.orderSave(e,null,video);}, {once:false});
-
-    // replace the contents of the cell with the editor
-    let valid = false;
-    let order = video.order;
-    let vidOrderDisplay = _.cloneDeep(this.state.vidOrderDisplay);
-    vidOrderDisplay[video.id] = (
-      <div onClick={(e) => {e.stopPropagation()}}>
-        <MynEditText
-          object={video}
-          property='order'
-          update={(prop,value) => { console.log(value); /*if (valid)*/ order = value}}
-          options={null}
-          storeTransform={v => {v = v.replace(/\s+/g,''); if (v === '') {return v} else {return Math.round(Number(v) * 10) / 10}}}
-          validator={{test:v => !isNaN(Number(v))}}
-          validatorTip={'#'}
-          allowedEmpty={true}
-          reportValid={(prop,value) => {/*valid = value;*/}}
-          noClear={true}
-          setFocus={true}
-        />
-      </div>
-    );
-    this.setState({vidOrderDisplay:vidOrderDisplay},() => {
-      console.log(JSON.stringify(this.state.vidOrderDisplay));
-      this.reset(false); // force the table to rerender, preserving vidOrderDisplay
-    });
-  }
-
-  // called when the user hits enter in the inline 'order' editor
-  orderSave(e,order,video) {
-    e.preventDefault();
-    // e.stopPropagation();
-    // e.target.removeEventListener()
-    // console.log(e.target);
-    console.log('Saving order as ' + order);
-
-    // update the order and save to library
-    if (order && this.props.collections) {
-      let cols = new Collections(this.props.collections);
-      let col = cols.get(this.props.collectionID);
-      cols.removeVideo(col,video.id);
-      cols.addVideo(col,video.id,order);
-      library.replace("collections", cols.getAll());
-    } else {
-      // if 'order' is falsy (e.g. null will be passed if the user hits escape)
-      // then we just keep the old order
-      order = video.order;
-    }
-
-    // replace the contents of the cell with the new order value
-    // (and a click event listener to enable another edit)
-    let vidOrderDisplay = _.cloneDeep(this.state.vidOrderDisplay);
-    vidOrderDisplay[video.id] = this.state.vidOrderDisplayTemplate(video,order);
-    this.setState({vidOrderDisplay:vidOrderDisplay},() => {
-      this.reset(false,true); // force the table to re-render
-    });
   }
 
   requestSort(key, ascending) {
@@ -2495,7 +2380,7 @@ class MynLibTable extends React.Component {
         // because when the user wants to edit the order, we use the state variable
         // to display an editor; we must initially populate that variable with the order itself
         // inside a div with a click event that calls up the editor
-        this.state.vidOrderDisplay[movie.id] = this.state.vidOrderDisplayTemplate(movie,movie.order);
+        // this.state.vidOrderDisplay[movie.id] = this.state.vidOrderDisplayTemplate(movie,movie.order);
       });
     }
 
@@ -2627,34 +2512,6 @@ class MynLibTable extends React.Component {
       console.log(`isExpanded change from ${oldProps.isExpanded} to ${this.props.isExpanded}`);
       this.showHide(false,true);
     }
-
-    // no need for the below anymore, we made a component for it
-    // // set the width of each OVERFLOWING title div to the width of the content minus the width of the actual cell
-    // // so that when the CSS marquee scrolls to 100%, that means it will scroll just enough to show the end of the text;
-    // // and give it the 'overflow' class so the css can scroll it (or whatever it wants to do)
-    // Array.from(document.getElementsByClassName('movie-table')).map((table) => {
-    //   Array.from(table.getElementsByClassName('table-title-text')).map((titleDiv) => {
-    //     // if (titleDiv.innerHTML == 'The Adventures of Buckaroo Banzai Across the 8th Dimension') {
-    //     if (titleDiv.innerHTML == 'The Craziest Final 2 Minutes in NFL History   NFL Vault') {
-    //       console.log(titleDiv.innerHTML);
-    //       console.log('parent offsetWidth: ' + titleDiv.parentNode.offsetWidth);
-    //       console.log('self offsetWidth: ' + titleDiv.offsetWidth);
-    //       console.log('scrollWidth: ' + titleDiv.scrollWidth);
-    //     }
-    //
-    //      // text is overflowing
-    //     if (titleDiv.parentNode.offsetWidth < titleDiv.scrollWidth) {// && !/\boverflow\b/.test(titleDiv.className)) {
-    //       // console.log('--found overflowing title: ' + titleDiv.innerHTML);
-    //       titleDiv.style.marginRight = titleDiv.parentNode.offsetWidth + 'px'; // necessary to force the parent element (the <td>) to stay wide; otherwise if this is the only overflowing row, the <td> will shrink if we don't add this margin
-    //       titleDiv.style.width = titleDiv.scrollWidth - titleDiv.parentNode.offsetWidth + 'px';
-    //       // titleDiv.style.border = '1px solid red';
-    //
-    //       titleDiv.classList.add('overflow');
-    //     }
-    //
-    //     // console.log('width: ' + titleDiv.style.width);
-    //   });
-    // });
 
   }
 
