@@ -1936,7 +1936,6 @@ class MynLibTable extends React.Component {
     // this.keyDown = this.keyDown.bind(this);
     // this.keyUp = this.keyUp.bind(this);
     this.requestSort = this.requestSort.bind(this);
-    this.reset = this.reset.bind(this);
     this.render = this.render.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentDidUpdate = this.componentDidUpdate.bind(this);
@@ -2157,7 +2156,7 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
-    //console.log(`SORTING TABLE ${this.tableID} by ${key}`);
+    console.log(`SORTING TABLE ${this.tableID} by ${key}`);
 
     if (key === undefined) {
       throw "Error: key was undefined; must supply a key to sort by";
@@ -2167,7 +2166,7 @@ class MynLibTable extends React.Component {
     // then we override the defaults and just reverse the sort direction of the previous sort
     // (unless we're explicitly told which direction to sort by)
     if (this.state.sortKey === key && ascending === undefined) {
-     ascending = !this.state.sortAscending;
+      ascending = !this.state.sortAscending;
     }
 
     if (ascending === undefined) {
@@ -2286,6 +2285,10 @@ class MynLibTable extends React.Component {
         />
       );
 
+      // if this table is part of a hierarchical playlist,
+      // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
+      // in which case MynLibrary will have given us the 'provided' prop,
+      // so if it has, we add the appropriate bits to make the table body droppable
       if (this.props.provided) {
         // row.props.ref = this.props.provided.innerRef;
         // row.props = {...row.props, ...this.props.provided.draggableProps}
@@ -2329,7 +2332,12 @@ class MynLibTable extends React.Component {
 
   }
 
-  showHide(initialSort,resetOrder) {
+  // this is the method that causes the table to render with all its content;
+  // it checks if the table should be visible (i.e. in a flat playlist, or expanded in a hierarchical playlist),
+  // and sorts the rows either by an initial value, if sortValue is passed as "initial-sort" (i.e. when first opened/expanded)
+  // or, if sortValue is a valid column name, sorts by that column (i.e. when the user clicks on a column header)
+  // or, if nothing is passed, by the current sort value (i.e. when re-rendering an already open table for various reasons)
+  reset(sortValue) {
     // if in a hierarchical playlist and this table is collapsed, render nothing
     if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
       this.setState({tBodyContent:null, tHeadContent:null});
@@ -2337,98 +2345,70 @@ class MynLibTable extends React.Component {
     // otherwise, whether in an expanded table in a hierarchical playlist,
     // or in a table in a flat playlist, render the table
     } else {
-      this.reset(initialSort,resetOrder);
+
+      // display 'order' column only if we're in a hierarchical playlist
+      if (this.props.view === 'flat') {
+        this.state.displayOrderColumn = "none";
+      } else {
+        this.state.displayOrderColumn = "table-cell";
+      }
+
+      // ==== sort the table === //
+
+      // if we're told to set to initial values (or if there is no current value)
+      if (sortValue === "initial-sort" || this.state.sortKey === null) {
+        console.log("sortValue: " + sortValue);
+        console.log("this.state.sortKey: " + this.state.sortKey);
+        console.log("this.props.initialSort: " + this.props.initialSort);
+        console.log("this.props.initialSortAscending: " + this.props.initialSortAscending);
+
+        // sort by initial (default) values
+        this.state.sortKey = null;
+        try {
+          this.requestSort(this.props.initialSort, this.props.initialSortAscending);
+          console.log('sorting by initialSort')
+        } catch(e) {
+          console.log("No initial sort parameter")
+          console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
+                     \ncolumns: ${this.props.columns}`);
+          // no initial sort parameter, so if the playlist has a default sort column, use that
+          if (this.props.flatDefaultSort && this.props.columns.includes(this.props.flatDefaultSort)) {
+            console.log("Sorting by flatDefaultSort: " + this.props.flatDefaultSort);
+            this.requestSort(this.props.flatDefaultSort);
+          } else {
+            console.log("Also, no flatDefaultSort, so sorting by [Title]");
+            // if not, sort by title
+            this.requestSort('title');
+          }
+        }
+      } else if (this.props.columns.includes(sortValue) || sortValue === "order") {
+        // if the sortValue is one of our columns, sort by that column
+        this.requestSort(sortValue);
+      } else {
+        // if no sort value was passed, sort by the current value
+        console.log("Sort key is not null?: " + this.state.sortKey);
+        this.requestSort(this.state.sortKey, this.state.sortAscending);
+      }
 
       // report the sorted rows to MynLibrary
+      // console.log(`The sorted rows are ${this.state.sortedRows}.`);
       this.props.reportSortedManifest(this.tableID,this.state.sortedRows);
 
-      // if this table is part of a hierarchical playlist,
-      // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
-      // in which case MynLibrary will have given us the 'provided' prop,
-      // so if it has, we add the appropriate bits to make the table body droppable
-      // console.log(`The sorted rows are ${this.state.sortedRows}.`);
+      // === create the table content and cause the table to re-render === //
 
       let tBodyContent = this.state.sortedRows.map(row => row.jsx);
 
       let tHeadContent = (
         <tr id="main-table-header-row">
-          <th onClick={() => this.requestSort('order')} style={{display:this.state.displayOrderColumn}}>#</th>
+          <th onClick={() => this.reset('order')} style={{display:this.state.displayOrderColumn}}>#</th>
           {this.props.columns.map(col => (
-            <th key={col} onClick={() => this.requestSort(col)}>{this.props.displayColumnName(col)}</th>
+            <th key={col} onClick={() => this.reset(col)}>{this.props.displayColumnName(col)}</th>
           ))}
         </tr>
       );
 
       this.setState({tBodyContent:tBodyContent, tHeadContent:tHeadContent});
     }
-  }
-
-  // re-render the table by requesting a new sort (if initialSort === true, sort by initial values,
-  // rather than the current values)
-  reset(initialSort,resetOrder) {
-    // do not render the table if we're in a collapsed collection in a hierarchical playlist
-    if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
-      console.log("this.props.view === 'hierarchical' && !this.props.isExpanded");
-      return;
-    }
-
-    console.log('RESETTING');
-    if (initialSort || resetOrder) {
-      console.log("RESETTING ORDER");
-      this.props.movies.map(movie => {
-        // we display the order property through a state variable
-        // because when the user wants to edit the order, we use the state variable
-        // to display an editor; we must initially populate that variable with the order itself
-        // inside a div with a click event that calls up the editor
-        // this.state.vidOrderDisplay[movie.id] = this.state.vidOrderDisplayTemplate(movie,movie.order);
-      });
-    }
-
-    // decide whether to show the 'order' column
-    // if (this.props.movies.filter(movie => (movie.order === undefined || movie.order === null)).length == this.props.movies.length) {
-      // if none of the movies handed to us have an "order" property
-      //    (not within the collections property, but a top-level "order" property—
-      //    this property does not exist in the library JSON, but is assigned by MynLibrary
-      //    in the case of showing a hierarchical view)
-      // then hide the 'order' column with CSS
-    if (this.props.view === 'flat') {
-      this.state.displayOrderColumn = "none";
-    } else {
-      this.state.displayOrderColumn = "table-cell";
-    }
-
-    // if we're told to set to initial values (or if there is no current value)
-    if (initialSort || this.state.sortKey === null) {
-      console.log("initial: " + initialSort);
-      console.log("this.state.sortKey: " + this.state.sortKey);
-      console.log("this.props.initialSort: " + this.props.initialSort);
-      console.log("this.props.initialSortAscending: " + this.props.initialSortAscending);
-
-      // sort by initial (default) values
-      this.state.sortKey = null;
-      try {
-        this.requestSort(this.props.initialSort, this.props.initialSortAscending);
-        console.log('sorting by initialSort')
-      } catch(e) {
-        console.log("No initial sort parameter")
-        console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
-                   \ncolumns: ${this.props.columns}`);
-        // no initial sort parameter, so if the playlist has a default sort column, use that
-        if (this.props.flatDefaultSort && this.props.columns.includes(this.props.flatDefaultSort)) {
-          console.log("Sorting by flatDefaultSort: " + this.props.flatDefaultSort);
-          this.requestSort(this.props.flatDefaultSort);
-        } else {
-          console.log("Also, no flatDefaultSort, so sorting by [Title]");
-          // if not, sort by title
-          this.requestSort('title');
-        }
-      }
-    } else {
-      // if initial is false, sort by the current value
-      console.log("Sort key is not null?: " + this.state.sortKey);
-      this.requestSort(this.state.sortKey, this.state.sortAscending);
-    }
-
   }
 
   removeArticle(string) {
@@ -2441,11 +2421,13 @@ class MynLibTable extends React.Component {
     // let propsDiff = getObjectDiff(oldProps,this.props);
     // if (propsDiff.length === 0) return;
     // console.log(Date.now());
-    if (_.isEqual(oldProps,this.props)) {
-      // console.log(Date.now());
-      // console.log('----------------')
-      return;
-    }
+
+    // if (_.isEqual(oldProps,this.props)) {
+    //   // console.log(Date.now());
+    //   // console.log('MynLibTable props are the same')
+    //   // console.log('----------------')
+    //   return;
+    // }
 
     // console.log('UPDATING MynTable at ' + Date.now());
     // console.log(getObjectDiff(oldProps,this.props));
@@ -2475,7 +2457,7 @@ class MynLibTable extends React.Component {
     if (oldProps.playlistID !== this.props.playlistID) {
       console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
       // setTimeout(() => this.reset(true,true), 1000);
-      this.showHide(true,true);
+      this.reset('initial-sort');
     } else if (this.props.view === 'flat' || this.props.isExpanded) {
       // console.log('playlist is the same, checking if any videos changed...');
       // if the playlist was NOT changed, but
@@ -2504,13 +2486,13 @@ class MynLibTable extends React.Component {
         this.state.include_user_rating_in_avg = this.props.settings.preferences.include_user_rating_in_avg;
 
         // re-render the table (sorting by the current values)
-        this.showHide(false,true);
+        this.reset();
       }
     }
 
     if (oldProps.isExpanded !== this.props.isExpanded) {
       console.log(`isExpanded change from ${oldProps.isExpanded} to ${this.props.isExpanded}`);
-      this.showHide(false,true);
+      this.reset();
     }
 
   }
@@ -2520,7 +2502,7 @@ class MynLibTable extends React.Component {
     // console.log("--MOUNTED--");
     // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
     // render the table
-    this.showHide(true,true);
+    this.reset('initial-sort');
 
   }
 
