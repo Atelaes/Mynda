@@ -879,43 +879,51 @@ class Mynda extends React.Component {
   render () {
     return (
       <div id='grid-container'>
-        <MynNav
-          playlists={this.state.playlists}
-          currentPlaylistID={this.state.currentPlaylistID}
-          setPlaylist={this.setPlaylist}
-          search={this.search}
-          showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
-          playlistLength={this.state.playlistLength}
-        />
-        <MynLibrary
-          videos={this.state.filteredVideos}
-          collections={this.state.collections}
-          settings={this.state.settings}
-          playlistID={this.state.currentPlaylistID}
-          view={this.state.view}
-          flatDefaultSort={this.state.flatDefaultSort}
-          columns={this.state.columns}
-          displayColumnName={this.displayColumnName}
-          calcAvgRatings={this.calcAvgRatings}
-          showDetails={this.showDetails}
-          playVideo={this.playVideo}
-          handleSelectedRows={this.handleSelectedRows}
-          handleHoveredRow={this.handleHoveredRow}
-          selectedRows={this.state.selectedRows}
-          reportSortedManifest={this.reportSortedManifest}
-          recentlyWatched={this.state.recentlyWatched}
-        />
-        <MynDetails
-          video={this.state.detailVideo}
-          rowID={this.state.detailRowID}
-          settings={this.state.settings}
-          showEditor={() => {this.showOpenablePane("editorPane")}}
-          scrollToVideo={this.scrollToVideo}
-          isRowVisible={this.isRowVisible}
-        />
-        <MynNotify
-          settings={this.state.settings}
-        />
+        <ErrorBoundary>
+          <MynNav
+            playlists={this.state.playlists}
+            currentPlaylistID={this.state.currentPlaylistID}
+            setPlaylist={this.setPlaylist}
+            search={this.search}
+            showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
+            playlistLength={this.state.playlistLength}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <MynLibrary
+            videos={this.state.filteredVideos}
+            collections={this.state.collections}
+            settings={this.state.settings}
+            playlistID={this.state.currentPlaylistID}
+            view={this.state.view}
+            flatDefaultSort={this.state.flatDefaultSort}
+            columns={this.state.columns}
+            displayColumnName={this.displayColumnName}
+            calcAvgRatings={this.calcAvgRatings}
+            showDetails={this.showDetails}
+            playVideo={this.playVideo}
+            handleSelectedRows={this.handleSelectedRows}
+            handleHoveredRow={this.handleHoveredRow}
+            selectedRows={this.state.selectedRows}
+            reportSortedManifest={this.reportSortedManifest}
+            recentlyWatched={this.state.recentlyWatched}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <MynDetails
+            video={this.state.detailVideo}
+            rowID={this.state.detailRowID}
+            settings={this.state.settings}
+            showEditor={() => {this.showOpenablePane("editorPane")}}
+            scrollToVideo={this.scrollToVideo}
+            isRowVisible={this.isRowVisible}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <MynNotify
+            settings={this.state.settings}
+          />
+        </ErrorBoundary>
         <MynSettings
           show={this.state.show.settingsPane}
           view={this.state.settingsView}
@@ -2824,39 +2832,6 @@ class MynDetails extends React.Component {
     return displaydate;
   }
 
-
-  // don't need the below anymore, we made a component for it instead
-  // // if the title text overflows its container,
-  // // set up title div with the appropriate width and class name for the css to apply a marquee effect
-  // setTitleMarquee() {
-  //   try {
-  //     let titleDiv = document.getElementById('detail-title').getElementsByClassName('detail-title-text')[0];
-  //     // titleDiv.style.width = '100%';
-  //     titleDiv.style.width = window.getComputedStyle(titleDiv.parentNode, null).getPropertyValue('width');
-  //     let computed = window.getComputedStyle(titleDiv, null);
-  //     // console.log(titleDiv.innerHTML);
-  //     // console.log('width: ' + titleDiv.style.width);
-  //     // console.log('actual width: ' + computed.getPropertyValue('width'));
-  //     // console.log('offsetWidth: ' + titleDiv.offsetWidth);
-  //     // console.log('scrollWidth: ' + titleDiv.scrollWidth);
-  //     // console.log('getBoundingClientRect().width: ' + titleDiv.getBoundingClientRect().width);
-  //     // console.log('padding: ' + computed.getPropertyValue('padding-left') + computed.getPropertyValue('padding-left'));
-  //     // console.log('font-size: ' + computed.getPropertyValue('font-size'));
-  //     // console.log('margin-right: ' + computed.getPropertyValue('margin-right'));
-  //
-  //     if (titleDiv.offsetWidth < titleDiv.scrollWidth) { // text is overflowing
-  //       titleDiv.style.width = titleDiv.scrollWidth - titleDiv.offsetWidth + 'px';
-  //       titleDiv.classList.add('overflow');
-  //     } else {
-  //       titleDiv.classList.remove('overflow');
-  //     }
-  //
-  //     // console.log('new width: ' + titleDiv.style.width);
-  //   } catch(e) {
-  //
-  //   }
-  // }
-
   clickDescrip(e) {
     // if (this.props.settings.preferences.hide_description === "hide") {
       try {
@@ -2948,7 +2923,7 @@ class MynDetails extends React.Component {
 
     try {
       const video = this.props.video;
-      let imageURL = video.artwork ? URL.pathToFileURL(video.artwork).pathname : URL.pathToFileURL('./images/qmark-details.png').pathname;
+      let imageURL = video.artwork ? URL.pathToFileURL(video.artwork).pathname : '';
       details = (
         <ul>
           <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
@@ -3417,7 +3392,6 @@ class MynOverflowTextMarquee extends React.Component {
 
 }
 
-
 class MynOpenablePane extends React.Component {
   constructor(props) {
     super(props)
@@ -3869,46 +3843,50 @@ class MynPlayer extends MynOpenablePane {
     } catch(err) {
       console.error(err);
     }
-    vidInfo.streams.map(stream => {
-      // loop over the various data streams that ffprobe found in the video;
-      // if any of these are subtitle streams, extract them as external files;
+    try {
+      vidInfo.streams.map(stream => {
+        // loop over the various data streams that ffprobe found in the video;
+        // if any of these are subtitle streams, extract them as external files;
 
-      if (stream.codec_type === 'subtitle') {
-        let filepath = path.join(tempFolder,`internal${stream.index}.vtt`);
+        if (stream.codec_type === 'subtitle') {
+          let filepath = path.join(tempFolder,`internal${stream.index}.vtt`);
 
-        let subObj = {
-          path: filepath,
-          name: stream.tags && stream.tags.title ? stream.tags.title : `Track ${subtitles.length+1}`,
-          lang: stream.tags ? stream.tags.language : ''
+          let subObj = {
+            path: filepath,
+            name: stream.tags && stream.tags.title ? stream.tags.title : `Track ${subtitles.length+1}`,
+            lang: stream.tags ? stream.tags.language : ''
+          }
+          subtitles.push(subObj);
+
+          let cmd = ffmpeg(this.state.video.filename, {
+            timeout:60
+          }).outputOptions([
+            `-map 0:${stream.index}`
+          ]).on('codecData', (data) => {
+            console.log('==== FFMPEG codecData ====');
+            console.log(data);
+            console.log(JSON.stringify(data));
+
+            // setTimeout(()=>cmd.kill(),15000);
+
+
+          }).on('end', (stdout, stderr) => {
+            console.log('==== FFMPEG end ====');
+            console.log(stdout);
+
+          }).on('error', (err) => {
+            console.log('==== FFMPEG error ====');
+            console.log(err.message);
+            // fs.unlink(tempFile, () => {
+            //   console.log('deleted temp file used by ffmpeg');
+            // });
+          }).save(filepath);
         }
-        subtitles.push(subObj);
 
-        let cmd = ffmpeg(this.state.video.filename, {
-          timeout:60
-        }).outputOptions([
-          `-map 0:${stream.index}`
-        ]).on('codecData', (data) => {
-          console.log('==== FFMPEG codecData ====');
-          console.log(data);
-          console.log(JSON.stringify(data));
-
-          // setTimeout(()=>cmd.kill(),15000);
-
-
-        }).on('end', (stdout, stderr) => {
-          console.log('==== FFMPEG end ====');
-          console.log(stdout);
-
-        }).on('error', (err) => {
-          console.log('==== FFMPEG error ====');
-          console.log(err.message);
-          // fs.unlink(tempFile, () => {
-          //   console.log('deleted temp file used by ffmpeg');
-          // });
-        }).save(filepath);
-      }
-
-    });
+      });
+    } catch(err) {
+      // if we don't have ffprobe we'll probably end up here
+    }
 
     // create track tags and set them in state to be rendered
     let tracks = subtitles.map((sub, index) =>
@@ -9135,6 +9113,29 @@ function isEqualIgnoreFuncs(obj1,obj2) {
   // console.log(`isEqual? ${_.isEqual(new1,new2)}`);
 
   return _.isEqual(new1,new2);
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {    // Update state so the next render will show the fallback UI.
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {    // You can also log the error to an error reporting service
+    console.log(error);
+    console.log(errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {      // You can render any custom fallback UI
+      return <h2>Something went wrong.</h2>;
+    }
+    return this.props.children;
+  }
 }
 
 const library = new Library;
