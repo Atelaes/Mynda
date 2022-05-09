@@ -56,7 +56,7 @@ async function search(video) {
           //If not, then we have a single entry with full info
           //Format the new info, merge it into the given video object, and return.
           video = addTagsToVideo(video, response.data);
-          if (video.artwork && video.artwork !== 'N/A') {
+          if (video.artwork) {
             try {
               video.artwork = await downloadArt(video.artwork) || video.artwork;
             } catch(e) {
@@ -192,7 +192,8 @@ function addTagsToVideo(video, data) {
   video.title = data.Title;
   delete video.Title;
   video.description = data.Plot;
-  video.artwork = data.Poster, // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
+  video.artwork = data.Poster; // the MynEditArtwork component will do the work to actually download the image from this url and change the reference to the local file when finished
+  if (video.artwork === "N/A") video.artwork = '';
   delete video.Poster;
   video.year = data.Year;
   delete video.Year;
