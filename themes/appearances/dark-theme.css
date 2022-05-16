@@ -543,7 +543,9 @@
   --listwidget-item-width: 100%;
   --listwidget-item-margin: 0em .2em .2em 0em; /*.5em 0em .5em 0em; */
   --listwidget-item-padding-top: .2em;
-  --listwidget-item-padding: var(--listwidget-item-padding-top) 1.6em var(--listwidget-item-padding-top) .5em;
+  --listwidget-item-padding-right: 1.6em;
+  --listwidget-item-padding-left: .5em;
+  --listwidget-item-padding: var(--listwidget-item-padding-top) var(--listwidget-item-padding-right) var(--listwidget-item-padding-top) var(--listwidget-item-padding-left);
   --listwidget-item-font: var(--main-font);
   --listwidget-item-fontsize-size: .8;
   --listwidget-item-fontsize: calc(var(--listwidget-item-fontsize-size) * 1rem);

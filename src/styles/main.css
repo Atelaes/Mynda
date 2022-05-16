@@ -1933,7 +1933,13 @@ th, tr, td {
 /* increase padding on text input to make room for browse button on left */
 #editor-pane .list-widget-add-with-browse .list-widget-add.inline input.list-widget-add-input,
 #settings-pane .list-widget-add-with-browse .list-widget-add.inline input.list-widget-add-input {
-  padding-left: 2em;
+  padding-left: calc(var(--listwidget-item-padding-left) + 1.5em);
+}
+
+/* increase padding on text input to make room for datalist dropdown button on the right */
+#editor-pane .list-widget-add.inline.datalist input.list-widget-add-input,
+#settings-pane .list-widget-add.inline.datalist input.list-widget-add-input {
+  padding-right: calc(var(--listwidget-item-padding-right) + 1.3em);
 }
 
 

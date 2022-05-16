@@ -7567,7 +7567,7 @@ class MynEditText extends MynEdit {
     if (this.props.options) {
       listName = "used-" + this.props.property;
       options = (
-        <datalist className={listName}>
+        <datalist id={listName}>
           {this.props.options.map((option) => (<option key={option} value={option} />))}
         </datalist>
       );
@@ -8286,7 +8286,7 @@ class MynEditAddToList extends MynEditListWidget {
     }
 
     return (
-      <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "")}>
+      <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "") + (options ? " datalist" : "")}>
         <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." value={this.state.value} minLength="1" onChange={(e) => this.handleInput(e)} />
         <button className="editor-inline-button" onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
         {options}
