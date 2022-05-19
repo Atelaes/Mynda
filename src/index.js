@@ -371,7 +371,7 @@ function findVideosFromFolder(folderNode) {
         // otherwise, it must be a file
         let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
 
-        if (videoExtensions.includes(fileExt)) {
+        if (videoExtensions.includes(fileExt) && !isSampleVideo(compAddress)) {
           //console.log(`We're about to add ${component.name} to libTree.`);
           // if it's a video file, add it as a video
           // console.log(`${compAddress} is a regular video file`);
@@ -394,6 +394,24 @@ function findVideosFromFolder(folderNode) {
     }
     if (!stillGoing) divineCollections(libFileTree, []);
   });
+}
+
+function isSampleVideo(filepath) {
+  let fileBasename = path.basename(filepath,path.extname(filepath));
+  let size;
+  try {
+    size = fs.statSync(filepath).size;
+  } catch(err) {
+    console.log(`Could not determine file size of ${filepath}: ${err}`);
+    return false;
+  }
+
+  // if the filename ends with 'sample' or 'Sample' and it's less than 100 MB, we say it's a sample video
+  if (/sample$/.test(fileBasename.toLowerCase()) && size < 100000000) {
+    console.log('Ignoring "SAMPLE" video: ' + filepath);
+    return true;
+  }
+  return false;
 }
 
 //Recursive function which takes a built libFileTree and figures out collections
@@ -434,6 +452,11 @@ function confirmCurrentVideos() {
   console.log(`Running confirmCurrentVideos.`)
   for (let h=library.media.length-1; h>=0; h--) {
     let video = library.media[h];
+    if (!video) {
+      // library.remove(`media.${h}`);
+      continue;
+    }
+
     let filename = video.filename;
     // We put the whole thing in a try block, as we'll be traversing
     // nodes that aren't guaranteed to exist, and are expected not to if the
@@ -473,18 +496,15 @@ function confirmCurrentVideos() {
         } else {
           for (let k=0; k<libTreeLoc.videos.length; k++) {
             if (libTreeLoc.videos[k].filename === filename) {
+
+              // before deleting existing video from libFileTree, check for any subtitle changes
+              updateVideoSubs(video.subtitles,getVideoSubs(path.basename(filename,path.extname(filename)), libTreeLoc),h);
+
               // If we've gotten here, then we have confirmed the video exists,
               // so delete it from libFileTree
               libTreeLoc.videos.splice(k, 1);
               problem = false;
-              // Let's also check its subtitles (it would probably be faster)
-              // to find these in libFileTree, but that's just too much to code.
-              for (let l=0; l<video.subtitles.length; l++) {
-                let subAddress = video.subtitles[l];
-                if (!fs.existsSync(subAddress)) {
-                  library.remove(`media.${h}.subtitles.${l}`);
-                }
-              }
+
               break;
             }
           }
@@ -492,7 +512,8 @@ function confirmCurrentVideos() {
         if (problem) {throw true}
       }
 
-    } catch {
+    } catch(err) {
+      console.log(err)
       // A thrown error means we didn't find the video where we expected to,
       // so move it to inactive media.
       console.log(`${filename} appears to have disappeared, moving to inactive media.`)
@@ -530,25 +551,8 @@ function mulchVideoTree(folderNode) {
 
       let fileBasename = path.basename(video.filename,path.extname(video.filename));
 
-
       // then check for subtitles
-      let allSubs = getSubs(folderNode); // get all subtitles from this clade
-      let subtitles = [];
-      if (folderNode.videos.length === 1) {
-        // if this is the only video in this folder
-        // we assume any subtitle file belongs to this video
-        // in this folder and in any subfolders
-        subtitles = allSubs;
-      } else {
-        // otherwise, we'll only consider subtitle files that have the same filename
-        // or whose filenames contain the video's filename as a substring
-        for (let sub of allSubs) {
-          if (new RegExp('^' + fileBasename).test(path.basename(sub))) {
-            subtitles.push(sub);
-          }
-        }
-      }
-      video.subtitles = subtitles;
+      video.subtitles = getVideoSubs(fileBasename,folderNode);
 
       // If we've divined a collection for videos in this folder, make sure that this
       // video is in it.
@@ -693,18 +697,7 @@ async function addVideoFile(video) {
       console.log(`${fileBasename} has the same id as ${library.media[indexOfVideoInLibrary(id)].title}`);
       let vidIndex = indexOfVideoInLibrary(id);
       let libraryVideo = library.media[vidIndex];
-      if (!_.isEqual(video.subtitles,libraryVideo.subtitles)) {
-        console.log(`Subtitle files have changed for ${fileBasename}. Updating subtitles.`);
-        // eventually here, we need to be more sophisticated. We don't want to
-        // remove any subtitles the user has manually added from other locations,
-        // but we do want to remove any subtitles from the searched folders that
-        // no longer exist (as well as adding any new ones);
-        // for the moment, all this does is add new ones
-
-        // add any new subtitles, removing duplicates
-        libraryVideo.subtitles = [...new Set([...libraryVideo.subtitles, ...video.subtitles])];
-        library.replace(`media.${vidIndex}`,libraryVideo);
-      }
+      updateVideoSubs(libraryVideo.subtitles,video.subtitles,vidIndex);
       return;
 
     case 2:
@@ -961,7 +954,32 @@ function getFilesRecursive(folder) {
   return files;
 }
 
-function getSubs(folderNode) {
+
+// get subtitles for the given video from its clade in libFileTree,
+// (which ones depend on whether it's the only video in that clade or not)
+function getVideoSubs(fileBasename, folderNode) {
+  let allSubs = getNodeSubs(folderNode); // get all subtitles from this clade
+  let subtitles = [];
+  if (folderNode.videos.length === 1) {
+    // if this is the only video in this folder
+    // we assume any subtitle file belongs to this video
+    // in this folder and in any subfolders
+    subtitles = allSubs;
+  } else {
+    // otherwise, we'll only consider subtitle files that have the same filename
+    // or whose filenames contain the video's filename as a substring
+    for (let sub of allSubs) {
+      if (new RegExp('^' + fileBasename).test(path.basename(sub))) {
+        subtitles.push(sub);
+      }
+    }
+  }
+
+  return subtitles
+}
+
+// get all subtitles from a given clade in libFileTree
+function getNodeSubs(folderNode) {
   let subs = [];
   // get subtitles from this folder
   if (folderNode.subtitles) {
@@ -970,10 +988,40 @@ function getSubs(folderNode) {
   // get subtitles from all child folders
   if (folderNode.folders) {
     for (let folder of folderNode.folders) {
-      subs = [...subs,...getSubs(folder)];
+      subs = [...subs,...getNodeSubs(folder)];
     }
   }
   return subs;
+}
+
+function updateVideoSubs(librarySubs, libFileTreeSubs, libVidIndex) {
+
+    if (!_.isEqual(libFileTreeSubs,librarySubs)) {
+      console.log(`Subtitle files have changed for ${path.basename(library.media[libVidIndex].filename)}. Updating subtitles.`);
+      // We don't want to
+      // remove any subtitles the user has manually added from other locations,
+      // but we do want to remove any subtitles from the searched folders that
+      // no longer exist (as well as adding any new ones);
+
+      // remove any subtitles that no longer exist
+      for (let i=librarySubs.length-1; i>=0; i--) {
+        let subAddress = librarySubs[i];
+        try {
+          if (!fs.existsSync(subAddress)) {
+            librarySubs.splice(i,1);
+            // library.remove(`media.${libVidIndex}.subtitles.${i}`);
+          }
+        } catch(err) {
+          console.log(`problem checking existence of/removing ${subAddress}: ${err}`);
+        }
+      }
+
+      // add any new subtitles, removing duplicates
+      librarySubs = [...new Set([...librarySubs, ...libFileTreeSubs])];
+
+      // update library
+      library.replace(`media.${libVidIndex}.subtitles`,librarySubs);
+    }
 }
 
 //Takes a full address for a file/folder and checks to see if
