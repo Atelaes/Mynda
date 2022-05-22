@@ -1244,7 +1244,7 @@ class MynLibrary extends React.Component {
         let colContainerID = `collection-${object.id}`;
 
         return (
-          <div className="collection collapsed" key={object.name}>
+          <div className={'collection' + (!this.state.isExpanded[colContainerID] ? ' collapsed' : ' expanded')} key={object.name}>
             <h1
               className="collection-header"
               onClick={(e) => this.toggleExpansion(e,colContainerID)}
@@ -1274,7 +1274,7 @@ class MynLibrary extends React.Component {
             </h1>
             {this.deleteBtn(object)}
             {this.addBtn(object)}
-            <div className="container hidden">{results}</div>
+            <div className={'container' + (!this.state.isExpanded[colContainerID] ? ' hidden' : '')}>{results}</div>
           </div>
         );
       } else {
@@ -1361,7 +1361,7 @@ class MynLibrary extends React.Component {
         // wrap the videos in the last collection div,
         // then hand them off to MynLibTable with an initial sort by 'order'
         return (
-          <div className="collection collapsed" key={object.name}>
+          <div className={'collection' + (!this.state.isExpanded[colContainerID] ? ' collapsed' : ' expanded')} key={object.name}>
           <h1
             className="collection-header"
             onClick={(e) => this.toggleExpansion(e,colContainerID)}
@@ -1373,7 +1373,7 @@ class MynLibrary extends React.Component {
           </h1>
             {this.deleteBtn(object)}
             {this.addBtn(object)}
-            <div className="container hidden">
+            <div className={'container' + (!this.state.isExpanded[colContainerID] ? ' hidden' : '')}>
               {object.id === 'uncategorized' ? (
                 <Droppable droppableId={this.state.addToExistingColID ? this.state.addToExistingColID : 'dummy'}>
                   {(provided, snapshot) => (

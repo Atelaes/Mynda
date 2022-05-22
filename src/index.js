@@ -207,24 +207,33 @@ function removeVideo(video, index, fromInactive) {
 
       if (!fromInactive) {
         // add the video to library.inactive_media
-        library.add('inactive_media.push',video);
-
-        // remove video id from its watchfolder's list of video ids
-        library.settings.watchfolders.map((wf, i) => {
-          if (!wf) return;
-
-          if (new RegExp('^' + wf.path).test(video.filename)) {
-            console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
-            wf.videos = wf.videos.filter(id => id !== video.id);
-            library.replace(`settings.watchfolders.${i}`, library.settings.watchfolders[i], (err) => {
-              if (err) {
-                reject(`Error: could not update watchfolder manifest: ${err}`);
-              } else {
-                resolve();
-              }
-            });
+        library.add('inactive_media.push',video, (err) => {
+          if (err) {
+            reject(`Error: could not add ${video.filename} to inactive_media: ${err}`);
+          } else {
+            resolve();
           }
         });
+
+
+        // // remove video id from its watchfolder's list of video ids
+        // library.settings.watchfolders.map((wf, i) => {
+        //   if (!wf) return;
+        //
+        //   if (new RegExp('^' + wf.path).test(video.filename)) {
+        //     console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
+        //     wf.videos = wf.videos.filter(id => id !== video.id);
+        //     library.replace(`settings.watchfolders.${i}`, library.settings.watchfolders[i], (err) => {
+        //       if (err) {
+        //         reject(`Error: could not update watchfolder manifest: ${err}`);
+        //       } else {
+        //         resolve();
+        //       }
+        //     });
+        //   }
+        // });
+      } else {
+        resolve();
       }
     });
   });
@@ -995,33 +1004,44 @@ function getNodeSubs(folderNode) {
 }
 
 function updateVideoSubs(librarySubs, libFileTreeSubs, libVidIndex) {
+  // console.log(`librarySubs: ${JSON.stringify(librarySubs)}`);
+  // console.log(`libFileTreeSubs: ${JSON.stringify(libFileTreeSubs)}`);
 
-    if (!_.isEqual(libFileTreeSubs,librarySubs)) {
-      console.log(`Subtitle files have changed for ${path.basename(library.media[libVidIndex].filename)}. Updating subtitles.`);
-      // We don't want to
-      // remove any subtitles the user has manually added from other locations,
-      // but we do want to remove any subtitles from the searched folders that
-      // no longer exist (as well as adding any new ones);
 
-      // remove any subtitles that no longer exist
-      for (let i=librarySubs.length-1; i>=0; i--) {
-        let subAddress = librarySubs[i];
-        try {
-          if (!fs.existsSync(subAddress)) {
-            librarySubs.splice(i,1);
-            // library.remove(`media.${libVidIndex}.subtitles.${i}`);
-          }
-        } catch(err) {
-          console.log(`problem checking existence of/removing ${subAddress}: ${err}`);
+  if (!_.isEqual(libFileTreeSubs,librarySubs)) {
+    console.log(`Subtitle files have changed for ${path.basename(library.media[libVidIndex].filename)}. Updating subtitles.`);
+    // We don't want to remove any subtitles
+    // the user has manually added from other locations,
+    // but we do want to remove any subtitles from the searched folders that
+    // no longer exist (as well as adding any new ones);
+
+    // if any subtitles were manually added (i.e. not found by getVideoSubs() and put into libFileTree),
+    // this conditional will fire, seeing a difference between libFileTreeSubs and librarySubs;
+    // in this case, the combined set of the two should be identical to librarySubs,
+    // hence the conditional below in which we don't do a library update if that's the case;
+    // otherwise any video with manually added subtitles would cause a library call every time
+
+    // remove any subtitles that no longer exist
+    for (let i=librarySubs.length-1; i>=0; i--) {
+      let subAddress = librarySubs[i];
+      try {
+        if (!fs.existsSync(subAddress)) {
+          librarySubs.splice(i,1);
+          // library.remove(`media.${libVidIndex}.subtitles.${i}`);
         }
+      } catch(err) {
+        console.log(`problem checking existence of/removing ${subAddress}: ${err}`);
       }
-
-      // add any new subtitles, removing duplicates
-      librarySubs = [...new Set([...librarySubs, ...libFileTreeSubs])];
-
-      // update library
-      library.replace(`media.${libVidIndex}.subtitles`,librarySubs);
     }
+
+    // add any new subtitles, removing duplicates
+    let updated = [...new Set([...librarySubs, ...libFileTreeSubs])];
+
+    // update library
+    if (!_.isEqual(updated,librarySubs)) {
+      library.replace(`media.${libVidIndex}.subtitles`,updated);
+    }
+  }
 }
 
 //Takes a full address for a file/folder and checks to see if
