@@ -3828,6 +3828,8 @@ class MynPlayer extends MynOpenablePane {
         name: subName,
         lang: 'English'
       }
+      console.log(subObj);
+
       subtitles.push(subObj);
 
       // return (

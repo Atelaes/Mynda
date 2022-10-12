@@ -66,6 +66,13 @@ async function start() {
     console.log(`Couldn't load React tools.`);
     console.log(err);
   }
+
+  // make the temp folder if it doesn't already exist
+  const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+  fs.mkdir(tempFolder, (err) => {
+    if (err) throw err;
+  });
+
   await createWindow();  //createWindow needs to come first else we get a big delay.
   eraseTempImages();
   await cleanLibrary();
