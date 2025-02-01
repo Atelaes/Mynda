@@ -54,6 +54,7 @@ class Mynda extends React.Component {
       view : "flat", // whether to display a flat table or a hierarchical view
       columns : [], // the list of columns to display for the current playlist
       detailVideo : null,
+      detailVideoRowIndex: null, // keep the row index of the detail video in state so we can go to prev/next video even if the video leaves the table after being edited
       currentPlaylistID : null,
       prevQuery : '',
       selectedRows : {},
@@ -366,13 +367,20 @@ class Mynda extends React.Component {
       console.log("Error: could not find video " + id)
     }
 
+    // save the row index of this video (for the incr/decr buttons to use)
+    let rowIndex;
+    this.state.playlistRowManifest.map((row, i) => {
+      if (row.rowID === rowID) rowIndex = i;
+    });
+    // console.log("Video row index is " + rowIndex);
+
     // note if the video is the first or last video in the playlist (as currently sorted)
     // so that in the video editor, we can gray out the 'next' or 'previous' button
     let boundaryFlag = '';
     if (/*this.state.playlistRowManifest.length > 0 && */this.state.playlistRowManifest[0].rowID === rowID) boundaryFlag = 'first';
     if (/*this.state.playlistRowManifest.length > 0 && */this.state.playlistRowManifest[this.state.playlistRowManifest.length-1].rowID === rowID) boundaryFlag = 'last';
 
-    this.setState({detailRowID: rowID, detailVideo: detailVideo, detailRowBoundaryFlag: boundaryFlag});
+    this.setState({detailRowID: rowID, detailVideo: detailVideo, detailVideoRowIndex: rowIndex, detailRowBoundaryFlag: boundaryFlag});
   }
 
   // activated from a button in the editor pane,
@@ -386,12 +394,32 @@ class Mynda extends React.Component {
     console.log(this.state.playlistRowManifest);
     console.log(`Current detail vid rowID: ${this.state.detailRowID}`);
 
-    // first find index of the current detail vid in the playlistRowManifest
+    // first find index of the current detail vid in the playlistRowManifest;
+    // even though we've already saved this in this.state.detailVideoRowIndex,
+    // we want to check again in case the video moved (in case of a saved edit);
+    // the only reason for saving it in state is in case it was edited out of 
+    // the playlist entirely, in which case we still want to be able to
+    // go to the next or prev video from where it used to be
     let index;
     this.state.playlistRowManifest.map((row,i) => {
       if (row.rowID === this.state.detailRowID) index = i;
     });
-    if (typeof index === "undefined") return console.error('Could not find current detail vid in manifest');
+    if (typeof index === "undefined") {
+      if (this.state.detailVideoRowIndex !== null && typeof this.state.detailVideoRowIndex !== "undefined") {
+        index = this.state.detailVideoRowIndex;
+
+        // so this little hack assumes that the video has disappeared from the playlist,
+        // which is why we ended up in this 'if' block, in which case if we're incrementing,
+        // we need to subtract from where we were in order to get to the next video;
+        // we subtract <<amount>> instead of 1 because of batch editing, which is probably
+        // the only scenario in which we would ever want to increment by more than 1
+        if (amount > 0) {
+          index -= amount;
+        }
+      } else {
+        return console.error('Could not find current detail vid in manifest');
+      }
+    }
 
     this.goToRow(this.state.playlistRowManifest[index + amount]);
 
@@ -1041,7 +1069,8 @@ class MynNav extends React.Component {
                   onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
-                  {playlist.id === 'new' && numVids > 0 ? <div id='nav-message'>({numVids})</div> : null}
+                  {playlist.id === 'new' && numVids > 0 ? <div class='nav-message loud'>({numVids})</div> : null}
+                  {playlist.id !== 'new' && playlist.id === this.props.currentPlaylistID ? <div class='nav-message quiet small'>({numVids})</div> : null} 
                   {/*playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null*/}
                   {/*newVidAlert*/}
                 </li>
@@ -8390,6 +8419,10 @@ class MynEditSubtitles extends MynEditListWidget {
     this.updateList(list);
   }
 
+  emptyList() {
+    this.updateList([]);
+  }
+
 
   render() {
     return (
@@ -8398,6 +8431,9 @@ class MynEditSubtitles extends MynEditListWidget {
         <li className='list-widget-add-with-browse'>
           <MynEditAddToList object={this.props.object} property={this.props.property} update={this.addToListUpdate} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.validator} validatorTip={this.validatorTip} />
           <button className='list-widget-browse editor-inline-button' onClick={() => ipcRenderer.send('editor-subtitle-select')}><div className='icon-container'></div></button>
+        </li>
+        <li>
+          <button className='' onClick={() => this.emptyList()}>Clear All Subtitles</button>
         </li>
       </ul>
     );

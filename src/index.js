@@ -70,7 +70,7 @@ async function start() {
   // make the temp folder if it doesn't already exist
   const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
   fs.mkdir(tempFolder, (err) => {
-    if (err) throw err;
+    if (err) console.log(err);
   });
 
   await createWindow();  //createWindow needs to come first else we get a big delay.

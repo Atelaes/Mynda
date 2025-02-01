@@ -360,7 +360,7 @@ img.ratings-icon {
   margin: var(--navcontrolschildren-margin);
 }
 
-#nav-message {
+.nav-message {
   display:inline-block;
   /* position:absolute;
   top:0;
@@ -368,7 +368,18 @@ img.ratings-icon {
   margin-left:.2rem;
   font-size:.8rem;
   /* line-height:.8rem; */
-  color:#DD4444;
+}
+
+.loud {
+  color: #DD4444;
+}
+
+.quiet {
+  opacity: 0.8;
+}
+
+.small {
+  font-size: 0.7rem;
 }
 
 /* search input container */
