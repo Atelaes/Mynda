@@ -4562,6 +4562,7 @@ class MynSettingsPrefs extends React.Component {
       },
       hide_description : props.settings.preferences.hide_description,
       include_new_vids_in_playlists : props.settings.preferences.include_new_vids_in_playlists,
+      remove_autotagged_from_new: props.settings.preferences.remove_autotagged_from_new,
       include_user_rating_in_avg : props.settings.preferences.include_user_rating_in_avg,
       kinds : props.settings.used.kinds.filter(kind => !!kind),
       override_dialogs : props.settings.preferences.override_dialogs
@@ -4589,6 +4590,10 @@ class MynSettingsPrefs extends React.Component {
         address = "settings.preferences.include_new_vids_in_playlists";
         this.setState({include_new_vids_in_playlists:value});
         break;
+      case "remove-autotagged-new":
+        address = "settings.preferences.remove_autotagged_from_new";
+        this.setState({ remove_autotagged_from_new: value });
+        break;
       case "kinds" :
         address = "settings.used.kinds";
         this.setState({kinds:value});
@@ -4607,7 +4612,7 @@ class MynSettingsPrefs extends React.Component {
       saveObj[address] = value;
       this.props.save(saveObj);
     } else {
-      console.error('Not address was provided to save.');
+      console.error('No address was provided to save.');
     }
   }
 
@@ -4680,6 +4685,16 @@ class MynSettingsPrefs extends React.Component {
             />
             Include new videos in playlists
             <MynTooltip tip="If unchecked, newly added videos will appear only in the 'New' playlist until edited (or auto-tagged)" />
+          </li>
+          <li id='settings-prefs-removeautotaggednew' className='subsection'>
+            <h2>Removed Autotagged from New:</h2>
+            <input
+              type='checkbox'
+              checked={this.state.remove_autotagged_from_new}
+              onChange={(e) => this.update('remove-autotagged-new', e.target.checked)}
+            />
+            Remove all videos from 'New' playlist after auto-tagging 
+            <MynTooltip tip="If unchecked, videos will only be removed from the 'New' playlist when manually edited/tagged" />
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
             <h2>Hide Descriptions:</h2>
@@ -8304,6 +8319,13 @@ class MynEditAddToList extends MynEditListWidget {
     // event.stopPropagation();
   }
 
+  // if Enter is pressed, add item
+  keyDown(event) {
+    if (event.key === "Enter") {
+      this.addItem(event);
+    }
+  }
+
   render() {
     let options = null;
     let listName = null;
@@ -8318,7 +8340,7 @@ class MynEditAddToList extends MynEditListWidget {
 
     return (
       <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "") + (options ? " datalist" : "")}>
-        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." value={this.state.value} minLength="1" onChange={(e) => this.handleInput(e)} />
+        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." value={this.state.value} minLength="1" onChange={(e) => this.handleInput(e)} onKeyDown={(e) => this.keyDown(e)} />
         <button className="editor-inline-button" onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
         {options}
       </div>

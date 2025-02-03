@@ -440,7 +440,8 @@ const defaultLibrary = {
         "MynLibrary-confirm-convertTerminalCol": false
       },
       "include_user_rating_in_avg": false,
-      "include_new_vids_in_playlists": true
+      "include_new_vids_in_playlists": true,
+      "remove_autotagged_from_new": true
     },
     "used" : {
       "kinds" : [

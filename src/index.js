@@ -1312,7 +1312,9 @@ async function autoTag() {
           results = resultsObject.data;
           // if successful in picking the first result, save it
           if (resultsObject.success && !Array.isArray(results)) {
-            results.new = false;
+            if (library.settings.preferences.remove_autotagged_from_new) {
+              results.new = false;
+            }
             batchSave.push(results);
             // library.replace(`media.id=${newVideo.id}`, results);
             disposition = 'Success';
@@ -1330,7 +1332,9 @@ async function autoTag() {
         }
       } else {
         // we got just a single result, so save it
-        results.new = false;
+        if (library.settings.preferences.remove_autotagged_from_new) {
+          results.new = false;
+        }
         batchSave.push(results);
         // library.replace(`media.id=${newVideo.id}`, results);
         disposition = 'Success';

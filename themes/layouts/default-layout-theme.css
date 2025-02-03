@@ -342,6 +342,11 @@
   grid-column: 2;
 }
 
+#settings-prefs-removeautotaggednew {
+  grid-row: 5;
+  grid-column: 2;
+}
+
 #settings-prefs-showdialogs {
   grid-row: 500;
   grid-column: 1 / span 2;

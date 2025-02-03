@@ -1689,6 +1689,18 @@ th, tr, td {
 .edit-field.metadata table td.field {
   white-space: nowrap;
 }
+
+.edit-field.metadata table tr td:first-child {
+  /* text-align: end; */
+  border-top-left-radius: .5em;
+  border-bottom-left-radius: .5em;
+}
+.edit-field.metadata table tr td:last-child {
+  border-top-right-radius: .5em;
+  border-bottom-right-radius: .5em;
+}
+
+
 .edit-field.metadata table tr:nth-of-type(odd) {
   /* background-color: var(--movie-row-bg-odd); */
 }
