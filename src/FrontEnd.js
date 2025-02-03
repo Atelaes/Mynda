@@ -8287,7 +8287,7 @@ class MynEditListWidget extends MynEditWidget {
 
       return (
         <li key={index} className="list-widget-item" title={item}>
-          {displayItem}
+          <pre>{displayItem}</pre>
           <div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>
             {"\u2715"}
           </div>

@@ -12,6 +12,13 @@
   display: none;
 }
 
+pre {
+  display: unset;
+  font-family: unset;
+  white-space: pre;
+  margin: unset;
+}
+
 body {
   background-color: var(--main-bg);
   color: var(--main-text);
