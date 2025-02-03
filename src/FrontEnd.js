@@ -506,10 +506,19 @@ class Mynda extends React.Component {
       console.error("Error: could not find playlist " + id + ", displaying first playlist")
       try {
         playlist = this.state.playlists[0] // display the first one
+        id = playlist.id
       } catch(error) {
         console.error("Error: no playlists found, displaying nothing")
-        playlist = { "filter_function" : "false" } // just display nothing
+        playlist = { "filter_function" : "false", "id":-1 } // just display nothing
+        id = playlist.id
       }
+    }
+
+    // I don't know how we ever get here after the above try blocks, but it happens when deleting an open playlist
+    // so this is necessary to keep Mynda from crashing
+    if (typeof playlist === "undefined") {
+      playlist = this.state.playlists[0] // display the first one
+      id = playlist.id
     }
     // console.log('playlistFilter() ' + playlist.name)
 
@@ -548,7 +557,28 @@ class Mynda extends React.Component {
 
     // set the playlist, and erase any row selection from the previous playlist (only if we actually switched playlists)
     let videos = this.playlistFilter(id);
-    let playlist = this.state.playlists.filter(playlist => playlist && playlist.id == id)[0];
+    let playlist
+    try {
+      playlist = this.state.playlists.filter(playlist => playlist && playlist.id == id)[0];
+    } catch(e) {
+      console.error("Error: could not find playlist " + id + ", setting to first playlist")
+      try {
+        playlist = this.state.playlists[0] // display the first one
+        id = playlist.id
+      } catch(e) {
+        console.error("Error: no playlists found, displaying nothing")
+        playlist = { "filter_function": "false", "id":-1 } // just display nothing
+        id = playlist.id
+      }
+    }
+
+    // I don't know how we ever get here after the above try blocks, but it happens when deleting an open playlist
+    // so this is necessary to display a playlist afterwards instead of nothing
+    if (typeof playlist === "undefined") {
+      playlist = this.state.playlists[0] // display the first one
+      id = playlist.id
+    }
+
     let view = playlist ? playlist.view : null; // set the view state variable to this playlist's view
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
     let flatDefaultSort = playlist ? playlist.flatDefaultSort : null; // default sort column for this playlist, but only applies when viewed in flat view
