@@ -35,6 +35,7 @@ class Library {
     this.dataPath = (electron.app || electron.remote.app).getPath('userData');
     this.path = path.join(this.dataPath, "Library", "library.json");
 
+    // Load library
     const data = this.load();
     Object.keys(data).map((key) => {this[key] = data[key]});
     // ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
@@ -402,7 +403,8 @@ const defaultLibrary = {
           "rated",
           "country",
           "languages",
-          "duration"
+          "duration",
+          "resolution"
         ]
       },
       "defaultdefaultcolumns" : {
@@ -426,7 +428,8 @@ const defaultLibrary = {
           "rated",
           "country",
           "languages",
-          "duration"
+          "duration",
+          "resolution"
         ]
       },
       "hide_description" : "show",
@@ -486,7 +489,7 @@ const defaultLibrary = {
     {
       "id" : "2",
       "name" : "Shows",
-      "filter_function" : "video.kind === 'show'",
+      "filter_function" : "video.kind === 'series'",
       "view" : "hierarchical",
       "tab" : true,
       "columns" : [

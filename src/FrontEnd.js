@@ -1867,7 +1867,6 @@ class MynLibrary extends React.Component {
           </div>
         </DragDropContext>
       )
-
     // if the playlist view is flat, we only need to display one table
     } else if (this.props.view === "flat") {
 
@@ -2283,7 +2282,8 @@ class MynLibTable extends React.Component {
      rated: (a, b) => [ratedOrder[a.rated.toUpperCase()], ratedOrder[b.rated.toUpperCase()]],
      country: (a, b) => [a.country.toLowerCase(), b.country.toLowerCase()],
      languages: (a, b) => [(a.languages[0] || '').toLowerCase(), (b.languages[0] || '').toLowerCase()],
-     duration: (a, b) => [a.metadata ? parseInt(a.metadata.duration)-1 : null, b.metadata ? parseInt(b.metadata.duration)-1 : null] // - 1 because we use 0 when we don't have a duration, but the sort function doesn't treat 0 as empty (it does treat -1 as empty);
+     duration: (a, b) => [a.metadata ? parseInt(a.metadata.duration)-1 : null, b.metadata ? parseInt(b.metadata.duration)-1 : null], // - 1 because we use 0 when we don't have a duration, but the sort function doesn't treat 0 as empty (it does treat -1 as empty);
+     resolution: (a, b) => [parseInt(a.metadata.width),parseInt(b.metadata.width)]
     }
 
     console.log('this.props.movies.length === ' + this.props.movies.length);
@@ -2643,6 +2643,44 @@ class MynLibTableRow extends React.Component {
     return result;
   }
 
+  displayResolution(metadata) {
+    let width = metadata.width;
+    if (!width) {
+      return '';
+    }
+
+    // this correlates with erroneous width and height metadata, causing the wrong resolution to be displayed,
+    // so we'd rather leave it blank
+    if (metadata.codec.includes("mjpeg")) {
+      return '';
+    }
+
+    let resolution = '';
+    width = parseInt(width);
+
+    if (width > 6000) { // 8K, nominal 7680
+      resolution = '4320p';
+    } else if (width > 3000) { // 4K, nominal 4096
+      resolution = '2160p';
+    } else if (width > 2240) { // 1440p, nominal 2560
+      resolution = '1440p';
+    } else if (width > 1600) { // 1080p, nominal 1920
+      resolution = '1080p';
+    } else if (width > 900) { // 720p, nominal 1280
+      resolution = '720p';
+    } else if (width > 670) { // 480p, nominal 720 (NTSC DVD resolution), or 854 (16:9 ratio)
+      resolution = '480p';
+    } else if (width > 400) { // 360p, nominal 640
+      resolution = '360p';
+    } else if (width > 340) { // 240p, nominal 427
+      resolution = '240p';
+    } else { // 144p, nominal 256
+      resolution = '144p';
+    }
+
+    return resolution
+  }
+
   saveEdited(originalVid, ...args) {
     // console.log('save-edited!!!');
     let changes = {};
@@ -2754,7 +2792,8 @@ class MynLibTableRow extends React.Component {
       rated: (<td key="rated" className="rated centered">{video.rated}</td>),
       country: (<td key="country" className="country">{video.country}</td>),
       languages: (<td key="languages" className="languages">{video.languages[0]}</td>),
-      duration: (<td key="duration" className="duration">{video.metadata.duration !== 0 && video.metadata.duration !== null ? `${Math.round(Number(video.metadata.duration)/60)} min` : ''}</td>)
+      duration: (<td key="duration" className="duration">{video.metadata.duration !== 0 && video.metadata.duration !== null ? `${Math.round(Number(video.metadata.duration)/60)} min` : ''}</td>),
+      resolution: (<td key="resolution" className="resolution">{this.displayResolution(video.metadata)}</td>)
     };
 
     let cells = this.props.columns.map(column => {
