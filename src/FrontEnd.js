@@ -97,6 +97,8 @@ class Mynda extends React.Component {
       "boxoffice" : "BoxOffice",
       "languages" : "language",
       "duration" : "runtime",
+      "episode" : "#",
+      "resolution" : "res"
     }
 
     let result = name;
@@ -1867,6 +1869,29 @@ class MynLibrary extends React.Component {
           </div>
         </DragDropContext>
       )
+    } else if (this.props.view === "series") {
+
+      tables = (
+          <div id="series-container">
+            <MynLibSeries
+              videos={this.state.videos}
+              settings={this.props.settings}
+              playlistID={this.props.playlistID}
+              view={this.props.view}
+              flatDefaultSort={this.props.flatDefaultSort}
+              columns={this.props.columns}
+              displayColumnName={this.props.displayColumnName}
+              calcAvgRatings={this.props.calcAvgRatings}
+              showDetails={this.props.showDetails}
+              playVideo={this.props.playVideo}
+              handleSelectedRows={this.props.handleSelectedRows}
+              handleHoveredRow={this.props.handleHoveredRow}
+              selectedRows={this.props.selectedRows}
+              reportSortedManifest={this.reportSortedManifest}
+            />
+          </div>
+      )
+
     // if the playlist view is flat, we only need to display one table
     } else if (this.props.view === "flat") {
 
@@ -1905,6 +1930,7 @@ class MynLibrary extends React.Component {
     let playlistBar = (
       <MynPlaylistBar
         playlist={playlist}
+        view={this.props.view}
         recentlyWatched={this.props.recentlyWatched}
         collections={this.state.collections}
         playVideo={this.props.playVideo}
@@ -1918,6 +1944,122 @@ class MynLibrary extends React.Component {
         {tables}
       </div>
     );
+  }
+}
+
+class MynLibSeries extends React.Component {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      manifest: {},
+      columns: _.cloneDeep(props.columns)
+    }
+  }
+
+  createManifest() {
+    // loop through all the videos in this playlist and add them to the manifest
+    this.props.videos.map((video) => {
+      if (video.series) {
+        let series = video.series;
+        let season = "none";
+        if (video.season) {
+          season = '' + video.season;
+        }
+
+        // create series object
+        if (!this.state.manifest.hasOwnProperty(series)) {
+          this.state.manifest[series] = {};
+        }
+
+        // create season array
+        if (!this.state.manifest[series].hasOwnProperty(season)) {
+          this.state.manifest[series][season] = [];
+        }
+
+        // add video to series and season (we don't need to worry about episode, since we'll simply have the table sort each season by episode number)
+        this.state.manifest[series][season].push(video);
+      }
+    });
+
+    // this.setState({manifest: this.state.manifest});
+  }
+
+  addEpisodeToColumns() {
+    if (!this.state.columns.includes('episode')) {
+      this.state.columns.unshift('episode');
+    }
+    return this.state.columns; // will check if episode is already part of it and move to beginning, else add to beginning
+  }
+
+  componentDidMount() {
+    this.createManifest();
+    this.setState({columns: this.addEpisodeToColumns()});
+  }
+
+  componentDidUpdate(oldProps) {
+    if (!_.isEqual(this.props.columns,oldProps.columns)) {
+      this.state.columns = _.cloneDeep(this.props.columns);
+      this.setState({ columns: this.addEpisodeToColumns() });
+    }
+
+    if (!_.isEqual(this.props.videos, oldProps.videos)) {
+      this.createManifest();
+    }
+  }
+
+  render() {
+    // sort the series' alphabetically
+    let seriesKeys = Object.keys(this.state.manifest);
+    seriesKeys.sort();
+
+    // go through the manifest and create a table for each season
+    let JSX = seriesKeys.map(series => {
+
+      // sort the seasons by season number in ascending order
+      let seasons = Object.keys(this.state.manifest[series]);
+      seasons.sort((a,b) => {
+        return parseFloat(a) - parseFloat(b);
+      });
+
+      let seriesJSX = seasons.map(season => {
+        let seasonVideos = this.state.manifest[series][season];
+        let tableID = `${series}.${season}`;
+
+        return (
+          <div class="season">
+            <h2 class="season-header">{season === 'none' ? '[No Season]' : `Season ${season}`}</h2>
+            <MynLibTable
+              tableID={tableID}
+              movies={seasonVideos}
+              settings={this.props.settings}
+              playlistID={this.props.playlistID}
+              view={this.props.view}
+              flatDefaultSort={'episode'}
+              columns={this.state.columns}
+              displayColumnName={this.props.displayColumnName}
+              calcAvgRatings={this.props.calcAvgRatings}
+              showDetails={this.props.showDetails}
+              playVideo={this.props.playVideo}
+              handleSelectedRows={this.props.handleSelectedRows}
+              handleHoveredRow={this.props.handleHoveredRow}
+              selectedRows={this.props.selectedRows}
+              reportSortedManifest={this.props.reportSortedManifest}
+            />
+          </div>
+        );
+      });
+
+      return (
+        <div class="series">
+          <h1 class="series-header">{series}</h1>
+          {seriesJSX}
+        </div>
+      );
+
+    });
+
+    return JSX;
   }
 }
 
@@ -1949,8 +2091,9 @@ class MynPlaylistBar extends React.Component {
         <div className="pb-element view">
           <div className="pb-text">View:</div>
           <div className="select-container select-alwaysicon">
-            <select value={this.props.playlist.view} onChange={(e) => this.changeView(e.target.value)}>
+            <select value={this.props.view} onChange={(e) => this.changeView(e.target.value)}>
               <option value='flat'>Flat</option>
+              <option value='series'>Series</option>
               <option value='hierarchical'>Hierarchical</option>
             </select>
           </div>
@@ -2414,10 +2557,10 @@ class MynLibTable extends React.Component {
     } else {
 
       // display 'order' column only if we're in a hierarchical playlist
-      if (this.props.view === 'flat') {
-        this.state.displayOrderColumn = "none";
-      } else {
+      if (this.props.view === 'hierarchical') {
         this.state.displayOrderColumn = "table-cell";
+      } else {
+        this.state.displayOrderColumn = "none";
       }
 
       // ==== sort the table === //
@@ -4972,6 +5115,7 @@ class MynSettingsPlaylistsTableRow extends React.Component {
         <div className='select-container select-alwaysicon'>
           <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
             <option value='flat'>Flat</option>
+            <option value='series'>Series</option>
             <option value='hierarchical'>Hierarchical</option>
           </select>
         </div>

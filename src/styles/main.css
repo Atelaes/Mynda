@@ -629,6 +629,7 @@ th, tr, td {
   margin-left: var(--collection-marginleft);
   position: relative;
 }
+.series-header,
 .collection h1,
 .collection h1 input[type=text],
 .collection .collection-btn,
@@ -670,6 +671,17 @@ th, tr, td {
 /* the input for when a collections title is clicked on to edit */
 .collection h1 input {
   width:20em;
+}
+
+.season-header {
+    margin: var(--collectionheader-margin);
+    padding-left: .5em;
+    font-size: var(--collectionheader-font-size);
+    line-height: calc(var(--collectionheader-font-size) * 1.5);
+    /* text-transform: uppercase; */
+    font-weight: var(--collectionheader-font-weight);
+    font-family: var(--collectionheader-font);
+    font-style: var(--collectionheader-font-style);
 }
 
 .collection .collection-btn-container {
