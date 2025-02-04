@@ -98,7 +98,8 @@ class Mynda extends React.Component {
       "languages" : "language",
       "duration" : "runtime",
       "episode" : "#",
-      "resolution" : "res"
+      "resolution" : "res",
+      "watchlater" : "\u2665"
     }
 
     let result = name;
@@ -2612,7 +2613,7 @@ class MynLibTable extends React.Component {
         <tr id="main-table-header-row">
           <th onClick={() => this.reset('order')} style={{display:this.state.displayOrderColumn}}>#</th>
           {this.props.columns.map(col => (
-            <th key={col} onClick={() => this.reset(col)}>{this.props.displayColumnName(col)}</th>
+            <th key={col} class={col} onClick={() => this.reset(col)}>{this.props.displayColumnName(col)}</th>
           ))}
         </tr>
       );
@@ -2923,6 +2924,7 @@ class MynLibTableRow extends React.Component {
       director: (<td key="director" className="director">{video.director}</td>),
       genre: (<td key="genre" className="genre">{video.genre}</td>),
       seen: (<td key="seen" className="seen centered"><MynEditSeenWidget movie={video} update={(...args) => this.saveEdited(video, ...args)} /></td>),
+      watchlater: (<td key="watchlater" className="watchlater centered"><MynEditWatchlaterWidget movie={video} update={(...args) => this.saveEdited(video, ...args)} /></td>),
       ratings_user: (<td key="ratings_user" className="ratings_user centered"><MynEditRatingWidget movie={video} update={(...args) => this.saveEdited(video, ...args)} /></td>),
       dateadded: (<td key="dateadded" className="dateadded centered mono">{this.displaydate(video.dateadded)}</td>),
       kind: (<td key="kind" className="kind">{video.kind ? video.kind.replace(/\b\w/g,ltr=>ltr.toUpperCase()) : null}</td>),
@@ -6711,6 +6713,16 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    /* WATCHLATER */
+    let watchlater = (
+      <div className='edit-field watchlater'>
+        <label className='edit-field-name' htmlFor="watchlater">Watch Later: </label>
+        <div className="edit-field-editor">
+          <MynEditWatchlaterWidget movie={this.props.video} update={this.props.handleChange} />
+        </div>
+      </div>
+    );
+
     /* POSITION */
     let position = (
       <div className='edit-field position'>
@@ -6968,6 +6980,7 @@ class MynEditorEdit extends React.Component {
           {kind}
           {rating}
           {seen}
+          {watchlater}
           {lastseen}
           {position}
           {dateadded}
@@ -8167,7 +8180,7 @@ class MynEditWidgetCheckmark extends MynEditGraphicalWidget {
   }
 
   updateGraphic(value) {
-    let graphic = <li className="checkmark" onMouseOver={(e) => this.mouseOver(!this.props.movie[this.state.property],e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(!this.props.movie[this.state.property],e)}>{value ? "\u2714" : "\u2718"}</li>;
+    let graphic = <li className="checkmark" onMouseOver={(e) => this.mouseOver(!this.props.movie[this.state.property],e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(!this.props.movie[this.state.property],e)}>{value ? this.state.onChar : this.state.offChar}</li>;
     this.setState({displayGraphic : graphic});
   }
 
@@ -8182,7 +8195,24 @@ class MynEditSeenWidget extends MynEditWidgetCheckmark {
     super(props)
 
     this.state = {
-      property : "seen"
+      property : "seen",
+      onChar: "\u2714",
+      offChar: "\u2718"
+    }
+
+    this.render = this.render.bind(this);
+  }
+}
+
+// ###### Graphical editor for the 'watchlater' heart ###### //
+class MynEditWatchlaterWidget extends MynEditWidgetCheckmark {
+  constructor(props) {
+    super(props)
+
+    this.state = {
+      property: "watchlater",
+      onChar: "\u2665",
+      offChar: "\u2661"
     }
 
     this.render = this.render.bind(this);
@@ -9165,7 +9195,8 @@ function validateVideo(video) {
     'metadata':'object',
     'imdbID':'string',
     'autotag_tried':'boolean',
-    'dvd':'boolean'
+    'dvd':'boolean',
+    'watchlater':'boolean'
   };
 
   let vidProps = Object.keys(video);

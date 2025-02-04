@@ -304,8 +304,12 @@
   grid-row: 15;
   grid-column: 4 / span 2;
 }
-.edit-field.new {
+.edit-field.watchlater {
   grid-row: 16;
+  grid-column: 4 / span 2;
+}
+.edit-field.new {
+  grid-row: 17;
   grid-column: 4 / span 2;
 }
 

@@ -459,6 +459,9 @@ th, tr, td {
   /* position:fixed; */
 }
 
+.movie-table th.watchlater {
+  font-size: calc(var(--th-font-size) * 0.7);
+}
 .movie-table th {
   background-color: var(--th-bg);
   color: var(--th-text);

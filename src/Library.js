@@ -395,6 +395,7 @@ const defaultLibrary = {
         "unused" : [
           "kind",
           "lastseen",
+          "watchlater",
           "ratings_rt",
           "ratings_imdb",
           "ratings_mc",
@@ -420,6 +421,7 @@ const defaultLibrary = {
         "unused" : [
           "kind",
           "lastseen",
+          "watchlater",
           "ratings_rt",
           "ratings_imdb",
           "ratings_mc",

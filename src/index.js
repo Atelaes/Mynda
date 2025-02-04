@@ -294,6 +294,7 @@ let videoTemplate =   {
     "ratings" : {},
     "dateadded" : '',
     "lastseen" : '',
+    "watchlater" : false,
     "kind" : '',
     "artwork" : '',
     "subtitles" : [],
