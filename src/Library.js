@@ -484,6 +484,7 @@ const defaultLibrary = {
         "director",
         "genre",
         "seen",
+        "watchlater",
         "ratings_user",
         "dateadded"
       ]
@@ -492,9 +493,26 @@ const defaultLibrary = {
       "id" : "2",
       "name" : "Shows",
       "filter_function" : "video.kind === 'series'",
-      "view" : "hierarchical",
+      "view" : "series",
       "tab" : true,
       "columns" : [
+        "title",
+        "year",
+        "director",
+        "genre",
+        "seen",
+        "watchlater",
+        "ratings_user",
+        "dateadded"
+      ]
+    },
+    {
+      "id": "3",
+      "name": "♥",
+      "filter_function": "video.watchlater === true",
+      "view": "flat",
+      "tab": true,
+      "columns": [
         "title",
         "year",
         "director",

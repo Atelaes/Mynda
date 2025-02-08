@@ -1920,7 +1920,7 @@ class MynLibrary extends React.Component {
       )
 
     } else {
-      console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical"');
+      console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical" or "series"');
       return null
     }
 
@@ -1954,11 +1954,14 @@ class MynLibSeries extends React.Component {
 
     this.state = {
       manifest: {},
-      columns: _.cloneDeep(props.columns)
+      columns: _.cloneDeep(props.columns),
+      collapsed: {}
     }
   }
 
   createManifest() {
+    this.state.manifest = {};
+
     // loop through all the videos in this playlist and add them to the manifest
     this.props.videos.map((video) => {
       if (video.series) {
@@ -1971,6 +1974,7 @@ class MynLibSeries extends React.Component {
         // create series object
         if (!this.state.manifest.hasOwnProperty(series)) {
           this.state.manifest[series] = {};
+          this.state.collapsed[series] = true;
         }
 
         // create season array
@@ -1986,11 +1990,24 @@ class MynLibSeries extends React.Component {
     // this.setState({manifest: this.state.manifest});
   }
 
+  // expand or collapse a series
+  toggleExpansion(e,series) {
+    let seriesContainer = e.target.parentNode;//findNearestOfClass("series")
+
+
+    let seasonsContainer = seriesContainer.getElementsByClassName("seasons-container")[0];
+    seasonsContainer.classList.toggle("hidden");
+    seriesContainer.classList.toggle("expanded");
+    seriesContainer.classList.toggle("collapsed");
+
+    this.state.collapsed[series] = !this.state.collapsed[series]
+  }
+
   addEpisodeToColumns() {
     if (!this.state.columns.includes('episode')) {
       this.state.columns.unshift('episode');
     }
-    return this.state.columns; // will check if episode is already part of it and move to beginning, else add to beginning
+    return this.state.columns;
   }
 
   componentDidMount() {
@@ -2052,9 +2069,11 @@ class MynLibSeries extends React.Component {
       });
 
       return (
-        <div class="series">
-          <h1 class="series-header">{series}</h1>
-          {seriesJSX}
+        <div class={"series " + (this.state.collapsed[series] ? "collapsed" : "expanded")}>
+          <h1 class="series-header" onClick={(e) => this.toggleExpansion(e,series)}>{series}</h1>
+          <div class={"seasons-container " + (this.state.collapsed[series] ? "hidden" : "")}>
+            {seriesJSX}
+          </div>
         </div>
       );
 
@@ -2095,7 +2114,7 @@ class MynPlaylistBar extends React.Component {
             <select value={this.props.view} onChange={(e) => this.changeView(e.target.value)}>
               <option value='flat'>Flat</option>
               <option value='series'>Series</option>
-              <option value='hierarchical'>Hierarchical</option>
+              {/* <option value='hierarchical'>Hierarchical</option> */}
             </select>
           </div>
         </div>
@@ -4747,7 +4766,7 @@ class MynSettingsPlaylists extends React.Component {
             <div className="header row">
               <div className="header cell tab" title="Checked playlists will display as tabs. Unchecked playlists will only appear in the dropdown">Tab</div>
               <div className="header cell name">Name</div>
-              <div className="header cell view" title="Flat view displays items as a simple list. Hierarchical view displays items as a collections tree.">View</div>
+              <div className="header cell view" title="Flat view displays items as a simple list. Series view displays only items that are part of a series.">View</div>
               <div className="header cell add-btn"><button onClick={() => this.addPlaylist()}>Add...</button></div>
             </div>
             <Droppable droppableId='settings-playlist-table'>
@@ -5118,7 +5137,7 @@ class MynSettingsPlaylistsTableRow extends React.Component {
           <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
             <option value='flat'>Flat</option>
             <option value='series'>Series</option>
-            <option value='hierarchical'>Hierarchical</option>
+            {/* <option value='hierarchical'>Hierarchical</option> */}
           </select>
         </div>
       </div>
@@ -6986,7 +7005,7 @@ class MynEditorEdit extends React.Component {
           {dateadded}
           {artwork}
           {subtitles}
-          {collections}
+          {/* {collections} */}
           {ratings}
           {boxoffice}
           {rated}
@@ -8180,7 +8199,7 @@ class MynEditWidgetCheckmark extends MynEditGraphicalWidget {
   }
 
   updateGraphic(value) {
-    let graphic = <li className="checkmark" onMouseOver={(e) => this.mouseOver(!this.props.movie[this.state.property],e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(!this.props.movie[this.state.property],e)}>{value ? this.state.onChar : this.state.offChar}</li>;
+    let graphic = <li className={"checkmark " + (value ? "on" : "off")} onMouseOver={(e) => this.mouseOver(!this.props.movie[this.state.property],e)} onMouseOut={(e) => this.mouseOut(e.target.parentNode,e)} onClick={(e) => this.updateValue(!this.props.movie[this.state.property],e)}>{value ? this.state.onChar : this.state.offChar}</li>;
     this.setState({displayGraphic : graphic});
   }
 
@@ -8195,7 +8214,8 @@ class MynEditSeenWidget extends MynEditWidgetCheckmark {
     super(props)
 
     this.state = {
-      property : "seen",
+      property: "seen",
+      className: "seen",
       onChar: "\u2714",
       offChar: "\u2718"
     }
@@ -8204,13 +8224,14 @@ class MynEditSeenWidget extends MynEditWidgetCheckmark {
   }
 }
 
-// ###### Graphical editor for the 'watchlater' heart ###### //
+// ###### Graphical editor for the 'watchlater' widget ###### //
 class MynEditWatchlaterWidget extends MynEditWidgetCheckmark {
   constructor(props) {
     super(props)
 
     this.state = {
       property: "watchlater",
+      className: "watchlater",
       onChar: "\u2665",
       offChar: "\u2661"
     }

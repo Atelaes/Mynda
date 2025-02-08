@@ -687,6 +687,14 @@ th, tr, td {
     font-style: var(--collectionheader-font-style);
 }
 
+.seasons-container.hidden {
+  display: none;
+}
+
+.series-header {
+  cursor: pointer;
+}
+
 .collection .collection-btn-container {
   position:absolute;
   top:0;
@@ -1773,6 +1781,10 @@ th, tr, td {
 }
 .edit-widget li {
   display: inline;
+}
+
+.edit-widget li.checkmark.off {
+  opacity: .6;
 }
 
 /* .position-outer {

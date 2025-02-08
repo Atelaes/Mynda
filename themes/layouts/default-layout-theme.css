@@ -255,6 +255,7 @@
   grid-column: 1 / span 3;
 }
 .edit-field.metadata {
+  grid-row: 14 / span 10;
   grid-column: 1 / span 3;
 }
 
