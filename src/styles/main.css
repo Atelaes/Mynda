@@ -943,6 +943,11 @@ th, tr, td {
   vertical-align: bottom;
 }
 
+#detail-year {
+    font-size: var(--detailyear-font-size);
+    text-align: center;
+}
+
 #edit-button {
   display: inline-block;
   cursor:pointer;

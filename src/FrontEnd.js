@@ -1038,6 +1038,7 @@ class MynNav extends React.Component {
     const input = document.getElementById("search-input");
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true })); // necessary to trigger the search function
+    input.focus();
   }
 
   // setPlaylist(playlistID,target) {
@@ -2027,9 +2028,11 @@ class MynLibSeries extends React.Component {
   }
 
   render() {
-    // sort the series' alphabetically
+    // sort the series alphabetically
     let seriesKeys = Object.keys(this.state.manifest);
-    seriesKeys.sort();
+    seriesKeys.sort((a,b) => {
+      return a.replace(/^(?:a\s|an\s|the\s)/i, "") - b.replace(/^(?:a\s|an\s|the\s)/i, "");
+    });
 
     // go through the manifest and create a table for each season
     let JSX = seriesKeys.map(series => {
@@ -2643,7 +2646,7 @@ class MynLibTable extends React.Component {
 
   removeArticle(string) {
     if (typeof string !== 'string') return string;
-    return string.replace(/^(?:a\s|the\s)/i,"")
+    return string.replace(/^(?:a\s|an\s|the\s)/i,"")
   }
 
 
@@ -3190,6 +3193,7 @@ class MynDetails extends React.Component {
         <ul>
           <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
           <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
+          <li className="detail" id="detail-year">{video.year}</li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
           <li className="detail" id="detail-ratings">{this.displayRatings()}</li>

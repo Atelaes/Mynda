@@ -146,6 +146,7 @@
   --detaillabel-font-weight: 300;
   --detaillabel-font-size: var(--main-font-size);
   --detaillabel-font-style: normal;
+  --detailyear-font-size: calc(var(--main-font-size) * 1.5);
   --alt-font: BalooTamma2, Helvetica, sans-serif;
 
   /* background colors */
