@@ -659,7 +659,8 @@ th, tr, td {
   font-size: calc(var(--tip-fontsize) * .8);
   opacity: calc(var(--tip-opacity) * 1.2);
 }
-#library-pane .collection h1:hover {
+#library-pane .collection h1:hover,
+.series h1.series-header:hover {
   background-color: var(--collectionheader-bg-hover);
   color: var(--collectionheader-text-hover);
 }
@@ -676,6 +677,10 @@ th, tr, td {
   width:20em;
 }
 
+.series.expanded .series-header {
+  background-color: var(--collectionheader-bg-expanded);
+}
+
 .season-header {
     margin: var(--collectionheader-margin);
     padding-left: .5em;
@@ -685,6 +690,8 @@ th, tr, td {
     font-weight: var(--collectionheader-font-weight);
     font-family: var(--collectionheader-font);
     font-style: var(--collectionheader-font-style);
+    background-color: var(--collectionheader-bg);
+    color: var(--collectionheader-text);
 }
 
 .seasons-container.hidden {

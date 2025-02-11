@@ -594,7 +594,16 @@ class Mynda extends React.Component {
       // continue to display the batch editor for those selected videos
       this.setState({selectedRows : {}, detailVideo: null});
     }
-    this.setState({playlistVideos : videos, filteredVideos : videos, view : view, currentPlaylistID : id, flatDefaultSort : flatDefaultSort, columns : columns});
+
+    //
+    let searchField = document.getElementById("search-input");
+    if (searchField.value !== "") {
+      this.state.playlistVideos = videos; // must set this prior to calling this.searchFilter so it only searches videos in this playlist
+      this.setState({ playlistVideos: videos, filteredVideos: this.searchFilter(searchField.value), view: view, currentPlaylistID: id, flatDefaultSort: flatDefaultSort, columns: columns });
+    } else {
+      this.setState({ playlistVideos: videos, filteredVideos: videos, view: view, currentPlaylistID: id, flatDefaultSort: flatDefaultSort, columns: columns });
+    }
+
 
 
     // reset the details pane
@@ -605,7 +614,13 @@ class Mynda extends React.Component {
   // called when the search input is changed
   // change the filteredVideos state variable to those videos that match query
   search(e) {
-    let query = e.target.value;
+    let query = "";
+    if (e.target) {
+      query = e.target.value;
+    } else { // could be passed as an element instead of event
+      query = e.value;
+    }
+
     if (query != "") {
       // change the classes of the element to help with styling
       e.target.classList.add('filled');
@@ -2030,9 +2045,12 @@ class MynLibSeries extends React.Component {
   render() {
     // sort the series alphabetically
     let seriesKeys = Object.keys(this.state.manifest);
-    seriesKeys.sort((a,b) => {
-      return a.replace(/^(?:a\s|an\s|the\s)/i, "") - b.replace(/^(?:a\s|an\s|the\s)/i, "");
-    });
+    seriesKeys.sort();
+    // (a,b) => { // (not working for some reason)
+    //   a = a.replace(/^(?:a\s|an\s|the\s)/i, "");
+    //   b = b.replace(/^(?:a\s|an\s|the\s)/i, "");
+    //   return a > b ? 1 : (a < b ? -1 : 0);
+    // });
 
     // go through the manifest and create a table for each season
     let JSX = seriesKeys.map(series => {
@@ -2449,7 +2467,8 @@ class MynLibTable extends React.Component {
      country: (a, b) => [a.country.toLowerCase(), b.country.toLowerCase()],
      languages: (a, b) => [(a.languages[0] || '').toLowerCase(), (b.languages[0] || '').toLowerCase()],
      duration: (a, b) => [a.metadata ? parseInt(a.metadata.duration)-1 : null, b.metadata ? parseInt(b.metadata.duration)-1 : null], // - 1 because we use 0 when we don't have a duration, but the sort function doesn't treat 0 as empty (it does treat -1 as empty);
-     resolution: (a, b) => [parseInt(a.metadata.width),parseInt(b.metadata.width)]
+     resolution: (a, b) => [parseInt(a.metadata.width),parseInt(b.metadata.width)],
+     episode: (a,b) => [parseFloat(a.episode),parseFloat(b.episode)],
     }
 
     console.log('this.props.movies.length === ' + this.props.movies.length);

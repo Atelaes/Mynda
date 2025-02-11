@@ -347,8 +347,9 @@
   --collection-marginleft: .7em;
 
   --collectionheader-bg: var(--lighter-bg);
-  --collectionheader-bg-hover: var(--lighter-bg);
+  --collectionheader-bg-hover: var(--light-bg);
   --collectionheader-bg-drag: var(--med-bg);
+  --collectionheader-bg-expanded: var(--lightest-bg);
   --collectionheader-text: var(--library-bg);
   --collectionheader-text-hover: var(--library-bg);
   --collectionheader-text-drag: var(--dim-text);
