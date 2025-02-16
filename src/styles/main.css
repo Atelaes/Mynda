@@ -508,6 +508,10 @@ th, tr, td {
   height: var(--movie-row-height);
   background-color:var(--movie-row-bg);
 }
+table.compact .movie-row {
+    font-size: var(--main-font-size-compact);
+    height: var(--movie-row-height-compact);
+}
 .movie-row:nth-of-type(odd) {
   background-color: var(--movie-row-bg-odd);
 }
@@ -697,7 +701,10 @@ th, tr, td {
 .series.expanded .series-header {
   background-color: var(--collectionheader-bg-expanded);
 }
-
+.series-header.compact {
+  /* font-size: var(--main-font-size-compact); */
+  line-height: calc(var(--main-font-size-compact) * .8);
+}
 .season-header {
     margin: var(--collectionheader-margin);
     padding-left: .5em;

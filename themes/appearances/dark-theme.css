@@ -118,6 +118,7 @@
   /* font styling */
   --main-font: HKGrotesk, Helvetica, sans-serif;
   --main-font-size: 20pt;
+  --main-font-size-compact: 16pt;
   --main-font-weight: normal;
   --textinput-font: var(--main-font);
   --big-title-font: Dorsa, Helvetica, sans-serif;
@@ -381,6 +382,7 @@
   --th-text-hover: var(--bright-text);
 
   --movie-row-height: 2.5rem;
+  --movie-row-height-compact: 1.5rem;
   --movie-row-bg: var(--library-bg);
   --movie-row-bg-odd: var(--movie-row-bg);
   --movie-row-bg-even: var(--med-bg);

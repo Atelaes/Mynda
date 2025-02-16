@@ -162,17 +162,17 @@ class Mynda extends React.Component {
     });
   }
 
-  handleHoveredRow(vidID, rowID) {
+  handleHoveredRow(video, rowID, index) {
     // if nothing is selected, populate the details pane with the video of the row being hovered
     if (_.isEmpty(this.state.selectedRows)) {
-      this.showDetails(vidID, rowID);
+      this.showDetails(video.id, rowID, video, index);
     }
   }
 
-  forceRowHover(vidID, rowID) {
-    this.state.selectedRows = {};
-    this.handleHoveredRow(vidID,rowID);
-  }
+  // forceRowHover(vidID, rowID) {
+  //   this.state.selectedRows = {};
+  //   this.handleHoveredRow(vidID,rowID);
+  // }
 
   // selectedVids should be an array of video ids
   // or a single video id
@@ -309,10 +309,10 @@ class Mynda extends React.Component {
     this.setState({detailsPaneShowing : show});
   }
 
-  showDetails(id, rowID) {
-    // if (!this.state.detailsPaneShowing) {
-    //   return;
-    // }
+  showDetails(id, rowID, video, index) { // video and index are meant to be optional
+    if (!this.state.detailsPaneShowing) {
+      return;
+    }
 
     this.state.batchVids = null;
     // if the first parameter is an array of ids, we want to display
@@ -381,21 +381,31 @@ class Mynda extends React.Component {
 
       this.setState({detailRowID: rowID, detailVideo: batchObject, batchVids: batchVids});
       return;
-    }
+    } // end if (we have multiple videos)
 
     let detailVideo = null;
-    try {
-      detailVideo = this.state.filteredVideos.filter(video => video.id === id)[0]
-    } catch(error) {
-      console.log("Error: could not find video " + id)
+    if (video) {
+      detailVideo = video;
+    } else {
+      try {
+        detailVideo = this.state.filteredVideos.filter(v => v.id === id)[0]
+      } catch (error) {
+        console.log("Error: could not find video " + id)
+      }
     }
+
 
     // save the row index of this video (for the incr/decr buttons to use)
     let rowIndex;
-    this.state.playlistRowManifest.map((row, i) => {
-      if (row.rowID === rowID) rowIndex = i;
-    });
+    if (typeof index !== "undefined") {
+      rowIndex = index;
+    } else {
+      this.state.playlistRowManifest.map((row, i) => {
+        if (row.rowID === rowID) rowIndex = i;
+      });
+    }
     // console.log("Video row index is " + rowIndex);
+
 
     // note if the video is the first or last video in the playlist (as currently sorted)
     // so that in the video editor, we can gray out the 'next' or 'previous' button
@@ -1190,7 +1200,8 @@ class MynLibrary extends React.Component {
       dragging : false,
       addToExistingColID : '',
       manifest: {},
-      isExpanded: {}
+      isExpanded: {},
+      compact: false
     }
 
     this.deleteBtn = object => {
@@ -1223,6 +1234,8 @@ class MynLibrary extends React.Component {
     this.onDragStart = this.onDragStart.bind(this);
     this.reportSort = this.reportSort.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
+    this.toggleCompact = this.toggleCompact.bind(this);
+
 
     // this.findCollections = this.findCollections.bind(this);
 
@@ -1300,12 +1313,7 @@ class MynLibrary extends React.Component {
   }
 
   componentDidMount() {
-    // console.log(this.props.videos);
-    //
-    // this.setState({videos:this.props.videos},() => {
-    //   console.log(this.state.videos);
-    // });
-    //
+
     this.createCollectionsMap();
   }
 
@@ -1901,6 +1909,11 @@ class MynLibrary extends React.Component {
     this.props.reportSortedManifest(sortedManifestFlat);
   }
 
+  toggleCompact() {
+    console.log('toggling compact');
+    this.setState({compact: !this.state.compact});
+  }
+
   render() {
     // console.log('----MynLibrary RENDER----');
     let tables = null;
@@ -1938,6 +1951,7 @@ class MynLibrary extends React.Component {
               handleHoveredRow={this.props.handleHoveredRow}
               selectedRows={this.props.selectedRows}
               reportSortedManifest={this.reportSortedManifest}
+              compact={this.state.compact}
             />
           </div>
       )
@@ -1965,6 +1979,7 @@ class MynLibrary extends React.Component {
           handleHoveredRow={this.props.handleHoveredRow}
           selectedRows={this.props.selectedRows}
           reportSortedManifest={this.reportSortedManifest}
+          compact={this.state.compact}
         />
       )
 
@@ -1984,6 +1999,8 @@ class MynLibrary extends React.Component {
         recentlyWatched={this.props.recentlyWatched}
         collections={this.state.collections}
         playVideo={this.props.playVideo}
+        toggleCompact={this.toggleCompact}
+        compact={this.state.compact}
       />
     );
 
@@ -2117,6 +2134,7 @@ class MynLibSeries extends React.Component {
               handleHoveredRow={this.props.handleHoveredRow}
               selectedRows={this.props.selectedRows}
               reportSortedManifest={this.props.reportSortedManifest}
+              compact={this.props.compact}
             />
           </div>
         );
@@ -2124,7 +2142,7 @@ class MynLibSeries extends React.Component {
 
       return (
         <div class={"series " + (this.state.collapsed[series] ? "collapsed" : "expanded")}>
-          <h1 class="series-header" onClick={(e) => this.toggleExpansion(e,series)}>{series}</h1>
+          <h1 class={"series-header " + (this.props.compact ? 'compact' : '')} onClick={(e) => this.toggleExpansion(e,series)}>{series}</h1>
           <div class={"seasons-container " + (this.state.collapsed[series] ? "hidden" : "")}>
             {seriesJSX}
           </div>
@@ -2161,6 +2179,8 @@ class MynPlaylistBar extends React.Component {
           <div className="pb-text">Recently Viewed:</div>
           <MynRecentlyWatched list={this.props.recentlyWatched} collections={this.props.collections} selected={0} playVideo={this.props.playVideo} />
         </div>
+
+        <button className="pb-element compact" onClick={(e) => this.props.toggleCompact()}>{this.props.compact ? 'Large' : 'Compact'}</button>
 
         <div className="pb-element view">
           <div className="pb-text">View:</div>
@@ -2250,14 +2270,14 @@ class MynLibTable extends React.Component {
     }
   }
 
-  rowHovered(id, rowID, e) {
+  rowHovered(video, rowID, index, e) {
     // show details in details pane on hovering a row
     // except if a row has been locked (because then we want that video's details
     // to persist in the details pane until it's unlocked), or if multiple
     // videos have been selected (in which case we will show a special batch-edit
     // screen in the details pane)
     // if (!this.state.batchSelected || this.state.batchSelected.length === 0) {
-      this.props.handleHoveredRow(id, rowID, e);
+      this.props.handleHoveredRow(video, rowID, index);
     // }
   }
 
@@ -2812,7 +2832,7 @@ class MynLibTable extends React.Component {
 
     return (
       <div className="movie-table-container">
-        <table className="movie-table" id={this.tableID}>
+        <table className={"movie-table " + (this.props.compact ? 'compact' : '')} id={this.tableID}>
           <thead>
             {this.state.tHeadContent}
           </thead>
@@ -3037,14 +3057,14 @@ class MynLibTableRow extends React.Component {
         {...this.props.innerDragP}
         {...this.props.innerDragHP}
         vid_id={video.id}
-        onMouseOver={(e) => this.props.rowHovered(video.id, rowID, e)}
-        onMouseOut={(e) => this.props.rowOut(video.id, rowID, e)}
+        onMouseOver={(e) => this.props.rowHovered(video, rowID, index, e)}
         onClick={(e) => this.props.rowClick(video.id, rowID, index, e)}
       >
         {/* {cellJSX.order} */}
         {cells}
       </tr>
     );
+    // onMouseOut = {(e) => this.props.rowOut(video.id, rowID, e)}
   }
 }
 
