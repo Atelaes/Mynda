@@ -59,6 +59,8 @@ class Mynda extends React.Component {
       prevQuery : '',
       selectedRows : {},
 
+      detailsPaneShowing : true,
+
       // openablePane: null
       show : {
         settingsPane : false,
@@ -74,6 +76,7 @@ class Mynda extends React.Component {
     this.setPlaylist = this.setPlaylist.bind(this);
     this.search = this.search.bind(this);
     this.calcAvgRatings = this.calcAvgRatings.bind(this);
+    this.toggleDetailsPane = this.toggleDetailsPane.bind(this);
     this.showDetails = this.showDetails.bind(this);
     this.playVideo = this.playVideo.bind(this);
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
@@ -293,7 +296,24 @@ class Mynda extends React.Component {
     this.state.playlistRowManifest = manifest;
   }
 
+  toggleDetailsPane(show) {
+    // when hiding details pane, add the class "whole" to the library pane,
+    // to allow it to take up the remaining space
+    let libPane = document.getElementById("library-pane");
+    if (show) {
+      libPane.classList.remove("whole");
+    } else {
+      libPane.classList.add("whole");
+    }
+
+    this.setState({detailsPaneShowing : show});
+  }
+
   showDetails(id, rowID) {
+    // if (!this.state.detailsPaneShowing) {
+    //   return;
+    // }
+
     this.state.batchVids = null;
     // if the first parameter is an array of ids, we want to display
     // a special screen indicating that multiple videos are selected,
@@ -963,6 +983,8 @@ class Mynda extends React.Component {
             search={this.search}
             showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
             playlistLength={this.state.playlistLength}
+            toggleDetailsPane={this.toggleDetailsPane}
+            detailsPaneShowing={this.state.detailsPaneShowing}
           />
         </ErrorBoundary>
         <ErrorBoundary>
@@ -986,14 +1008,17 @@ class Mynda extends React.Component {
           />
         </ErrorBoundary>
         <ErrorBoundary>
-          <MynDetails
-            video={this.state.detailVideo}
-            rowID={this.state.detailRowID}
-            settings={this.state.settings}
-            showEditor={() => {this.showOpenablePane("editorPane")}}
-            scrollToVideo={this.scrollToVideo}
-            isRowVisible={this.isRowVisible}
-          />
+          { this.state.detailsPaneShowing ? 
+            (<MynDetails
+              video={this.state.detailVideo}
+              rowID={this.state.detailRowID}
+              settings={this.state.settings}
+              showEditor={() => {this.showOpenablePane("editorPane")}}
+              scrollToVideo={this.scrollToVideo}
+              isRowVisible={this.isRowVisible}
+            />)
+          : null
+          }
         </ErrorBoundary>
         <ErrorBoundary>
           <MynNotify
@@ -1087,7 +1112,7 @@ class MynNav extends React.Component {
             if (playlist.id === 'new') {
               let anyNew = false;
               for (const v of library.media) {
-                if (v.new) {
+                if (v && v.new) {
                   anyNew = true;
                   break;
                 }
@@ -1133,6 +1158,7 @@ class MynNav extends React.Component {
         <div id="nav-controls">
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
+          <div id="show-hide-details-btn" className="controls" onClick={() => this.props.toggleDetailsPane(!this.props.detailsPaneShowing)} title="Hide/Show Details Pane">{this.props.detailsPaneShowing ? "\u21E5" : "\u21E4"}</div>
         </div>
       </div>
     )
@@ -1253,6 +1279,9 @@ class MynLibrary extends React.Component {
       playlist = true;
     }
 
+    // force collections to be false for testing purposes, since we're no longer using collections
+    collections = false;
+
     // if (videos) this.setState({videos:_.cloneDeep(this.props.videos)});
     // if (collections) this.setState({collections:_.cloneDeep(this.props.collections)});
     // if (videos || collections) this.createCollectionsMap();
@@ -1281,7 +1310,7 @@ class MynLibrary extends React.Component {
   }
 
   createCollectionsMap() {
-    // console.log("Creating new collections map");
+    console.log("Creating new collections map");
     this.state.hierarchy = this.state.collections.map(collection => this.findCollections(collection));
 
     // create dummy collection of leftover videos, if any
@@ -1294,7 +1323,11 @@ class MynLibrary extends React.Component {
     // and add it to the hierarchy
     this.state.hierarchy.push(this.findCollections(uncategorized));
 
-    this.setState({hierarchy:this.state.hierarchy});
+    console.log("...finished creating collections map");
+
+    this.setState({hierarchy:this.state.hierarchy}, () => {
+      
+    });
   }
 
   // recursive function that walks down the collections and returns each branch
@@ -2582,6 +2615,7 @@ class MynLibTable extends React.Component {
       this.props.reportSort(this.props.collectionID,key,ascending);
     }
 
+    console.log("...finished sorting");
   }
 
   // this is the method that causes the table to render with all its content;
@@ -2590,6 +2624,7 @@ class MynLibTable extends React.Component {
   // or, if sortValue is a valid column name, sorts by that column (i.e. when the user clicks on a column header)
   // or, if nothing is passed, by the current sort value (i.e. when re-rendering an already open table for various reasons)
   reset(sortValue) {
+    console.log("======== MynLibTable RESET WAS CALLED ========");
     // if in a hierarchical playlist and this table is collapsed, render nothing
     if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
       this.setState({tBodyContent:null, tHeadContent:null});
@@ -2710,7 +2745,7 @@ class MynLibTable extends React.Component {
       console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
       // setTimeout(() => this.reset(true,true), 1000);
       this.reset('initial-sort');
-    } else if (this.props.view === 'flat' || this.props.isExpanded) {
+    } else { //if (this.props.view === 'flat' || this.props.isExpanded) {
       // console.log('playlist is the same, checking if any videos changed...');
       // if the playlist was NOT changed, but
       // if any videos in the playlist were changed...
@@ -2915,52 +2950,54 @@ class MynLibTableRow extends React.Component {
 
 
   render() {
+
     let rowID = this.props.rowID;
     let video = this.props.video;
     let index = this.props.index;
 
     // set the JSX for the 'order' column (which is only displayed in a hierarchical playlist) separately,
     // because it's rather wordy. It's editable by double clicking, so we need to use MynClickToEditText
-    let order;
-    let orderJSX = (
-      <td key="order" className="order" style={{display:this.props.displayOrderColumn}}>
-        <MynClickToEditText
-          object={video}
-          property='order'
-          update={(prop,value) => { console.log(value); /*if (valid)*/ order = value}}
-          options={null}
-          storeTransform={v => {v = v.replace(/\s+/g,''); if (v === '') {return v} else {return Math.round(Number(v) * 10) / 10}}}
-          validator={{test:v => !isNaN(Number(v))}}
-          validatorTip={'#'}
-          allowedEmpty={true}
-          reportValid={(prop,value) => {/*valid = value;*/}}
-          noClear={true}
-          setFocus={true}
-          doubleClick={true}
-          save={() => {
-            console.log('Saving order as ' + order);
+    // let order;
+    // let orderJSX = (
+    //   <td key="order" className="order" style={{display:this.props.displayOrderColumn}}>
+    //     <MynClickToEditText
+    //       object={video}
+    //       property='order'
+    //       update={(prop,value) => { console.log(value); /*if (valid)*/ order = value}}
+    //       options={null}
+    //       storeTransform={v => {v = v.replace(/\s+/g,''); if (v === '') {return v} else {return Math.round(Number(v) * 10) / 10}}}
+    //       validator={{test:v => !isNaN(Number(v))}}
+    //       validatorTip={'#'}
+    //       allowedEmpty={true}
+    //       reportValid={(prop,value) => {/*valid = value;*/}}
+    //       noClear={true}
+    //       setFocus={true}
+    //       doubleClick={true}
+    //       save={() => {
+    //         console.log('Saving order as ' + order);
 
-            // update the order and save to library
-            if (order && this.props.collections) {
-              let cols = new Collections(this.props.collections);
-              let col = cols.get(this.props.collectionID);
-              cols.removeVideo(col,video.id);
-              cols.addVideo(col,video.id,order);
-              library.replace("collections", cols.getAll());
-            } else {
-              // if 'order' is falsy (e.g. null will be passed if the user hits escape)
-              // then we just keep the old order
-              order = video.order;
-            }
-          }}
-      />
-      </td>
-    );
+    //         // update the order and save to library
+    //         if (order && this.props.collections) {
+    //           let cols = new Collections(this.props.collections);
+    //           let col = cols.get(this.props.collectionID);
+    //           cols.removeVideo(col,video.id);
+    //           cols.addVideo(col,video.id,order);
+    //           library.replace("collections", cols.getAll());
+    //         } else {
+    //           // if 'order' is falsy (e.g. null will be passed if the user hits escape)
+    //           // then we just keep the old order
+    //           order = video.order;
+    //         }
+    //       }}
+    //   />
+    //   </td>
+    // );
 
     let cellJSX = {
       // order: (<td key="order" className="order" style={{display:this.props.displayOrderColumn}}>{this.props.vidOrderDisplay[video.id]}</td>),
-      order: orderJSX,
-      title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={video.title} ellipsis='fade' /></td>),
+      // order: orderJSX,
+      title: (<td key="title" className="title">{video.title}</td>),
+      // title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={video.title} ellipsis='fade' /></td>),
       year: (<td key="year" className="year centered mono">{video.year}</td>),
       director: (<td key="director" className="director">{video.director}</td>),
       genre: (<td key="genre" className="genre">{video.genre}</td>),
@@ -2992,8 +3029,6 @@ class MynLibTableRow extends React.Component {
       return (<td key={column} className={column}>{String(video[column])}</td>)
     });
 
-
-
     return (
       <tr
         className={"movie-row " + rowID}
@@ -3006,7 +3041,7 @@ class MynLibTableRow extends React.Component {
         onMouseOut={(e) => this.props.rowOut(video.id, rowID, e)}
         onClick={(e) => this.props.rowClick(video.id, rowID, index, e)}
       >
-        {cellJSX.order}
+        {/* {cellJSX.order} */}
         {cells}
       </tr>
     );
@@ -6242,7 +6277,7 @@ class MynEditorSearch extends React.Component {
     // next, we have to get the actual movie object from the database
     OmdbHelper.search(movie).then(responseObject => {
       if (!responseObject.success) {
-        return console.log('Error: no result found: ' + response.data);
+        return console.log('Error: no result found: ' + responseObject.data);
       } else {
         this.props.handleChange(responseObject.data);
       }

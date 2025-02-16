@@ -298,6 +298,9 @@ img.ratings-icon {
   overflow-x: hidden;
   scrollbar-width: none;
 }
+#library-pane.whole {
+    grid-column: span 2;
+}
 #library-pane ::-webkit-scrollbar {
     display: none;
 }
@@ -387,6 +390,20 @@ img.ratings-icon {
 
 .small {
   font-size: 0.7rem;
+}
+
+#show-hide-details-btn {
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+  font-size: 1.6em;
+  line-height: .9em;
+  margin-right: .3em !important;
+  opacity: var(--settingsicon-opacity);
+}
+
+#show-hide-details-btn:hover {
+  opacity: var(--settingsicon-opacity-hover);
 }
 
 /* search input container */

@@ -314,6 +314,7 @@ class Library {
     if (this.Queue.length > 0) {
       console.log(`${this.Queue.length} items left in queue, moving to next item...`);
       let nextOp = this.Queue.shift();
+      console.log(`Next item: ${nextOp.opType} ${nextOp.address}`);
       this.alter(nextOp);
     }
   }
@@ -492,7 +493,7 @@ const defaultLibrary = {
     {
       "id" : "2",
       "name" : "Shows",
-      "filter_function" : "video.kind === 'series'",
+      "filter_function" : "video.kind === 'show'",
       "view" : "series",
       "tab" : true,
       "columns" : [
