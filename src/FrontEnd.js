@@ -2,6 +2,7 @@ const React = require('react');
 const ReactDOM = require('react-dom');
 const electron = require('electron');
 const { ipcRenderer } = require('electron');
+const { shell } = require('electron');
 const os = require('os');
 const _ = require('lodash');
 const DateJS = require('datejs');
@@ -3227,6 +3228,10 @@ class MynDetails extends React.Component {
     library.replace(`media.id=${this.props.video.id}`,updated);
   }
 
+  openInFinder() {
+    shell.showItemInFolder(this.props.video.filename);
+  }
+
   componentDidUpdate(oldProps) {
     // this.setTitleMarquee();
     if (!_.isEqual(oldProps.video, this.props.video)) {
@@ -3280,7 +3285,7 @@ class MynDetails extends React.Component {
           {video.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(video.boxoffice,'$',0) || ''}</li>) : null}
           <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(video.dateadded)}</li>
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(video.lastseen)}</li>
-
+          <li className="detail" id="detail-showFileBtn"><button onClick={() => this.openInFinder()}>Open in {os.platform() === 'darwin' ? "Finder" : "Explorer"}</button></li>
         </ul>
       );
 

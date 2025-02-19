@@ -464,6 +464,7 @@ img.ratings-icon {
 
 .movie-table-container {
   overflow-x: scroll;
+  /* overflow: visible; /* this must be on in order for position: sticky to work on the table header */
 }
 th, tr, td {
   border-width:0px;
@@ -472,12 +473,15 @@ th, tr, td {
   border-collapse: collapse;
   width: 100%;
 }
-.movie-table thead {
-  /* position:fixed; */
-}
-
+/* .movie-table thead th {
+  position:sticky;
+  top: 0px;
+} */
 .movie-table th.watchlater {
   font-size: calc(var(--th-font-size) * 0.7);
+}
+.movie-table thead tr {
+  background: var(--th-bg);
 }
 .movie-table th {
   background-color: var(--th-bg);
@@ -977,6 +981,12 @@ table.compact .movie-row {
 #detail-year {
     font-size: var(--detailyear-font-size);
     text-align: center;
+}
+
+#detail-showFileBtn {
+  text-align: center;
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 
 #edit-button {
