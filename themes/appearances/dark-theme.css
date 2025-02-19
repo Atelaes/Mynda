@@ -810,7 +810,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 /* line extending to the right of the tabs to match the tab borders */
 #nav-playlists::after {
   content:"";
-  border-top: var(--playlisttab-borderwidth-width) var(--playlisttab-borderstyle) var(--playlisttab-bordercolor-selected-color);
+  border-bottom: var(--playlisttab-borderwidth-width) var(--playlisttab-borderstyle) var(--playlisttab-bordercolor-selected-color);
   flex-grow:1;
 }
 

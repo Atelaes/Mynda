@@ -2422,6 +2422,10 @@ table.compact .movie-row {
   /* padding-left: var(--pb-padding); */
   padding-right: var(--pb-padding);
   background-color: var(--th-bg);
+
+  position: sticky;
+  top: -1px; /* needs to be -1px to avoid some leakage of the table rows appearing above it for some reason */
+  z-index: 999999999999999;
 }
 
 .pb-element {
