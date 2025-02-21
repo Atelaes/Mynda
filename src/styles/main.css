@@ -1119,14 +1119,21 @@ table.compact .movie-row {
 /*########### PLAYER PANE ###########*/
 /*************************************/
 #player-pane {
-  background-color: rgba(0,0,0,0);
+  /* background-color: rgba(0,0,0,0); */
+  border-radius: 1em;
 }
 
 #video-container {
   margin: 0;
-  padding: 0;
-  line-height: 0;
+  padding-left: 1em;
+  padding-right: 1em;
+  text-align: center;
+  /* line-height: 0; */
   overflow:hidden;
+}
+
+#video-container .video-title {
+  font-style: italic;
 }
 
 #video-player {
