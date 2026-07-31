@@ -210,6 +210,7 @@ function removeVideo(video, index, fromInactive) {
     library.remove(`${address}.${index}`, (err) => {
       if (err) {
         reject(`Error removing ${video.title} (${video.filename}); given bad index (index === ${index}) or could not find video in library.${address}:\n${err}`);
+        return;
       }
 
       if (!fromInactive) {
@@ -217,6 +218,7 @@ function removeVideo(video, index, fromInactive) {
         library.add('inactive_media.push',video, (err) => {
           if (err) {
             reject(`Error: could not add ${video.filename} to inactive_media: ${err}`);
+            return;
           } else {
             resolve();
           }
@@ -247,6 +249,20 @@ function removeVideo(video, index, fromInactive) {
 }
 function deleteFromInactive(video, index) {
   return removeVideo(video, index, true);
+}
+
+// Promise wrapper for Library.replace(), so callers can wait until a queued
+// replacement has actually been applied to the local library object.
+function replaceLibrary(address, replacement) {
+  return new Promise((resolve, reject) => {
+    library.replace(address, replacement, (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 //Takes a complete file address of a directory.
@@ -314,6 +330,12 @@ let videoTemplate =   {
   }
 
 function checkWatchFolders() {
+  // These values describe one scan only. Leaving them populated causes files
+  // from earlier scans to be treated as members of the current batch.
+  parsing = {};
+  libMulch = [];
+  newIDs = [];
+
   win.webContents.send('status-update', {action: 'check'});
   // reset libFileTree
   libFileTree = {name:'root', folders:[]};
@@ -456,13 +478,16 @@ function divineCollections(node, pathStack) {
   if (pathStack.length === 0) {
     //Again, we're on root.
     //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
-    confirmCurrentVideos();
+    confirmCurrentVideos().catch(err => {
+      console.error(`Watchfolder reconciliation failed: ${err}`);
+      win.webContents.send('status-update', {action: ''});
+    });
   } else {
     return count;
   }
 }
 
-function confirmCurrentVideos() {
+async function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
   // all there, removing from libFileTree as we go
   //console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
@@ -534,7 +559,7 @@ function confirmCurrentVideos() {
       // A thrown error means we didn't find the video where we expected to,
       // so move it to inactive media.
       console.log(`${filename} appears to have disappeared, moving to inactive media.`)
-      removeVideo(video);
+      await removeVideo(video);
     }
   }
   //console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
@@ -544,7 +569,7 @@ function confirmCurrentVideos() {
   // walk through libFileTree, adding all the videos to the library
   // (and making our best guess as to which subtitles go with which videos)
   mulchVideoTree(libFileTree);
-  addVideoController();
+  await addVideoController();
 }
 
 function mulchVideoTree(folderNode) {
@@ -607,12 +632,10 @@ async function addVideoController() {
   let addEnd = new Date();
   console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
-  library.replace('media', combinedMedia, (err) => {
-
-  });
+  await replaceLibrary('media', combinedMedia);
 
   // replace collections with updated version
-  library.replace('collections', collections.getAll());
+  await replaceLibrary('collections', collections.getAll());
 
   // tell the user how many videos we added
   win.webContents.send('videos_added',numNewVids);
@@ -649,12 +672,9 @@ async function addVideoController() {
     }
   }
 
-  // now update the actual videos with their metadata
-  // (here we have to use library.media instead of combinedMedia [see comment above],
-  // because the whole idea of waiting to add the metadata all at once is that it will incorporate
-  // any changes the user might have made in the meantime; so until we get Library.js working with
-  // promises so we can await the library save above, we will just hope that that library save
-  // will have finished by this point; not ideal, but it probably has??)
+  // now update the actual videos with their metadata. The media replacement
+  // above has been awaited, so library.media includes all newly added or
+  // rescued videos before this snapshot is made.
   let updatedMedia = library.media.map(v => {
     if (v && metadataToAdd[v.id]) {
       v.metadata = metadataToAdd[v.id];
@@ -663,14 +683,13 @@ async function addVideoController() {
   });
 
   // save to library
-  library.replace('media', updatedMedia, (err) => {
-    win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
-    console.log(`Added metadata for ${numSuccessful} videos`)
+  await replaceLibrary('media', updatedMedia);
+  win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
+  console.log(`Added metadata for ${numSuccessful} videos`)
 
-    setTimeout(() => {
-      win.webContents.send('status-update', {action: ''});
-    },3000);
-  });
+  setTimeout(() => {
+    win.webContents.send('status-update', {action: ''});
+  },3000);
 }
 
 // Takes a video object and fills it out
@@ -743,12 +762,7 @@ async function addVideoFile(video) {
             console.log('Could not update kind based on watchfolder default kind: ' + err);
           }
 
-          library.remove(`inactive_media.${inactiveVidIndex}`,(err) => {
-            if (err) {
-              throw err;
-              console.log(err);
-            }
-          });
+          await deleteFromInactive(vidObj, inactiveVidIndex);
 
         } catch(err) {
           console.log(`Error: found video object for ${fileBasename} in library.inactive_media but could not remove: ${err}`);
