@@ -762,14 +762,14 @@ async function addVideoFile(video) {
           vidObj = _.cloneDeep(library.inactive_media[inactiveVidIndex]);
           vidObj.filename = file; // this is important because the file may have been renamed
 
-          try {
-            // update the video's kind based on the watchfolder's default kind;
-            // in case the user has changed the default kind, we want to update it when re-adding the video
-            // vidObj.kind = library.settings.watchfolders.filter(wf => wf && wf.path === rootWatchFolder)[0].kind;
-            vidObj.kind = video.kind;
-          } catch(err) {
-            console.log('Could not update kind based on watchfolder default kind: ' + err);
-          }
+          // === DO NOT UPDATE THE KIND BASED ON WATCHFOLDER DEFAULT KIND ===
+          // try {
+          //   // update the video's kind based on the watchfolder's default kind;
+          //   // in case the user has changed the default kind, we want to update it when re-adding the video
+          //   // vidObj.kind = video.kind;
+          // } catch(err) {
+          //   console.log('Could not update kind based on watchfolder default kind: ' + err);
+          // }
 
           await deleteFromInactive(vidObj, inactiveVidIndex);
 

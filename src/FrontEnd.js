@@ -4055,7 +4055,7 @@ class MynSettings extends MynOpenablePane {
     let views = {
       folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
-      collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} settings={this.props.settings} />),
+      // collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} settings={this.props.settings} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />),
       sync : (<MynSettingsSync                save={this.save} settings={this.props.settings} />)
