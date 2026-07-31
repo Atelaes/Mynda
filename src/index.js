@@ -435,21 +435,27 @@ function findVideosFromFolder(folderNode) {
   });
 }
 
+// if the filename ends with 'sample' or 'Sample' and it's less than 100 MB, we say it's a sample video
+// if the filename is 'ETRG' or 'RARBG.com' and it's less than 100 MB, we say it's a garbage video
 function isSampleVideo(filepath) {
-  let fileBasename = path.basename(filepath,path.extname(filepath));
+  let fileBasename = path.basename(filepath, path.extname(filepath));
   let size;
+
   try {
     size = fs.statSync(filepath).size;
-  } catch(err) {
+  } catch (err) {
     console.log(`Could not determine file size of ${filepath}: ${err}`);
     return false;
   }
 
-  // if the filename ends with 'sample' or 'Sample' and it's less than 100 MB, we say it's a sample video
-  if (/sample$/.test(fileBasename.toLowerCase()) && size < 100000000) {
-    console.log('Ignoring "SAMPLE" video: ' + filepath);
+  const endsWithSample = /sample$/i.test(fileBasename);
+  const isGarbageFilename = /^(?:ETRG|RARBG\.com)$/i.test(fileBasename);
+
+  if ((endsWithSample || isGarbageFilename) && size < 100000000) {
+    console.log('Ignoring "SAMPLE"/garbage video: ' + filepath);
     return true;
   }
+
   return false;
 }
 
@@ -558,6 +564,7 @@ async function confirmCurrentVideos() {
       console.log(err)
       // A thrown error means we didn't find the video where we expected to,
       // so move it to inactive media.
+      console.log(`========= VIDEO FILE NOT FOUND =======`);
       console.log(`${filename} appears to have disappeared, moving to inactive media.`)
       await removeVideo(video);
     }
@@ -729,8 +736,8 @@ async function addVideoFile(video) {
     // and update the video in the library, check to make sure the id
     // is in the watchfolder manifest, and then we're done
     case 1:
-      console.log(`=========Video Already in Library=======`);
-      console.log(`${fileBasename} has the same id as ${library.media[indexOfVideoInLibrary(id)].title}`);
+      console.log(`========= VIDEO ALREADY IN LIBRARY =======`);
+      console.log(`${file} has the same id as ${library.media[indexOfVideoInLibrary(id)].title}`);
       let vidIndex = indexOfVideoInLibrary(id);
       let libraryVideo = library.media[vidIndex];
       updateVideoSubs(libraryVideo.subtitles,video.subtitles,vidIndex);
@@ -744,6 +751,8 @@ async function addVideoFile(video) {
     case 3:
     case 4:
       if (situation === 3) {
+        console.log(`========= VIDEO FOUND IN INACTIVE_MEDIA =======`);
+
         // ------------- VIDEO IS IN LIBRARY.INACTIVE_MEDIA ------------- //
         // remove the video object from inactive media (it will be added to active media below)
         console.log(`There is a video object for ${fileBasename} in library.inactive_media. Moving to library.media...`);
@@ -770,6 +779,8 @@ async function addVideoFile(video) {
         }
       } else {
         // ------------- VIDEO IS BRAND NEW ------------- //
+        console.log(`========= NEW VIDEO FOUND =======`);
+
         // otherwise, add the video from scratch
 
         // start creating the video object
