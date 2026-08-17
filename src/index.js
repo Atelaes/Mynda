@@ -41,6 +41,7 @@ const BrowserWindow = electron.BrowserWindow;
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let libMulch = [];  //After libFileTree has been created and chewed up, this is the flattened version
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
+let unavailableWatchFolders = new Set(); // watchfolders whose scan failed; preserve their library entries for this scan
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
 let newIDs = [];
 let ffMpegQueue = [];
@@ -335,6 +336,7 @@ function checkWatchFolders() {
   parsing = {};
   libMulch = [];
   newIDs = [];
+  unavailableWatchFolders = new Set();
 
   win.webContents.send('status-update', {action: 'check'});
   // reset libFileTree
@@ -368,7 +370,7 @@ function checkWatchFolders() {
 // recursively maps out the folder structure and files (only videos/DVDs and subtitle files)
 // storing the whole thing in libFolderTree;
 // once this is done, we'll traverse the tree, adding all the videos to the library
-function findVideosFromFolder(folderNode) {
+function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
   // the id here (and the <parsing> object it gets put into)
   // is just to keep track of all the recursive branches of this function,
   // so we'll know when they're all finished
@@ -382,7 +384,8 @@ function findVideosFromFolder(folderNode) {
   fs.readdir(folder, {withFileTypes : true}, function (err, components) {
     // handling error
     if (err) {
-        console.log('Unable to scan directory: ' + err);
+        unavailableWatchFolders.add(rootWatchFolder);
+        console.log(`Unable to scan directory: ${err}\nSkipping unavailable watchfolder: ${rootWatchFolder}`);
         components = []; // in case of error, components will be undefined, so we make it an empty array instead
     }
 
@@ -401,7 +404,7 @@ function findVideosFromFolder(folderNode) {
           // if it's not, recurse on it as a folder
           recursed = true;
           folderNode.folders.push({path:compAddress, kind:kind, folders:[], videos:[], subtitles:[]});
-          findVideosFromFolder(folderNode.folders[folderNode.folders.length-1]);
+          findVideosFromFolder(folderNode.folders[folderNode.folders.length-1], rootWatchFolder);
         }
       } else if (!/^\./.test(component.name)) {
         //If it's a hidden file, as evidenced by a filename starting with a dot
@@ -433,6 +436,17 @@ function findVideosFromFolder(folderNode) {
     }
     if (!stillGoing) divineCollections(libFileTree, []);
   });
+}
+
+function isInUnavailableWatchFolder(filepath) {
+  for (let watchfolder of unavailableWatchFolders) {
+    let relativePath = path.relative(watchfolder, filepath);
+    if (relativePath === '' ||
+        (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // if the filename ends with 'sample' or 'Sample' and it's less than 100 MB, we say it's a sample video
@@ -524,6 +538,12 @@ async function confirmCurrentVideos() {
         }
       }
       if (problem) {throw true}
+      // A failed scan means we do not know whether any file in this
+      // watchfolder is present. Preserve its library entries until a later,
+      // successful scan can determine that safely.
+      if (unavailableWatchFolders.has(conWatchFolder)) {
+        continue;
+      }
       // Then traverse the libFileTree nodes based on the video's filepath.
       let libTreeLoc = libFileTree
       let pathComps = [conWatchFolder].concat(filename.replace(conWatchFolder + path.sep, '').split(path.sep));
@@ -581,6 +601,10 @@ async function confirmCurrentVideos() {
 
 function mulchVideoTree(folderNode) {
   win.webContents.send('status-update', {action: 'add'});
+  // Do not add, remove, or update anything from an incomplete watchfolder scan.
+  if (folderNode.path && unavailableWatchFolders.has(folderNode.path)) {
+    return;
+  }
   // If there is a collection assigned to this folder, make sure it exists,
   // and if not, make it.
   if (folderNode.collection) {
@@ -655,7 +679,9 @@ async function addVideoController() {
   // to use the combinedMedia object we created above to base our metadata search on,
   // so that even if the library call hasn't finished, we're not using an outdated media object here
   let metaStart = new Date();
-  let unchecked = combinedMedia.filter(v => v !== null && !v.metadata.checked); // all videos in the library that haven't already been checked for metadata
+  let unchecked = combinedMedia.filter(v =>
+    v !== null && !v.metadata.checked && !isInUnavailableWatchFolder(v.filename)
+  ); // all available videos in the library that haven't already been checked for metadata
   let numTotal = unchecked.length;
   let numChecked = 0;
   let numSuccessful = 0;
