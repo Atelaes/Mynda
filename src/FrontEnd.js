@@ -167,7 +167,8 @@ class Mynda extends React.Component {
 
   handleHoveredRow(video, rowID, index) {
     // if nothing is selected, populate the details pane with the video of the row being hovered
-    if (_.isEmpty(this.state.selectedRows) && this.state.detailsPaneShowing) {
+    // but don't re-render the details pane when the pointer moves between cells in the same row
+    if (_.isEmpty(this.state.selectedRows) && this.state.detailsPaneShowing && rowID !== this.state.detailRowID) {
       this.showDetails(video.id, rowID, video, index);
     }
   }
@@ -1267,6 +1268,26 @@ class MynLibrary extends React.Component {
     });
   }
 
+  shouldComponentUpdate(nextProps, nextState) {
+    // TEMPORARY HOVER-LAG DIAGNOSTIC:
+    // Mynda updates its own state whenever the hovered video's details change.
+    // Do not re-render the whole library when every MynLibrary input is unchanged.
+    // console.count('[hover diagnostic] MynLibrary update requested');
+
+    const oldPropKeys = Object.keys(this.props);
+    const nextPropKeys = Object.keys(nextProps);
+    const propsChanged = oldPropKeys.length !== nextPropKeys.length ||
+      nextPropKeys.some(key => nextProps[key] !== this.props[key]);
+    const stateChanged = nextState !== this.state;
+
+    if (!propsChanged && !stateChanged) {
+      // console.count('[hover diagnostic] MynLibrary update skipped');
+      return false;
+    }
+
+    return true;
+  }
+
   componentDidUpdate(oldProps) {
     let videos = false;
     let collections = false;
@@ -1917,7 +1938,9 @@ class MynLibrary extends React.Component {
   }
 
   render() {
-    console.log('----MynLibrary RENDER----');
+    // TEMPORARY HOVER-LAG DIAGNOSTIC
+    // console.count('[hover diagnostic] MynLibrary render');
+
     let tables = null;
     this.state.manifest = {};
 
@@ -2776,14 +2799,19 @@ class MynLibTable extends React.Component {
       // console.log("USER_RATING_IN_AVG STATE == " + this.state.include_user_rating_in_avg);
       // console.log("USER_RATING_IN_AVG PROPS == " + this.props.settings.preferences.include_user_rating_in_avg);
 
-      // we have to sort the movies array before comparing it,
-      // otherwise the conditional fires when the elements change order,
-      // whereas we want them to change only when a movie is changed, added, or removed
-      let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id > b.id ? 1 : (a.id < b.id ? -1 : 0));
-      let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id > b.id ? 1 : (a.id < b.id ? -1 : 0));
-      // console.log(tempOld);
-      // console.log(tempNew);
-      if (!_.isEqual(tempOld,tempNew) || this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
+      // Comparing the movies is expensive, so only do it when the parent supplied
+      // a different array. Detail-pane updates reuse the same array and can skip it.
+      let moviesChanged = false;
+      if (oldProps.movies !== this.props.movies) {
+        // We have to sort the movies arrays before comparing them; otherwise a
+        // change in element order alone would look like a video update.
+        let tempOld = _.cloneDeep(oldProps.movies).sort((a,b) => a.id > b.id ? 1 : (a.id < b.id ? -1 : 0));
+        let tempNew = _.cloneDeep(this.props.movies).sort((a,b) => a.id > b.id ? 1 : (a.id < b.id ? -1 : 0));
+        moviesChanged = !_.isEqual(tempOld,tempNew);
+      }
+
+      let includeUserRatingChanged = this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg;
+      if (moviesChanged || includeUserRatingChanged) {
         console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
         // let diff = getArrayDiff(tempOld,tempNew);
         // console.log(diff);
@@ -2829,6 +2857,8 @@ class MynLibTable extends React.Component {
 
   render() {
     // console.log('----MynLibTable RENDER----');
+    // TEMPORARY HOVER-LAG DIAGNOSTIC
+    // console.count('[hover diagnostic] MynLibTable render');
 
     // return this.state.content;
 
@@ -3059,7 +3089,7 @@ class MynLibTableRow extends React.Component {
         {...this.props.innerDragP}
         {...this.props.innerDragHP}
         vid_id={video.id}
-        onMouseOver={(e) => this.props.rowHovered(video, rowID, index, e)}
+        onMouseEnter={(e) => this.props.rowHovered(video, rowID, index, e)}
         onClick={(e) => this.props.rowClick(video.id, rowID, index, e)}
       >
         {/* {cellJSX.order} */}
@@ -3262,6 +3292,9 @@ class MynDetails extends React.Component {
   }
 
   render() {
+    // TEMPORARY HOVER-LAG DIAGNOSTIC
+    // console.count('[hover diagnostic] MynDetails render');
+
     let details;
     let editBtn = (<div id="edit-button" onClick={() => this.props.showEditor()}>Edit</div>);
     let scrollBtn = null;
@@ -3272,7 +3305,8 @@ class MynDetails extends React.Component {
       details = (
         <ul>
           <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
-          <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li>
+          {/* <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li> */}
+          <li className="detail" id="detail-title">{video.title}</li>
           <li className="detail" id="detail-year">{video.year}</li>
           <li className="detail" id="detail-position"><MynEditPositionWidget movie={video} update={this.saveVideo} /></li>
           <li className={"detail " + this.props.settings.preferences.hide_description} id="detail-description" onClick={(e) => this.clickDescrip(e)}><div>{video.description}</div></li>
@@ -4176,6 +4210,13 @@ class MynSettings extends MynOpenablePane {
   componentDidUpdate(oldProps) {
     // console.log('MynSettings: component has updated');
     // console.log(this.props.settings.watchfolders)
+
+    // Mynda creates new callback functions whenever it renders. Ignore those
+    // function-only changes before doing the expensive deep prop comparison.
+    const nonFunctionPropsChanged = Object.keys(this.props).some(key => {
+      return !_.isFunction(this.props[key]) && oldProps[key] !== this.props[key];
+    });
+    if (!nonFunctionPropsChanged) return;
 
     if (!isEqualIgnoreFuncs(oldProps,this.props)) {
       console.log('MynSettings: PROPS HAVE CHANGED:\n' + getObjectDiff(oldProps,this.props));

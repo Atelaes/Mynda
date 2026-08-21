@@ -584,7 +584,7 @@ table.compact .movie-row {
 .movie-row td {
   overflow:hidden;
   max-width:15em;
-  position: relative; /* necessary for the positioning of the ellipsis gradient */
+  /* position: relative; necessary for the positioning of the ellipsis gradient, but causes HUGE performance issues */
 }
 /* ellipsis gradient */
 /* .movie-row .title::after, .movie-row:hover .title::after {
@@ -854,6 +854,9 @@ table.compact .movie-row {
 #detail-title {
   --padding: 100px;
   text-align:center;
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
+  overflow-x: hidden;
   font-family: var(--big-title-font);
   font-size: var(--detailtitle-font-size);
   height: var(--detailtitle-font-size);
