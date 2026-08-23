@@ -3,7 +3,7 @@ const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4, v5: uuidv5 } = require('uuid');
+const {v4: uuidv4, v5: uuidv5} = require('uuid');
 const crypto = require('crypto');
 const Library = require("./Library.js");
 const {
@@ -21,7 +21,8 @@ const ffprobe = require('ffprobe');
 let ffprobeStatic = {};
 try {
   ffprobeStatic = require('ffprobe-static');
-} catch (err) { console.log('Warning: ffprobe-static not installed') }
+} catch(err) {console.log('Warning: ffprobe-static not installed')}
+const Logger = require('./Logger.js');
 const OmdbHelper = require('./OmdbHelper.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
@@ -29,20 +30,22 @@ const checkDiskSpace = require('check-disk-space').default
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const videoExtensions = [
-  '3g2', '3gp', 'amv', 'asf', 'avchd', 'avi', 'divx', 'drc', 'f4a', 'f4b', 'f4p',
-  'f4v', 'flv', 'm2ts', 'm2v', 'm4p', 'm4v', 'mkv', 'mov', 'mp2', 'mp4',
-  'mpe', 'mpeg', 'mpg', 'mpv', 'mts', 'mxf', 'nsv', 'ogg', 'ogv', 'qt',
-  'rm', 'rmvb', 'roq', 'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
+  '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
+  'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
+  'mpe', 'mpeg', 'mpg',  'mpv', 'mts', 'mxf', 'nsv',  'ogg',  'ogv', 'qt',
+  'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
 ]
 let win;
 let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
+const backendLog = Logger.child('Backend');
+const autoTagLog = Logger.child('AutoTag');
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let libMulch = [];  //After libFileTree has been created and chewed up, this is the flattened version
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
 let unavailableWatchFolders = new Set(); // watchfolders whose scan failed; preserve their library entries for this scan
-let subtitleReconciliationContext = { detectedOwners: new Map(), legacyCounts: new Map() };
+let subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
 let newIDs = [];
 let ffMpegQueue = [];
@@ -52,6 +55,16 @@ let appStartTime = new Date();
 app.whenReady().then(start);
 
 async function start() {
+  Logger.initialize({
+    app: app,
+    ipcMain: ipcMain
+  });
+  backendLog.info('Mynda backend starting', {
+    version: app.getVersion(),
+    platform: process.platform,
+    architecture: process.arch
+  });
+
   //Tutorial at https://www.electronjs.org/docs/tutorial/devtools-extension
   //You need to install React Dev tools in Chrome before this will work, also, double-check the location.
   try {
@@ -70,7 +83,7 @@ async function start() {
   }
 
   // make the temp folder if it doesn't already exist
-  const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'), 'temp');
+  const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
   fs.mkdir(tempFolder, (err) => {
     if (err) console.log(err);
   });
@@ -85,18 +98,18 @@ async function start() {
 
 function testNotify(i) {
   let max = 250;
-  win.webContents.send('status-update', { action: 'add', numCurrent: i, numTotal: max });
+  win.webContents.send('status-update', {action: 'add', numCurrent: i, numTotal: max});
 
   // if (i === 0) win.webContents.send('status-update', {action: 'add'});
   if (i < max) {
-    setTimeout(() => testNotify(i + 1), 20);
+    setTimeout(() => testNotify(i+1),20);
   } else {
-    win.webContents.send('status-update', { action: '' });
+    win.webContents.send('status-update', {action: ''});
   }
 }
 
 function eraseTempImages() {
-  let folderPath = path.join((electron.app || electron.remote.app).getPath('userData'), 'temp');
+  let folderPath = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
 
   fs.readdir(folderPath, (err, files) => {
     if (err) {
@@ -114,7 +127,7 @@ function eraseTempImages() {
           }
           console.log(`...successfully deleted ${file}`);
         });
-      } catch (err) {
+      } catch(err) {
         console.error(err);
       }
     });
@@ -127,9 +140,9 @@ async function createWindow() {
     height: 900,
     //frame: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true
+        nodeIntegration: true,
+        contextIsolation: false,
+        enableRemoteModule: true
     }
   })
 
@@ -140,13 +153,13 @@ async function createWindow() {
 
 // get rid of any null values in media, inactive_media, watchfolders, etc.
 function cleanLibrary() {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve,reject) => {
     // library.media.map();
     resolve();
   });
 }
 
-function removeWatchfolder(path, cb) {
+function removeWatchfolder(path,cb) {
   // in case we're currently adding media, we need to delete the removed
   // watchfolder from libFileTree, otherwise videos may get re-added as they get removed
   libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== path);
@@ -158,12 +171,12 @@ function removeWatchfolder(path, cb) {
 
   // remove the watchfolder
   let index;
-  library.settings.watchfolders.map((folder, i) => {
+  library.settings.watchfolders.map((folder,i) => {
     if (folder && folder.path === path) {
       index = i;
     }
   });
-  library.remove(`settings.watchfolders.${index}`, cb);
+  library.remove(`settings.watchfolders.${index}`,cb);
 }
 
 
@@ -176,7 +189,7 @@ async function removeWatchfolderVideosFromLibrary(folder) {
   //   vidIDs = library.settings.watchfolders.filter(wf => wf && wf.path === folder)[0].videos;
   // } catch(err) {
   //   console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
-  vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
+    vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
   // }
 
   let removedMedia = [];
@@ -188,12 +201,12 @@ async function removeWatchfolderVideosFromLibrary(folder) {
   });
   let inactiveMedia = [...library.inactive_media, ...removedMedia];
 
-  library.replace('media', keptMedia);
-  library.replace('inactive_media', inactiveMedia);
+  library.replace('media',keptMedia);
+  library.replace('inactive_media',inactiveMedia);
 }
 
 function removeVideo(video, index, fromInactive) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve,reject) => {
     let address;
     if (fromInactive) {
       console.log(`Deleting ${video.filename} from library.inactive_media`);
@@ -205,7 +218,7 @@ function removeVideo(video, index, fromInactive) {
 
     // if we weren't given an index, find it
     if (typeof index === "undefined") {
-      index = indexOfVideoInLibrary(video.id, fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
+      index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
     }
 
     // remove from library.media or library.inactive_media
@@ -217,7 +230,7 @@ function removeVideo(video, index, fromInactive) {
 
       if (!fromInactive) {
         // add the video to library.inactive_media
-        library.add('inactive_media.push', video, (err) => {
+        library.add('inactive_media.push',video, (err) => {
           if (err) {
             reject(`Error: could not add ${video.filename} to inactive_media: ${err}`);
             return;
@@ -275,7 +288,7 @@ function isDVDRip(folder) {
   if (contents.length > 30) {
     return false;
   }
-  for (let i = 0; i < contents.length; i++) {
+  for (let i=0; i<contents.length; i++) {
     let content = contents[i];
     if (content.isDirectory()) {
       if (content.name === 'VIDEO_TS') {
@@ -292,51 +305,51 @@ function isDVDRip(folder) {
   return positiveEvidence;
 }
 
-let videoTemplate = {
-  "id": '',
-  "imdbID": '',
-  "title": '',
-  "year": '',
-  "series": '',
-  "season": '',
-  "episode": '',
-  "director": '',
-  "directorsort": '',
-  "cast": [],
-  "description": '',
-  "genre": '',
-  "tags": [],
-  "seen": false,
-  "position": 0,
-  "country": '',
-  "languages": [],
-  "boxoffice": 0,
-  "rated": '',
-  "ratings": {},
-  "dateadded": '',
-  "lastseen": '',
-  "watchlater": false,
-  "kind": '',
-  "artwork": '',
-  "subtitles": [],
-  "detected_subtitles": [],
-  "manual_subtitles": [],
-  "ignored_subtitles": [],
-  "subtitle_tracking_initialized": true,
-  "filename": '',
-  "new": true,
-  "metadata": {
-    "codec": "",
-    "duration": 0,
-    "width": 0,
-    "height": 0,
-    "aspect_ratio": "",
-    "framerate": 0,
-    "audio_codec": "",
-    "audio_layout": "",
-    "audio_channels": 0
+let videoTemplate =   {
+    "id" : '',
+    "imdbID" : '',
+    "title" : '',
+    "year" : '',
+    "series" : '',
+    "season" : '',
+    "episode" : '',
+    "director" : '',
+    "directorsort" : '',
+    "cast" : [],
+    "description" : '',
+    "genre" : '',
+    "tags" : [],
+    "seen" : false,
+    "position" : 0,
+    "country" : '',
+    "languages" : [],
+    "boxoffice" : 0,
+    "rated" : '',
+    "ratings" : {},
+    "dateadded" : '',
+    "lastseen" : '',
+    "watchlater" : false,
+    "kind" : '',
+    "artwork" : '',
+    "subtitles" : [],
+    "detected_subtitles" : [],
+    "manual_subtitles" : [],
+    "ignored_subtitles" : [],
+    "subtitle_tracking_initialized" : true,
+    "filename" : '',
+    "new" : true,
+    "metadata" : {
+      "codec" : "",
+      "duration" : 0,
+      "width" : 0,
+      "height" : 0,
+      "aspect_ratio" : "",
+      "framerate" : 0,
+      "audio_codec" : "",
+      "audio_layout" : "",
+      "audio_channels" : 0
+    }
   }
-}
 
 function checkWatchFolders() {
   // These values describe one scan only. Leaving them populated causes files
@@ -345,25 +358,25 @@ function checkWatchFolders() {
   libMulch = [];
   newIDs = [];
   unavailableWatchFolders = new Set();
-  subtitleReconciliationContext = { detectedOwners: new Map(), legacyCounts: new Map() };
+  subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
 
-  win.webContents.send('status-update', { action: 'check' });
+  win.webContents.send('status-update', {action: 'check'});
   // reset libFileTree
-  libFileTree = { name: 'root', folders: [] };
+  libFileTree = {name:'root', folders:[]};
 
   // Search watchfolders for new files and add any new videos to the library
   console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
   numNewVids = 0; // reset the number of new videos found
   let folders = library.settings.watchfolders;
-  for (let i = 0; i < folders.length; i++) {
+  for (let i=0; i<folders.length; i++) {
     let thisFolder = folders[i];
     if (thisFolder) {
       let thisNode;
       let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
       if (filtered.length === 0) {
-        let child = { path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: [] };
+        let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
         libFileTree.folders.push(child);
-        thisNode = libFileTree.folders[libFileTree.folders.length - 1];
+        thisNode = libFileTree.folders[libFileTree.folders.length-1];
       } else {
         thisNode = filtered[0];
       }
@@ -372,7 +385,7 @@ function checkWatchFolders() {
   }
   if (folders.length === 0) {
     console.log('Done parsing. No watchfolders found.');
-    win.webContents.send('status-update', { action: '' });
+    win.webContents.send('status-update', {action: ''});
   }
 }
 
@@ -390,16 +403,16 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
   const kind = folderNode.kind;
 
   // read the contents of this folder
-  fs.readdir(folder, { withFileTypes: true }, function (err, components) {
+  fs.readdir(folder, {withFileTypes : true}, function (err, components) {
     // handling error
     if (err) {
-      unavailableWatchFolders.add(rootWatchFolder);
-      console.log(`Unable to scan directory: ${err}\nSkipping unavailable watchfolder: ${rootWatchFolder}`);
-      components = []; // in case of error, components will be undefined, so we make it an empty array instead
+        unavailableWatchFolders.add(rootWatchFolder);
+        console.log(`Unable to scan directory: ${err}\nSkipping unavailable watchfolder: ${rootWatchFolder}`);
+        components = []; // in case of error, components will be undefined, so we make it an empty array instead
     }
 
     // loop through all the folder contents
-    for (let i = 0; i < components.length; i++) {
+    for (let i=0; i<components.length; i++) {
       let component = components[i];
       let compAddress = path.join(folder, component.name);
 
@@ -417,8 +430,8 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
         } else {
           // if it's not, recurse on it as a folder
           recursed = true;
-          folderNode.folders.push({ path: compAddress, kind: kind, folders: [], videos: [], subtitles: [] });
-          findVideosFromFolder(folderNode.folders[folderNode.folders.length - 1], rootWatchFolder);
+          folderNode.folders.push({path:compAddress, kind:kind, folders:[], videos:[], subtitles:[]});
+          findVideosFromFolder(folderNode.folders[folderNode.folders.length-1], rootWatchFolder);
         }
       } else if (!/^\./.test(component.name)) {
         //If it's a hidden file, as evidenced by a filename starting with a dot
@@ -455,7 +468,7 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
     if (!stillGoing) {
       confirmCurrentVideos().catch(err => {
         console.error(`Watchfolder reconciliation failed: ${err}`);
-        win.webContents.send('status-update', { action: '' });
+        win.webContents.send('status-update', {action: ''});
       });
     }
   });
@@ -465,7 +478,7 @@ function isInUnavailableWatchFolder(filepath) {
   for (let watchfolder of unavailableWatchFolders) {
     let relativePath = path.relative(watchfolder, filepath);
     if (relativePath === '' ||
-      (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))) {
+        (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))) {
       return true;
     }
   }
@@ -518,7 +531,7 @@ async function confirmCurrentVideos() {
   if (preparedSubtitles.stats.unmatched.length > 0) {
     console.log('Subtitle files left unmatched:', preparedSubtitles.stats.unmatched);
   }
-  for (let h = library.media.length - 1; h >= 0; h--) {
+  for (let h=library.media.length-1; h>=0; h--) {
     let video = library.media[h];
     if (!video) {
       // library.remove(`media.${h}`);
@@ -543,7 +556,7 @@ async function confirmCurrentVideos() {
           break;
         }
       }
-      if (problem) { throw true }
+      if (problem) {throw true}
       // A failed scan means we do not know whether any file in this
       // watchfolder is present. Preserve its library entries until a later,
       // successful scan can determine that safely.
@@ -554,13 +567,13 @@ async function confirmCurrentVideos() {
       let libTreeLoc = libFileTree
       let pathComps = [conWatchFolder].concat(filename.replace(conWatchFolder + path.sep, '').split(path.sep));
       let pathComp = '';
-      for (let j = 0; j < pathComps.length; j++) {
+      for (let j=0; j<pathComps.length; j++) {
         problem = true;
-        let pathAdd = (j === 0) ? pathComps[j] : path.sep + pathComps[j];
+        let pathAdd =  (j===0) ? pathComps[j] : path.sep + pathComps[j];
         pathComp = pathComp + pathAdd;
         let lastOne = j === (pathComps.length - 1);
         if (!lastOne) {
-          for (let k = 0; k < libTreeLoc.folders.length; k++) {
+          for (let k=0; k<libTreeLoc.folders.length; k++) {
             if (libTreeLoc.folders[k].path === pathComp) {
               libTreeLoc = libTreeLoc.folders[k];
               problem = false;
@@ -568,7 +581,7 @@ async function confirmCurrentVideos() {
             }
           }
         } else {
-          for (let k = 0; k < libTreeLoc.videos.length; k++) {
+          for (let k=0; k<libTreeLoc.videos.length; k++) {
             if (libTreeLoc.videos[k].filename === filename) {
 
               // before deleting existing video from libFileTree, check for any subtitle changes
@@ -583,10 +596,10 @@ async function confirmCurrentVideos() {
             }
           }
         }
-        if (problem) { throw true }
+        if (problem) {throw true}
       }
 
-    } catch (err) {
+    } catch(err) {
       console.log(err)
       // A thrown error means we didn't find the video where we expected to,
       // so move it to inactive media.
@@ -606,7 +619,7 @@ async function confirmCurrentVideos() {
 }
 
 function mulchVideoTree(folderNode) {
-  win.webContents.send('status-update', { action: 'add' });
+  win.webContents.send('status-update', {action: 'add'});
   // Do not add, remove, or update anything from an incomplete watchfolder scan.
   if (folderNode.path && unavailableWatchFolders.has(folderNode.path)) {
     return;
@@ -629,9 +642,9 @@ async function addVideoController() {
   let addStart = new Date();
   let newMedia = [];
   let numNewVids = 0;
-  win.webContents.send('status-update', { action: 'add', numTotal: libMulch.length });
-  for (let i = 0; i < libMulch.length; i++) {
-    win.webContents.send('status-update', { action: 'add', numCurrent: i + 1, numTotal: libMulch.length });
+  win.webContents.send('status-update', {action: 'add', numTotal: libMulch.length});
+  for (let i=0; i<libMulch.length; i++) {
+    win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {
@@ -640,12 +653,12 @@ async function addVideoController() {
     }
   }
   let addEnd = new Date();
-  console.log(`Adding ${newMedia.length} new videos took ${addEnd - addStart}ms.`);
+  console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
   await replaceLibrary('media', combinedMedia);
 
   // tell the user how many videos we added
-  win.webContents.send('videos_added', numNewVids);
+  win.webContents.send('videos_added',numNewVids);
 
   // now let's try and get some metadata.
   // eventually we want to do all this after the above media replacement library call
@@ -674,7 +687,7 @@ async function addVideoController() {
   for (let v of unchecked) {
     if (v !== null && !v.metadata.checked) {
       numChecked++;
-      win.webContents.send('status-update', { action: 'metadata', numCurrent: numChecked, numTotal: numTotal });
+      win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
       let metadata = await getMetadata(v);
       if (metadata.hasOwnProperty('checked') && Object.keys(metadata).length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
       metadataToAdd[v.id] = metadata;
@@ -693,25 +706,25 @@ async function addVideoController() {
 
   // save to library
   await replaceLibrary('media', updatedMedia);
-  win.webContents.send('status-update', { action: 'metadata_save', numTotal: numSuccessful });
+  win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
   console.log(`Added metadata for ${numSuccessful} videos`)
 
   setTimeout(() => {
-    win.webContents.send('status-update', { action: '' });
-  }, 3000);
+    win.webContents.send('status-update', {action: ''});
+  },3000);
 }
 
 // Takes a video object and fills it out
 async function addVideoFile(video) {
   // console.log(video)
   let file = video.filename;
-  let fileBasename = path.basename(file, path.extname(file));
+  let fileBasename = path.basename(file,path.extname(file));
   let id = await createVideoID(video.filename);
 
   //There are four major possibilities for this video's situation:
   //1. We already have this video in the library (either because:
-  //confirmCurrentVideos missed it or
-  //We have multiple copies of an identical file in our watchfolder
+    //confirmCurrentVideos missed it or
+    //We have multiple copies of an identical file in our watchfolder
   //2. We don't have it in the library, but have another copy in libFileTree
   //3. We have it in inactive media, probably because file was moved.
   //4. We don't have it anywhere, it's new.
@@ -731,7 +744,7 @@ async function addVideoFile(video) {
   newIDs.push(id);
   let vidObj;
 
-  switch (situation) {
+  switch(situation) {
     //########### VIDEO IS ALREADY IN LIBRARY ###########//
 
     // if the video is already in the library, update the subtitles
@@ -781,7 +794,7 @@ async function addVideoFile(video) {
 
           await deleteFromInactive(vidObj, inactiveVidIndex);
 
-        } catch (err) {
+        } catch(err) {
           console.log(`Error: found video object for ${fileBasename} in library.inactive_media but could not remove: ${err}`);
           return;
         }
@@ -805,7 +818,7 @@ async function addVideoFile(video) {
         try {
           // get the date the file was added, from the OS
           vidObj.dateadded = await getFileBirthtime(file);
-        } catch (err) {
+        } catch(err) {
           // if we couldn't get the file creation/added date from the OS, just use now
           vidObj.dateadded = Math.floor(Date.now() / 1000);
           console.log(err);
@@ -834,7 +847,7 @@ async function addVideoFile(video) {
         updateVideoSubs(vidObj, video.subtitles);
         return vidObj;
       }
-  }
+    }
 }
 
 async function getMetadata(video) {
@@ -877,11 +890,11 @@ async function getMetadata(video) {
         //   console.log(`Taking duration (${stream.duration}) from ${stream.codec_type} stream`);
         //   vidObj.metadata.duration = Number(stream.duration);
         // }
-      } catch (err) {
+      } catch(err) {
         console.log(`Error storing ffprobe metadata for ${file}: ${err}`);
       }
     }
-  } catch (err) {
+  } catch(err) {
     console.log(`Unable to retrieve metadata with ffprobe for ${file}: ${err}`);
   }
 
@@ -889,10 +902,10 @@ async function getMetadata(video) {
   // in this case, we analyze the file with ffmpeg to obtain the duration
   if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
     try {
-      let ffmpegData = await getMetadataFromFFmpeg(file, video.id);
+      let ffmpegData = await getMetadataFromFFmpeg(file,video.id);
       console.log(ffmpegData);
-      returnObj = { ...ffmpegData, ...returnObj };
-    } catch (err) {
+      returnObj = {...ffmpegData, ...returnObj};
+    } catch(err) {
       console.log(`Unable to retrieve metadata with ffmpeg for ${file}: ${err}`);
     }
   }
@@ -908,7 +921,7 @@ async function getMetadata(video) {
 
 // create a uuid based on a hash of the video file; this will be the video's id in the library
 async function createVideoID(filepath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve,reject) => {
     let baseStats;
     try {
       baseStats = fs.lstatSync(filepath)
@@ -919,7 +932,7 @@ async function createVideoID(filepath) {
 
     // If the path points to a directory, we're dealing with a DVD rip
     // Find the appropriate file and hash it
-    if (baseStats.isDirectory()) {
+    if(baseStats.isDirectory()) {
       try {
         if (fs.existsSync(path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO'))) {
           hashPath = path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO');
@@ -935,7 +948,7 @@ async function createVideoID(filepath) {
             let size = 0;
             try {
               size = fs.statSync(file).size;
-            } catch (err) {
+            } catch(err) {
               console.log(err);
             }
             if (size > biggestSize) {
@@ -954,7 +967,7 @@ async function createVideoID(filepath) {
       }
     }
 
-    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex' }).
+    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex'}).
       pipe(crypto.createHash('sha1').setEncoding('hex')).
       on('finish', function () {
         filehash = this.read();
@@ -976,18 +989,18 @@ function getFilesRecursive(folder) {
   let contents = [];
   try {
     contents = fs.readdirSync(folder);
-  } catch (err) {
+  } catch(err) {
     console.log(err);
   }
   for (let content of contents) {
     let fullPath = path.join(folder, content);
     try {
       if (fs.lstatSync(fullPath).isDirectory()) {
-        files = [...files, ...getFilesRecursive(fullPath)];
+        files = [...files,...getFilesRecursive(fullPath)];
       } else {
         files.push(fullPath);
       }
-    } catch (err) {
+    } catch(err) {
       console.log(err);
     }
   }
@@ -1007,7 +1020,7 @@ function updateVideoSubs(video, detectedSubtitles) {
 // instead of from library.media
 function indexOfVideoInLibrary(id, checkInactive) {
   let media = checkInactive ? library.inactive_media : library.media;
-  for (let i = 0; i < media.length; i++) {
+  for (let i=0; i<media.length; i++) {
     // if (media[i].filename === filepath) {
     if (media[i] && media[i].id === id) {
       return i;
@@ -1016,12 +1029,12 @@ function indexOfVideoInLibrary(id, checkInactive) {
   return null;
 }
 function indexOfVideoInInactiveMedia(id) {
-  return indexOfVideoInLibrary(id, true);
+  return indexOfVideoInLibrary(id,true);
 }
 
 function getFileBirthtime(file) {
   return new Promise((resolve, reject) => {
-    fs.stat(file, (err, stats) => {
+    fs.stat(file,(err, stats) => {
       if (err) {
         reject(`Error. Could not retrieve file stats for ${file} : ${err}`);
       } else {
@@ -1031,7 +1044,7 @@ function getFileBirthtime(file) {
         let dateadded;
         try {
           dateadded = Math.floor(stats.birthtimeMs / 1000);
-        } catch (e) {
+        } catch(e) {
           reject(`Unable to add dateadded to file: ${e}`);
         }
 
@@ -1043,7 +1056,7 @@ function getFileBirthtime(file) {
   });
 }
 
-function getMetadataFromFFmpeg(filepath, id) {
+function getMetadataFromFFmpeg(filepath,id) {
   return new Promise((resolve, reject) => {
     try {
       console.log('Could not find duration with ffprobe, trying with ffmpeg...');
@@ -1117,13 +1130,13 @@ function getMetadataFromFFmpeg(filepath, id) {
           // audio layout and audio channels
           data.audio_details.map(detail => {
             let poss_values = {
-              'mono': 1,
-              'stereo': 2,
-              '2.0': 2,
-              '2.1': 3,
-              '5.1': 6,
-              '6.1': 7,
-              '7.1': 8
+              'mono' : 1,
+              'stereo' : 2,
+              '2.0' : 2,
+              '2.1' : 3,
+              '5.1' : 6,
+              '6.1' : 7,
+              '7.1' : 8
             }
             if (Object.keys(poss_values).includes(detail)) {
               metadata.audio_layout = detail;
@@ -1153,7 +1166,7 @@ function getMetadataFromFFmpeg(filepath, id) {
       //   console.log('ffmpeg just wrote ' + chunk.length + ' bytes');
       // });
 
-    } catch (err) {
+    } catch(err) {
       console.log('----- Error in getMetadataFromFFmpeg -----');
       reject(err);
     }
@@ -1181,11 +1194,11 @@ function titleCaseDetectedTitle(title) {
 
   return title.replace(wordRegex, (word, offset) => {
     const isFirst = wordIndex === 0;
-    const isLast = wordIndex === words.length - 1;
+    const isLast = wordIndex === words.length-1;
     wordIndex++;
 
-    const previousCharacter = title[offset - 1];
-    const nextCharacter = title[offset + word.length];
+    const previousCharacter = title[offset-1];
+    const nextCharacter = title[offset+word.length];
     const isDottedInitial = word.length === 1 &&
       (previousCharacter === '.' || nextCharacter === '.');
     const beginsSubtitle = /(?:[:–—]|(?:^|\s)-)\s*$/.test(title.slice(0, offset));
@@ -1284,7 +1297,7 @@ function findEpisodeTitle(fileBasename, extrasDetected) {
     let protectedDots = [];
     title = title.replace(/\.{2,}/g, dots => {
       protectedDots.push(dots);
-      return `\u0000${protectedDots.length - 1}\u0000`;
+      return `\u0000${protectedDots.length-1}\u0000`;
     });
     title = title.replace(/\./g, ' ');
     title = title.replace(/\u0000(\d+)\u0000/g, (whole, index) => protectedDots[Number(index)]);
@@ -1325,7 +1338,7 @@ function findSeasonEpisode(video, fileBasename) {
   function findSeasonNumber(value) {
     // A range describes several seasons, so it cannot provide one season number.
     if (/season[. _-]*\d{1,3}\s*(?:-\s*|to\s+)\d{1,3}/i.test(value) ||
-      /(?:^|[^a-z0-9])s\d{1,3}\s*-\s*s?\d{1,3}(?!\d)/i.test(value)) {
+        /(?:^|[^a-z0-9])s\d{1,3}\s*-\s*s?\d{1,3}(?!\d)/i.test(value)) {
       return null;
     }
     for (let regex of seasonRegexes) {
@@ -1428,7 +1441,7 @@ function findSeasonEpisode(video, fileBasename) {
 
     // Use the closest folder that describes one specific season. This also
     // works when the video is inside an Extras or Episodes subfolder.
-    for (let i = folders.length - 1; i >= 0; i--) {
+    for (let i=folders.length-1; i>=0; i--) {
       let folderSeason = findSeasonNumber(folders[i]);
       if (folderSeason !== null) {
         result.season = folderSeason;
@@ -1443,8 +1456,8 @@ function findSeasonEpisode(video, fileBasename) {
 
   // Explicit filename numbering is stronger evidence than an extras folder.
   // This preserves real season-zero entries such as Specials/S00E01.
-  for (let i = 0; i < seRegexes.length; i++) {
-    let regex = seRegexes[i];
+  for (let i=0; i<seRegexes.length; i++) {
+    let regex  = seRegexes[i];
     let match = fileBasename.match(regex);
     if (match) {
       result.season = normalizeNumber(match[1]);
@@ -1468,8 +1481,8 @@ function findSeasonEpisode(video, fileBasename) {
     }
   }
 
-  for (let j = 0; j < eRegexes.length; j++) {
-    let regex = eRegexes[j];
+  for (let j=0; j<eRegexes.length; j++) {
+    let regex  = eRegexes[j];
     let match = fileBasename.match(regex);
     if (match) {
       result.episode = normalizeNumber(match[1]);
@@ -1485,7 +1498,7 @@ function findSeasonEpisode(video, fileBasename) {
     let leadingNumber = leadingMatch[1];
     let episode = leadingNumber;
     if (result.season && leadingNumber.startsWith(result.season) &&
-      leadingNumber.length - result.season.length === 2) {
+        leadingNumber.length-result.season.length === 2) {
       episode = leadingNumber.slice(result.season.length);
     } else if (leadingNumber.length > 3) {
       return result;
@@ -1497,13 +1510,13 @@ function findSeasonEpisode(video, fileBasename) {
 }
 
 function downloadFile(url, destination) {
-  return new Promise(function (resolve, reject) {
-    let response = { success: false, message: '' };
+  return new Promise(function(resolve, reject) {
+    let response = {success:false, message:''};
     // event.sender.send('cancel-download', dl.canceller, "hi");
-    dl.download(url, destination, (args) => {
+    dl.download(url,destination, (args) => {
       try {
         // if successful, we'll receive an object with the path at "path"
-        if (args.hasOwnProperty('path')) {
+        if (args && Object.prototype.hasOwnProperty.call(args, 'path')) {
           response.success = true;
           response.message = args.path;
           resolve(response);
@@ -1511,10 +1524,12 @@ function downloadFile(url, destination) {
         } else {
           // console.log(JSON.stringify(args));
           response.success = false;
-          response.message = args;
+          response.message = args && args.message ? args.message : args;
+          response.status = args && args.status;
+          response.statusText = args && args.statusText;
           reject(response);
         }
-      } catch (error) {
+      } catch(error) {
         response.success = false;
         response.message = error;
         reject(response);
@@ -1525,20 +1540,35 @@ function downloadFile(url, destination) {
 }
 
 async function autoTag() {
-  win.webContents.send('status-update', { action: 'autotag' });
+  win.webContents.send('status-update', {action: 'autotag'});
   let newMedia = library.media.filter(medium => (medium.new && !medium.autotag_tried));
-  let autoStats = { totalVideos: newMedia.length };
+  let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
   let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
 
+  autoTagLog.info('Automatic tagging batch started', {totalVideos: newMedia.length});
+
   // entire library loop
-  for (let i = 0; i < newMedia.length; i++) {
+  for (let i=0; i<newMedia.length; i++) {
     // tell the user what number we're on
-    win.webContents.send('status-update', { action: 'autotag', numCurrent: i + 1, numTotal: newMedia.length });
+    win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
 
     // create new video object
     let newVideo = newMedia[i];
     console.log(`Running autotag on ${newVideo.title}.`);
+    autoTagLog.info('Automatic tagging started for video', {
+      position: i+1,
+      totalVideos: newMedia.length,
+      id: newVideo.id,
+      filename: newVideo.filename,
+      title: newVideo.title,
+      kind: newVideo.kind,
+      year: newVideo.year,
+      series: newVideo.series,
+      season: newVideo.season,
+      episode: newVideo.episode,
+      imdbID: newVideo.imdbID
+    });
 
     // get search results
     let disposition = '';
@@ -1584,7 +1614,7 @@ async function autoTag() {
         // library.replace(`media.id=${newVideo.id}`, results);
         disposition = 'Success';
       }
-    } else if (resultsObject.failure === 'No results') {
+    } else if (resultsObject.failure === 'No results' || resultsObject.permanentFailure) {
       // we got no results, but we still want to save the video object so we can set autotag_tried to true
       //This means we've tried and failed in a predicted manner, let's not try again.
       newVideo.autotag_tried = true;
@@ -1605,6 +1635,24 @@ async function autoTag() {
     // some debug logging
     autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
     autoLog.push(`${newVideo.title}: ${disposition}`);
+
+    let resultLog = {
+      id: newVideo.id,
+      filename: newVideo.filename,
+      title: newVideo.title,
+      disposition: disposition,
+      failure: resultsObject.failure,
+      failureData: resultsObject.success ? undefined : resultsObject.data,
+      permanentFailure: Boolean(resultsObject.permanentFailure)
+    };
+    if (disposition === 'Success') {
+      autoTagLog.info('Automatic tagging finished for video', resultLog);
+    } else if (disposition === 'Failure after getting imdb id??' ||
+               (!resultsObject.success && !['No results', 'Not enough data', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure))) {
+      autoTagLog.error('Automatic tagging failed for video', resultLog);
+    } else {
+      autoTagLog.warn('Automatic tagging did not tag video', resultLog);
+    }
   } // end library loop
 
   // save any leftovers at the end
@@ -1616,15 +1664,16 @@ async function autoTag() {
   console.log('===AutoTag Finished===');
   console.log(JSON.stringify(autoStats));
   console.log(autoLog.join('\n'));
+  autoTagLog.info('Automatic tagging batch finished', {statistics: autoStats});
 
   // clear the user notification
-  win.webContents.send('status-update', { action: '' });
+  win.webContents.send('status-update', {action: ''});
 }
 
 function saveBatch(batch) {
   let saveMedia = library.media;
   batch.map(newVid => {
-    for (let i = 0; i < saveMedia.length; i++) {
+    for (let i=0; i<saveMedia.length; i++) {
       if (saveMedia[i].id === newVid.id) {
         saveMedia[i] = newVid;
         break;
@@ -1635,11 +1684,11 @@ function saveBatch(batch) {
   // but we do need to make sure library.media is getting updated as we go,
   // otherwise queued library saves will overwrite each other's updates
   library.media = saveMedia;
-  library.replace('media', saveMedia);
+  library.replace('media',saveMedia);
 }
 
 async function exportFiles(drive) {
-  win.webContents.send('status-update', { action: 'export' });
+  win.webContents.send('status-update', {action: 'export'});
   console.log(`Starting exportFiles.`);
   let fileLocation = path.join(drive, "Mynda Manifest.json");
   let manifest;
@@ -1647,18 +1696,18 @@ async function exportFiles(drive) {
     manifest = JSON.parse(fs.readFileSync(fileLocation));
     //console.log('Loaded manifest.')
   } else {
-    manifest = { media: [] };
+    manifest = {media: []};
     console.log("Couldn't load manifest, assuming all new.")
   }
   let matchedMedia = [];
   let unmatchedMedia = [];
-  for (let i = 0; i < library.media.length; i++) {
+  for (let i=0; i<library.media.length; i++) {
     let homeVideo = library.media[i];
     let match = null;
-    for (let j = 0; j < manifest.media.length; j++) {
+    for (let j=0; j<manifest.media.length; j++) {
       let awayVideo = manifest.media[j];
       if (homeVideo.id === awayVideo.id) {
-        match = { id: homeVideo.id, file: homeVideo.filename }
+        match = {id : homeVideo.id, file : homeVideo.filename}
         matchedMedia.push(match);
         break;
       }
@@ -1668,8 +1717,8 @@ async function exportFiles(drive) {
     }
   }
   console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
-  unmatchedMedia.sort((a, b) => { return b.dateadded - a.dateadded });
-  for (let k = 0; k < unmatchedMedia.length; k++) {
+  unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
+  for (let k=0; k<unmatchedMedia.length; k++) {
     let video = unmatchedMedia[k];
     //console.log(`Starting export process on ${video.title}`);
     if (video.dvd) {
@@ -1677,7 +1726,7 @@ async function exportFiles(drive) {
     }
     let filename = video.filename;
     let conWatchFolder = '';
-    for (let l = 0; l < library.settings.watchfolders.length; l++) {
+    for (let l=0; l<library.settings.watchfolders.length; l++) {
       let watchfolder = library.settings.watchfolders[l];
       //console.log(`Checking watchfolder ${watchfolder.path}`)
       if (filename.includes(watchfolder.path)) {
@@ -1692,7 +1741,7 @@ async function exportFiles(drive) {
     let filePathTrim = conWatchFolder.replace(path.basename(conWatchFolder), '');
     let subtitles = video.subtitles;
     let totalSize = fs.lstatSync(filename).size;
-    for (let m = 0; m < subtitles.length; m++) {
+    for (let m=0; m<subtitles.length; m++) {
       let subtitle = subtitles[m];
       totalSize += fs.lstatSync(subtitle).size;
     }
@@ -1710,7 +1759,7 @@ async function exportFiles(drive) {
         let destDir = destFile.replace(path.basename(destFile), '');
         fs.mkdirSync(destDir, { recursive: true });
         fs.copyFileSync(filename, destFile, fs.constants.COPYFILE_EXCL);
-        for (let m = 0; m < subtitles.length; m++) {
+        for (let m=0; m<subtitles.length; m++) {
           let subtitle = subtitles[m];
           let subDestFile = path.join(drive, subtitle.replace(filePathTrim, ''));
           let subDestDir = subDestFile.replace(path.basename(subDestFile), '');
@@ -1726,17 +1775,16 @@ async function exportFiles(drive) {
       break;
     }
   }
-  win.webContents.send('status-update', { action: '' });
+  win.webContents.send('status-update', {action: ''});
 }
 
 ipcMain.on('settings-folder-select', (event) => {
-  let options = { properties: ['openDirectory'] };
+  let options = {properties: ['openDirectory']};
   dialog.showOpenDialog(null, options).then(result => {
-    event.sender.send('settings-folder-selected', result.filePaths[0]);
-  }).catch(err => {
-    console.log(err)
-  })
-})
+  event.sender.send('settings-folder-selected', result.filePaths[0]);
+}).catch(err => {
+  console.log(err)
+})})
 
 ipcMain.on('settings-watchfolder-add', (event, args) => {
   const folder = args['address'];
@@ -1745,12 +1793,12 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
   // check if path exists and is a folder, not a file
   fs.lstat(folder, (err, stats) => {
     // if path exists and is a folder
-    if (!err && stats.isDirectory()) {
+    if(!err && stats.isDirectory()) {
 
       // if we don't already have this watchfolder, add it
       if (library.settings.watchfolders.filter(wf => path.resolve(wf.path) === path.resolve(folder)).length === 0) {
         // add to library
-        let folderObject = { "path": folder, "kind": kind, "videos": [] };
+        let folderObject = {"path" : folder, "kind" : kind, "videos" : []};
         library.add('settings.watchfolders.push', folderObject, () => {
           checkWatchFolders();
 
@@ -1760,18 +1808,18 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
       } else {
         // if this folder is already a watchfolder, display a dialog
         dialog.showMessageBox({
-          type: 'warning',
-          buttons: ['Ok'],
-          message: 'This directory is already a watchfolder!'
+          type : 'warning',
+          buttons : ['Ok'],
+          message : 'This directory is already a watchfolder!'
         });
       }
 
     } else {
       // if not a directory or we got an error, display an error dialog
       dialog.showMessageBox({
-        type: 'error',
-        buttons: ['Ok'],
-        message: 'Error: not a valid directory'
+        type : 'error',
+        buttons : ['Ok'],
+        message : 'Error: not a valid directory'
       });
     }
   });
@@ -1782,11 +1830,11 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
 
   // first, show the user a confirmation dialog
   const options = {
-    type: 'warning',
-    buttons: ['Cancel', 'Remove Folder'],
-    message: 'Are you sure you want to remove following folder from the library?\n\n' +
-      path + '\n\n' +
-      'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
+    type : 'warning',
+    buttons : ['Cancel','Remove Folder'],
+    message : 'Are you sure you want to remove following folder from the library?\n\n' +
+              path + '\n\n' +
+              'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
   };
   dialog.showMessageBox(options).then(result => {
     // if the user said okay
@@ -1795,7 +1843,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
       // the callback function will return only after the watchfolder
       // has actually been removed from the library, so we can tell the front end
       // whether we succeeded or not, and it can use the info to update itself
-      removeWatchfolder(path, (err) => {
+      removeWatchfolder(path,(err) => {
         // tell the client side what happened
         event.sender.send('settings-watchfolder-remove', path, !err); // <-- pass !err to the front end, which expects a boolean for success or failure
 
@@ -1814,19 +1862,18 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
 
 ipcMain.on('editor-artwork-select', (event) => {
   let options = {
-    filters: [{ name: 'Images', extensions: ['jpg', 'png', 'gif'] }],
+    filters: [{name: 'Images', extensions: ['jpg', 'png', 'gif']}],
     properties: ['openFile']
   };
   dialog.showOpenDialog(null, options).then(result => {
-    event.sender.send('editor-artwork-selected', result.filePaths[0]);
-  }).catch(err => {
-    console.log(err)
-  })
-});
+  event.sender.send('editor-artwork-selected', result.filePaths[0]);
+}).catch(err => {
+  console.log(err)
+})});
 
 ipcMain.on('editor-subtitle-select', (event) => {
   let options = {
-    filters: [{ name: 'Subtitles', extensions: subtitleExtensions }],
+    filters: [{name: 'Subtitles', extensions: subtitleExtensions}],
     properties: ['openFile']
   };
   dialog.showOpenDialog(null, options).then(result => {
@@ -1836,10 +1883,16 @@ ipcMain.on('editor-subtitle-select', (event) => {
   })
 });
 
-ipcMain.on('download', (event, url, destination) => {
-  downloadFile(url, destination)
-    .then(response => event.sender.send('downloaded', response))
-    .catch(response => event.sender.send('downloaded', response))
+ipcMain.on('download', (event, url, destination, requestedResponseChannel) => {
+    // Artwork downloads use private reply channels so concurrent downloads
+    // cannot resolve one another. Keep the original shared channel as the
+    // fallback for existing callers.
+    let responseChannel = typeof requestedResponseChannel === 'string' &&
+      /^downloaded-(?:omdb|editor-artwork)-\d+-\d+$/.test(requestedResponseChannel) ?
+      requestedResponseChannel : 'downloaded';
+    downloadFile(url, destination)
+      .then(response => event.sender.send(responseChannel, response))
+      .catch(response => event.sender.send(responseChannel, response))
 })
 
 ipcMain.on('autotag', (event) => {
@@ -1869,9 +1922,9 @@ ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
   }
 
   let options = {
-    type: 'question',
-    buttons: ['Yes', 'No'],
-    message: message
+    type : 'question',
+    buttons : ['Yes','No'],
+    message : message
   };
 
   if (showSkipDialog) {
@@ -1879,18 +1932,17 @@ ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
   }
 
   dialog.showMessageBox(options).then(result => {
-    event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
-  }).catch(err => {
-    console.log(err)
-  })
-})
+  event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
+}).catch(err => {
+  console.log(err)
+})})
 
 ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
   console.log('generic-confirm!!!');
 
   let options = {
-    type: 'question',
-    buttons: ['Yes', 'No'],
+    type : 'question',
+    buttons : ['Yes','No'],
   };
 
   // if the opts parameter is a string
@@ -1901,15 +1953,14 @@ ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
 
   // if it's an object, add its data to the options
   if (typeof opts === 'object' && opts !== null) {
-    options = { ...options, ...opts };
+    options = {...options, ...opts};
   }
 
   dialog.showMessageBox(options).then(result => {
-    event.sender.send(returnTo, result.response, data, result.checkboxChecked);
-  }).catch(err => {
-    console.log(err)
-  })
-})
+  event.sender.send(returnTo, result.response, data, result.checkboxChecked);
+}).catch(err => {
+  console.log(err)
+})})
 
 ipcMain.on('exportFiles', (event, drive) => {
   exportFiles(drive);

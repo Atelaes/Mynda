@@ -32,6 +32,7 @@ try {
   ffprobeStatic = require('ffprobe-static');
 } catch(err) {console.warn('Warning: ffprobe-static not installed')}
 const placeholderImage = "../images/qmark.png";
+let nextEditorArtworkDownloadNumber = 0;
 
 
 // let savedPing = {};
@@ -4399,7 +4400,7 @@ class MynEditorSearch extends React.Component {
     this.clearSearch = this.clearSearch.bind(this);
     this.render = this.render.bind(this);
 
-    ipcRenderer.on('MynEditorSearch-confirm-select', (event, response, video, checked) => {
+    this.handleConfirmSelect = (event, response, video, checked) => {
       console.log('CONFIRMATION OF SEARCH RESULTS HAS FIRED')
       console.log(event);
       // if the user checked the checkbox to override the confirmation dialog,
@@ -4420,7 +4421,7 @@ class MynEditorSearch extends React.Component {
       } else {
         console.log('Selection canceled by user')
       }
-    });
+    };
   }
 
   // search online movie database to auto-fill fields
@@ -4430,40 +4431,48 @@ class MynEditorSearch extends React.Component {
     let resultsObject = await OmdbHelper.search(this.props.video);
     this.setState({searching:false});
     //console.log(results);
+    let results;
     if (resultsObject.success) {
-      let results = resultsObject.data;
+      results = resultsObject.data;
       if (!Array.isArray(results)) {
         results = [
           {
             Poster: results.artwork,
             Title: results.title,
-            Type: results.type,
+            Type: results.kind === 'show' ? 'episode' : (results.type || results.kind),
             Year: results.year,
             imdbID: results.imdbID
           }
         ];
       }
-
-      let movies = results.map((movie) => {
-        if (movie.Type === 'series') return; // don't want to display series results
-
-        if (!isValidURL(movie.Poster)) {
-          movie.Poster = this.props.placeholderImage;
-        }
-
-        return (
-          <tr key={movie.imdbID} onClick={() => (this.chooseResult(movie))}>
-            <td className='artwork'><img src={movie.Poster} /></td>
-            <td className='title'>{movie.Title}</td>
-            <td className='year'>{movie.Year}</td>
-            <td><a href={`https://www.imdb.com/title/${movie.imdbID}`} target='_blank' onClick={(e) => {e.stopPropagation()}}>IMDb</a></td>
-          </tr>
-        );
-      });
-      this.setState({results:movies});
+    } else if (resultsObject.choiceType === 'series' && Array.isArray(resultsObject.choices) && resultsObject.choices.length > 0) {
+      // OmdbHelper does not decide whether ambiguity is fatal. Automatic
+      // tagging leaves these choices unresolved, while the editor lets the
+      // user select the intended series and then retrieves that exact episode.
+      results = resultsObject.choices;
     } else {
-      alert('No results found! Try editing the title and searching again, or enter the IMDb ID for an exact match.');
+      alert('No results found! For shows, check the series, season, and episode. For other videos, try editing the title and year, or enter the IMDb ID for an exact match.');
+      return;
     }
+
+    let movies = results.map((movie) => {
+      let isSeriesChoice = movie.myndaChoiceType === 'series';
+      if (movie.Type === 'series' && !isSeriesChoice) return; // don't display unrelated series from ordinary title searches
+
+      if (!isValidURL(movie.Poster)) {
+        movie.Poster = this.props.placeholderImage;
+      }
+
+      return (
+        <tr key={movie.imdbID} onClick={() => (this.chooseResult(movie))}>
+          <td className='artwork'><img src={movie.Poster} /></td>
+          <td className='title'>{movie.Title}</td>
+          <td className='year'>{movie.Year}</td>
+          <td><a href={`https://www.imdb.com/title/${movie.imdbID}`} target='_blank' onClick={(e) => {e.stopPropagation()}}>IMDb</a></td>
+        </tr>
+      );
+    });
+    this.setState({results:movies});
   }
 
   clearSearch() {
@@ -4495,9 +4504,16 @@ class MynEditorSearch extends React.Component {
     // clear the search results
     this.clearSearch();
 
-    // next, we have to get the actual movie object from the database
-    OmdbHelper.search(movie).then(responseObject => {
+    // A series choice identifies which show owns the already-known season and
+    // episode. Ordinary movie/episode result rows continue to be retrieved by
+    // their own IMDb ID as before.
+    let searchTarget = movie.myndaChoiceType === 'series' ? this.props.video : movie;
+    let searchOptions = movie.myndaChoiceType === 'series' ? {seriesImdbID: movie.imdbID} : {};
+    OmdbHelper.search(searchTarget, searchOptions).then(responseObject => {
       if (!responseObject.success) {
+        alert(movie.myndaChoiceType === 'series' ?
+          'OMDb could not find this episode in the selected series.' :
+          'OMDb could not retrieve the selected result.');
         return console.log('Error: no result found: ' + responseObject.data);
       } else {
         this.props.handleChange(responseObject.data);
@@ -4505,9 +4521,17 @@ class MynEditorSearch extends React.Component {
     })
   }
 
+  componentDidMount() {
+    ipcRenderer.on('MynEditorSearch-confirm-select', this.handleConfirmSelect);
+  }
+
+  componentWillUnmount() {
+    ipcRenderer.removeListener('MynEditorSearch-confirm-select', this.handleConfirmSelect);
+  }
+
   render() {
     let clearBtn = this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
-    let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search online database for movie information (based on IMDb ID if present, then title and year if present, otherwise filename). You will be able to choose a result and manually edit afterwards.'>Search</button>);
+    let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search OMDb for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
     return (
         <div id='edit-search'>
           <div id='edit-search-controls'>
@@ -4600,7 +4624,7 @@ class MynEditorEdit extends React.Component {
 
     this.render = this.render.bind(this);
 
-    ipcRenderer.on('MynEditorEdit-confirm-revert', (event, response, data, checked) => {
+    this.handleConfirmRevert = (event, response, data, checked) => {
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
       if (checked) {
@@ -4619,7 +4643,7 @@ class MynEditorEdit extends React.Component {
       } else {
         console.log('Reversion canceled by user');
       }
-    });
+    };
   }
 
   requestRevert(e) {
@@ -4652,6 +4676,7 @@ class MynEditorEdit extends React.Component {
 
   componentDidMount() {
     this._isMounted = true;
+    ipcRenderer.on('MynEditorEdit-confirm-revert', this.handleConfirmRevert);
 
     // we're now doing the validating in MynEditor before it gets here, to avoid issues with the saveHash
     // validate the video in place (function fixes any broken values)
@@ -4663,6 +4688,7 @@ class MynEditorEdit extends React.Component {
   }
 
   componentWillUnmount() {
+    ipcRenderer.removeListener('MynEditorEdit-confirm-revert', this.handleConfirmRevert);
     this._isMounted = false;
   }
 
@@ -5683,50 +5709,18 @@ class MynEditArtwork extends MynEdit {
     this.input = React.createRef();
     this.dlMsg = React.createRef();
     this.container = React.createRef();
+    this.downloadResponseChannel = null;
+    this.downloadResponseHandler = null;
+    this.downloadStatusTimer = null;
 
-    ipcRenderer.on('editor-artwork-selected', (event, image) => {
+    this.handleArtworkSelected = (event, image) => {
       if (image) {
         this.update(image);
       } else {
         console.log("Unable to select file");
       }
-    });
-
-    /*ipcRenderer.on('downloaded', (event, response) => {
-      if (response.success) {
-        this.props.update({'artwork':response.message});
-        console.log('Successfully downloaded artwork');
-      } else {
-        console.log("Unable to download file: " + response.message);
-        this.update(this.props.placeholderImage);
-      }
-
-      // on finishing, whether successful or not,
-      // hide message and show input field again
-      try {
-        this.input.current.style.visibility = 'visible';
-      } catch(err) {
-        console.error(err);
-        try {
-          document.getElementById('edit-field-artwork').style.visibility = 'visible';
-        } catch(err1) {
-          console.error(err1);
-        }
-      }
-      try {
-        this.dlMsg.current.style.display = 'none';
-      } catch(err) {
-        console.error(err);
-        try {
-          document.getElementById('edit-field-artwork-dl-msg').style.display = 'none';
-        } catch(err1) {
-          console.error(err1);
-        }
-      }
-
-      this._isMounted && this.setState({message: ""});
-
-    });*/
+    };
+    ipcRenderer.on('editor-artwork-selected', this.handleArtworkSelected);
 
     // ipcRenderer.on('cancel-download', (event, cancelFunc, string) => {
     //   this.setState({cancelDownload: cancelFunc});
@@ -5758,14 +5752,94 @@ class MynEditArtwork extends MynEdit {
 
   }
 
-  download(url) {
-    // hide the input element and display message while downloading
-    this.input.current.style.visibility = 'hidden'
-    this._isMounted && this.setState({message: "downloading"});
-    this.dlMsg.current.style.display = 'block';
+  removeDownloadListener() {
+    if (this.downloadResponseChannel && this.downloadResponseHandler) {
+      ipcRenderer.removeListener(this.downloadResponseChannel, this.downloadResponseHandler);
+    }
+    this.downloadResponseChannel = null;
+    this.downloadResponseHandler = null;
+  }
 
-    // download
-    this._isMounted && ipcRenderer.send('download', url, );
+  clearDownloadStatusTimer() {
+    if (this.downloadStatusTimer) {
+      clearTimeout(this.downloadStatusTimer);
+      this.downloadStatusTimer = null;
+    }
+  }
+
+  showDownloadStatus(message, downloading, clearAfter = 0) {
+    this.clearDownloadStatusTimer();
+    if (!this._isMounted) {
+      return;
+    }
+    if (this.input.current) {
+      this.input.current.style.visibility = downloading ? 'hidden' : 'visible';
+    }
+    if (this.dlMsg.current) {
+      this.dlMsg.current.style.display = message ? 'block' : 'none';
+    }
+    this.setState({message: message});
+    if (clearAfter) {
+      this.downloadStatusTimer = setTimeout(() => {
+        this.downloadStatusTimer = null;
+        this.showDownloadStatus('', false);
+      }, clearAfter);
+    }
+  }
+
+  download(url, fallbackArtwork) {
+    this.removeDownloadListener();
+    if (!this._isMounted) {
+      return;
+    }
+
+    // hide the input element and display message while downloading
+    this.showDownloadStatus('Downloading', true);
+
+    let responseChannel = `downloaded-editor-artwork-${process.pid}-${++nextEditorArtworkDownloadNumber}`;
+    let restorePreviousArtwork = typeof fallbackArtwork !== 'undefined';
+    let handleFailure = response => {
+      let status = response && response.status;
+      console.error('Unable to download artwork', response && response.message ? response.message : response);
+      this.showDownloadStatus(
+        status ? `Download failed (${status})` : 'Download failed',
+        false,
+        4000
+      );
+
+      if (restorePreviousArtwork) {
+        // Never restore another remote URL: that would immediately trigger the
+        // same download again. Keep the previous local file, or clear artwork.
+        let safeFallback = fallbackArtwork && !isValidURL(fallbackArtwork) ? fallbackArtwork : '';
+        if (this.props.movie.artwork !== safeFallback) {
+          this.update(safeFallback);
+        }
+      }
+    };
+    let handleDownload = (event, response) => {
+      if (this.downloadResponseChannel !== responseChannel) {
+        return;
+      }
+      this.downloadResponseChannel = null;
+      this.downloadResponseHandler = null;
+      if (response && response.success) {
+        this.showDownloadStatus('', false);
+        this.update(response.message);
+        console.log('Successfully downloaded artwork');
+      } else {
+        handleFailure(response);
+      }
+    };
+    this.downloadResponseChannel = responseChannel;
+    this.downloadResponseHandler = handleDownload;
+    ipcRenderer.once(responseChannel, handleDownload);
+
+    try {
+      ipcRenderer.send('download', url, undefined, responseChannel);
+    } catch(err) {
+      this.removeDownloadListener();
+      handleFailure({message: err && err.message ? err.message : err});
+    }
   }
 
   handleLocalFile(path) {
@@ -5792,7 +5866,8 @@ class MynEditArtwork extends MynEdit {
 
   handleRevert() {
     console.log("reverting! " + this.state.original);
-    // this.state.cancelDownload(); // in case there's a download in progress, cancel it
+    this.removeDownloadListener();
+    this.showDownloadStatus('', false);
     this.update(this.state.original);
   }
 
@@ -5817,7 +5892,7 @@ class MynEditArtwork extends MynEdit {
     // then we want to download it, and point the movie metadata to the downloaded local file instead
     if (oldProps.movie.artwork !== this.props.movie.artwork && isValidURL(this.props.movie.artwork)) {
       console.log("artwork changed from outside (i.e. from search results)");
-      this.download(this.props.movie.artwork);
+      this.download(this.props.movie.artwork, oldProps.movie.artwork || '');
     }
   }
 
@@ -5870,6 +5945,9 @@ class MynEditArtwork extends MynEdit {
   }
 
   componentWillUnmount() {
+    this.removeDownloadListener();
+    this.clearDownloadStatusTimer();
+    ipcRenderer.removeListener('editor-artwork-selected', this.handleArtworkSelected);
     this._isMounted = false;
   }
 
@@ -6419,14 +6497,14 @@ class MynEditSubtitles extends MynEditListWidget {
 
     // this.input = React.createRef();
 
-    ipcRenderer.on('editor-subtitle-selected', (event, subs) => {
+    this.handleSubtitleSelected = (event, subs) => {
       if (subs) {
         let update = [...this.props.object[this.props.property], ...subs];
         this.updateList(update);
       } else {
         console.log("Unable to select subtitle file(s): nothing returned from server");
       }
-    });
+    };
 
     this.render = this.render.bind(this);
     this.addToListUpdate = this.addToListUpdate.bind(this);
@@ -6484,6 +6562,15 @@ class MynEditSubtitles extends MynEditListWidget {
 
   emptyList() {
     this.updateList([]);
+  }
+
+  componentDidMount() {
+    super.componentDidMount();
+    ipcRenderer.on('editor-subtitle-selected', this.handleSubtitleSelected);
+  }
+
+  componentWillUnmount() {
+    ipcRenderer.removeListener('editor-subtitle-selected', this.handleSubtitleSelected);
   }
 
 
