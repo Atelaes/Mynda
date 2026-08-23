@@ -1065,8 +1065,8 @@ class MynNav extends React.Component {
                   onClick={(e) => this.props.setPlaylist(playlist.id,e.target)}
                 >
                   {playlist.name}
-                  {playlist.id === 'new' && numVids > 0 ? <div class='nav-message loud'>({numVids})</div> : null}
-                  {playlist.id !== 'new' && playlist.id === this.props.currentPlaylistID ? <div class='nav-message quiet small'>({numVids})</div> : null} 
+                  {playlist.id === 'new' && numVids > 0 ? <div className='nav-message loud'>({numVids})</div> : null}
+                  {playlist.id !== 'new' && playlist.id === this.props.currentPlaylistID ? <div className='nav-message quiet small'>({numVids})</div> : null} 
                   {/*playlist.id === this.props.currentPlaylistID ? (<MynNavPlaylistMiniEdit playlist={playlist} />) : null*/}
                   {/*newVidAlert*/}
                 </li>
@@ -1383,10 +1383,40 @@ class MynPlaylistBar extends React.Component {
   constructor(props) {
     super(props)
 
+    this.state = {
+      autotagRunning: false,
+      autotagCancelRequested: false
+    }
+
+    this.handleAutoTagStatus = (event, status) => {
+      if (status.action === 'autotag') {
+        this.setState({
+          autotagRunning: true,
+          autotagCancelRequested: Boolean(status.cancelRequested)
+        });
+      } else if (status.action === '') {
+        this.setState({
+          autotagRunning: false,
+          autotagCancelRequested: false
+        });
+      }
+    };
   }
 
   autotag(e) {
     ipcRenderer.send('autotag');
+  }
+
+  cancelAutotag(e) {
+    ipcRenderer.send('autotag-cancel');
+  }
+
+  componentDidMount() {
+    ipcRenderer.on('status-update', this.handleAutoTagStatus);
+  }
+
+  componentWillUnmount() {
+    ipcRenderer.removeListener('status-update', this.handleAutoTagStatus);
   }
 
   changeView(view) {
@@ -1395,6 +1425,22 @@ class MynPlaylistBar extends React.Component {
 
   render() {
     if (typeof this.props.playlist === "undefined") return null;
+
+    let autotagButton = null;
+    if (this.state.autotagRunning) {
+      autotagButton = (
+        <button
+          className="pb-element autotag cancel"
+          onClick={this.cancelAutotag.bind(this)}
+          disabled={this.state.autotagCancelRequested}
+          title="Stop Auto-Tag after the current video finishes"
+        >
+          {this.state.autotagCancelRequested ? 'Canceling...' : 'Cancel Auto-Tag'}
+        </button>
+      );
+    } else if (this.props.playlist.id === 'new') {
+      autotagButton = <button className="pb-element autotag" onClick={this.autotag.bind(this)} title="Run auto-tagging on all new videos; has no effect on videos not in the 'New' playlist">Auto-tag</button>;
+    }
 
     return (
       <div className="playlist-bar">
@@ -1416,7 +1462,7 @@ class MynPlaylistBar extends React.Component {
           </div>
         </div>
 
-        <button className="pb-element autotag" onClick={this.autotag.bind(this)}>Auto-tag</button>
+        {autotagButton}
       </div>
     );
   }
@@ -2387,6 +2433,10 @@ class MynNotify extends React.Component {
   }
 
   messageFor(status) {
+    if (status.action === 'autotag' && status.cancelRequested) {
+      return 'Finishing the current video before canceling auto-tagging';
+    }
+
     let _c = '';
     let _t = '';
     let _of = '';

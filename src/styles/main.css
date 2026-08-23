@@ -11,7 +11,7 @@
 :root ::-webkit-scrollbar {
   display: none;
 }
-
+ 
 pre {
   display: unset;
   font-family: unset;
@@ -2213,6 +2213,25 @@ table.compact .movie-row {
 .pb-element.autotag {
   white-space: nowrap;
   flex: 0 1 auto;
+}
+.pb-element.autotag.cancel {
+  background: var(--button-bgcolor-alert);
+  background-color: var(--button-bgcolor-alert);
+  border: var(--button-border-alert);
+  box-shadow: var(--button-boxshadow-alert);
+}
+.pb-element.autotag.cancel:hover:not(:disabled) {
+  background: var(--button-bgcolor-alert-hover);
+  background-color: var(--button-bgcolor-alert-hover);
+  border: var(--button-border-alert-hover);
+  box-shadow: var(--button-boxshadow-alert-hover);
+}
+.pb-element.autotag.cancel:disabled {
+  cursor: wait;
+  color: var(--button-text-disabled);
+  background: var(--button-bgcolor-disabled);
+  background-color: var(--button-bgcolor-disabled);
+  border: var(--button-border-disabled);
 }
 
 .pb-element.recent > .pb-text {

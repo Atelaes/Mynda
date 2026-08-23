@@ -51,6 +51,9 @@ let newIDs = [];
 let ffMpegQueue = [];
 let videoAddTimers = [];
 let appStartTime = new Date();
+let autoTagRunning = false;
+let autoTagCancelRequested = false;
+let autoTagCancellationDecision = null;
 
 app.whenReady().then(start);
 
@@ -1539,135 +1542,263 @@ function downloadFile(url, destination) {
   });
 }
 
+function getAutoTagCandidates() {
+  return library.media.filter(medium => (medium.new && !medium.autotag_tried));
+}
+
+function prepareSuccessfulAutoTagResult(video) {
+  // A successful video has already had its automatic attempt even when the
+  // user prefers to leave it in New for manual review.
+  video.autotag_tried = true;
+  if (library.settings.preferences.remove_autotagged_from_new) {
+    video.new = false;
+  }
+  return video;
+}
+
+async function requestAutoTag() {
+  if (autoTagRunning) {
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Auto-Tag',
+      message: 'Auto-Tag is already running.'
+    });
+    return;
+  }
+
+  const eligibleCount = getAutoTagCandidates().length;
+  const plural = eligibleCount === 1 ? '' : 's';
+
+  if (eligibleCount === 0) {
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Auto-Tag',
+      message: 'There are no eligible videos to auto-tag.',
+      detail: "Eligible videos must be in the 'New' playlist and must not already have had an Auto-Tag attempt. Edit a video to reset its Auto-Tag status if you want to try again."
+    });
+    return;
+  }
+
+  const result = await dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Cancel', 'Auto-Tag'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Auto-Tag',
+    message: `Auto-tag ${eligibleCount} video${plural}?`,
+    detail: "Mynda will search OMDb for every video in the 'New' playlist (unless it has already been auto-tagged). Successful matches will overwrite most existing metadata. This may take a very long time when many videos are eligible."
+  });
+
+  if (result.response === 1) {
+    await autoTag();
+  } else {
+    autoTagLog.info('Automatic tagging canceled by user', {eligibleVideos: eligibleCount});
+  }
+}
+
+function requestAutoTagCancellation() {
+  if (!autoTagRunning || autoTagCancelRequested) {
+    return Promise.resolve(false);
+  }
+  if (autoTagCancellationDecision) {
+    return autoTagCancellationDecision;
+  }
+
+  autoTagCancellationDecision = dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Continue', 'Cancel'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Cancel Auto-Tag',
+    message: 'Cancel auto-tagging?',
+    detail: 'Mynda will finish and save the video currently being processed, then stop. Videos that have not been processed will remain eligible for the next Auto-Tag run, which will pick up where it left off.'
+  }).then(result => {
+    if (result.response !== 1) {
+      autoTagLog.info('Automatic tagging cancellation declined by user');
+      return false;
+    }
+    if (!autoTagRunning) {
+      autoTagLog.info('Automatic tagging finished before cancellation was confirmed');
+      return false;
+    }
+
+    autoTagCancelRequested = true;
+    autoTagLog.info('Automatic tagging cancellation confirmed by user');
+    win.webContents.send('status-update', {action: 'autotag', cancelRequested: true});
+    return true;
+  }).catch(err => {
+    autoTagLog.error('Could not confirm automatic tagging cancellation', {
+      error: err && err.stack ? err.stack : String(err)
+    });
+    return false;
+  }).finally(() => {
+    autoTagCancellationDecision = null;
+  });
+
+  return autoTagCancellationDecision;
+}
+
 async function autoTag() {
+  if (autoTagRunning) return;
+
+  autoTagRunning = true;
+  autoTagCancelRequested = false;
   win.webContents.send('status-update', {action: 'autotag'});
-  let newMedia = library.media.filter(medium => (medium.new && !medium.autotag_tried));
+  let newMedia = getAutoTagCandidates();
   let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
   let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
+  let processedVideos = 0;
 
   autoTagLog.info('Automatic tagging batch started', {totalVideos: newMedia.length});
 
-  // entire library loop
-  for (let i=0; i<newMedia.length; i++) {
-    // tell the user what number we're on
-    win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
+  try {
+    // entire library loop
+    for (let i=0; i<newMedia.length; i++) {
+      // If a cancellation confirmation is open, do not begin another video
+      // until the user chooses whether to stop or continue.
+      if (autoTagCancellationDecision) {
+        await autoTagCancellationDecision;
+      }
 
-    // create new video object
-    let newVideo = newMedia[i];
-    console.log(`Running autotag on ${newVideo.title}.`);
-    autoTagLog.info('Automatic tagging started for video', {
-      position: i+1,
-      totalVideos: newMedia.length,
-      id: newVideo.id,
-      filename: newVideo.filename,
-      title: newVideo.title,
-      kind: newVideo.kind,
-      year: newVideo.year,
-      series: newVideo.series,
-      season: newVideo.season,
-      episode: newVideo.episode,
-      imdbID: newVideo.imdbID
-    });
+      // Cancellation is cooperative: finish and save the current video, then
+      // stop before beginning another one.
+      if (autoTagCancelRequested) break;
 
-    // get search results
-    let disposition = '';
-    let resultsObject = await OmdbHelper.search(newVideo);
+      // tell the user what number we're on
+      win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
 
-    // check results
-    if (resultsObject.success) {
-      let results = resultsObject.data;
-      // if we got more than one result (or an empty array of results, I suppose?)
-      if (Array.isArray(results)) {
-        // if there were between 1 and 4 results (inclusive), pick the first one
-        if (results.length > 0 && results.length <= 4) {
-          // in order to pick the first result, we get the imdbID and search again using that
-          newVideo.imdbID = results[0].imdbID;
-          resultsObject = await OmdbHelper.search(newVideo);
-          results = resultsObject.data;
-          // if successful in picking the first result, save it
-          if (resultsObject.success && !Array.isArray(results)) {
-            if (library.settings.preferences.remove_autotagged_from_new) {
-              results.new = false;
+      // create new video object
+      let newVideo = newMedia[i];
+      console.log(`Running autotag on ${newVideo.title}.`);
+      autoTagLog.info('Automatic tagging started for video', {
+        position: i+1,
+        totalVideos: newMedia.length,
+        id: newVideo.id,
+        filename: newVideo.filename,
+        title: newVideo.title,
+        kind: newVideo.kind,
+        year: newVideo.year,
+        series: newVideo.series,
+        season: newVideo.season,
+        episode: newVideo.episode,
+        imdbID: newVideo.imdbID
+      });
+
+      // get search results
+      let disposition = '';
+      let resultsObject = await OmdbHelper.search(newVideo);
+
+      // check results
+      if (resultsObject.success) {
+        let results = resultsObject.data;
+        // if we got more than one result (or an empty array of results, I suppose?)
+        if (Array.isArray(results)) {
+          // if there were between 1 and 4 results (inclusive), pick the first one
+          if (results.length > 0 && results.length <= 4) {
+            // in order to pick the first result, we get the imdbID and search again using that
+            newVideo.imdbID = results[0].imdbID;
+            resultsObject = await OmdbHelper.search(newVideo);
+            results = resultsObject.data;
+            // if successful in picking the first result, save it
+            if (resultsObject.success && !Array.isArray(results)) {
+              results = prepareSuccessfulAutoTagResult(results);
+              batchSave.push(results);
+              // library.replace(`media.id=${newVideo.id}`, results);
+              disposition = 'Success';
+            } else {
+              disposition = 'Failure after getting imdb id??';
             }
-            batchSave.push(results);
-            // library.replace(`media.id=${newVideo.id}`, results);
-            disposition = 'Success';
           } else {
-            disposition = 'Failure after getting imdb id??';
+            // there were too many results (or an empty array of results?)
+            // but we still want to save the video object so we can set autotag_tried to true
+            //This means we've tried and failed in a predicted manner, let's not try again.
+            newVideo.autotag_tried = true;
+            batchSave.push(newVideo);
+            // library.replace(`media.id=${newVideo.id}`, newVideo);
+            disposition = 'Too many results';
           }
         } else {
-          // there were too many results (or an empty array of results?)
-          // but we still want to save the video object so we can set autotag_tried to true
-          //This means we've tried and failed in a predicted manner, let's not try again.
-          newVideo.autotag_tried = true;
-          batchSave.push(newVideo);
-          // library.replace(`media.id=${newVideo.id}`, newVideo);
-          disposition = 'Too many results';
+          // we got just a single result, so save it
+          results = prepareSuccessfulAutoTagResult(results);
+          batchSave.push(results);
+          // library.replace(`media.id=${newVideo.id}`, results);
+          disposition = 'Success';
         }
+      } else if (resultsObject.failure === 'No results' || resultsObject.permanentFailure) {
+        // we got no results, but we still want to save the video object so we can set autotag_tried to true
+        //This means we've tried and failed in a predicted manner, let's not try again.
+        newVideo.autotag_tried = true;
+        batchSave.push(newVideo);
+        // library.replace(`media.id=${newVideo.id}`, newVideo);
+        disposition = resultsObject.failure;
       } else {
-        // we got just a single result, so save it
-        if (library.settings.preferences.remove_autotagged_from_new) {
-          results.new = false;
-        }
-        batchSave.push(results);
-        // library.replace(`media.id=${newVideo.id}`, results);
-        disposition = 'Success';
+        // some other failure mode, do not save
+        disposition = resultsObject.failure;
       }
-    } else if (resultsObject.failure === 'No results' || resultsObject.permanentFailure) {
-      // we got no results, but we still want to save the video object so we can set autotag_tried to true
-      //This means we've tried and failed in a predicted manner, let's not try again.
-      newVideo.autotag_tried = true;
-      batchSave.push(newVideo);
-      // library.replace(`media.id=${newVideo.id}`, newVideo);
-      disposition = resultsObject.failure;
-    } else {
-      // some other failure mode, do not save
-      disposition = resultsObject.failure;
-    }
 
-    // if we've accumulated enough videos to save, save them
-    if (batchSave.length >= 10) {
+      // if we've accumulated enough videos to save, save them
+      if (batchSave.length >= 10) {
+        saveBatch(batchSave);
+        batchSave = []; // empty batchShave for the next batch
+      }
+
+      // some debug logging
+      autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
+      autoLog.push(`${newVideo.title}: ${disposition}`);
+
+      let resultLog = {
+        id: newVideo.id,
+        filename: newVideo.filename,
+        title: newVideo.title,
+        disposition: disposition,
+        failure: resultsObject.failure,
+        failureData: resultsObject.success ? undefined : resultsObject.data,
+        permanentFailure: Boolean(resultsObject.permanentFailure)
+      };
+      if (disposition === 'Success') {
+        autoTagLog.info('Automatic tagging finished for video', resultLog);
+      } else if (disposition === 'Failure after getting imdb id??' ||
+                 (!resultsObject.success && !['No results', 'Not enough data', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure))) {
+        autoTagLog.error('Automatic tagging failed for video', resultLog);
+      } else {
+        autoTagLog.warn('Automatic tagging did not tag video', resultLog);
+      }
+
+      processedVideos = i + 1;
+    } // end library loop
+
+    // save any leftovers at the end, including a completed video that was in
+    // progress when the user requested cancellation
+    if (batchSave.length > 0) {
       saveBatch(batchSave);
-      batchSave = []; // empty batchShave for the next batch
     }
 
-    // some debug logging
-    autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
-    autoLog.push(`${newVideo.title}: ${disposition}`);
+    autoStats.processedVideos = processedVideos;
+    autoStats.remainingVideos = newMedia.length - processedVideos;
+    autoLog.sort();
 
-    let resultLog = {
-      id: newVideo.id,
-      filename: newVideo.filename,
-      title: newVideo.title,
-      disposition: disposition,
-      failure: resultsObject.failure,
-      failureData: resultsObject.success ? undefined : resultsObject.data,
-      permanentFailure: Boolean(resultsObject.permanentFailure)
-    };
-    if (disposition === 'Success') {
-      autoTagLog.info('Automatic tagging finished for video', resultLog);
-    } else if (disposition === 'Failure after getting imdb id??' ||
-               (!resultsObject.success && !['No results', 'Not enough data', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure))) {
-      autoTagLog.error('Automatic tagging failed for video', resultLog);
+    if (autoTagCancelRequested) {
+      console.log('===AutoTag Canceled===');
+      autoTagLog.info('Automatic tagging batch canceled by user', {statistics: autoStats});
     } else {
-      autoTagLog.warn('Automatic tagging did not tag video', resultLog);
+      console.log('===AutoTag Finished===');
+      autoTagLog.info('Automatic tagging batch finished', {statistics: autoStats});
     }
-  } // end library loop
+    console.log(JSON.stringify(autoStats));
+    console.log(autoLog.join('\n'));
+  } finally {
+    autoTagRunning = false;
+    autoTagCancelRequested = false;
 
-  // save any leftovers at the end
-  if (batchSave.length > 0) {
-    saveBatch(batchSave);
+    // clear the user notification whether the batch completed, was canceled,
+    // or stopped because of an unexpected error
+    win.webContents.send('status-update', {action: ''});
   }
-
-  autoLog.sort();
-  console.log('===AutoTag Finished===');
-  console.log(JSON.stringify(autoStats));
-  console.log(autoLog.join('\n'));
-  autoTagLog.info('Automatic tagging batch finished', {statistics: autoStats});
-
-  // clear the user notification
-  win.webContents.send('status-update', {action: ''});
 }
 
 function saveBatch(batch) {
@@ -1895,8 +2026,16 @@ ipcMain.on('download', (event, url, destination, requestedResponseChannel) => {
       .catch(response => event.sender.send(responseChannel, response))
 })
 
-ipcMain.on('autotag', (event) => {
-  autoTag();
+ipcMain.on('autotag', () => {
+  requestAutoTag().catch(err => {
+    autoTagLog.error('Could not start automatic tagging', {
+      error: err && err.stack ? err.stack : String(err)
+    });
+  });
+})
+
+ipcMain.on('autotag-cancel', () => {
+  requestAutoTagCancellation();
 })
 
 ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {

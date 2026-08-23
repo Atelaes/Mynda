@@ -258,6 +258,17 @@
   --button-text-hover: var(--bright-text);
   --button-border-hover: var(--button-border-width) solid var(--dim-text);
 
+  --button-bgcolor-alert: rgba(255,0,0,.2);
+  --button-border-alert: var(--button-border-width) solid rgba(255,0,0,.6);
+  --button-boxshadow-alert: inset 0em 0em .4em 0em rgba(255,0,0,.6);
+  --button-bgcolor-alert-hover: rgba(255,0,0,.4);
+  --button-border-alert-hover: var(--button-border-width) solid rgba(255,0,0,.8);
+  --button-boxshadow-alert-hover: inset 0em 0em .4em 0em rgba(255,0,0,.8);
+
+  --button-bgcolor-disabled: var(--dark-bg);
+  --button-text-disabled: var(--dimmer-text);
+  --button-border-disabled: var(--button-border-width) solid var(--lighter-bg);
+
   --ratingsicon-size: 1.5em;
   --ratingsicon-opacity: .5;
   --ratingsicon-opacity-hover: .8;
