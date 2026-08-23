@@ -68,6 +68,18 @@ async function start() {
     architecture: process.arch
   });
 
+  // Library construction happens before Electron is ready, when it is too
+  // early to display a native dialog. Once ready, resolve any recorded load
+  // problem before opening the renderer or starting a watchfolder scan; either
+  // could otherwise save provisional data over the unreadable primary.
+  if (!await resolveLibraryLoadIssue()) {
+    return;
+  }
+
+  // Ensure an existing valid library gets its first restore point immediately,
+  // even if this session never performs another save.
+  library.maybeCreateAutomaticBackup();
+
   //Tutorial at https://www.electronjs.org/docs/tutorial/devtools-extension
   //You need to install React Dev tools in Chrome before this will work, also, double-check the location.
   try {
@@ -97,6 +109,141 @@ async function start() {
   checkWatchFolders();
 
   // testNotify(0);
+}
+
+async function quitAfterLibraryLoadIssue() {
+  // This path is reached when the user chooses the safe "Quit Mynda" option or
+  // when a requested recovery action fails. Give already-queued diagnostic log
+  // entries a chance to reach disk before terminating the otherwise windowless
+  // startup process.
+  try {
+    await Logger.flush();
+  } catch(err) {}
+  app.quit();
+  return false;
+}
+
+// A second-line failure dialog. We get here only after the user explicitly
+// requested restoration or empty-library creation and that filesystem action
+// threw—for example because the disk is full or the directory is read-only.
+async function showLibraryRecoveryFailure(action, err) {
+  backendLog.error(`Could not ${action} after a library load failure`, {
+    error: err && err.stack ? err.stack : String(err)
+  });
+  await dialog.showMessageBox({
+    type: 'error',
+    buttons: ['Quit Mynda'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Library Recovery Failed',
+    message: `Mynda could not ${action}.`,
+    detail: 'Mynda will quit without making further changes to the unreadable library.'
+  });
+  return quitAfterLibraryLoadIssue();
+}
+
+// Resolve the loadIssue recorded synchronously by Library.load(). This runs
+// before createWindow(), making recovery an all-or-nothing startup gate rather
+// than allowing the rest of Mynda to operate on provisional data.
+async function resolveLibraryLoadIssue() {
+  const issue = library.getLoadIssue();
+
+  // Normal startup: the primary parsed and validated, so no dialog is needed.
+  if (!issue) return true;
+
+  // Record the full technical diagnosis in the backend log. The dialog below
+  // uses friendlier language while retaining the exact paths and error for
+  // later troubleshooting.
+  backendLog.error('Mynda could not load the primary library', issue);
+
+  // Best recovery scenario: Library.load() found and provisionally loaded the
+  // newest structurally valid automatic snapshot.
+  if (issue.latestBackupPath) {
+    const backupDate = new Date(issue.latestBackupDate).toLocaleString();
+
+    // A newer file can exist but fail validation (for example, after disk
+    // damage). Tell the user when Mynda intentionally fell back past one or
+    // more such files instead of silently implying the newest file was used.
+    const skippedBackups = issue.invalidNewerBackups > 0 ?
+      ` Mynda skipped ${issue.invalidNewerBackups} newer backup${issue.invalidNewerBackups === 1 ? '' : 's'} that could not be validated.` : '';
+    const result = await dialog.showMessageBox({
+      type: 'error',
+      buttons: ['Quit Mynda', 'Restore Backup'],
+      defaultId: 1,
+      cancelId: 0,
+      title: 'Library Recovery',
+      message: 'Mynda could not read your library.',
+      detail: `The unreadable file has not been changed. A valid automatic backup from ${backupDate} is available.${skippedBackups}\n\nIf you restore it, Mynda will preserve the unreadable file in the Library/Recovery folder before replacing it.`
+    });
+
+    // Cancel, Escape, or "Quit Mynda" takes this branch. No recovery method has
+    // run yet, so the unreadable primary remains byte-for-byte unchanged.
+    if (result.response !== 1) {
+      backendLog.warn('User declined automatic library recovery', issue);
+      return quitAfterLibraryLoadIssue();
+    }
+
+    try {
+      // "Restore Backup" preserves the unreadable primary in Recovery, then
+      // atomically commits the already-validated and migrated backup data.
+      const recovery = library.restoreLatestAutomaticBackup();
+      backendLog.warn('Restored automatic library backup', recovery);
+      await dialog.showMessageBox({
+        type: 'info',
+        buttons: ['Continue'],
+        defaultId: 0,
+        title: 'Library Restored',
+        message: `Mynda restored the automatic backup from ${backupDate}.`,
+        detail: `The unreadable library was preserved at:\n${recovery.preservedLibraryPath}`
+      });
+      return true;
+    } catch(err) {
+      // Do not continue into the application after a partial or failed recovery
+      // attempt. The recovery method keeps or reinstates its save guard.
+      return showLibraryRecoveryFailure('restore the automatic library backup', err);
+    }
+  }
+
+  // Worst recovery scenario: the primary failed and no automatic backup passed
+  // validation. Quitting is the default. Creating an empty library is offered
+  // only as an explicit opt-in, with the damaged original preserved first.
+  const result = await dialog.showMessageBox({
+    type: 'error',
+    buttons: ['Quit Mynda', 'Create Empty Library'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Library Recovery',
+    message: 'Mynda could not read your library, and no valid automatic backup was found.',
+    detail: 'The unreadable file has not been changed. You can quit and attempt a manual recovery, or create a new empty library. If you create an empty library, Mynda will first preserve the unreadable file in the Library/Recovery folder.'
+  });
+
+  // The user wants to investigate or repair the original manually. Since no
+  // mutation has happened, quitting leaves the primary where it was.
+  if (result.response !== 1) {
+    backendLog.warn('User quit after library recovery found no valid backup', issue);
+    return quitAfterLibraryLoadIssue();
+  }
+
+  try {
+    // The user accepted the destructive-looking option, but the implementation
+    // is still recoverable: exact damaged bytes are copied to Recovery before
+    // a validated empty primary is atomically written.
+    const recovery = library.createEmptyLibraryAfterLoadFailure();
+    backendLog.warn('Created an empty library after preserving an unreadable library', recovery);
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Continue'],
+      defaultId: 0,
+      title: 'Empty Library Created',
+      message: 'Mynda created a new empty library.',
+      detail: `The unreadable library was preserved at:\n${recovery.preservedLibraryPath}`
+    });
+    return true;
+  } catch(err) {
+    // As with failed restoration, never open Mynda after failing to establish a
+    // valid primary library.
+    return showLibraryRecoveryFailure('create a new empty library', err);
+  }
 }
 
 function testNotify(i) {
@@ -1316,6 +1463,90 @@ function findEpisodeTitle(fileBasename, extrasDetected) {
   return titleCaseDetectedTitle(title);
 }
 
+// Find the most specific watchfolder containing a video's current path. The
+// longest match matters when users configure nested watchfolders. path.relative
+// avoids false positives such as treating "/Movies 2" as part of "/Movies".
+function findContainingWatchfolder(filename, watchfolders = library.settings.watchfolders) {
+  if (typeof filename !== 'string' || filename === '' || !Array.isArray(watchfolders)) {
+    return null;
+  }
+
+  return watchfolders
+    .filter(watchfolder => {
+      if (!watchfolder || typeof watchfolder.path !== 'string' || watchfolder.path === '') {
+        return false;
+      }
+      const relativePath = path.relative(path.resolve(watchfolder.path), path.resolve(filename));
+      return relativePath === '' ||
+        (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath));
+    })
+    .sort((a, b) => path.resolve(b.path).length - path.resolve(a.path).length)[0] || null;
+}
+
+// Build, but do not save, the changes for the editor's "Reset from Filename"
+// action. This deliberately starts identification from the file path instead
+// of the video's current title/series values, so a bad OMDb match cannot feed
+// back into the retry. It reuses findSeasonEpisode(), keeping manual and batch
+// reset behavior identical to the detector used when a show is first added.
+function deriveFilenameResetChanges(video, watchfolders = library.settings.watchfolders) {
+  if (!video || typeof video.id !== 'string' || typeof video.filename !== 'string') {
+    throw new Error('Cannot reset a video without an id and filename');
+  }
+
+  const watchfolder = findContainingWatchfolder(video.filename, watchfolders);
+  const detectedKind = watchfolder && watchfolder.kind ? watchfolder.kind : (video.kind || '');
+  const fileBasename = path.basename(video.filename, path.extname(video.filename));
+  const containingFolder = path.dirname(video.filename);
+  const folderParts = watchfolder ?
+    path.relative(watchfolder.path, containingFolder).split(path.sep).filter(Boolean) : [];
+
+  // OMDb adds these catalog fields. Clear them so the next manual search or
+  // Auto-Tag pass starts cleanly. User-owned state—tags, subtitles, watched
+  // state, playback position, dates, and technical metadata—is absent from
+  // this patch and therefore survives unchanged in the editor.
+  const changes = {
+    imdbID: '',
+    title: fileBasename,
+    year: '',
+    series: '',
+    season: '',
+    episode: '',
+    director: '',
+    directorsort: '',
+    cast: [],
+    description: '',
+    genre: '',
+    country: '',
+    languages: [],
+    boxoffice: 0,
+    rated: '',
+    artwork: '',
+    kind: detectedKind,
+    new: true,
+    autotag_tried: false,
+    ratings: {
+      ...((video.ratings && typeof video.ratings === 'object') ? _.cloneDeep(video.ratings) : {}),
+      imdb: '',
+      rt: '',
+      mc: ''
+    }
+  };
+
+  if (detectedKind === 'show') {
+    const detected = findSeasonEpisode({folderParts: folderParts}, fileBasename);
+    changes.title = detected.title || fileBasename;
+    changes.series = detected.series || '';
+    changes.season = detected.season || '';
+    changes.episode = detected.episode || '';
+  }
+
+  return {
+    id: video.id,
+    changes: changes,
+    watchfolderFound: Boolean(watchfolder)
+  };
+}
+
 function findSeasonEpisode(video, fileBasename) {
   const normalizeNumber = value => value.replace(/^0+(?=\d)/, '');
   let seRegexes = [
@@ -1615,7 +1846,7 @@ function requestAutoTagCancellation() {
     cancelId: 0,
     title: 'Cancel Auto-Tag',
     message: 'Cancel auto-tagging?',
-    detail: 'Mynda will finish and save the video currently being processed, then stop. Videos that have not been processed will remain eligible for the next Auto-Tag run, which will pick up where it left off.'
+    detail: 'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Videos that have not been processed will remain eligible for the next Auto-Tag run, which will pick up where it left off.'
   }).then(result => {
     if (result.response !== 1) {
       autoTagLog.info('Automatic tagging cancellation declined by user');
@@ -1743,8 +1974,9 @@ async function autoTag() {
 
       // if we've accumulated enough videos to save, save them
       if (batchSave.length >= 10) {
-        saveBatch(batchSave);
-        batchSave = []; // empty batchShave for the next batch
+        const completedBatch = batchSave;
+        batchSave = []; // start a fresh batch while retaining this one for the awaited save
+        await saveBatch(completedBatch);
       }
 
       // some debug logging
@@ -1775,8 +2007,20 @@ async function autoTag() {
     // save any leftovers at the end, including a completed video that was in
     // progress when the user requested cancellation
     if (batchSave.length > 0) {
-      saveBatch(batchSave);
+      await saveBatch(batchSave);
     }
+
+    // A Library operation's callback fires after the local atomic write and
+    // IPC send. Wait for the renderer to confirm the final mirror operation as
+    // well, so the status banner cannot disappear while older Auto-Tag data is
+    // still capable of overwriting a subsequent editor reset.
+    autoTagLog.info('Waiting for automatic tagging saves to synchronize', {
+      processedVideos: processedVideos
+    });
+    await library.whenIdle();
+    autoTagLog.info('Automatic tagging saves synchronized', {
+      processedVideos: processedVideos
+    });
 
     autoStats.processedVideos = processedVideos;
     autoStats.remainingVideos = newMedia.length - processedVideos;
@@ -1802,20 +2046,30 @@ async function autoTag() {
 }
 
 function saveBatch(batch) {
-  let saveMedia = library.media;
-  batch.map(newVid => {
-    for (let i=0; i<saveMedia.length; i++) {
-      if (saveMedia[i].id === newVid.id) {
-        saveMedia[i] = newVid;
-        break;
-      }
-    }
+  const replacements = batch.map(video => _.cloneDeep(video));
+  autoTagLog.info('Saving automatic tagging batch', {
+    videoCount: replacements.length
   });
-  // I don't THINK the following is necessary, because saveMedia is not cloned,
-  // but we do need to make sure library.media is getting updated as we go,
-  // otherwise queued library saves will overwrite each other's updates
-  library.media = saveMedia;
-  library.replace('media',saveMedia);
+
+  // Submit only the videos in this batch. Library.js merges them into the
+  // freshest media array when the queued operation actually executes, avoiding
+  // the stale full-array snapshots that previously survived past cancellation.
+  return new Promise((resolve, reject) => {
+    library.replaceMediaBatch(replacements, (err) => {
+      if (err) {
+        autoTagLog.error('Could not save automatic tagging batch', {
+          videoCount: replacements.length,
+          error: String(err)
+        });
+        reject(err);
+        return;
+      }
+      autoTagLog.info('Automatic tagging batch saved locally', {
+        videoCount: replacements.length
+      });
+      resolve();
+    });
+  });
 }
 
 async function exportFiles(drive) {
@@ -2036,6 +2290,113 @@ ipcMain.on('autotag', () => {
 
 ipcMain.on('autotag-cancel', () => {
   requestAutoTagCancellation();
+})
+
+ipcMain.on('reset-from-filename', (event, requestedResponseChannel, videos) => {
+  // The renderer creates a private one-use channel for each request. Restrict
+  // its shape before reflecting it back through IPC, just as artwork download
+  // replies do, rather than accepting an arbitrary renderer-supplied channel.
+  if (typeof requestedResponseChannel !== 'string' ||
+      !/^reset-from-filename-\d+-\d+$/.test(requestedResponseChannel)) {
+    backendLog.warn('Rejected filename reset with an invalid response channel');
+    return;
+  }
+
+  const sourceVideos = Array.isArray(videos) ? videos.filter(Boolean) : [];
+  if (sourceVideos.length === 0) {
+    backendLog.warn('Filename-reset request did not include any videos');
+    event.sender.send(requestedResponseChannel, {
+      confirmed: false,
+      error: 'No videos were supplied for reset'
+    });
+    return;
+  }
+
+  // Auto-Tag owns a sequence of media writes in the main process. Its running
+  // flag now remains true until the renderer has confirmed the final write, so
+  // refusing this conflicting action closes the window in which an older
+  // Auto-Tag snapshot could land after—and undo—the user's reset.
+  if (autoTagRunning) {
+    backendLog.warn('Rejected filename reset while automatic tagging was still active', {
+      videoCount: sourceVideos.length
+    });
+    event.sender.send(requestedResponseChannel, {
+      confirmed: false,
+      error: 'Auto-Tag is still running or finishing its saves. Cancel it or wait for it to finish, then try Reset from Filename again.'
+    });
+    return;
+  }
+
+  backendLog.info('Filename-derived editor reset requested', {
+    videoCount: sourceVideos.length
+  });
+
+  let patches;
+  try {
+    patches = sourceVideos.map(video => deriveFilenameResetChanges(video));
+  } catch(err) {
+    backendLog.error('Could not derive filename metadata for editor reset', {
+      error: err && err.stack ? err.stack : String(err)
+    });
+    event.sender.send(requestedResponseChannel, {
+      confirmed: false,
+      error: err && err.message ? err.message : String(err)
+    });
+    return;
+  }
+
+  const count = patches.length;
+  const missingWatchfolders = patches.filter(patch => !patch.watchfolderFound).length;
+  const resetFields = Array.from(new Set(
+    patches.flatMap(patch => Object.keys(patch.changes || {}))
+  )).sort();
+  backendLog.info('Prepared filename-derived editor reset patches', {
+    videoCount: count,
+    missingWatchfolders: missingWatchfolders,
+    resetFields: resetFields
+  });
+  let detail =
+    'Mynda will re-detect title, series, season, and episode from each filename and its folders. ' +
+    'It will restore the watchfolder\'s default kind, clear the IMDb ID, artwork reference, and other OMDb catalog fields, ' +
+    'mark the video as New, and allow Auto-Tag to try it again.\n\n' +
+    'Tags, subtitles, watched status, playback position, technical metadata, and your rating will be kept. ' +
+    'Nothing is written to the library until you click Save in the editor.';
+
+  if (missingWatchfolders > 0) {
+    detail += `\n\nMynda could not identify a containing watchfolder for ${missingWatchfolders} ` +
+      `video${missingWatchfolders === 1 ? '' : 's'}; for those, it will use the filename alone and keep the current kind.`;
+  }
+
+  dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Cancel', 'Reset from Filename'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+    message: count === 1 ?
+      'Reset this video from its filename?' :
+      `Reset ${count} videos from their filenames?`,
+    detail: detail
+  }).then(result => {
+    backendLog.info(result.response === 1 ?
+      'Filename-derived editor reset confirmed' :
+      'Filename-derived editor reset canceled', {
+        videoCount: count,
+        returnedPatchCount: result.response === 1 ? patches.length : 0
+      });
+    event.sender.send(requestedResponseChannel, {
+      confirmed: result.response === 1,
+      patches: result.response === 1 ? patches.map(({id, changes}) => ({id, changes})) : []
+    });
+  }).catch(err => {
+    backendLog.error('Could not display filename reset confirmation', {
+      error: err && err.stack ? err.stack : String(err)
+    });
+    event.sender.send(requestedResponseChannel, {
+      confirmed: false,
+      error: err && err.message ? err.message : String(err)
+    });
+  });
 })
 
 ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {

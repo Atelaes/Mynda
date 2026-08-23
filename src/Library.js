@@ -1,11 +1,19 @@
 
 const electron = require('electron');
 const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const _ = require('lodash');
 const { ipcRenderer } = require('electron');
 const { trackManualSubtitleEdit } = require('./SubtitleMatcher.js');
+
+// LibraryPersistence owns file validation, atomic writes, automatic snapshots,
+// retention, and preservation of damaged bytes. Keeping those mechanics out of
+// this class lets a future manual-backup UI reuse them without duplicating the
+// main library's save logic.
+const LibraryPersistence = require('./LibraryPersistence.js');
+const Logger = require('./Logger.js');
+
+const libraryLog = Logger.child('Library');
 
 class Library {
   constructor() {
@@ -32,11 +40,49 @@ class Library {
       ipcRenderer.send('lib-beacon');
     }
 
+    // Both Electron processes construct a Library instance. They resolve the
+    // same user-data paths here, while the existing IPC queue keeps their
+    // in-memory copies synchronized after either side initiates an edit.
     this.dataPath = (electron.app || electron.remote.app).getPath('userData');
-    this.path = path.join(this.dataPath, "Library", "library.json");
+    this.libraryDirectory = path.join(this.dataPath, 'Library');
+    this.path = path.join(this.libraryDirectory, 'library.json');
+    this.artworkDirectory = path.join(this.libraryDirectory, 'Artwork');
 
-    // Load library
-    const data = this.load();
+    // Automatic restore points and preserved damaged originals are deliberately
+    // separated. Retention manages Backups; it must never prune Recovery files.
+    this.backupDirectory = path.join(this.libraryDirectory, 'Backups');
+    this.recoveryDirectory = path.join(this.libraryDirectory, 'Recovery');
+
+    // loadIssue remains null during an ordinary startup. load() populates it
+    // only when the primary exists but cannot safely be used, which blocks all
+    // normal primary saves until index.js resolves the startup dialog.
+    this.loadIssue = null;
+
+    // Each process caches the last snapshot it created. The due-check refreshes
+    // from disk once this cache ages out, accounting for backups made by the
+    // other Electron process.
+    this.lastAutomaticBackupDate = null;
+    LibraryPersistence.ensureDirectory(this.libraryDirectory);
+    LibraryPersistence.ensureDirectory(this.artworkDirectory);
+
+    // On a healthy startup this is the primary library. During recovery it is
+    // the newest validated backup loaded provisionally, or a provisional empty
+    // default when no backup exists. No application window opens until the user
+    // accepts or declines that recovery choice in index.js.
+    this.applyLibraryData(this.load());
+
+    this.Queue = [];
+    this.arrayCleanupHistory = {};
+    this.waitConfirm = null;
+    this.idleWaiters = [];
+    // this.lastUpdate = Date.now();
+  }
+
+  // Normalize data from every entry path: ordinary primary load, automatic
+  // backup recovery, and explicit empty-library creation. Centralizing this
+  // prevents recovered older libraries from bypassing current migrations and
+  // default-field repair.
+  applyLibraryData(data) {
     Object.keys(defaultLibrary).map((key) => {
       this[key] = typeof data[key] === 'undefined' ? _.cloneDeep(defaultLibrary[key]) : data[key];
     });
@@ -70,11 +116,37 @@ class Library {
     } catch (err) {
       this.settings.preferences.override_dialogs = _.cloneDeep(defaultLibrary.settings.preferences.override_dialogs);
     }
+  }
 
-    this.Queue = [];
-    this.arrayCleanupHistory = {};
-    this.waitConfirm = null;
-    // this.lastUpdate = Date.now();
+  // Prepare a full-video replacement that originated in the renderer's editor.
+  // This is needed for both ordinary one-video saves and replaceMediaBatch().
+  // A scan may have refreshed the video's subtitle state after the editor was
+  // opened, so unrelated metadata edits must not overwrite that newer state.
+  // When subtitles really were edited, record the user's additions/removals so
+  // later scans know which detected files should stay ignored or manually kept.
+  prepareRendererVideoReplacement(oldVideo, replacement) {
+    const subtitlesWereEdited = replacement.__mynda_subtitles_edited === true;
+    delete replacement.__mynda_subtitles_edited;
+
+    if (oldVideo && subtitlesWereEdited) {
+      return trackManualSubtitleEdit(oldVideo, replacement);
+    }
+    if (oldVideo) {
+      replacement.subtitles = _.cloneDeep(oldVideo.subtitles || []);
+      for (const property of [
+        'detected_subtitles',
+        'manual_subtitles',
+        'ignored_subtitles',
+        'subtitle_tracking_initialized'
+      ]) {
+        if (Object.prototype.hasOwnProperty.call(oldVideo, property)) {
+          replacement[property] = _.cloneDeep(oldVideo[property]);
+        } else {
+          delete replacement[property];
+        }
+      }
+    }
+    return replacement;
   }
 
   // Master changing function used by add, replace, and remove.
@@ -86,6 +158,53 @@ class Library {
     //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     //let startTime = new Date();
     try {
+      // A large editor batch arrives as a list of complete replacement videos,
+      // not as a prebuilt media array. Resolve it only when this operation
+      // reaches the front of the Library queue: earlier queued changes may have
+      // altered media in the meantime, and building the array sooner could
+      // accidentally overwrite them with stale data.
+      //
+      // Once prepared, turn the batch into one ordinary replacement of media.
+      // The existing save/sync machinery below will therefore perform one
+      // atomic library write and one renderer-to-backend IPC round trip.
+      if (opType === 'replace-media-batch') {
+        if (!Array.isArray(entry)) {
+          throw 'A media batch replacement requires an array of videos.';
+        }
+
+        let updatedMedia = this.media.slice();
+        let seenIDs = new Set();
+        for (const suppliedVideo of entry) {
+          if (!suppliedVideo || typeof suppliedVideo !== 'object' || !suppliedVideo.id) {
+            throw 'Every media batch replacement requires a video with an id.';
+          }
+          if (seenIDs.has(suppliedVideo.id)) {
+            throw `The media batch contains duplicate video id ${suppliedVideo.id}.`;
+          }
+          seenIDs.add(suppliedVideo.id);
+
+          const mediaIndex = updatedMedia.findIndex(video =>
+            video && video.id === suppliedVideo.id
+          );
+          if (mediaIndex < 0) {
+            throw `Unable to find video ${suppliedVideo.id} for batch replacement.`;
+          }
+
+          let replacement = _.cloneDeep(suppliedVideo);
+          if (this.env === 'browser' && !sync) {
+            replacement = this.prepareRendererVideoReplacement(
+              updatedMedia[mediaIndex],
+              replacement
+            );
+          }
+          updatedMedia[mediaIndex] = replacement;
+        }
+
+        opType = 'replace';
+        address = 'media';
+        entry = updatedMedia;
+      }
+
       //Start with some basic validation
       if (!['add', 'replace', 'remove'].includes(opType)) {
         throw 'Unrecognized operation type.';
@@ -100,8 +219,6 @@ class Library {
       // backend so later scans can preserve the user's choices.
       if (this.env === 'browser' && !sync && opType === 'replace' &&
         /^media\.[^.]+$/.test(address) && entry && typeof entry === 'object') {
-        const subtitlesWereEdited = entry.__mynda_subtitles_edited === true;
-        delete entry.__mynda_subtitles_edited;
         const selector = address.slice('media.'.length);
         let oldVideo = null;
         if (Number.isInteger(Number(selector))) {
@@ -114,26 +231,7 @@ class Library {
             video && typeof video[property] !== 'undefined' && video[property] === value
           );
         }
-        if (oldVideo && subtitlesWereEdited) {
-          entry = trackManualSubtitleEdit(oldVideo, entry);
-        } else if (oldVideo) {
-          // Full-video saves are also used for unrelated edits and playback
-          // state. Preserve the newest subtitle state instead of allowing a
-          // stale renderer clone to overwrite a concurrent scan update.
-          entry.subtitles = _.cloneDeep(oldVideo.subtitles || []);
-          for (const property of [
-            'detected_subtitles',
-            'manual_subtitles',
-            'ignored_subtitles',
-            'subtitle_tracking_initialized'
-          ]) {
-            if (Object.prototype.hasOwnProperty.call(oldVideo, property)) {
-              entry[property] = _.cloneDeep(oldVideo[property]);
-            } else {
-              delete entry[property];
-            }
-          }
-        }
+        entry = this.prepareRendererVideoReplacement(oldVideo, entry);
       }
 
       //Get one step away from the location specified by address
@@ -317,6 +415,22 @@ class Library {
     this.addToQueue({ opType: 'replace', address: address, entry: replacement, sync: false, origin: null, cb: cb });
   }
 
+  // Replace many editor videos as one queued operation. alter() deliberately
+  // receives the individual videos rather than a whole array assembled here,
+  // so it can merge them into the freshest media state when the queue reaches
+  // this job. The final operation still uses the normal atomic save, IPC sync,
+  // confirmation, callback, and savedPing behavior of replace('media', ...).
+  replaceMediaBatch(replacements, cb) {
+    this.addToQueue({
+      opType: 'replace-media-batch',
+      address: 'media',
+      entry: replacements,
+      sync: false,
+      origin: null,
+      cb: cb
+    });
+  }
+
   // Takes a string address in dot format, and removes whatever is there.
   remove(address, cb) {
     this.addToQueue({ opType: 'remove', address: address, entry: null, sync: false, origin: null, cb: cb });
@@ -330,6 +444,25 @@ class Library {
       //console.log('Nothing in pipeline, performing operation now...')
       this.alter(argObj);
     }
+  }
+
+  // A local Library callback means that process has saved and sent its IPC
+  // mirror operation; it does not mean the other Electron process has applied
+  // it yet. Long-running workflows such as Auto-Tag need this stronger barrier
+  // before announcing completion, otherwise the user can begin a conflicting
+  // edit while an older full-library synchronization is still in flight.
+  whenIdle() {
+    if (!this.waitConfirm && this.Queue.length === 0) {
+      return Promise.resolve();
+    }
+    return new Promise(resolve => this.idleWaiters.push(resolve));
+  }
+
+  resolveIdleWaiters() {
+    if (this.waitConfirm || this.Queue.length > 0) return;
+
+    const waiters = this.idleWaiters.splice(0);
+    waiters.forEach(resolve => resolve());
   }
 
   // Takes an operation type, a string address in dot format, and optionally an item.
@@ -387,44 +520,239 @@ class Library {
       console.log(`Next item: ${nextOp.opType} ${nextOp.address}`);
       this.alter(nextOp);
     }
+
+    // alter(nextOp) sets waitConfirm again when it starts another outbound
+    // synchronization. Only the confirmation for the final queued operation
+    // reaches this point with both waitConfirm and Queue empty.
+    this.resolveIdleWaiters();
   }
 
-  //Loads all data into an object and saves that object to file location.
-  //Takes an optional location to save, otherwise saves to appData.
-  save(loc = this.path) {
+  // Build the serializable portion of the Library instance. IPC state, queues,
+  // paths, and recovery bookkeeping are class internals and must not leak into
+  // library.json or a manual library copy.
+  getSaveObject() {
+    let saveObj = {};
+    Object.keys(defaultLibrary).map((key) => { saveObj[key] = this[key] });
+    return saveObj;
+  }
+
+  // index.js asks for this after Electron becomes ready. Returning a clone lets
+  // the recovery UI inspect paths and error details without mutating the state
+  // that guards primary saves.
+  getLoadIssue() {
+    if (!this.loadIssue) return null;
+    return _.cloneDeep(this.loadIssue);
+  }
+
+  // Called at startup and before ordinary primary saves. Most invocations exit
+  // immediately because the last automatic snapshot is less than an hour old.
+  // When due, this captures the currently committed primary—the restore point
+  // immediately before the upcoming edit—and then applies tiered retention.
+  maybeCreateAutomaticBackup(now = new Date()) {
+    // A malformed primary must never become a restore point. While loadIssue is
+    // unresolved, the only legal writes are the explicit recovery methods.
+    if (this.loadIssue) return null;
+    if (!LibraryPersistence.automaticBackupIsDue(
+      this.backupDirectory,
+      now,
+      this.lastAutomaticBackupDate
+    )) {
+      return null;
+    }
+
     try {
-      let saveObj = {};
-      Object.keys(defaultLibrary).map((key) => { saveObj[key] = this[key] });
-      // console.log(`\n==== SAVING ====\n\n\n${JSON.stringify(saveObj)}\n\n\n`);
-      fs.writeFileSync(loc, JSON.stringify(saveObj));
-    } catch (e) {
-      console.log("Error writing to file: " + e.toString());
+      const backup = LibraryPersistence.createAutomaticBackup(
+        this.path,
+        this.backupDirectory,
+        now
+      );
+      this.lastAutomaticBackupDate = backup.date;
+      libraryLog.info('Automatic library backup created', {
+        backupPath: backup.path,
+        retainedBackups: backup.retainedCount,
+        prunedBackups: backup.removedCount
+      });
+      return backup;
+    } catch(err) {
+      // Atomic primary saving can still proceed if an automatic snapshot fails.
+      // Report the failure prominently so the user does not unknowingly remain
+      // without the intended backup protection.
+      libraryLog.error('Could not create automatic library backup', {
+        libraryPath: this.path,
+        backupDirectory: this.backupDirectory,
+        error: err && err.stack ? err.stack : String(err)
+      });
+      return null;
     }
   }
 
-  //Loads all data from save file to object.
-  load() {
-    // We'll try/catch it in case the file doesn't exist yet, which will be the case on the first application run.
-    // `fs.readFileSync` will return a JSON string which we then parse into a Javascript object
+  // Save either the live library or a standalone copy. Both paths use the same
+  // validated atomic writer, which is also the foundation for a future manual
+  // "Back Up Library" command.
+  save(loc = this.path, options = {}) {
+    const isPrimarySave = path.resolve(loc) === path.resolve(this.path);
+
+    // This guard is reached if some ordinary edit or scan attempts to save
+    // before the startup recovery dialog has resolved. Refusing the operation
+    // is safer than silently replacing the user's unreadable evidence file.
+    if (isPrimarySave && this.loadIssue && !options.recoveryWrite) {
+      throw new Error('Refusing to overwrite an unreadable library before recovery is resolved.');
+    }
+
+    // Automatic snapshots belong only to the live primary. Exports, future
+    // manual backups, and recovery commits use the same atomic writer without
+    // entering automatic retention.
+    if (isPrimarySave && options.automaticBackup !== false) {
+      this.maybeCreateAutomaticBackup();
+    }
+
     try {
-      return JSON.parse(fs.readFileSync(this.path));
-    } catch (error) {
-      // if there was some kind of error, return the passed in defaults instead.
-      console.log("No library found, creating default empty library");
-      try {
-        let libDir = path.join(this.dataPath, "Library");
-        let artDir = path.join(libDir, "Artwork");
-        if (!fs.existsSync(libDir)) {
-          fs.mkdirSync(libDir);
-          fs.mkdirSync(artDir);
-        }
-        fs.writeFileSync(this.path, JSON.stringify(defaultLibrary));
-      } catch (e) {
-        console.log("Error writing to file: " + e.toString());
+      // writeLibraryFile validates the object, writes a flushed sibling temp
+      // file, and atomically renames it over the destination.
+      LibraryPersistence.writeLibraryFile(loc, this.getSaveObject());
+      return loc;
+    } catch(err) {
+      libraryLog.error('Could not save library file', {
+        libraryPath: loc,
+        error: err && err.stack ? err.stack : String(err)
+      });
+      throw err;
+    }
+  }
+
+  // Reserved for the later user-initiated backup feature. The caller supplies
+  // a path chosen by the user; the resulting file is validated and atomic but
+  // is not placed in, or pruned by, the automatic Backups directory.
+  saveCopy(loc) {
+    return this.save(loc, {automaticBackup: false});
+  }
+
+  // Used immediately before either recovery action replaces library.json. The
+  // original bytes go to Recovery even if they are not parseable JSON.
+  preserveUnreadableLibrary() {
+    return LibraryPersistence.preserveDamagedLibrary(
+      this.path,
+      this.recoveryDirectory
+    );
+  }
+
+  // Reached when startup found a valid automatic backup and the user clicked
+  // "Restore Backup." load() already placed that backup into memory and
+  // applyLibraryData() already ran current migrations, so this method preserves
+  // the damaged primary and atomically commits the prepared in-memory library.
+  restoreLatestAutomaticBackup() {
+    if (!this.loadIssue || !this.loadIssue.latestBackupPath) {
+      throw new Error('No validated automatic library backup is available to restore.');
+    }
+
+    // Preserve first. If preservation itself fails, the unreadable primary is
+    // left untouched and the caller reports that recovery could not proceed.
+    const issue = this.loadIssue;
+    const preservedPath = this.preserveUnreadableLibrary();
+    this.loadIssue = null;
+    try {
+      // applyLibraryData() already migrated the validated backup loaded during
+      // construction, so save that current in-memory form as the new primary.
+      this.save(this.path, {automaticBackup: false, recoveryWrite: true});
+    } catch(err) {
+      // Reinstate the guard so no later code can mistake this failed recovery
+      // attempt for a healthy, writable library.
+      this.loadIssue = issue;
+      throw err;
+    }
+
+    return {
+      restoredBackupPath: issue.latestBackupPath,
+      restoredBackupDate: issue.latestBackupDate,
+      preservedLibraryPath: preservedPath
+    };
+  }
+
+  // Reached only when no valid automatic backup exists and the user explicitly
+  // chooses "Create Empty Library." This is never the default action. The
+  // damaged source is preserved before defaults replace the provisional state.
+  createEmptyLibraryAfterLoadFailure() {
+    if (!this.loadIssue) {
+      throw new Error('The library does not have an unresolved load failure.');
+    }
+
+    const issue = this.loadIssue;
+    const preservedPath = this.preserveUnreadableLibrary();
+    this.applyLibraryData(_.cloneDeep(defaultLibrary));
+    this.loadIssue = null;
+    try {
+      this.save(this.path, {automaticBackup: false, recoveryWrite: true});
+    } catch(err) {
+      // As above, a failed atomic commit restores the unresolved-failure flag;
+      // index.js will alert the user and quit rather than opening the app.
+      this.loadIssue = issue;
+      throw err;
+    }
+    return {preservedLibraryPath: preservedPath};
+  }
+
+  // Load failures never overwrite library.json. If possible, use the newest
+  // validated automatic backup provisionally; index.js asks the user whether
+  // to commit that recovery before creating the application window.
+  load() {
+    try {
+      // The overwhelmingly common path: parse and structurally validate the
+      // live primary before exposing any of its contents to the application.
+      return LibraryPersistence.readLibraryFile(this.path).data;
+    } catch(error) {
+      // ENOENT is expected on the very first launch. It is not corruption, so
+      // create a validated empty primary without presenting a recovery dialog.
+      if (error && error.code === 'ENOENT') {
+        const newLibrary = _.cloneDeep(defaultLibrary);
+        LibraryPersistence.writeLibraryFile(this.path, newLibrary);
+        console.log('No library found; created a default empty library.');
+        return newLibrary;
       }
 
+      // Any other read/parse/validation failure is treated as a recovery event.
+      // Search newest-first for a valid automatic snapshot, but do not alter
+      // the primary merely because a candidate was found.
+      let backupSearch = {
+        backup: null,
+        candidateCount: 0,
+        invalidNewerCount: 0
+      };
+      let backupSearchError = '';
+      try {
+        backupSearch = LibraryPersistence.findLatestValidAutomaticBackup(this.backupDirectory);
+      } catch(backupError) {
+        backupSearchError = backupError && backupError.message ? backupError.message : String(backupError);
+      }
 
-      return defaultLibrary;
+      const backup = backupSearch.backup;
+
+      // Store only compact UI/logging metadata here. The selected backup's data
+      // is returned below and becomes ordinary in-memory Library fields.
+      this.loadIssue = {
+        type: error && error.code === 'INVALID_LIBRARY' ? 'malformed' : 'unreadable',
+        libraryPath: this.path,
+        errorCode: error && error.code ? error.code : '',
+        errorMessage: error && error.message ? error.message : String(error),
+        latestBackupPath: backup ? backup.path : '',
+        latestBackupDate: backup ? backup.date.toISOString() : '',
+        backupCandidateCount: backupSearch.candidateCount,
+        invalidNewerBackups: backupSearch.invalidNewerCount,
+        backupSearchError: backupSearchError
+      };
+
+      console.error(`Could not load ${this.path}: ${this.loadIssue.errorMessage}`);
+      if (backup) {
+        // "Provisionally" is important: index.js still asks the user before the
+        // damaged primary is preserved and replaced on disk.
+        console.log(`Provisionally loaded automatic backup ${backup.path}.`);
+        return _.cloneDeep(backup.data);
+      }
+
+      // With no usable backup, defaults exist in memory only so construction can
+      // finish. Primary saving remains blocked until the user explicitly opts
+      // to create an empty library; choosing Quit leaves library.json untouched.
+      console.error('No valid automatic library backup was available.');
+      return _.cloneDeep(defaultLibrary);
     }
   }
 }

@@ -74,6 +74,14 @@ input[type=text]::placeholder {
   /* opacity: var(--textinput-text-placeholder-opacity); */
 }
 
+/* Native placeholders make pending batch resets visible in empty text fields.
+   Select elements have no placeholder attribute, so their temporary disabled
+   "Reset" option uses the same subdued color explicitly. */
+#editor-pane textarea::placeholder,
+#editor-pane select.pending-reset {
+  color: var(--textinput-text-placeholder);
+}
+
 /* when an input field is empty, optionally display an icon on the right side of it */
 /* in order to display an icon, override the 'background' property with an image */
 /* this is simply an empty div; we must populate it with an icon using the background property */
@@ -641,6 +649,7 @@ table.compact .movie-row {
 
 .series-header {
   display: block;
+  position: relative;
   background-color: var(--seriesheader-bg);
   color: var(--seriesheader-text);
   margin: var(--seriesheader-margin);
@@ -651,6 +660,36 @@ table.compact .movie-row {
   font-weight: var(--seriesheader-font-weight);
   font-family: var(--seriesheader-font);
   font-style: var(--seriesheader-font-style);
+}
+
+.series-header-title {
+  display: block;
+  overflow: hidden;
+  padding-right: 4em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Keep the series-wide batch action out of the way until the user points at
+   its header. :focus also exposes it for keyboard navigation. Absolute
+   positioning prevents the button from moving or resizing the series name. */
+.series-edit-button {
+  position: absolute;
+  right: .5em;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  font-size: .65em;
+  line-height: 1.2;
+  text-transform: none;
+  transition: opacity .12s ease-in-out;
+}
+
+.series-header:hover .series-edit-button,
+.series-edit-button:focus {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .series h1.series-header:hover {

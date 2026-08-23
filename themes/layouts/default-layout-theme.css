@@ -309,7 +309,11 @@
   grid-row: 17;
   grid-column: 4 / span 2;
 }
-
+.edit-field.filename-reset-btn
+{
+  grid-row: 18;
+  grid-column: 4 / span 2;
+}
 
 #settings-preferences .sections-container {
   display:grid;

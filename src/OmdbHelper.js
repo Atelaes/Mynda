@@ -194,6 +194,26 @@ async function performSearch(video, context, options) {
           //If not, then we have a single entry with full info
           //Format the new info, merge it into the given video object, and return.
           let omdbData = response.data;
+
+          // A user editing a show may paste the IMDb ID for the series rather
+          // than the individual episode. The generic ID request is the safest
+          // first step because it tells us which kind of ID was supplied. If
+          // OMDb identifies it as a series, combine that authoritative series
+          // ID with Mynda's existing season and episode fields and continue
+          // through the normal episode workflow. An actual episode ID retains
+          // the established exact-ID behavior below.
+          if (video && video.kind === 'show' && omdbData.Type === 'series') {
+            log.info('IMDb ID identified a series for a show episode; continuing with episode lookup', {
+              searchID: context.searchID,
+              suppliedImdbID: video.imdbID,
+              seriesImdbID: omdbData.imdbID,
+              seriesTitle: omdbData.Title,
+              season: video.season,
+              episode: video.episode
+            });
+            return searchShowEpisode(video, context, omdbData.imdbID);
+          }
+
           video = addTagsToVideo(_.cloneDeep(video), omdbData, context);
           video.artwork = await downloadArtworkWithSeriesFallback(
             omdbData,
@@ -576,6 +596,58 @@ function extractSeriesSearchParts(series) {
   return {title: title, year: year};
 }
 
+// Looks for a premiere year or year range in the folder that supplied the
+// video's series name. findSeasonEpisode() deliberately cleans release details
+// out of the stored series value, so a folder such as
+// "Kung Fu 1972-1975 (complete original TV series...)" becomes simply
+// "Kung Fu" in the library. The discarded first year is still valuable when
+// OMDb contains an original series and a same-name remake.
+//
+// This does not grab an arbitrary year from the path. The text before the year
+// must normalize to exactly the stored series title. Thus a parent named
+// "Archive 1972-1975" or a season folder containing an episode air year cannot
+// influence the series search.
+function extractSeriesFolderYear(filename, seriesTitle) {
+  let expectedTitle = comparableSeriesTitle(seriesTitle);
+  if (!expectedTitle || typeof filename !== 'string' || !filename.trim()) {
+    return null;
+  }
+
+  // Split on both separators so this works with libraries created on either
+  // macOS or Windows, regardless of the OS currently running Mynda.
+  let folders = filename.split(/[\\/]+/).slice(0, -1).reverse();
+  for (let folder of folders) {
+    let yearMatch = folder.match(
+      /(?:^|[\s.(\[_-])((?:19|20)\d{2})(?:\s*[-–—]\s*(?:19|20)\d{2})?(?=$|[\s.)\]_-])/
+    );
+    if (!yearMatch) {
+      continue;
+    }
+
+    let titleBeforeYear = folder.slice(0, yearMatch.index).trim();
+    if (comparableSeriesTitle(titleBeforeYear) === expectedTitle) {
+      return yearMatch[1];
+    }
+  }
+  return null;
+}
+
+// Combines an explicit year written in the editable series field with the
+// conservative folder hint above. The explicit value wins. video.year is not
+// used because it describes one episode's air year, not the series premiere.
+function seriesSearchPartsForVideo(video) {
+  let series = video && typeof video.series === 'string' ? video.series.trim() : '';
+  let searchParts = extractSeriesSearchParts(series);
+  searchParts.yearSource = searchParts.year ? 'series field' : null;
+  if (!searchParts.year) {
+    searchParts.year = extractSeriesFolderYear(video && video.filename, searchParts.title);
+    if (searchParts.year) {
+      searchParts.yearSource = 'series folder';
+    }
+  }
+  return searchParts;
+}
+
 // Returns narrowly targeted query alternatives for titles whose only likely
 // catalog spelling difference is the conjunction: "Law and Order" becomes
 // "Law & Order", and "Me & You" becomes "Me and You". Whole-word matching
@@ -597,6 +669,25 @@ function andAmpersandTitleAlternates(title) {
     addAlternative(original.replace(/\s*&\s*/g, ' and '));
   }
   return alternatives;
+}
+
+// Returns the part of a series name before a final standalone uppercase
+// acronym. This is a discovery aid for names such as "Law and Order SVU":
+// OMDb may find nothing for the abbreviation even though a broader search for
+// "Law and Order" returns "Law & Order: Special Victims Unit". Lowercase
+// words, punctuation-bound suffixes, acronyms longer than six characters, and
+// acronym-only names are deliberately excluded so ordinary titles are never
+// shortened by this fallback.
+function terminalAcronymSearchPrefix(title) {
+  let original = String(title || '').trim();
+  let match = original.match(/^(.+?)\s+([A-Z0-9]{2,6})$/);
+  if (!match || !/[A-Z]/.test(match[2])) {
+    return null;
+  }
+  return {
+    title: match[1].trim(),
+    acronym: match[2]
+  };
 }
 
 function comparableCatalogTitle(title) {
@@ -739,13 +830,31 @@ function seriesTitlesMatch(requestedTitle, resultTitle, allowContainedTitle) {
 }
 
 // Produces a deliberately strict comparison key for episode titles. It ignores
-// punctuation and a few display-only conventions, including "Chapter 4: Title"
-// and equivalent part suffixes such as "(1)" versus "Part I". Unlike series
-// matching, it does not use substring or edit-distance matching: an adjacent
-// episode number is accepted only when the titles clearly agree.
+// punctuation and a few display-only conventions, including "Chapter 4: Title",
+// "Chapter Four 'Title'", and equivalent part suffixes such as "(1)" versus
+// "Part I". Unlike series matching, it does not use substring or edit-distance
+// matching: a nearby episode number is accepted only when the titles clearly
+// agree.
 function comparableEpisodeTitle(title) {
   let normalized = String(title || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-  normalized = normalized.replace(/^\s*(?:episode|chapter)\s+\d{1,3}\s*[:\-–—]\s*/i, '');
+
+  // Some shows use an editorial chapter wrapper around the real episode title.
+  // Heroes, for example, is returned by OMDb as "Chapter One 'Genesis'" even
+  // when the release filename contains only "Genesis". Treat the wrapper as
+  // presentation text, but require a numeric/number-word chapter and either a
+  // clear separator or balanced-looking quotation marks. This remains much
+  // stricter than accepting an arbitrary substring of an episode title.
+  const smallNumber = '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)';
+  const tensNumber = '(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\\s-]+(?:one|two|three|four|five|six|seven|eight|nine))?';
+  const chapterNumber = `(?:\\d{1,3}|${smallNumber}|${tensNumber})`;
+  normalized = normalized.replace(
+    new RegExp(`^\\s*(?:episode|chapter)\\s+${chapterNumber}\\s+['\"“‘](.+)['\"”’]\\s*$`, 'i'),
+    '$1'
+  );
+  normalized = normalized.replace(
+    new RegExp(`^\\s*(?:episode|chapter)\\s+${chapterNumber}\\s*[:\\-–—]\\s*`, 'i'),
+    ''
+  );
 
   const partNumbers = {
     one: 1, two: 2, three: 3, four: 4, five: 5,
@@ -776,16 +885,54 @@ function comparableEpisodeTitle(title) {
   return normalized.replace(/[^a-z0-9]+/g, '');
 }
 
+// Older releases sometimes leave presentation/source flags at the end of the
+// title extracted from their filename. For example, the ER files in the user's
+// library produce titles such as "Day One FS", "Chicago Heat WS", and
+// "Another Perfect Day FS DVD-SFM". These are not alternate episode titles:
+// FS and WS mean fullscreen and widescreen, while the following tokens describe
+// the audio, disc/source, encoder, or codec.
+//
+// Keep this deliberately narrower than the general filename parser. A suffix is
+// removable only when it starts with the standalone FS or WS release flag, and
+// every later token is also recognized technical metadata. Unknown trailing
+// words are preserved, so "Day One fan edit" cannot become a match for OMDb's
+// "Day One" merely because the beginning happens to agree.
+function stripTrailingEpisodeReleaseFlags(title) {
+  let original = String(title || '').trim();
+  let stripped = original.replace(
+    /[\s._-]+(?:fs|ws)(?:[\s._-]+(?:ac-?3|eac-?3|aac|dvd(?:rip)?|sfm|smis|xvid|x26[45]|h26[45]|hevc))*\s*$/i,
+    ''
+  ).trim();
+
+  // Never turn a title made entirely from release flags into an empty match.
+  return stripped ? stripped : original;
+}
+
 function episodeTitlesMatch(localTitle, omdbTitle) {
   let local = comparableEpisodeTitle(localTitle);
   let omdb = comparableEpisodeTitle(omdbTitle);
-  return Boolean(local && omdb && local === omdb);
+  if (!local || !omdb) {
+    return false;
+  }
+  if (local === omdb) {
+    return true;
+  }
+
+  // Only the local filename-derived title can contain release flags. After
+  // removing a recognized trailing run, still require exact normalized title
+  // equality. The four-character minimum retains useful short titles such as
+  // ER's "Home FS" while rejecting very weak one- or two-letter evidence.
+  let localWithoutReleaseFlags = comparableEpisodeTitle(
+    stripTrailingEpisodeReleaseFlags(localTitle)
+  );
+  return localWithoutReleaseFlags.length >= 4 &&
+    localWithoutReleaseFlags !== local && localWithoutReleaseFlags === omdb;
 }
 
 // findEpisodeTitle() leaves the complete basename in video.title when it could
 // not confidently extract a real episode title. Only a title that differs from
 // that fallback, and contains enough information to be useful, may correct an
-// adjacent OMDb episode number.
+// nearby OMDb episode number.
 function localEpisodeTitleForVerification(video) {
   let title = video && typeof video.title === 'string' ? video.title.trim() : '';
   let filename = video && typeof video.filename === 'string' ? video.filename : '';
@@ -858,10 +1005,12 @@ function ambiguousSeriesFailure(series, candidates) {
 }
 
 // When two series have the same exact title, test the requested episode against
-// each series ID. A single matching episode safely resolves remakes without
-// trusting OMDb result order. If zero or several candidates match, ambiguity is
-// preserved for the caller rather than guessed away.
-async function disambiguateSeriesByEpisode(candidates, season, episode, context) {
+// each series ID. If Mynda has a clean filename-derived episode title, require
+// that title to agree as well. This matters when both an original and a remake
+// have the same S/E number, and it prevents the only series with a returned
+// episode from winning when its title clearly describes different content.
+// Without a usable local title, retain the older existence-only fallback.
+async function disambiguateSeriesByEpisode(candidates, season, episode, localTitle, context) {
   let episodeMatches = [];
   for (let candidate of candidates) {
     let response = await pollOMDB(createURLParts({
@@ -874,7 +1023,11 @@ async function disambiguateSeriesByEpisode(candidates, season, episode, context)
     });
     let failure = requestFailure(response);
     if (!failure && episodeResponseMatches(response.data, candidate.imdbID, season, episode)) {
-      episodeMatches.push({candidate: candidate, episodeData: response.data});
+      episodeMatches.push({
+        candidate: candidate,
+        episodeData: response.data,
+        titleMatches: localTitle ? episodeTitlesMatch(localTitle, response.data.Title) : null
+      });
     } else if (failure && failure.failure !== 'No results') {
       return {success: false, requestFailure: failure};
     }
@@ -884,24 +1037,37 @@ async function disambiguateSeriesByEpisode(candidates, season, episode, context)
     searchID: context.searchID,
     season: season,
     episode: episode,
+    localTitle: localTitle,
     matchingCandidates: episodeMatches.map(match => ({
       title: match.candidate.Title,
       year: match.candidate.Year,
-      imdbID: match.candidate.imdbID
+      imdbID: match.candidate.imdbID,
+      episodeTitle: match.episodeData.Title,
+      episodeTitleMatches: match.titleMatches
     }))
   });
 
-  if (episodeMatches.length === 1) {
+  // A title extracted independently from the filename is stronger evidence
+  // than episode existence. Kung Fu S1E6 exposed why: OMDb temporarily returned
+  // no episode for the 1972 series and "Rage" for the 2021 series, while the
+  // local title was "The Soul Is the Warrior". Existence alone selected and
+  // cached the remake; a clear title disagreement must instead stay ambiguous.
+  let decisiveMatches = localTitle ?
+    episodeMatches.filter(match => match.titleMatches) : episodeMatches;
+  if (decisiveMatches.length === 1) {
     return {
       success: true,
-      candidate: episodeMatches[0].candidate,
-      episodeData: episodeMatches[0].episodeData
+      candidate: decisiveMatches[0].candidate,
+      episodeData: decisiveMatches[0].episodeData
     };
   }
   return {
     success: false,
-    candidates: episodeMatches.length > 1 ?
-      episodeMatches.map(match => match.candidate) : candidates
+    // If more than one title agrees, narrow the choices to those matches. If
+    // no title agrees, keep every original candidate available for a manual
+    // decision—including one whose episode endpoint may simply be incomplete.
+    candidates: decisiveMatches.length > 1 ?
+      decisiveMatches.map(match => match.candidate) : candidates
   };
 }
 
@@ -910,13 +1076,16 @@ async function disambiguateSeriesByEpisode(candidates, season, episode, context)
 // guess when several candidates match, and uses OMDb's single-title endpoint as
 // a carefully validated fallback. Expected failures and API errors are returned
 // in the same result format as search().
-async function resolveSeries(series, season, episode, context) {
-  let searchParts = extractSeriesSearchParts(series);
+async function resolveSeries(video, season, episode, localTitle, context) {
+  let series = typeof video.series === 'string' ? video.series.trim() : '';
+  let searchParts = seriesSearchPartsForVideo(video);
   log.info('Resolving series for episode lookup', {
     searchID: context.searchID,
     storedSeries: series,
     queryTitle: searchParts.title,
-    queryYear: searchParts.year
+    queryYear: searchParts.year,
+    queryYearSource: searchParts.yearSource,
+    localEpisodeTitle: localTitle
   });
   if (!searchParts.title) {
     return predictableFailure('Not enough data', 'Series is empty');
@@ -939,18 +1108,53 @@ async function resolveSeries(series, season, episode, context) {
     // (for example, an original and a remake) are visible instead of silently
     // accepting whichever one OMDb considers most popular. OMDb's search is
     // sensitive to "and" versus "&", so try that exact alternative before a
-    // merely fuzzy result is trusted.
-    let queryTitles = [searchParts.title].concat(andAmpersandTitleAlternates(searchParts.title));
+    // merely fuzzy result is trusted. If both full-title forms fail and the
+    // stored title ends in an uppercase acronym, a later query may omit only
+    // that acronym to make OMDb surface possible expanded titles. Those wider
+    // results still have to exactly match the complete original title or pass
+    // seriesAcronymMatches(), so this changes discovery but not acceptance.
+    let exactQueryTitles = [searchParts.title].concat(
+      andAmpersandTitleAlternates(searchParts.title)
+    );
+    let seriesQueries = exactQueryTitles.map(title => ({
+      title: title,
+      terminalAcronym: null
+    }));
+    let acronymPrefix = terminalAcronymSearchPrefix(searchParts.title);
+    if (acronymPrefix) {
+      let prefixTitles = [acronymPrefix.title].concat(
+        andAmpersandTitleAlternates(acronymPrefix.title)
+      );
+      for (let prefixTitle of prefixTitles) {
+        if (!seriesQueries.some(query => query.title === prefixTitle)) {
+          seriesQueries.push({
+            title: prefixTitle,
+            terminalAcronym: acronymPrefix.acronym
+          });
+        }
+      }
+    }
     let matchRanks = {fuzzy: 1, acronym: 2, exact: 3};
     let bestMatches = {matchStrength: 'fuzzy', candidates: []};
-    for (let queryIndex=0; queryIndex<queryTitles.length; queryIndex++) {
-      let queryTitle = queryTitles[queryIndex];
+    for (let queryIndex=0; queryIndex<seriesQueries.length; queryIndex++) {
+      let query = seriesQueries[queryIndex];
+      let queryTitle = query.title;
       if (queryIndex > 0) {
-        log.info('Retrying series search with an and/ampersand title alternative', {
-          searchID: context.searchID,
-          previousTitle: queryTitles[queryIndex-1],
-          nextTitle: queryTitle
-        });
+        if (query.terminalAcronym) {
+          log.info('Retrying series search without a terminal acronym', {
+            searchID: context.searchID,
+            previousTitle: seriesQueries[queryIndex-1].title,
+            nextTitle: queryTitle,
+            omittedAcronym: query.terminalAcronym,
+            reason: 'The full abbreviated series title did not return a validated match'
+          });
+        } else {
+          log.info('Retrying series search with an and/ampersand title alternative', {
+            searchID: context.searchID,
+            previousTitle: seriesQueries[queryIndex-1].title,
+            nextTitle: queryTitle
+          });
+        }
       }
       let response = await pollOMDB(createURLParts({
         title: queryTitle,
@@ -958,7 +1162,9 @@ async function resolveSeries(series, season, episode, context) {
         type: 'series'
       }), {
         searchID: context.searchID,
-        stage: queryIndex === 0 ? 'series search' : 'and/ampersand series search'
+        stage: query.terminalAcronym ?
+          'terminal-acronym prefix series search' :
+          (queryIndex === 0 ? 'series search' : 'and/ampersand series search')
       });
       let failure = requestFailure(response);
       if (failure) {
@@ -973,6 +1179,13 @@ async function resolveSeries(series, season, episode, context) {
         searchParts.year,
         response.data.Search
       );
+      if (query.terminalAcronym && currentMatches.matchStrength === 'fuzzy') {
+        // The prefix query is intentionally broader than the stored title.
+        // Never let its mere containment create a new fuzzy match (for example,
+        // "Law & Order" must not satisfy "Law and Order SVU"). Only an exact
+        // full-title result or a validated acronym expansion can be accepted.
+        currentMatches = {matchStrength: 'fuzzy', candidates: []};
+      }
       log.info('Evaluated OMDb series candidates', {
         searchID: context.searchID,
         queryTitle: queryTitle,
@@ -1013,7 +1226,9 @@ async function resolveSeries(series, season, episode, context) {
       // choice because an episode existing in a loosely related series is not
       // strong enough evidence by itself.
       if (matches.matchStrength === 'exact' || matches.matchStrength === 'acronym') {
-        let episodeResult = await disambiguateSeriesByEpisode(candidates, season, episode, context);
+        let episodeResult = await disambiguateSeriesByEpisode(
+          candidates, season, episode, localTitle, context
+        );
         if (episodeResult.requestFailure) {
           return episodeResult.requestFailure;
         }
@@ -1045,12 +1260,12 @@ async function resolveSeries(series, season, episode, context) {
     // its "most popular" result.
     let lastNoResultsFailure = null;
     let invalidFallbackFound = false;
-    for (let queryIndex=0; queryIndex<queryTitles.length; queryIndex++) {
-      let queryTitle = queryTitles[queryIndex];
+    for (let queryIndex=0; queryIndex<exactQueryTitles.length; queryIndex++) {
+      let queryTitle = exactQueryTitles[queryIndex];
       if (queryIndex > 0) {
         log.info('Retrying single-series lookup with an and/ampersand title alternative', {
           searchID: context.searchID,
-          previousTitle: queryTitles[queryIndex-1],
+          previousTitle: exactQueryTitles[queryIndex-1],
           nextTitle: queryTitle
         });
       }
@@ -1115,80 +1330,88 @@ function episodeResponseMatches(data, seriesID, season, episode) {
     (!data.seriesID || data.seriesID === seriesID);
 }
 
-// Some releases number every episode one place earlier than OMDb (for example,
-// a pilot stored as episode 0). When Mynda has a real extracted title, inspect
-// only the immediately adjacent episode numbers and accept a correction only
-// if exactly one of their titles is an exact normalized match.
-async function findAdjacentEpisodeByTitle(seriesID, season, episode, localTitle, context) {
+// Some releases use a different episode order from OMDb (for example, a pilot
+// stored as episode 0 or a small block of episodes rearranged on home video).
+// When Mynda has a real extracted title, inspect the immediately adjacent
+// episodes first. Only when neither matches, inspect episodes two places away.
+// A correction is accepted only when exactly one title at that distance is an
+// exact normalized match, keeping the wider search conservative.
+async function findNearbyEpisodeByTitle(seriesID, season, episode, localTitle, context) {
   let episodeNumber = Number(episode);
-  let adjacentEpisodes = [episodeNumber-1, episodeNumber+1]
-    .filter(number => number >= 0)
-    .map(String);
-  let matches = [];
+  for (let distance of [1, 2]) {
+    let nearbyEpisodes = [episodeNumber-distance, episodeNumber+distance]
+      .filter(number => number >= 0)
+      .map(String);
+    let matches = [];
 
-  for (let adjacentEpisode of adjacentEpisodes) {
-    let response = await pollOMDB(createURLParts({
-      id: seriesID,
-      season: season,
-      episode: adjacentEpisode
-    }), {searchID: context.searchID, stage: 'adjacent episode title probe'});
-    let failure = requestFailure(response);
-    if (failure) {
-      if (failure.failure !== 'No results') {
-        return {success: false, requestFailure: failure};
-      }
-      continue;
-    }
-
-    if (!episodeResponseMatches(response.data, seriesID, season, adjacentEpisode)) {
-      log.warn('Adjacent OMDb episode response did not match the probe', {
-        searchID: context.searchID,
-        expected: {seriesID: seriesID, season: season, episode: adjacentEpisode},
-        received: summarizeOMDbResponse(response)
-      });
-      continue;
-    }
-
-    let titleMatches = episodeTitlesMatch(localTitle, response.data.Title);
-    log.info('Compared adjacent OMDb episode title', {
-      searchID: context.searchID,
-      localTitle: localTitle,
-      omdbTitle: response.data.Title,
-      season: season,
-      episode: adjacentEpisode,
-      titleMatches: titleMatches
-    });
-    if (titleMatches) {
-      matches.push({episode: adjacentEpisode, data: response.data});
-    }
-  }
-
-  if (matches.length === 1) {
-    log.warn('Corrected shifted OMDb episode number using the local title', {
-      searchID: context.searchID,
-      localTitle: localTitle,
-      requested: {season: season, episode: episode},
-      matched: {
+    for (let nearbyEpisode of nearbyEpisodes) {
+      let response = await pollOMDB(createURLParts({
+        id: seriesID,
         season: season,
-        episode: matches[0].episode,
-        title: matches[0].data.Title,
-        imdbID: matches[0].data.imdbID
+        episode: nearbyEpisode
+      }), {searchID: context.searchID, stage: 'nearby episode title probe'});
+      let failure = requestFailure(response);
+      if (failure) {
+        if (failure.failure !== 'No results') {
+          return {success: false, requestFailure: failure};
+        }
+        continue;
       }
-    });
-    return {
-      success: true,
-      data: matches[0].data,
-      episode: matches[0].episode
-    };
-  }
 
-  if (matches.length > 1) {
-    log.warn('More than one adjacent OMDb episode matched the local title; retaining normal lookup behavior', {
-      searchID: context.searchID,
-      localTitle: localTitle,
-      requested: {season: season, episode: episode},
-      matchingEpisodes: matches.map(match => match.episode)
-    });
+      if (!episodeResponseMatches(response.data, seriesID, season, nearbyEpisode)) {
+        log.warn('Nearby OMDb episode response did not match the probe', {
+          searchID: context.searchID,
+          expected: {seriesID: seriesID, season: season, episode: nearbyEpisode},
+          received: summarizeOMDbResponse(response)
+        });
+        continue;
+      }
+
+      let titleMatches = episodeTitlesMatch(localTitle, response.data.Title);
+      log.info('Compared nearby OMDb episode title', {
+        searchID: context.searchID,
+        localTitle: localTitle,
+        omdbTitle: response.data.Title,
+        season: season,
+        episode: nearbyEpisode,
+        distance: distance,
+        titleMatches: titleMatches
+      });
+      if (titleMatches) {
+        matches.push({episode: nearbyEpisode, data: response.data});
+      }
+    }
+
+    if (matches.length === 1) {
+      log.warn('Corrected shifted OMDb episode number using the local title', {
+        searchID: context.searchID,
+        localTitle: localTitle,
+        requested: {season: season, episode: episode},
+        matched: {
+          season: season,
+          episode: matches[0].episode,
+          distance: distance,
+          title: matches[0].data.Title,
+          imdbID: matches[0].data.imdbID
+        }
+      });
+      return {
+        success: true,
+        data: matches[0].data,
+        episode: matches[0].episode
+      };
+    }
+
+    if (matches.length > 1) {
+      log.warn('More than one nearby OMDb episode matched the local title; retaining normal lookup behavior', {
+        searchID: context.searchID,
+        localTitle: localTitle,
+        requested: {season: season, episode: episode},
+        distance: distance,
+        matchingEpisodes: matches.map(match => match.episode)
+      });
+      return {success: false};
+    }
   }
   return {success: false};
 }
@@ -1196,8 +1419,8 @@ async function findAdjacentEpisodeByTitle(seriesID, season, episode, localTitle,
 // Show-specific auto-tagging workflow. It validates Mynda's series/season/episode
 // fields, resolves and caches the IMDb series ID, retrieves the exact episode,
 // validates that response, applies its metadata, and downloads available art.
-// A confidently extracted local title may correct an immediately adjacent OMDb
-// episode number, but it never changes the season/episode stored by Mynda.
+// A confidently extracted local title may correct an OMDb episode number up to
+// two places away, but it never changes the season/episode stored by Mynda.
 async function searchShowEpisode(video, context, selectedSeriesImdbID) {
   let series = typeof video.series === 'string' ? video.series.trim() : '';
   let season = normalizeEpisodeNumber(video.season);
@@ -1217,6 +1440,9 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     return predictableFailure('Not enough data', reason);
   }
 
+  // Resolve this before choosing a series so a clean filename-derived episode
+  // title can distinguish same-name originals and remakes during the probes.
+  let localTitle = localEpisodeTitleForVerification(video);
   let seriesResult;
   if (typeof selectedSeriesImdbID !== 'undefined') {
     if (!/^tt\d+$/.test(String(selectedSeriesImdbID))) {
@@ -1227,12 +1453,12 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
       series: series,
       selectedSeriesImdbID: selectedSeriesImdbID
     });
-    let selectedSearchParts = extractSeriesSearchParts(series);
+    let selectedSearchParts = seriesSearchPartsForVideo(video);
     let selectedCacheKey = seriesCacheKey(selectedSearchParts);
     seriesIdCache.set(selectedCacheKey, String(selectedSeriesImdbID));
     seriesResult = {success: true, data: String(selectedSeriesImdbID)};
   } else {
-    seriesResult = await resolveSeries(series, season, episode, context);
+    seriesResult = await resolveSeries(video, season, episode, localTitle, context);
   }
   if (!seriesResult.success) {
     return seriesResult;
@@ -1246,7 +1472,6 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     // response instead of making the same OMDb request twice.
     let episodeData = seriesResult.episodeData;
     let matchedEpisode = episode;
-    let localTitle = localEpisodeTitleForVerification(video);
     let lookupFailure = null;
     if (!episodeData) {
       let response = await pollOMDB(createURLParts({
@@ -1263,9 +1488,9 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     if (lookupFailure) {
       // A missing episode 0 is the common signal for a release whose numbering
       // is shifted by one. Do not broaden the search unless the filename parser
-      // supplied a useful title that can verify the adjacent result.
+      // supplied a useful title that can verify the nearby result.
       if (lookupFailure.failure === 'No results' && localTitle) {
-        let correction = await findAdjacentEpisodeByTitle(
+        let correction = await findNearbyEpisodeByTitle(
           seriesID, season, episode, localTitle, context
         );
         if (correction.requestFailure) {
@@ -1294,13 +1519,13 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     }
 
     // A structurally valid S/E response can still describe the wrong content
-    // when a release starts numbering at zero. A unique adjacent title match is
-    // stronger evidence than the numeric label alone. If no adjacent title
+    // when a release uses a different episode order. A unique nearby title
+    // match is stronger evidence than the numeric label alone. If no nearby title
     // matches, preserve the existing exact-S/E behavior to avoid introducing
     // false negatives for alternate episode titles.
     if (matchedEpisode === episode && localTitle &&
         !episodeTitlesMatch(localTitle, episodeData.Title)) {
-      let correction = await findAdjacentEpisodeByTitle(
+      let correction = await findNearbyEpisodeByTitle(
         seriesID, season, episode, localTitle, context
       );
       if (correction.success) {
@@ -1313,7 +1538,7 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
           omdbTitle: episodeData.Title,
           season: season,
           episode: episode,
-          adjacentProbeError: summarizeError(correction.requestFailure && correction.requestFailure.data)
+          nearbyProbeError: summarizeError(correction.requestFailure && correction.requestFailure.data)
         });
       }
     }

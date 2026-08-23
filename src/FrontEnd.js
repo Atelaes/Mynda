@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
+const Logger = require('./Logger.js');
 const OmdbHelper = require('./OmdbHelper.js');
 const omdb = require('../omdb');
 const axios = require('axios');
@@ -32,7 +33,36 @@ try {
   ffprobeStatic = require('ffprobe-static');
 } catch(err) {console.warn('Warning: ffprobe-static not installed')}
 const placeholderImage = "../images/qmark.png";
+const editorLog = Logger.child('Editor');
 let nextEditorArtworkDownloadNumber = 0;
+let nextFilenameResetNumber = 0;
+
+// Most long-running status messages originate in index.js and arrive through
+// Electron IPC. Batch editing is different: the renderer prepares the edited
+// videos and submits one Library.replaceMediaBatch() operation, so there is no
+// backend loop that can report its progress. A local DOM event lets that
+// renderer-side workflow reuse MynNotify instead of creating a second progress
+// UI or bouncing a message through the main process.
+const LOCAL_STATUS_UPDATE_EVENT = 'mynda-local-status-update';
+
+function sendLocalStatusUpdate(status) {
+  window.dispatchEvent(new CustomEvent(LOCAL_STATUS_UPDATE_EVENT, {detail: status}));
+}
+
+// React may give the editor freshly cloned props even though the user is
+// still editing the exact same video selection. Compare stable video IDs
+// rather than object identity so those harmless refreshes cannot discard
+// filename-reset patches or other editor state that has not been saved yet.
+function editorSelectionKey(video, batch) {
+  if (!video) return '';
+  if (video.id !== 'batch') return `single:${video.id || ''}`;
+
+  const ids = (Array.isArray(batch) ? batch : [])
+    .map(item => item && item.id)
+    .filter(Boolean)
+    .sort();
+  return `batch:${JSON.stringify(ids)}`;
+}
 
 
 // let savedPing = {};
@@ -81,6 +111,7 @@ class Mynda extends React.Component {
     this.calcAvgRatings = this.calcAvgRatings.bind(this);
     this.toggleDetailsPane = this.toggleDetailsPane.bind(this);
     this.showDetails = this.showDetails.bind(this);
+    this.editSeries = this.editSeries.bind(this);
     this.playVideo = this.playVideo.bind(this);
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
@@ -264,7 +295,45 @@ class Mynda extends React.Component {
     this.setState({detailsPaneShowing : show});
   }
 
-  showDetails(id, rowID, video, index) { // video and index are meant to be optional
+  // Open the existing batch editor for every video in one series. Series
+  // headers are not ordinary table rows, so they cannot use rowSelect(). Build
+  // the same selectedRows structure that a Cmd/Ctrl/Shift selection would
+  // have produced; this keeps the batch alive when saves refresh the playlist.
+  editSeries(videos) {
+    const videoIDs = (videos || []).map(video => video && video.id).filter(Boolean);
+    if (videoIDs.length === 0) return;
+
+    const selectedIDSet = new Set(videoIDs);
+    const selectedRows = {};
+    let firstRowID = null;
+
+    (this.state.playlistRowManifest || []).forEach(row => {
+      if (!row || !selectedIDSet.has(row.vidID)) return;
+
+      if (!firstRowID) firstRowID = row.rowID;
+      if (!selectedRows[row.tableID]) {
+        selectedRows[row.tableID] = {rows: [], highestRow: row.rowID};
+      }
+      if (!selectedRows[row.tableID].rows.includes(row.vidID)) {
+        selectedRows[row.tableID].rows.push(row.vidID);
+      }
+    });
+
+    // A just-rendered or otherwise incomplete manifest should not prevent the
+    // explicit series action. This synthetic entry is enough for refreshDetails
+    // to reconstruct the same batch after the first save completes.
+    if (Object.keys(selectedRows).length === 0) {
+      selectedRows['series-edit'] = {rows: videoIDs, highestRow: null};
+    }
+
+    this.setState({selectedRows: selectedRows}, () => {
+      this.showDetails(videoIDs, firstRowID, undefined, undefined, () => {
+        this.showOpenablePane('editorPane');
+      });
+    });
+  }
+
+  showDetails(id, rowID, video, index, callback) { // video, index, and callback are optional
     // if (!this.state.detailsPaneShowing) {
     //   return;
     // }
@@ -334,7 +403,7 @@ class Mynda extends React.Component {
       });
       console.log(JSON.stringify(batchObject));
 
-      this.setState({detailRowID: rowID, detailVideo: batchObject, batchVids: batchVids});
+      this.setState({detailRowID: rowID, detailVideo: batchObject, batchVids: batchVids}, callback);
       return;
     } // end if (we have multiple videos)
 
@@ -368,7 +437,7 @@ class Mynda extends React.Component {
     if (/*this.state.playlistRowManifest.length > 0 && */this.state.playlistRowManifest[0].rowID === rowID) boundaryFlag = 'first';
     if (/*this.state.playlistRowManifest.length > 0 && */this.state.playlistRowManifest[this.state.playlistRowManifest.length-1].rowID === rowID) boundaryFlag = 'last';
 
-    this.setState({detailRowID: rowID, detailVideo: detailVideo, detailVideoRowIndex: rowIndex, detailRowBoundaryFlag: boundaryFlag});
+    this.setState({detailRowID: rowID, detailVideo: detailVideo, detailVideoRowIndex: rowIndex, detailRowBoundaryFlag: boundaryFlag}, callback);
   }
 
   // activated from a button in the editor pane,
@@ -800,28 +869,27 @@ class Mynda extends React.Component {
       console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
 
       // if the whole media array was replaced at one time
-      // (this happens when a watchfolder is removed)
+      // (this happens when a watchfolder is removed or a batch is saved),
+      // first put that replacement array into React state. setState() is
+      // asynchronous, so rebuilding the playlist outside its callback would
+      // make playlistFilter() read the old this.state.videos array and leave
+      // the table showing stale data even though library.json was saved.
       if (address === 'media') {
         console.log('library.media was replaced. Refreshing videos');
 
-        this.setState({videos:library.media});
-      }
-
-      // if a movie was changed
-      if (address.includes('media')) {
+        this.setState({videos:library.media}, () => {
+          // Now playlistFilter(), the table, and the details/editor refresh all
+          // read the newly saved videos rather than the pre-save references.
+          this.setPlaylist(this.state.currentPlaylistID);
+          this.setPlaylistLengths(true);
+          this.refreshDetails(timeout);
+        });
+      } else if (address.includes('media')) {
+        // A one-video save replaces an entry inside the existing media array,
+        // so no parent-state handoff is needed before refreshing its consumers.
         console.log('a video was edited');
-        // // change the videoEditFlag, which components can listen for to find out if a video was edited
-        // // (if they don't care which one or what the change was)
-        // this.setState({videoEditFlag:uuidv4()});
-
-
-        // update the currently displayed playlist
         this.setPlaylist(this.state.currentPlaylistID);
-
-        // check all the playlist lengths (pass true to skip the one we just set above)
         this.setPlaylistLengths(true);
-
-        // update movie in details pane (we don't know if this is the movie that was edited, but just in case)
         this.refreshDetails(timeout);
       }
 
@@ -926,6 +994,7 @@ class Mynda extends React.Component {
             playVideo={this.playVideo}
             handleSelectedRows={this.handleSelectedRows}
             handleHoveredRow={this.handleHoveredRow}
+            editSeries={this.editSeries}
             selectedRows={this.state.selectedRows}
             reportSortedManifest={this.reportSortedManifest}
             recentlyWatched={this.state.recentlyWatched}
@@ -1155,6 +1224,7 @@ class MynLibrary extends React.Component {
       tables = (
         <div id="series-container">
           <MynLibSeries
+            key={this.props.playlistID}
             videos={this.props.videos}
             settings={this.props.settings}
             playlistID={this.props.playlistID}
@@ -1167,6 +1237,7 @@ class MynLibrary extends React.Component {
             playVideo={this.props.playVideo}
             handleSelectedRows={this.props.handleSelectedRows}
             handleHoveredRow={this.props.handleHoveredRow}
+            editSeries={this.props.editSeries}
             selectedRows={this.props.selectedRows}
             reportSortedManifest={this.reportSortedManifest}
             compact={this.state.compact}
@@ -1247,7 +1318,17 @@ class MynLibSeries extends React.Component {
         // create series object
         if (!this.state.manifest.hasOwnProperty(series)) {
           this.state.manifest[series] = {};
-          this.state.collapsed[series] = true;
+
+          // A changed video object causes this manifest to be rebuilt even
+          // though the user is still viewing the same playlist—for example,
+          // immediately after saving an edit. Initialize only genuinely new
+          // series as collapsed so existing series retain the expansion state
+          // the user chose before that re-render. MynLibrary keys this entire
+          // component by playlist ID, so leaving the playlist still discards
+          // this state and returning starts with every series collapsed.
+          if (!Object.prototype.hasOwnProperty.call(this.state.collapsed, series)) {
+            this.state.collapsed[series] = true;
+          }
         }
 
         // create season array
@@ -1264,16 +1345,16 @@ class MynLibSeries extends React.Component {
   }
 
   // expand or collapse a series
-  toggleExpansion(e,series) {
-    let seriesContainer = e.target.parentNode;//findNearestOfClass("series")
-
-
-    let seasonsContainer = seriesContainer.getElementsByClassName("seasons-container")[0];
-    seasonsContainer.classList.toggle("hidden");
-    seriesContainer.classList.toggle("expanded");
-    seriesContainer.classList.toggle("collapsed");
-
-    this.state.collapsed[series] = !this.state.collapsed[series]
+  toggleExpansion(series) {
+    // Keep expansion in React state instead of changing the rendered DOM by
+    // hand. That makes this state the authoritative value used both for the
+    // immediate click and for any later re-render caused by edited video data.
+    this.setState(previousState => ({
+      collapsed: {
+        ...previousState.collapsed,
+        [series]: !previousState.collapsed[series]
+      }
+    }));
   }
 
   addEpisodeToColumns() {
@@ -1364,9 +1445,32 @@ class MynLibSeries extends React.Component {
         );
       });
 
+      // Flatten the season buckets only for this header action. The same
+      // video objects are handed to Mynda, which converts them into the batch
+      // editor's normal ID-based selection without changing their sort order.
+      const seriesVideos = seasons.reduce(
+        (allVideos, season) => allVideos.concat(this.state.manifest[series][season]),
+        []
+      );
+
       return (
         <div className={"series " + (this.state.collapsed[series] ? "collapsed" : "expanded")} key={series}>
-          <h1 className={"series-header " + (this.props.compact ? 'compact' : '')} onClick={(e) => this.toggleExpansion(e,series)}>{series}</h1>
+          <h1 className={"series-header " + (this.props.compact ? 'compact' : '')} onClick={() => this.toggleExpansion(series)}>
+            <span className="series-header-title">{series}</span>
+            <button
+              type="button"
+              className="series-edit-button"
+              title={`Edit all ${seriesVideos.length} video${seriesVideos.length === 1 ? '' : 's'} in ${series}`}
+              onClick={(event) => {
+                // The header itself expands/collapses the series. Do not let
+                // an Edit click also toggle that unrelated state.
+                event.stopPropagation();
+                this.props.editSeries(seriesVideos);
+              }}
+            >
+              Edit
+            </button>
+          </h1>
           <div className={"seasons-container " + (this.state.collapsed[series] ? "hidden" : "")}>
             {seriesJSX}
           </div>
@@ -2379,6 +2483,12 @@ class MynNotify extends React.Component {
 
     ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
 
+    // Renderer-owned jobs, currently batch video saves, arrive here. The
+    // listener exists for the lifetime of this notification component and is
+    // removed if React ever unmounts it.
+    this.handleLocalStatusUpdate = (event) => this.statusUpdate(event.detail);
+    window.addEventListener(LOCAL_STATUS_UPDATE_EVENT, this.handleLocalStatusUpdate);
+
     this.render = this.render.bind(this);
     this.statusUpdate = this.statusUpdate.bind(this);
     this.animateEllipsis = this.animateEllipsis.bind(this);
@@ -2449,6 +2559,7 @@ class MynNotify extends React.Component {
       'add'           : `Adding${_c}${_of}${_t} videos`,
       'metadata'      : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
       'metadata_save' : `Saving metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
+      'batch_save'    : `Saving${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
       'autotag'       : `Auto-tagging${_c}${_of}${_t} videos`,
       'check'         : 'Checking for new videos'
     }
@@ -2494,6 +2605,10 @@ class MynNotify extends React.Component {
 
   componentDidMount() {
     // this.statusUpdate({action:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)], numCurrent:1, numTotal:85});
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener(LOCAL_STATUS_UPDATE_EVENT, this.handleLocalStatusUpdate);
   }
 
   render() {
@@ -4086,12 +4201,28 @@ class MynEditor extends MynOpenablePane {
       paneID: 'editor-pane',
       placeholderImage: placeholderImage,
       valid: {},
-      changed: new Set()
+      changed: new Set(),
+
+      // Batch fields normally hold one value that is applied to every video.
+      // A filename reset is different: each episode gets its own detected
+      // title/season/episode. Keep those individual patches here until Save.
+      pendingFilenameResetPatches: {},
+
+      // The main process derives the patches and owns the native confirmation
+      // dialog. While that round trip is pending, prevent a form submission
+      // from racing ahead and saving before the patches reach the renderer.
+      resetFromFilenamePending: false,
+
+      // This remains true after confirmation until Save or Revert. It also
+      // covers single-video resets, which apply their patch directly to the
+      // editable video rather than storing a per-video batch patch.
+      filenameResetStaged: false
     }
 
     this.render = this.render.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.revertChanges = this.revertChanges.bind(this);
+    this.requestResetFromFilename = this.requestResetFromFilename.bind(this);
     this.saveChanges = this.saveChanges.bind(this);
     this.reportValid = this.reportValid.bind(this);
   }
@@ -4161,9 +4292,188 @@ class MynEditor extends MynOpenablePane {
 
   }
 
+  // Ask the main process to rerun the same conservative filename/folder
+  // detector used for brand-new videos. The native confirmation explains the
+  // wider reset (IMDb/catalog fields are cleared), and a private response
+  // channel prevents simultaneous editor actions from hearing one another.
+  requestResetFromFilename(event) {
+    if (event) event.preventDefault();
+    if (!this.state.video) return;
+    if (this.state.resetFromFilenamePending) {
+      editorLog.warn('Ignored duplicate filename-reset request while the first request was pending');
+      return;
+    }
+
+    let sourceVideos;
+    if (this.state.video.id === 'batch') {
+      sourceVideos = (this.props.batch || []).map(video => {
+        const source = _.cloneDeep(video);
+
+        // Ratings are one object in the editor, but only the external catalog
+        // ratings are reset. Carry a pending batch user-rating edit into every
+        // source object so the backend can preserve that unsaved value too.
+        if (this.state.changed.has('ratings') && this.state.video.ratings) {
+          source.ratings = source.ratings || {};
+          source.ratings.user = this.state.video.ratings.user;
+        }
+        return source;
+      });
+    } else {
+      sourceVideos = [this.state.video];
+    }
+    if (!sourceVideos || sourceVideos.length === 0) return;
+
+    const requestedSelectionKey = editorSelectionKey(this.state.video, this.props.batch);
+    const responseChannel = `reset-from-filename-${process.pid}-${++nextFilenameResetNumber}`;
+    this.setState({resetFromFilenamePending: true});
+    editorLog.info('Requesting filename-derived editor reset', {
+      videoCount: sourceVideos.length,
+      selectionType: this.state.video.id === 'batch' ? 'batch' : 'single',
+      changedFieldsBeforeReset: Array.from(this.state.changed).sort()
+    });
+
+    const handleResetResponse = (ipcEvent, response) => {
+      // The native dialog can remain open while the renderer changes for other
+      // reasons. Never apply its eventual response to a different selection.
+      const currentSelectionKey = editorSelectionKey(this.state.video, this.props.batch);
+      if (currentSelectionKey !== requestedSelectionKey) {
+        editorLog.warn('Ignored filename-reset response because the editor selection changed', {
+          requestedSelectionKey: requestedSelectionKey,
+          currentSelectionKey: currentSelectionKey
+        });
+        this._isMounted && this.setState({resetFromFilenamePending: false});
+        return;
+      }
+
+      if (response && response.error) {
+        editorLog.error('Filename-derived editor reset failed', {
+          error: response.error
+        });
+        this.setState({resetFromFilenamePending: false});
+        alert(`Mynda could not reset the video information: ${response.error}`);
+        return;
+      }
+      if (!response || !response.confirmed || !Array.isArray(response.patches)) {
+        editorLog.info('Filename-derived editor reset canceled', {
+          videoCount: sourceVideos.length
+        });
+        this.setState({resetFromFilenamePending: false});
+        return;
+      }
+
+      const patchesByID = {};
+      response.patches.forEach(item => {
+        if (item && item.id && item.changes) {
+          patchesByID[item.id] = item.changes;
+        }
+      });
+      const patches = Object.values(patchesByID);
+      if (patches.length === 0) {
+        editorLog.warn('Filename-reset response contained no usable patches', {
+          requestedVideoCount: sourceVideos.length
+        });
+        this.setState({resetFromFilenamePending: false});
+        return;
+      }
+
+      const resetFields = new Set();
+      patches.forEach(patch => Object.keys(patch).forEach(field => resetFields.add(field)));
+
+      // A reset deliberately replaces any unsaved edits to fields that it
+      // controls. Changes to unrelated user fields, notably tags, remain in
+      // the ordinary changed set and will still be applied at Save time.
+      const changed = new Set(
+        Array.from(this.state.changed).filter(field => !resetFields.has(field))
+      );
+
+      if (this.state.video.id !== 'batch') {
+        const patch = patchesByID[this.state.video.id];
+        if (!patch) {
+          editorLog.warn('Filename-reset response did not contain the open video', {
+            requestedVideoCount: sourceVideos.length,
+            receivedPatchCount: patches.length
+          });
+          this.setState({resetFromFilenamePending: false});
+          return;
+        }
+
+        Object.keys(patch).forEach(field => changed.add(field));
+        this.setState({
+          video: {...this.state.video, ..._.cloneDeep(patch)},
+          changed: changed,
+          pendingFilenameResetPatches: {},
+          resetFromFilenamePending: false,
+          filenameResetStaged: true
+        });
+        editorLog.info('Staged filename-derived reset in the editor', {
+          videoCount: 1,
+          patchCount: 1,
+          resetFields: Array.from(resetFields).sort(),
+          changedFieldsAfterReset: Array.from(changed).sort()
+        });
+        return;
+      }
+
+      // The batch form can display only values shared by every video. Build a
+      // preview of the reset fields using the same intersection rules as the
+      // original batch object, while retaining every per-video patch for Save.
+      const commonPatch = {};
+      resetFields.forEach(field => {
+        let commonValue = _.cloneDeep(patches[0][field]);
+        for (let i=1; i<patches.length; i++) {
+          const value = patches[i][field];
+          if (Array.isArray(commonValue) && Array.isArray(value)) {
+            commonValue = commonValue.filter(item => value.includes(item));
+          } else if (commonValue && typeof commonValue === 'object' && value && typeof value === 'object') {
+            Object.keys(commonValue).forEach(key => {
+              if (!_.isEqual(commonValue[key], value[key])) commonValue[key] = '';
+            });
+          } else if (!_.isEqual(commonValue, value)) {
+            commonValue = '';
+          }
+        }
+        commonPatch[field] = commonValue;
+      });
+
+      this.setState({
+        video: {...this.state.video, ...commonPatch},
+        changed: changed,
+        pendingFilenameResetPatches: patchesByID,
+        resetFromFilenamePending: false,
+        filenameResetStaged: true
+      });
+      editorLog.info('Staged filename-derived batch reset in the editor', {
+        requestedVideoCount: sourceVideos.length,
+        receivedPatchCount: patches.length,
+        resetFields: Array.from(resetFields).sort(),
+        changedFieldsAfterReset: Array.from(changed).sort()
+      });
+    };
+
+    ipcRenderer.once(responseChannel, handleResetResponse);
+    try {
+      ipcRenderer.send('reset-from-filename', responseChannel, sourceVideos);
+    } catch(err) {
+      ipcRenderer.removeListener(responseChannel, handleResetResponse);
+      this.setState({resetFromFilenamePending: false});
+      editorLog.error('Could not request filename-derived editor reset', {
+        error: err && err.stack ? err.stack : String(err)
+      });
+    }
+  }
+
   saveChanges(event) {
     if (event) {
       event.preventDefault();
+    }
+
+    // A form can still submit via Enter even when its visible submit button is
+    // disabled. Refuse that race explicitly so Save cannot run between the
+    // reset request and the arrival of its per-video patches.
+    if (this.state.resetFromFilenamePending) {
+      editorLog.warn('Blocked editor save while filename reset was pending');
+      alert('Please wait for the filename reset to finish before saving.');
+      return;
     }
 
     /* make sure all the fields are valid before submitting */
@@ -4218,6 +4528,13 @@ class MynEditor extends MynOpenablePane {
     /* Submit */
     // console.log('saving...');
 
+    // When a batch is saved, this object remains non-null until the final
+    // queued library operation reports completion. The edited videos are
+    // prepared individually below, but Library commits the resulting media
+    // array with one atomic write instead of rewriting library.json per video.
+    let batchSaveProgress = null;
+    let batchVideosToSave = [];
+
     // if we're editing multiple videos
     // find the edited fields, and apply only those changes to
     // the videos in the batch
@@ -4230,8 +4547,56 @@ class MynEditor extends MynOpenablePane {
       console.log('SAVING BATCH')
       console.log('Changed Fields: ' + JSON.stringify(this.state.changed))
       if (this.props.batch) { // <-- this should always be true if this.state.video.id === 'batch', this is just for safety
+        const changedFields = Array.from(this.state.changed).sort();
+        const filenameResetPatches = this.state.pendingFilenameResetPatches || {};
+        const filenameResetPatchCount = Object.keys(filenameResetPatches).length;
+
+        // A confirmed batch reset must have one private patch per selected
+        // video. If that invariant is ever broken, stop instead of silently
+        // saving only the user's ordinary overrides (the original symptom).
+        if (this.state.filenameResetStaged && filenameResetPatchCount !== this.props.batch.length) {
+          editorLog.error('Blocked batch save because staged filename-reset patches were incomplete', {
+            videoCount: this.props.batch.length,
+            filenameResetPatchCount: filenameResetPatchCount,
+            changedFields: changedFields
+          });
+          alert('The filename reset data is incomplete, so Mynda has not saved this batch. Please use Reset from Filename again.');
+          return;
+        }
+
+        editorLog.info('Preparing editor batch save', {
+          videoCount: this.props.batch.length,
+          filenameResetStaged: Boolean(this.state.filenameResetStaged),
+          filenameResetPatchCount: filenameResetPatchCount,
+          changedFields: changedFields
+        });
+
+        batchSaveProgress = {
+          numCurrent: 0,
+          numTotal: this.props.batch.length
+        };
+
+        // Show the banner before the first synchronous file write begins. With
+        // only numTotal supplied, MynNotify initially says "Saving N videos";
+        // subsequent callbacks add the familiar "X of N" counter.
+        if (batchSaveProgress.numTotal > 0) {
+          sendLocalStatusUpdate({
+            action: 'batch_save',
+            numTotal: batchSaveProgress.numTotal
+          });
+        }
+
         // loop through the videos we're editing
         this.props.batch.map(video => {
+          // Unlike ordinary batch edits, this reset contains a different
+          // derived title/season/episode for each file. Apply that video's
+          // private patch first; any fields the user edited afterwards are
+          // applied by the normal changed-fields loop below and therefore win.
+          const filenameResetPatch = filenameResetPatches[video.id];
+          if (filenameResetPatch) {
+            Object.assign(video, _.cloneDeep(filenameResetPatch));
+          }
+
           // loop through each property of this video
           Object.keys(video).map(prop => {
             if (prop === 'id' || prop === 'metadata') return;
@@ -4279,13 +4644,43 @@ class MynEditor extends MynOpenablePane {
           });
           console.log('EDITED: ' + JSON.stringify(video));
 
-          // save this video to the library
+          // Prepare this video's final replacement. Do not submit it yet:
+          // replaceMediaBatch() will merge every prepared video into the
+          // freshest media array and commit that array with one library write.
           let temp = _.cloneDeep(video);
+          temp.autotag_tried = false; // reset this flag whenever a video is saved
           // Transient signal for Library.js; it is removed before saving.
           temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
-          let index = library.media.findIndex(v => v.id === video.id);
-          library.replace("media." + index, temp);
+          batchVideosToSave.push(temp);
         });
+
+        if (batchVideosToSave.length > 0) {
+          library.replaceMediaBatch(batchVideosToSave, (err) => {
+            if (err) {
+              console.error(`Could not save video batch: ${err}`);
+              editorLog.error('Editor video batch save failed', {
+                videoCount: batchVideosToSave.length,
+                filenameResetPatchCount: filenameResetPatchCount,
+                error: err && err.stack ? err.stack : String(err)
+              });
+            } else {
+              // The complete media-array write has finished. Jump the counter
+              // to N of N and leave it visible until the queued settings save
+              // below also completes.
+              batchSaveProgress.numCurrent = batchSaveProgress.numTotal;
+              editorLog.info('Editor video batch saved', {
+                videoCount: batchVideosToSave.length,
+                filenameResetPatchCount: filenameResetPatchCount,
+                changedFields: changedFields
+              });
+            }
+            sendLocalStatusUpdate({
+              action: 'batch_save',
+              numCurrent: batchSaveProgress.numCurrent,
+              numTotal: batchSaveProgress.numTotal
+            });
+          });
+        }
 
       } else {
         console.error('The video objects were not supplied to MynEditor when editing multiple videos');
@@ -4305,15 +4700,39 @@ class MynEditor extends MynOpenablePane {
     // as options for the next video the user edits
     let tags = [...this.props.settings.used.tags];
     tags = tags.concat(this.state.video.tags.filter(tag => tags.indexOf(tag) < 0)).sort();
-    library.replace("settings.used.tags",tags);
 
     // and then do the same for genres
     let genres = [...this.props.settings.used.genres];
-    if (this.state.video.genre !== '' && genres.indexOf(this.state.video.genre) < 0) {
+    const saveNewGenre = this.state.video.genre !== '' && genres.indexOf(this.state.video.genre) < 0;
+
+    // Whichever settings operation is last owns the completion callback. The
+    // callback is omitted for ordinary single-video saves, whose behavior and
+    // lack of a progress banner remain unchanged.
+    const finishBatchSave = batchSaveProgress && batchSaveProgress.numTotal > 0 ? (err) => {
+      // Tags and genres are queued after the one media-array replacement. Keep
+      // the completed "N of N" message visible until the final settings
+      // operation finishes, then release the banner for the next task.
+      if (err) {
+        console.error(`Could not finish batch save: ${err}`);
+        editorLog.error('Could not finish editor batch settings save', {
+          videoCount: batchSaveProgress.numTotal,
+          error: err && err.stack ? err.stack : String(err)
+        });
+      } else {
+        editorLog.info('Editor batch save finished', {
+          videoCount: batchSaveProgress.numTotal
+        });
+      }
+      sendLocalStatusUpdate({action: ''});
+    } : undefined;
+
+    library.replace("settings.used.tags", tags, saveNewGenre ? undefined : finishBatchSave);
+
+    if (saveNewGenre) {
       // library.add("settings.used.genres.0",this.state.video.genre);
       genres.push(this.state.video.genre);
       genres.sort();
-      library.replace("settings.used.genres",genres);
+      library.replace("settings.used.genres", genres, finishBatchSave);
     }
 
     // console.log('object when saving:');
@@ -4325,12 +4744,36 @@ class MynEditor extends MynOpenablePane {
     // are changed before saving)
     this.setState({
       saveHash: hashObject(this.state.video),
-      changed: new Set()
+      changed: new Set(),
+      pendingFilenameResetPatches: {},
+      resetFromFilenamePending: false,
+      filenameResetStaged: false
     });
   }
 
   componentDidUpdate(oldProps) {
     if (!_.isEqual(oldProps.video, this.props.video)) {
+      const oldSelectionKey = editorSelectionKey(oldProps.video, oldProps.batch);
+      const currentSelectionKey = editorSelectionKey(this.props.video, this.props.batch);
+
+      // Parent-level library updates recreate the batch summary object. Before
+      // this guard, such a same-selection refresh unconditionally replaced the
+      // editor state and erased the confirmed per-video reset patches. Preserve
+      // the local reset transaction until the user explicitly Saves, Reverts,
+      // or moves to a genuinely different video selection.
+      if (oldSelectionKey === currentSelectionKey &&
+          (this.state.resetFromFilenamePending || this.state.filenameResetStaged)) {
+        editorLog.info('Preserved staged filename reset during same-selection refresh', {
+          selectionType: this.props.video && this.props.video.id === 'batch' ? 'batch' : 'single',
+          videoCount: this.props.video && this.props.video.id === 'batch' ?
+            (this.props.batch || []).length : 1,
+          resetRequestPending: Boolean(this.state.resetFromFilenamePending),
+          filenameResetPatchCount: Object.keys(this.state.pendingFilenameResetPatches || {}).length,
+          changedFields: Array.from(this.state.changed || []).sort()
+        });
+        return;
+      }
+
       let videoEditPrepped = _.cloneDeep(this.props.video);
 
       if (videoEditPrepped) {
@@ -4345,6 +4788,9 @@ class MynEditor extends MynOpenablePane {
         this.setState({
           video: videoEditPrepped,
           changed: new Set(),
+          pendingFilenameResetPatches: {},
+          resetFromFilenamePending: false,
+          filenameResetStaged: false,
           saveHash: hashObject(videoEditPrepped)
         });
       }
@@ -4407,6 +4853,10 @@ class MynEditor extends MynOpenablePane {
           settings={this.props.settings}
           handleChange={this.handleChange}
           revertChanges={this.revertChanges}
+          resetFromFilename={this.requestResetFromFilename}
+          resetPatches={this.state.pendingFilenameResetPatches}
+          resetPending={this.state.resetFromFilenamePending}
+          changedFields={this.state.changed}
           saveChanges={this.saveChanges}
           placeholderImage={this.state.placeholderImage}
           reportValid={this.reportValid}
@@ -4429,7 +4879,8 @@ class MynEditor extends MynOpenablePane {
         // console.log(this.state.video);
 
         let newHash = this.state.video ? hashObject(this.state.video) : null;
-        return this.state.saveHash !== newHash;
+        return this.state.saveHash !== newHash ||
+          Object.keys(this.state.pendingFilenameResetPatches || {}).length > 0;
       }, // boolean for whether or not to show confirmation dialog upon exiting the pane
       confirmMsg: 'Are you sure you want to exit without saving? Your changes will be lost'
     });
@@ -4505,9 +4956,24 @@ class MynEditorSearch extends React.Component {
       return;
     }
 
-    let movies = results.map((movie) => {
+    // Ordinary title searches can contain series records that are not valid
+    // choices for a movie or episode. Filter those records before rendering,
+    // rather than returning undefined JSX entries: an array of undefined
+    // entries is truthy and used to produce an empty results area with only
+    // its X button visible.
+    let displayableResults = results.filter(movie => {
+      if (!movie) return false;
       let isSeriesChoice = movie.myndaChoiceType === 'series';
-      if (movie.Type === 'series' && !isSeriesChoice) return; // don't display unrelated series from ordinary title searches
+      return movie.Type !== 'series' || isSeriesChoice;
+    });
+
+    if (displayableResults.length === 0) {
+      this.setState({results:null});
+      alert('No compatible results found! For shows, check the series, season, and episode. For other videos, try editing the title and year, or enter the IMDb ID for an exact match.');
+      return;
+    }
+
+    let movies = displayableResults.map((movie) => {
 
       if (!isValidURL(movie.Poster)) {
         movie.Poster = this.props.placeholderImage;
@@ -4753,6 +5219,24 @@ class MynEditorEdit extends React.Component {
     }
 
     const video = this.props.video;
+    const resetPatches = Object.values(this.props.resetPatches || {});
+
+    // A batch reset can contain a different derived value for every video.
+    // The common batch object must represent those differing values as blank,
+    // which otherwise makes the editor look unchanged. Give every still-pending
+    // reset field a normal form placeholder so the user can see what Save will
+    // do. Once the user supplies an overriding value for a field, its ordinary
+    // placeholder returns. (Ratings are handled per input below, because one
+    // edited rating should not hide the reset marker from the other sources.)
+    const isPendingResetField = (property, ignoreChanged = false) => {
+      return video.id === 'batch' &&
+        resetPatches.length > 0 &&
+        (ignoreChanged || !this.props.changedFields || !this.props.changedFields.has(property)) &&
+        resetPatches.every(patch => Object.prototype.hasOwnProperty.call(patch, property));
+    };
+    const resetPlaceholder = (property, ordinaryPlaceholder = '') => {
+      return isPendingResetField(property) ? 'Reset' : ordinaryPlaceholder;
+    };
     // validateVideo(video);
 
     // if (validateVideo(video) !== true) {
@@ -4780,7 +5264,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="title"
-            placeholder={'[Title]'}
+            placeholder={resetPlaceholder('title', '[Title]')}
             className="edit-field-title"
             update={this.props.handleChange}
             options={null}
@@ -4800,6 +5284,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="imdbID"
+            placeholder={resetPlaceholder('imdbID')}
             className="edit-field-imdbID"
             update={this.props.handleChange}
             options={null}
@@ -4819,6 +5304,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="year"
+            placeholder={resetPlaceholder('year')}
             className="edit-field-year"
             update={this.props.handleChange}
             options={null}
@@ -4838,6 +5324,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="director"
+            placeholder={resetPlaceholder('director')}
             className="edit-field-director"
             update={this.props.handleChange}
             options={null}
@@ -4857,6 +5344,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="directorsort"
+            placeholder={resetPlaceholder('directorsort')}
             className="edit-field-directorsort"
             update={this.props.handleChange}
             options={null}
@@ -4877,7 +5365,7 @@ class MynEditorEdit extends React.Component {
             id="edit-field-description"
             name="description"
             value={this.props.video.description}
-            placeholder={'[Description]'}
+            placeholder={resetPlaceholder('description', '[Description]')}
             onChange={(e) => this.props.handleChange({'description':e.target.value})}
           />
         </div>
@@ -4916,6 +5404,7 @@ class MynEditorEdit extends React.Component {
             movie={this.props.video}
             update={this.props.handleChange}
             placeholderImage={this.props.placeholderImage}
+            placeholder={resetPlaceholder('artwork', 'Paste path/URL')}
           />
         </div>
       </div>
@@ -4947,6 +5436,7 @@ class MynEditorEdit extends React.Component {
           <MynEditInlineAddListWidget
             object={this.props.video}
             property="cast"
+            placeholder={resetPlaceholder('cast', 'Add...')}
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.people.exp}
@@ -4965,6 +5455,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="genre"
+            placeholder={resetPlaceholder('genre')}
             className="edit-field-genre"
             update={this.props.handleChange}
             options={this.props.settings.used.genres}
@@ -4985,6 +5476,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="series"
+            placeholder={resetPlaceholder('series')}
             className="edit-field-series"
             update={this.props.handleChange}
             options={null}
@@ -5004,6 +5496,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="season"
+            placeholder={resetPlaceholder('season')}
             className="edit-field-season"
             update={this.props.handleChange}
             options={null}
@@ -5023,6 +5516,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="episode"
+            placeholder={resetPlaceholder('episode')}
             className="edit-field-episode"
             update={this.props.handleChange}
             options={null}
@@ -5043,12 +5537,12 @@ class MynEditorEdit extends React.Component {
     if (this.props.video.kind && this.props.video.kind !== '' && !this.props.settings.used.kinds.includes(this.props.video.kind)) {
       options.unshift(<option key='invalid' disabled hidden value={this.props.video.kind}>{this.props.video.kind}</option>);
     }
-    options.unshift(<option key='none' disabled hidden value=''></option>);
+    options.unshift(<option key='none' disabled hidden value=''>{resetPlaceholder('kind')}</option>);
     let kind = (
       <div className='edit-field kind'>
         <label className="edit-field-name" htmlFor="kind">Kind: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
-          <select id="edit-field-kind" name="kind" value={this.props.video.kind || ''} onChange={(e) => this.props.handleChange({'kind':e.target.value})}>
+          <select id="edit-field-kind" name="kind" className={isPendingResetField('kind') && !this.props.video.kind ? 'pending-reset' : ''} value={this.props.video.kind || ''} onChange={(e) => this.props.handleChange({'kind':e.target.value})}>
             {options}
           </select>
         </div>
@@ -5135,6 +5629,7 @@ class MynEditorEdit extends React.Component {
             property="ratings"
             video={this.props.video}
             update={this.props.handleChange}
+            placeholder={isPendingResetField('ratings', true) ? 'Reset' : '#'}
             validator={this.state.validators.numrange.exp}
             validatorTip={this.state.validators.numrange.tip}
             reportValid={this.props.reportValid}
@@ -5151,6 +5646,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="boxoffice"
+            placeholder={resetPlaceholder('boxoffice')}
             className="edit-field-boxoffice"
             update={this.props.handleChange}
             options={null}
@@ -5187,12 +5683,12 @@ class MynEditorEdit extends React.Component {
         return (<option key={i} disabled>{'\u2501'}{'\u2501'}{'\u2501'}{'\u2501'}</option>)
       }
     });
-    options.unshift(<option key={options.length} disabled hidden value=''></option>);
+    options.unshift(<option key={options.length} disabled hidden value=''>{resetPlaceholder('rated')}</option>);
     let rated = (
       <div className='edit-field rated'>
         <label className="edit-field-name" htmlFor="rated">Rated: </label>
         <div className="edit-field-editor select-container select-alwaysicon">
-          <select id="edit-field-kind" name="rated" value={this.props.video.rated} onChange={(e) => this.props.handleChange({'rated':e.target.value})}>
+          <select id="edit-field-kind" name="rated" className={isPendingResetField('rated') && !this.props.video.rated ? 'pending-reset' : ''} value={this.props.video.rated} onChange={(e) => this.props.handleChange({'rated':e.target.value})}>
             {options}
           </select>
         </div>
@@ -5207,6 +5703,7 @@ class MynEditorEdit extends React.Component {
           <MynEditInlineAddListWidget
             object={this.props.video}
             property="languages"
+            placeholder={resetPlaceholder('languages', 'Add...')}
             update={this.props.handleChange}
             options={null}
             validator={this.state.validators.generous.exp}
@@ -5225,6 +5722,7 @@ class MynEditorEdit extends React.Component {
           <MynEditText
             object={this.props.video}
             property="country"
+            placeholder={resetPlaceholder('country')}
             className="edit-field-country"
             update={this.props.handleChange}
             options={null}
@@ -5299,13 +5797,22 @@ class MynEditorEdit extends React.Component {
               </tr>
             </thead>
             <tbody>
-             {this.props.batch.map(v => (
-                 <tr key={v.id}>
-                  <td className='title'><MynOverflowTextMarquee text={v.title} ellipsis='fade' /></td>
-                  <td className='year'>{v.year}</td>
-                  <td className='filename'><MynOverflowTextMarquee text={v.filename} direction='left' ellipsis='fade' /></td>
+             {this.props.batch.map(v => {
+               // Filename-derived batch resets remain pending until Save.
+               // Preview each video's own patch here so the user can inspect
+               // the newly detected titles rather than the stale saved ones.
+               const previewVideo = {
+                 ...v,
+                 ...((this.props.resetPatches && this.props.resetPatches[v.id]) || {})
+               };
+               return (
+                 <tr key={previewVideo.id}>
+                  <td className='title'><MynOverflowTextMarquee text={previewVideo.title} ellipsis='fade' /></td>
+                  <td className='year'>{previewVideo.year}</td>
+                  <td className='filename'><MynOverflowTextMarquee text={previewVideo.filename} direction='left' ellipsis='fade' /></td>
                  </tr>
-             ))}
+               );
+             })}
             </tbody>
           </table>
        );
@@ -5355,8 +5862,23 @@ class MynEditorEdit extends React.Component {
           {languages}
           {new_}
           {metadata}
+          <button
+            type="button"
+            className="edit-field filename-reset-btn"
+            onClick={this.props.resetFromFilename}
+            disabled={this.props.resetPending}
+            title="Re-detect identification from each filename and its folders, then clear downloaded catalog information so tagging can be tried again"
+          >
+            {this.props.resetPending ? 'Preparing Reset…' : 'Reset from Filename'}
+          </button>
           <button className="edit-field revert-btn" onClick={(e) => this.requestRevert(e)}>Revert to Saved</button>
-          <input className="edit-field save-btn" type="submit" value="Save" />
+          <input
+            className="edit-field save-btn"
+            type="submit"
+            value="Save"
+            disabled={this.props.resetPending}
+            title={this.props.resetPending ? 'Wait for the filename reset to finish before saving' : ''}
+          />
         </form>
       </div>
     );
@@ -5452,12 +5974,10 @@ class MynEditRatings extends MynEdit {
     // this.handleInput = this.handleInput.bind(this);
   }
 
-  handleInput(target, value, source) {
+  validateInput(target, value, source) {
     let min = this.state.source[source].min;
     let max = this.state.source[source].max;
 
-    // let target = event.target;
-    // let value = target.value;
     if (value === "") {
       super.handleValidity(true,this.props.property,target);
     } else if (this.props.validator.test(value,min,max)) {
@@ -5467,6 +5987,10 @@ class MynEditRatings extends MynEdit {
       // console.log('validation error!');
       // event.target.parentElement.getElementsByClassName('error-message')[0].classList.add('show');
     }
+  }
+
+  handleInput(target, value, source) {
+    this.validateInput(target, value, source);
 
     let update = _.cloneDeep(this.props.video[this.props.property]);
     // update[source] = !isNaN(Number(value)) && value !== '' ? value / this.state.source[source].max : value;
@@ -5476,28 +6000,21 @@ class MynEditRatings extends MynEdit {
   }
 
   componentDidUpdate(oldProps) {
-    // this will trigger when we hit the 'revert to saved' button
+    // Controlled React inputs already receive their new displayed values from
+    // props when Revert or Reset changes the ratings object. Revalidate those
+    // programmatic values, but do not route them through handleInput(): doing
+    // so falsely marked ratings as a user edit and made the later batch-save
+    // override logic run even when the user never touched a rating field.
     if (!_.isEqual(oldProps.video[this.props.property],this.props.video[this.props.property])) {
-      // we have to reset each field back, which is actually a little convoluted since there are 3 of them
-
-       // get array of each input and loop over them
       let inputs = Array.from(this.table.current.getElementsByClassName('ratings-input-input'));
       inputs.map(input => {
-        // get the source for this input by comparing the classList to the state object, picking the one that matches one of the state object's keys (convoluted, right?)
+        // Identify the rating source from the input's imdb/rt/mc class.
         let source = Array.from(input.classList).find(theClass => Object.keys(this.state.source).includes(theClass));
         let value = this.props.video[this.props.property][source];
-        // if the value does not exist in the video object, we have to supply our own empty string;
-        // if it does, we have to multiply it to produce the appropriate display value
         if (value === undefined) {
           value = '';
         }
-        // if (!isNaN(Number(value))) {
-        //   value *= this.state.source[source].max;
-        // } else {
-        //   value = ''
-        // }
-        // now we can call handleInput to update the input values
-        this.handleInput(input, value, source);
+        this.validateInput(input, value, source);
       });
     }
   }
@@ -5519,7 +6036,7 @@ class MynEditRatings extends MynEdit {
                  type="text"
                  name={source}
                  value={this.props.video[this.props.property][source] || ''}
-                 placeholder={'#'}
+                 placeholder={this.props.placeholder || '#'}
                  onChange={(e) => this.handleInput(e.target, e.target.value, source)}
                 />
               </td>
@@ -6012,7 +6529,7 @@ class MynEditArtwork extends MynEdit {
           onMouseLeave={(e) => this.imageOut(e)}
         />
         <div>
-          <input ref={this.input} type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder="Paste path/URL" onChange={(e) => this.handleInput(e)} />
+          <input ref={this.input} type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder={this.props.placeholder || "Paste path/URL"} onChange={(e) => this.handleInput(e)} />
           <div ref={this.dlMsg} id="edit-field-artwork-dl-msg" style={{display:"none"}}>{this.state.message}</div>
         </div>
         <div id="edit-field-artwork-buttons">
@@ -6509,7 +7026,7 @@ class MynEditAddToList extends MynEditListWidget {
 
     return (
       <div id={this.state.id} className={"list-widget-add select-container " + (this.props.inline || "") + (this.props.options ? " select-hovericon" : "") + (options ? " datalist" : "")}>
-        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder="Add..." value={this.state.value} minLength="1" onChange={(e) => this.handleInput(e)} onKeyDown={(e) => this.keyDown(e)} />
+        <input type="text" list={listName} id={this.state.id + "-input"} className="list-widget-add-input" placeholder={this.props.placeholder || "Add..."} value={this.state.value} minLength="1" onChange={(e) => this.handleInput(e)} onKeyDown={(e) => this.keyDown(e)} />
         <button className="editor-inline-button" onClick={(e) => this.addItem(e)}>{"\uFE62"}</button>
         {options}
       </div>
@@ -6528,7 +7045,7 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
     return (
       <ul className={"list-widget-list " + this.props.property}>
         {this.displayList()}
-        <MynEditAddToList object={this.props.object} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} />
+        <MynEditAddToList object={this.props.object} property={this.props.property} update={this.props.update} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.props.validator} validatorTip={this.props.validatorTip} placeholder={this.props.placeholder} />
       </ul>
     );
   }
