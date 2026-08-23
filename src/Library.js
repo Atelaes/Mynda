@@ -2,9 +2,10 @@
 const electron = require('electron');
 const path = require('path');
 const fs = require('fs');
-const {v4: uuidv4} = require('uuid');
+const { v4: uuidv4 } = require('uuid');
 const _ = require('lodash');
 const { ipcRenderer } = require('electron');
+const { trackManualSubtitleEdit } = require('./SubtitleMatcher.js');
 
 class Library {
   constructor() {
@@ -26,7 +27,6 @@ class Library {
         this.alter(message)
       });
       ipcRenderer.on('lib-confirm', (event, message) => {
-        // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
         this.getConfirm(message)
       });
       ipcRenderer.send('lib-beacon');
@@ -37,8 +37,39 @@ class Library {
 
     // Load library
     const data = this.load();
-    Object.keys(data).map((key) => {this[key] = data[key]});
-    // ['settings', 'playlists', 'collections', 'media'].map((key) => {this[key] = data[key]});
+    Object.keys(defaultLibrary).map((key) => {
+      this[key] = typeof data[key] === 'undefined' ? _.cloneDeep(defaultLibrary[key]) : data[key];
+    });
+
+    // Remove the retired per-video field from both active and inactive media.
+    for (const listName of ['media', 'inactive_media']) {
+      if (Array.isArray(this[listName])) {
+        this[listName].forEach(video => {
+          if (video && typeof video === 'object') delete video.collections;
+        });
+      }
+    }
+
+    // Retired or otherwise unsupported playlist views fall back to the flat view.
+    if (Array.isArray(this.playlists)) {
+      this.playlists.forEach(playlist => {
+        if (playlist && playlist.view !== 'series') playlist.view = 'flat';
+      });
+    }
+
+    // Keep only confirmation preferences that the current build supports.
+    try {
+      const supportedDialogs = Object.keys(defaultLibrary.settings.preferences.override_dialogs);
+      this.settings.preferences.override_dialogs = _.pick(
+        {
+          ...defaultLibrary.settings.preferences.override_dialogs,
+          ...(this.settings.preferences.override_dialogs || {})
+        },
+        supportedDialogs
+      );
+    } catch (err) {
+      this.settings.preferences.override_dialogs = _.cloneDeep(defaultLibrary.settings.preferences.override_dialogs);
+    }
 
     this.Queue = [];
     this.arrayCleanupHistory = {};
@@ -51,7 +82,7 @@ class Library {
   //address: the location of the operation
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
-  alter({opType=null, address=null, entry=null, sync=false, origin=null, cb=(err)=>{if (err) console.log(err)}} = {}) {
+  alter({ opType = null, address = null, entry = null, sync = false, origin = null, cb = (err) => { if (err) console.log(err) } } = {}) {
     //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     //let startTime = new Date();
     try {
@@ -63,6 +94,48 @@ class Library {
       } else if (opType === 'remove' && entry) {
         throw 'Remove operations should not contain an entry';
       }
+
+      // Full-video replacements made in the renderer are editor saves. Record
+      // subtitle additions/removals before mirroring the replacement to the
+      // backend so later scans can preserve the user's choices.
+      if (this.env === 'browser' && !sync && opType === 'replace' &&
+        /^media\.[^.]+$/.test(address) && entry && typeof entry === 'object') {
+        const subtitlesWereEdited = entry.__mynda_subtitles_edited === true;
+        delete entry.__mynda_subtitles_edited;
+        const selector = address.slice('media.'.length);
+        let oldVideo = null;
+        if (Number.isInteger(Number(selector))) {
+          oldVideo = this.media[Number(selector)];
+        } else if (selector.includes('=')) {
+          const components = selector.split('=');
+          const property = components[0];
+          const value = components.slice(1).join('=');
+          oldVideo = this.media.find(video =>
+            video && typeof video[property] !== 'undefined' && video[property] === value
+          );
+        }
+        if (oldVideo && subtitlesWereEdited) {
+          entry = trackManualSubtitleEdit(oldVideo, entry);
+        } else if (oldVideo) {
+          // Full-video saves are also used for unrelated edits and playback
+          // state. Preserve the newest subtitle state instead of allowing a
+          // stale renderer clone to overwrite a concurrent scan update.
+          entry.subtitles = _.cloneDeep(oldVideo.subtitles || []);
+          for (const property of [
+            'detected_subtitles',
+            'manual_subtitles',
+            'ignored_subtitles',
+            'subtitle_tracking_initialized'
+          ]) {
+            if (Object.prototype.hasOwnProperty.call(oldVideo, property)) {
+              entry[property] = _.cloneDeep(oldVideo[property]);
+            } else {
+              delete entry[property];
+            }
+          }
+        }
+      }
+
       //Get one step away from the location specified by address
       //Most operations won't work if we go all the way
       let addArr = address.split('.');
@@ -70,7 +143,7 @@ class Library {
       // let addEnd = addArr[addArr.length-1];
       let addEnd = addArr.pop();
       // for (let i=0; i<addArr.length-1; i++) {
-      for (let i=0; i<addArr.length; i++) {
+      for (let i = 0; i < addArr.length; i++) {
         dest = dest[addArr[i]];
       }
 
@@ -79,7 +152,7 @@ class Library {
       //Push is used as address terminus if we're just adding to end of array
       if (Array.isArray(dest)) {
         if (addEnd === 'push') {
-          switch(opType) {
+          switch (opType) {
             case 'add':
               dest.push(entry);
               break;
@@ -106,7 +179,7 @@ class Library {
                 let val = components.slice(1).join('=');
 
                 let found = false;
-                for (let i=0; i<dest.length; i++) {
+                for (let i = 0; i < dest.length; i++) {
                   if (typeof dest[i][prop] !== 'undefined' && dest[i][prop] === val) {
                     console.log(`found element to replace at index ${i}; replacing...`);
                     found = true;
@@ -145,15 +218,15 @@ class Library {
               // because that will throw off other operations reliant on indices;
               // at the end, all the null elements will be removed
               // if (this.Queue.length > 0) {
-                dest.splice(addEnd, 1, null);
-              // } else {
-              //   dest.splice(addEnd, 1);
-              // }
+              dest.splice(addEnd, 1, null);
+            // } else {
+            //   dest.splice(addEnd, 1);
+            // }
           }
         }
       } else {
         //If we're not in array, then we're in an object
-        switch(opType) {
+        switch (opType) {
           case 'add':
             if (dest[addEnd]) {
               throw 'Something already exists at that location, use replace.';
@@ -163,7 +236,7 @@ class Library {
             break;
           case 'replace':
             // if (typeof dest[addEnd] !== "undefined") {
-              dest[addEnd] = entry;
+            dest[addEnd] = entry;
             // } else {
             //   throw 'Nothing to replace, use add.';
             // }
@@ -207,14 +280,14 @@ class Library {
       // save to file, communicate with partner library
       if (sync) {
         //If this was requested by other library, let them know we did it
-        this.confirm({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
+        this.confirm({ opType: opType, address: address, entry: entry, sync: sync, origin: origin });
       } else {
 
         // Start by saving to file.
         this.save();
 
         //If this was a local operation, request other library mirror it
-        this.sync({opType: opType, address: address, entry: entry, sync: sync, origin: origin});
+        this.sync({ opType: opType, address: address, entry: entry, sync: sync, origin: origin });
 
         // execute callback;
         cb();
@@ -224,7 +297,7 @@ class Library {
       if (this.env === 'browser') {
         savedPing.saved(address);
       }
-    } catch(e) {
+    } catch (e) {
       cb(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
     }
     //let endTime = new Date();
@@ -236,17 +309,17 @@ class Library {
   // Takes a string address in dot format, and adds "addition" to that location.
   add(address, addition, cb) {
     //console.log('adding...')
-    this.addToQueue({opType: 'add', address: address, entry: addition, sync: false, origin: null, cb:cb});
+    this.addToQueue({ opType: 'add', address: address, entry: addition, sync: false, origin: null, cb: cb });
   }
 
   // Takes a string address in dot format, and replaces whatever is there with "replacement".
   replace(address, replacement, cb) {
-    this.addToQueue({opType: 'replace', address: address, entry: replacement, sync: false, origin: null, cb:cb});
+    this.addToQueue({ opType: 'replace', address: address, entry: replacement, sync: false, origin: null, cb: cb });
   }
 
   // Takes a string address in dot format, and removes whatever is there.
   remove(address, cb) {
-    this.addToQueue({opType: 'remove', address: address, entry: null, sync: false, origin: null, cb:cb});
+    this.addToQueue({ opType: 'remove', address: address, entry: null, sync: false, origin: null, cb: cb });
   }
 
   addToQueue(argObj) {
@@ -268,13 +341,12 @@ class Library {
       console.log("Trying to create confirm, but something already at waitConfirm.");
     } else {
       this.waitConfirm = _.cloneDeep(argObj);
-      // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     }
     if (this.env === 'server') {
       try {
         //console.log('Sending a mirror request to browser');
         this.browser.send('lib-sync-op', argObj);
-      } catch(err) {
+      } catch (err) {
         //console.log('Browser does not exist yet or did not send beacon. Continuing server operation without sending sync operation.');
         this.getConfirm(); // manually call getConfirm to proceed to the next item in queue
       }
@@ -282,7 +354,6 @@ class Library {
       //console.log('Sending a mirror request to server');
       ipcRenderer.send('lib-sync-op', argObj);
     }
-    // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
   }
 
   // Takes an operation type, a string address in dot format, and optionally an item.
@@ -299,7 +370,6 @@ class Library {
   }
 
   getConfirm(argObj) {
-    // console.log(`waitConfirm collections is ${JSON.stringify(this.waitConfirm.entry.collections)}`);
     if (_.isEqual(argObj, this.waitConfirm)) {
       //console.log("Got a valid confirmation back, sync operation successful!")
     } else if (typeof argObj === "undefined") {
@@ -321,13 +391,13 @@ class Library {
 
   //Loads all data into an object and saves that object to file location.
   //Takes an optional location to save, otherwise saves to appData.
-  save(loc=this.path) {
+  save(loc = this.path) {
     try {
       let saveObj = {};
-      Object.keys(defaultLibrary).map((key) => {saveObj[key] = this[key]});
+      Object.keys(defaultLibrary).map((key) => { saveObj[key] = this[key] });
       // console.log(`\n==== SAVING ====\n\n\n${JSON.stringify(saveObj)}\n\n\n`);
       fs.writeFileSync(loc, JSON.stringify(saveObj));
-    } catch(e) {
+    } catch (e) {
       console.log("Error writing to file: " + e.toString());
     }
   }
@@ -338,7 +408,7 @@ class Library {
     // `fs.readFileSync` will return a JSON string which we then parse into a Javascript object
     try {
       return JSON.parse(fs.readFileSync(this.path));
-    } catch(error) {
+    } catch (error) {
       // if there was some kind of error, return the passed in defaults instead.
       console.log("No library found, creating default empty library");
       try {
@@ -349,7 +419,7 @@ class Library {
           fs.mkdirSync(artDir);
         }
         fs.writeFileSync(this.path, JSON.stringify(defaultLibrary));
-      } catch(e) {
+      } catch (e) {
         console.log("Error writing to file: " + e.toString());
       }
 
@@ -360,31 +430,31 @@ class Library {
 }
 
 const defaultLibrary = {
-  "id" : uuidv4(),
-  "settings" : {
-    "watchfolders" : [],
-    "themes" : {
-      "appearances" : [
+  "id": uuidv4(),
+  "settings": {
+    "watchfolders": [],
+    "themes": {
+      "appearances": [
         {
-          "name" : "Dark Theme",
-          "path" : "../themes/appearances/dark-theme.css",
-          "dependencies" : {
-            "fonts" : [],
-            "images" : []
+          "name": "Dark Theme",
+          "path": "../themes/appearances/dark-theme.css",
+          "dependencies": {
+            "fonts": [],
+            "images": []
           }
         }
       ],
-      "layouts" : [
+      "layouts": [
         {
-          "name" : "Default Layout Theme",
-          "path" : "../themes/layouts/default-layout-theme.css",
-          "dependencies" : {}
+          "name": "Default Layout Theme",
+          "path": "../themes/layouts/default-layout-theme.css",
+          "dependencies": {}
         }
       ]
     },
-    "preferences" : {
-      "defaultcolumns" : {
-        "used" : [
+    "preferences": {
+      "defaultcolumns": {
+        "used": [
           "title",
           "year",
           "director",
@@ -393,7 +463,7 @@ const defaultLibrary = {
           "ratings_user",
           "dateadded"
         ],
-        "unused" : [
+        "unused": [
           "kind",
           "lastseen",
           "watchlater",
@@ -409,8 +479,8 @@ const defaultLibrary = {
           "resolution"
         ]
       },
-      "defaultdefaultcolumns" : {
-        "used" : [
+      "defaultdefaultcolumns": {
+        "used": [
           "title",
           "year",
           "director",
@@ -419,7 +489,7 @@ const defaultLibrary = {
           "ratings_user",
           "dateadded"
         ],
-        "unused" : [
+        "unused": [
           "kind",
           "lastseen",
           "watchlater",
@@ -435,38 +505,35 @@ const defaultLibrary = {
           "resolution"
         ]
       },
-      "hide_description" : "show",
-      "override_dialogs" : {
+      "hide_description": "show",
+      "override_dialogs": {
         "MynEditorSearch-confirm-select": false,
         "MynEditor-confirm-exit": false,
         "MynEditorEdit-confirm-revert": false,
-        "MynLibTable-confirm-inlineEdit": false,
-        "MynSettingsCollections-confirm-delete": false,
-        "MynSettingsCollections-confirm-convertToNonTerminal": false,
-        "MynLibrary-confirm-convertTerminalCol": false
+        "MynLibTable-confirm-inlineEdit": false
       },
       "include_user_rating_in_avg": false,
       "include_new_vids_in_playlists": true,
       "remove_autotagged_from_new": true
     },
-    "used" : {
-      "kinds" : [
+    "used": {
+      "kinds": [
         "movie",
         "show"
       ],
-      "genres" : [],
-      "tags" : []
+      "genres": [],
+      "tags": []
     }
   },
-  "playlists" : [
+  "playlists": [
     {
-      "id" : "new",
-      "name" : "New",
-      "filter_function" : "video.new === true",
-      "view" : "flat",
-      "tab" : true,
-      "flatDefaultSort" : "dateadded",
-      "columns" : [
+      "id": "new",
+      "name": "New",
+      "filter_function": "video.new === true",
+      "view": "flat",
+      "tab": true,
+      "flatDefaultSort": "dateadded",
+      "columns": [
         "title",
         "dateadded",
         "seen",
@@ -474,12 +541,12 @@ const defaultLibrary = {
       ]
     },
     {
-      "id" : "1",
-      "name" : "Movies",
-      "filter_function" : "video.kind === 'movie'",
-      "view" : "flat",
-      "tab" : true,
-      "columns" : [
+      "id": "1",
+      "name": "Movies",
+      "filter_function": "video.kind === 'movie'",
+      "view": "flat",
+      "tab": true,
+      "columns": [
         "title",
         "year",
         "director",
@@ -491,12 +558,12 @@ const defaultLibrary = {
       ]
     },
     {
-      "id" : "2",
-      "name" : "Shows",
-      "filter_function" : "video.kind === 'show'",
-      "view" : "series",
-      "tab" : true,
-      "columns" : [
+      "id": "2",
+      "name": "Shows",
+      "filter_function": "video.kind === 'show'",
+      "view": "series",
+      "tab": true,
+      "columns": [
         "title",
         "year",
         "director",
@@ -524,10 +591,9 @@ const defaultLibrary = {
       ]
     }
   ],
-  "collections" : [],
-  "recently_watched" : [],
-  "media" : [],
-  "object_media" : {},
+  "recently_watched": [],
+  "media": [],
+  "object_media": {},
   "inactive_media": []
 };
 

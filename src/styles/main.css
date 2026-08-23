@@ -40,9 +40,8 @@ body ::-webkit-scrollbar {
   outline: rgba(0,0,0,0) auto 0px;
 }
 
-/*  collection titles, table headers, playlist tabs, edit widgets, and table rows
-    should have a pointer cursor and not have selectable text */
-select, .collection h1, .movie-table th, #nav-playlists li, .edit-widget *, .movie-row, input[type=checkbox], .clickable {
+/* Interactive controls should have a pointer cursor and not have selectable text. */
+select, .movie-table th, #nav-playlists li, .edit-widget *, .movie-row, input[type=checkbox], .clickable {
   cursor: pointer;
   user-select: none;
 }
@@ -640,86 +639,43 @@ table.compact .movie-row {
   text-align: center;
 }
 
-.movie-row .order > div {
-  position:relative; /* necessary so the clear button sits inside the input element */
-}
-.movie-row .order input {
-  width:2.7em;
+.series-header {
+  display: block;
+  background-color: var(--seriesheader-bg);
+  color: var(--seriesheader-text);
+  margin: var(--seriesheader-margin);
+  padding: var(--seriesheader-padding);
+  font-size: var(--seriesheader-font-size);
+  line-height: calc(var(--seriesheader-font-size) * 1.2);
+  text-transform: uppercase;
+  font-weight: var(--seriesheader-font-weight);
+  font-family: var(--seriesheader-font);
+  font-style: var(--seriesheader-font-style);
 }
 
-#collections-container {
-  margin-left: calc(-1 * var(--collection-marginleft));
-}
-#collections-container *.hidden {
-  display:none;
-}
-.collection {
-  margin-left: var(--collection-marginleft);
-  position: relative;
-}
-.series-header,
-.collection h1,
-.collection h1 input[type=text],
-.collection .collection-btn,
-.collection .delete-collection {
-  display:block;
-  background-color: var(--collectionheader-bg);
-  color: var(--collectionheader-text);
-  margin: var(--collectionheader-margin);
-  padding: var(--collectionheader-padding);
-  font-size: var(--collectionheader-font-size);
-  line-height: calc(var(--collectionheader-font-size) * 1.2);
-  text-transform: uppercase;
-  font-weight: var(--collectionheader-font-weight);
-  font-family: var(--collectionheader-font);
-  font-style: var(--collectionheader-font-style);
-}
-.collection h1 input[type=text] {
-  background-color: rgba(0,0,0,.15);
-  line-height:calc(var(--collectionheader-font-size) * 1);
-  height:calc(var(--collectionheader-font-size) * 1.2);
-  margin:0;
-}
-.collection h1 .tip {
-  font-size: calc(var(--tip-fontsize) * .8);
-  opacity: calc(var(--tip-opacity) * 1.2);
-}
-#library-pane .collection h1:hover,
 .series h1.series-header:hover {
-  background-color: var(--collectionheader-bg-hover);
-  color: var(--collectionheader-text-hover);
-}
-.collection.collapsed.drag-over h1 {
-  background-color: var(--collectionheader-bg-drag);
-  color: var(--collectionheader-text-drag);
-}
-/* the container div for a collections title */
-.collection h1 > div {
-  display: inline-block;
-}
-/* the input for when a collections title is clicked on to edit */
-.collection h1 input {
-  width:20em;
+  background-color: var(--seriesheader-bg-hover);
+  color: var(--seriesheader-text-hover);
 }
 
 .series.expanded .series-header {
-  background-color: var(--collectionheader-bg-expanded);
+  background-color: var(--seriesheader-bg-expanded);
 }
 .series-header.compact {
   /* font-size: var(--main-font-size-compact); */
   line-height: calc(var(--main-font-size-compact) * .8);
 }
 .season-header {
-    margin: var(--collectionheader-margin);
+    margin: var(--seriesheader-margin);
     padding-left: .5em;
-    font-size: var(--collectionheader-font-size);
-    line-height: calc(var(--collectionheader-font-size) * 1.5);
+    font-size: var(--seriesheader-font-size);
+    line-height: calc(var(--seriesheader-font-size) * 1.5);
     /* text-transform: uppercase; */
-    font-weight: var(--collectionheader-font-weight);
-    font-family: var(--collectionheader-font);
-    font-style: var(--collectionheader-font-style);
-    background-color: var(--collectionheader-bg);
-    color: var(--collectionheader-text);
+    font-weight: var(--seriesheader-font-weight);
+    font-family: var(--seriesheader-font);
+    font-style: var(--seriesheader-font-style);
+    background-color: var(--seriesheader-bg);
+    color: var(--seriesheader-text);
 }
 
 .seasons-container.hidden {
@@ -730,91 +686,6 @@ table.compact .movie-row {
   cursor: pointer;
 }
 
-.collection .collection-btn-container {
-  position:absolute;
-  top:0;
-  right:0;
-}
-.collection .collection-btn {
-  padding: var(--collectionheader-padding-padding);
-  text-align: center;
-  /* background-color: var(--settings-addcollection-bg-trans); */
-  color: var(--settings-addcollection-text);
-}
-.collection .collection-btn:hover {
-  background-color: var(--settings-addcollection-bg-hover);
-  color: var(--settings-addcollection-text-hover);
-}
-#library-pane .collection .collection-btn {
-  visibility: hidden;
-}
-/* .collection:hover > .collection-btn, */
-#library-pane .collection.dragging .collection-btn {
-  visibility: visible;
-}
-
-.collection .delete-collection {
-  display:none;
-  position:absolute;
-  top:0;
-  right:0;
-  padding: var(--collectionheader-padding-padding);
-  background-color: initial;
-  text-align: center;
-  opacity:0.5;
-}
-.collection:hover > .delete-collection {
-  display: block;
-}
-.collection > .delete-collection:hover {
-  color: var(--settings-addcollection-text-hover);
-  opacity:1;
-}
-.collection.dragging > .delete-collection {
-  display:none;
-}
-
-#library-addToExistingCollection {
-  position:relative;
-  padding: var(--collectionheader-padding-padding);
-}
-
-.collection.dragging #library-addToExistingCollection.selected:hover {
-  background-color: var(--collectionheader-bg-hover);
-}
-
-#library-addToExistingCollection.changing::after {
-  content:'DROP HERE';
-  position:absolute;
-  left:0;
-  top:0;
-  width:100%;
-  height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  /* font-family: var(--big-title-font); */
-  font-size: calc(var(--main-font-size) * 2.5);
-  white-space: nowrap;
-  letter-spacing: .3em;
-  /* text-align: center; */
-  font-weight:bold;
-  background-color: var(--lighter-bg);
-  color: black;
-  animation: addToExistingCollection .8s ease-in 1;
-  animation-delay: 0s;
-  animation-fill-mode: forwards;
-  opacity:.8;
-}
-
-@keyframes addToExistingCollection {
-  0% {
-  }
-  100% {
-    font-size: calc(var(--main-font-size) * 3);
-    opacity: 0;
-  }
-}
 
 
 /*************************************/
@@ -1544,89 +1415,6 @@ table.compact .movie-row {
   font-weight: bold;
 }
 
-#settings-collections .collection .videos {
-  margin-bottom:.2em;
-}
-#settings-collections .collection .video {
-  font-size: var(--settings-collectionvideo-font-size);
-  margin-left: var(--collection-marginleft);
-}
-#settings-collections .collection .video .order {
-  display:inline-block;
-  /* font-family:var(--alt-font); */
-  text-align: center;
-  box-sizing: border-box;
-  padding: .1em .4em .1em .4em;
-  /* padding: .1em .3em .1em .3em; */
-  /* padding: .1em; */
-  line-height: 1.2em;
-  vertical-align: middle;
-  /* height: 1.2em; */
-  min-width: 1.2em;
-  border-radius: 1.2em; /*0 1em 1em 0;*/
-  border: 1px solid var(--medlight-bg);
-  color: var(--dim-text);
-  background-color: var(--dark-bg);
-  /* background: linear-gradient(to left, var(--med-bg) 0, var(--med-bg-rgba0) 150%); */
-}
-
-
-#settings-collections .collection-btn {
-  margin-left: var(--collection-marginleft);
-  display: inline-block;
-}
-
-#settings-collections .collection header > h1 {
-/* #settings-collections .collection header > h1 input[type=text] { */
-  cursor: default;
-  font-size: var(--settings-collectionheader-font-size);
-  padding: var(--settings-collectionheader-padding);
-}
-
-#settings-collections .collection header > h1 input[type=text] {
-  /* text-transform: uppercase;
-  font-weight: var(--collectionheader-font-weight);
-  font-family: var(--collectionheader-font);
-  font-style: var(--collectionheader-font-style); */
-  font-size: var(--settings-collectionheader-font-size);
-  height:calc(var(--settings-collectionheader-font-size) * 1.2);
-}
-#settings-collections .collection header > h1 .tip {
-  font-size: calc(var(--tip-fontsize) * .7);
-  margin-top: -.1em;
-}
-#settings-collections .collection-btn h1 {
-  font-size: var(--settings-collectionheader-font-size);
-  padding: var(--settings-addcollection-padding);
-  width: var(--settings-addcollection-width);
-  text-align: center;
-
-  display:block;
-  color: var(--settings-addcollection-text);
-  background-color: var(--settings-addcollection-bg);
-  /* margin: var(--collectionheader-margin); */
-  margin:0;
-  text-transform: uppercase;
-  font-weight: var(--collectionheader-font-weight);
-  font-family: var(--collectionheader-font);
-  font-style: var(--collectionheader-font-style);
-}
-#settings-collections .collection-btn.add h1 {
-  /* background-color: var(--settings-addcollection-bg); */
-}
-#settings-collections .collection-btn.delete h1 {
-  background-color: var(--settings-addcollection-bg-delete);
-}
-#settings-collections .collection-btn:hover h1 {
-  background: var(--settings-addcollection-bg-hover);
-  color: var(--settings-addcollection-text-hover);
-}
-#settings-collections .collection-btn.delete:hover h1 {
-  background-color: rgba(200,70,70,.4);
-}
-#settings-collections .collection-btn.terminal {
-  opacity: .6;
-}
 
 
 /*************************************/
@@ -2170,10 +1958,6 @@ table.compact .movie-row {
   text-shadow: var(--editartwork-revert-textshadow-hover);
 }
 
-.edit-field.collections .edit-field-editor {
-  font-size: var(--collections-fontsize);
-}
-
 .edit-field.ratings table {
   /* list-style-type: none;
   margin: 0em;
@@ -2382,42 +2166,6 @@ table.compact .movie-row {
   height:1.2rem;
 }
 
-#editor-pane .collection-header * {
-  display: inline-block;
-}
-
-#editor-pane .collection-name {
-  color: var(--colname-text);
-  font-family: var(--colname-font);
-  font-size: var(--colname-fontsize);
-  font-style: var(--colname-fontstyle);
-  font-weight: var(--colname-fontweight);
-  text-transform: var(--colname-texttransform);
-}
-
-#editor-pane .collection-terminal-node {
-  display: inline-flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-
-  background: var(--coltermnode-bg);
-  background-color: var(--coltermnode-bg-color);
-  color: var(--coltermnode-text);
-  border-radius: var(--coltermnode-borderradius);
-  height: var(--coltermnode-height);
-  width: var(--coltermnode-width);
-  margin: var(--coltermnode-margin);
-  padding: var(--coltermnode-padding);
-  font-family: var(--coltermnode-font);
-  font-size: var(--coltermnode-fontsize);
-  font-style: var(--coltermnode-fontstyle);
-  font-weight: var(--coltermnode-fontweight);
-}
-
-#editor-pane .collection-terminal-node input[type=text] {
-  width:4.3em;
-  height: var(--coltermnode-height);
-}
 
 .playlist-bar {
   /* --bar-height: var(--movie-row-height); */

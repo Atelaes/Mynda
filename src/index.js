@@ -3,10 +3,15 @@ const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const {v4: uuidv4, v5: uuidv5} = require('uuid');
+const { v4: uuidv4, v5: uuidv5 } = require('uuid');
 const crypto = require('crypto');
 const Library = require("./Library.js");
-const Collections = require("./Collections.js");
+const {
+  subtitleExtensions,
+  prepareSubtitleMatches,
+  buildLegacySubtitleCounts,
+  reconcileVideoSubtitles
+} = require('./SubtitleMatcher.js');
 const dl = require('./download');
 const _ = require('lodash');
 const pathToFFmpeg = require('ffmpeg-static');
@@ -16,7 +21,7 @@ const ffprobe = require('ffprobe');
 let ffprobeStatic = {};
 try {
   ffprobeStatic = require('ffprobe-static');
-} catch(err) {console.log('Warning: ffprobe-static not installed')}
+} catch (err) { console.log('Warning: ffprobe-static not installed') }
 const OmdbHelper = require('./OmdbHelper.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
@@ -24,24 +29,20 @@ const checkDiskSpace = require('check-disk-space').default
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const videoExtensions = [
-  '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
-  'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
-  'mpe', 'mpeg', 'mpg',  'mpv', 'mts', 'mxf', 'nsv',  'ogg',  'ogv', 'qt',
-  'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
+  '3g2', '3gp', 'amv', 'asf', 'avchd', 'avi', 'divx', 'drc', 'f4a', 'f4b', 'f4p',
+  'f4v', 'flv', 'm2ts', 'm2v', 'm4p', 'm4v', 'mkv', 'mov', 'mp2', 'mp4',
+  'mpe', 'mpeg', 'mpg', 'mpv', 'mts', 'mxf', 'nsv', 'ogg', 'ogv', 'qt',
+  'rm', 'rmvb', 'roq', 'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
 ]
-const subtitleExtensions = [
-  'srt', 'ass', 'ssa', 'vtt', 'usf', 'ttml'
-];
-
 let win;
 let library = new Library;
-let collections = new Collections(library.collections);
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let libMulch = [];  //After libFileTree has been created and chewed up, this is the flattened version
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
 let unavailableWatchFolders = new Set(); // watchfolders whose scan failed; preserve their library entries for this scan
+let subtitleReconciliationContext = { detectedOwners: new Map(), legacyCounts: new Map() };
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
 let newIDs = [];
 let ffMpegQueue = [];
@@ -69,7 +70,7 @@ async function start() {
   }
 
   // make the temp folder if it doesn't already exist
-  const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+  const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'), 'temp');
   fs.mkdir(tempFolder, (err) => {
     if (err) console.log(err);
   });
@@ -84,18 +85,18 @@ async function start() {
 
 function testNotify(i) {
   let max = 250;
-  win.webContents.send('status-update', {action: 'add', numCurrent: i, numTotal: max});
+  win.webContents.send('status-update', { action: 'add', numCurrent: i, numTotal: max });
 
   // if (i === 0) win.webContents.send('status-update', {action: 'add'});
   if (i < max) {
-    setTimeout(() => testNotify(i+1),20);
+    setTimeout(() => testNotify(i + 1), 20);
   } else {
-    win.webContents.send('status-update', {action: ''});
+    win.webContents.send('status-update', { action: '' });
   }
 }
 
 function eraseTempImages() {
-  let folderPath = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+  let folderPath = path.join((electron.app || electron.remote.app).getPath('userData'), 'temp');
 
   fs.readdir(folderPath, (err, files) => {
     if (err) {
@@ -113,7 +114,7 @@ function eraseTempImages() {
           }
           console.log(`...successfully deleted ${file}`);
         });
-      } catch(err) {
+      } catch (err) {
         console.error(err);
       }
     });
@@ -126,9 +127,9 @@ async function createWindow() {
     height: 900,
     //frame: false,
     webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-        enableRemoteModule: true
+      nodeIntegration: true,
+      contextIsolation: false,
+      enableRemoteModule: true
     }
   })
 
@@ -139,13 +140,13 @@ async function createWindow() {
 
 // get rid of any null values in media, inactive_media, watchfolders, etc.
 function cleanLibrary() {
-  return new Promise((resolve,reject) => {
+  return new Promise((resolve, reject) => {
     // library.media.map();
     resolve();
   });
 }
 
-function removeWatchfolder(path,cb) {
+function removeWatchfolder(path, cb) {
   // in case we're currently adding media, we need to delete the removed
   // watchfolder from libFileTree, otherwise videos may get re-added as they get removed
   libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== path);
@@ -157,12 +158,12 @@ function removeWatchfolder(path,cb) {
 
   // remove the watchfolder
   let index;
-  library.settings.watchfolders.map((folder,i) => {
+  library.settings.watchfolders.map((folder, i) => {
     if (folder && folder.path === path) {
       index = i;
     }
   });
-  library.remove(`settings.watchfolders.${index}`,cb);
+  library.remove(`settings.watchfolders.${index}`, cb);
 }
 
 
@@ -175,7 +176,7 @@ async function removeWatchfolderVideosFromLibrary(folder) {
   //   vidIDs = library.settings.watchfolders.filter(wf => wf && wf.path === folder)[0].videos;
   // } catch(err) {
   //   console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
-    vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
+  vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
   // }
 
   let removedMedia = [];
@@ -187,12 +188,12 @@ async function removeWatchfolderVideosFromLibrary(folder) {
   });
   let inactiveMedia = [...library.inactive_media, ...removedMedia];
 
-  library.replace('media',keptMedia);
-  library.replace('inactive_media',inactiveMedia);
+  library.replace('media', keptMedia);
+  library.replace('inactive_media', inactiveMedia);
 }
 
 function removeVideo(video, index, fromInactive) {
-  return new Promise((resolve,reject) => {
+  return new Promise((resolve, reject) => {
     let address;
     if (fromInactive) {
       console.log(`Deleting ${video.filename} from library.inactive_media`);
@@ -204,7 +205,7 @@ function removeVideo(video, index, fromInactive) {
 
     // if we weren't given an index, find it
     if (typeof index === "undefined") {
-      index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
+      index = indexOfVideoInLibrary(video.id, fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
     }
 
     // remove from library.media or library.inactive_media
@@ -216,7 +217,7 @@ function removeVideo(video, index, fromInactive) {
 
       if (!fromInactive) {
         // add the video to library.inactive_media
-        library.add('inactive_media.push',video, (err) => {
+        library.add('inactive_media.push', video, (err) => {
           if (err) {
             reject(`Error: could not add ${video.filename} to inactive_media: ${err}`);
             return;
@@ -274,7 +275,7 @@ function isDVDRip(folder) {
   if (contents.length > 30) {
     return false;
   }
-  for (let i=0; i<contents.length; i++) {
+  for (let i = 0; i < contents.length; i++) {
     let content = contents[i];
     if (content.isDirectory()) {
       if (content.name === 'VIDEO_TS') {
@@ -291,44 +292,51 @@ function isDVDRip(folder) {
   return positiveEvidence;
 }
 
-let videoTemplate =   {
-    "id" : '',
-    "imdbID" : '',
-    "title" : '',
-    "year" : '',
-    "director" : '',
-    "directorsort" : '',
-    "cast" : [],
-    "description" : '',
-    "genre" : '',
-    "tags" : [],
-    "seen" : false,
-    "position" : 0,
-    "country" : '',
-    "languages" : [],
-    "boxoffice" : 0,
-    "rated" : '',
-    "ratings" : {},
-    "dateadded" : '',
-    "lastseen" : '',
-    "watchlater" : false,
-    "kind" : '',
-    "artwork" : '',
-    "subtitles" : [],
-    "filename" : '',
-    "new" : true,
-    "metadata" : {
-      "codec" : "",
-      "duration" : 0,
-      "width" : 0,
-      "height" : 0,
-      "aspect_ratio" : "",
-      "framerate" : 0,
-      "audio_codec" : "",
-      "audio_layout" : "",
-      "audio_channels" : 0
-    }
+let videoTemplate = {
+  "id": '',
+  "imdbID": '',
+  "title": '',
+  "year": '',
+  "series": '',
+  "season": '',
+  "episode": '',
+  "director": '',
+  "directorsort": '',
+  "cast": [],
+  "description": '',
+  "genre": '',
+  "tags": [],
+  "seen": false,
+  "position": 0,
+  "country": '',
+  "languages": [],
+  "boxoffice": 0,
+  "rated": '',
+  "ratings": {},
+  "dateadded": '',
+  "lastseen": '',
+  "watchlater": false,
+  "kind": '',
+  "artwork": '',
+  "subtitles": [],
+  "detected_subtitles": [],
+  "manual_subtitles": [],
+  "ignored_subtitles": [],
+  "subtitle_tracking_initialized": true,
+  "filename": '',
+  "new": true,
+  "metadata": {
+    "codec": "",
+    "duration": 0,
+    "width": 0,
+    "height": 0,
+    "aspect_ratio": "",
+    "framerate": 0,
+    "audio_codec": "",
+    "audio_layout": "",
+    "audio_channels": 0
   }
+}
 
 function checkWatchFolders() {
   // These values describe one scan only. Leaving them populated causes files
@@ -337,24 +345,25 @@ function checkWatchFolders() {
   libMulch = [];
   newIDs = [];
   unavailableWatchFolders = new Set();
+  subtitleReconciliationContext = { detectedOwners: new Map(), legacyCounts: new Map() };
 
-  win.webContents.send('status-update', {action: 'check'});
+  win.webContents.send('status-update', { action: 'check' });
   // reset libFileTree
-  libFileTree = {name:'root', folders:[]};
+  libFileTree = { name: 'root', folders: [] };
 
   // Search watchfolders for new files and add any new videos to the library
   console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
   numNewVids = 0; // reset the number of new videos found
   let folders = library.settings.watchfolders;
-  for (let i=0; i<folders.length; i++) {
+  for (let i = 0; i < folders.length; i++) {
     let thisFolder = folders[i];
     if (thisFolder) {
       let thisNode;
       let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
       if (filtered.length === 0) {
-        let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
+        let child = { path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: [] };
         libFileTree.folders.push(child);
-        thisNode = libFileTree.folders[libFileTree.folders.length-1];
+        thisNode = libFileTree.folders[libFileTree.folders.length - 1];
       } else {
         thisNode = filtered[0];
       }
@@ -363,7 +372,7 @@ function checkWatchFolders() {
   }
   if (folders.length === 0) {
     console.log('Done parsing. No watchfolders found.');
-    win.webContents.send('status-update', {action: ''});
+    win.webContents.send('status-update', { action: '' });
   }
 }
 
@@ -381,16 +390,16 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
   const kind = folderNode.kind;
 
   // read the contents of this folder
-  fs.readdir(folder, {withFileTypes : true}, function (err, components) {
+  fs.readdir(folder, { withFileTypes: true }, function (err, components) {
     // handling error
     if (err) {
-        unavailableWatchFolders.add(rootWatchFolder);
-        console.log(`Unable to scan directory: ${err}\nSkipping unavailable watchfolder: ${rootWatchFolder}`);
-        components = []; // in case of error, components will be undefined, so we make it an empty array instead
+      unavailableWatchFolders.add(rootWatchFolder);
+      console.log(`Unable to scan directory: ${err}\nSkipping unavailable watchfolder: ${rootWatchFolder}`);
+      components = []; // in case of error, components will be undefined, so we make it an empty array instead
     }
 
     // loop through all the folder contents
-    for (let i=0; i<components.length; i++) {
+    for (let i = 0; i < components.length; i++) {
       let component = components[i];
       let compAddress = path.join(folder, component.name);
 
@@ -399,12 +408,17 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
         if (isDVDRip(compAddress)) {
           // if it is, add it as a video
           // console.log(`${compAddress} is a DVD rip`);
-          folderNode.videos.push({dvd: true, filename: compAddress, kind: kind}); // add the DVD to libFileTree
+          folderNode.videos.push({
+            dvd: true,
+            filename: compAddress,
+            kind: kind,
+            folderParts: path.relative(rootWatchFolder, folder).split(path.sep).filter(Boolean)
+          }); // add the DVD to libFileTree
         } else {
           // if it's not, recurse on it as a folder
           recursed = true;
-          folderNode.folders.push({path:compAddress, kind:kind, folders:[], videos:[], subtitles:[]});
-          findVideosFromFolder(folderNode.folders[folderNode.folders.length-1], rootWatchFolder);
+          folderNode.folders.push({ path: compAddress, kind: kind, folders: [], videos: [], subtitles: [] });
+          findVideosFromFolder(folderNode.folders[folderNode.folders.length - 1], rootWatchFolder);
         }
       } else if (!/^\./.test(component.name)) {
         //If it's a hidden file, as evidenced by a filename starting with a dot
@@ -417,7 +431,11 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
           //console.log(`We're about to add ${component.name} to libTree.`);
           // if it's a video file, add it as a video
           // console.log(`${compAddress} is a regular video file`);
-          folderNode.videos.push({filename: compAddress, kind: kind}); // add the video to this node of the libFileTree
+          folderNode.videos.push({
+            filename: compAddress,
+            kind: kind,
+            folderParts: path.relative(rootWatchFolder, folder).split(path.sep).filter(Boolean)
+          }); // add the video to this node of the libFileTree
         } else if (subtitleExtensions.includes(fileExt)) {
           // if it's a subtitle file, add it as a subtitle
           // console.log(`${compAddress} is a subtitle file`);
@@ -434,7 +452,12 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
         break;
       }
     }
-    if (!stillGoing) divineCollections(libFileTree, []);
+    if (!stillGoing) {
+      confirmCurrentVideos().catch(err => {
+        console.error(`Watchfolder reconciliation failed: ${err}`);
+        win.webContents.send('status-update', { action: '' });
+      });
+    }
   });
 }
 
@@ -442,7 +465,7 @@ function isInUnavailableWatchFolder(filepath) {
   for (let watchfolder of unavailableWatchFolders) {
     let relativePath = path.relative(watchfolder, filepath);
     if (relativePath === '' ||
-        (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))) {
+      (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))) {
       return true;
     }
   }
@@ -473,46 +496,29 @@ function isSampleVideo(filepath) {
   return false;
 }
 
-//Recursive function which takes a built libFileTree and figures out collections
-// for videos based on file structure.
-function divineCollections(node, pathStack) {
-  //console.log('pathStack:');
-  //console.log(pathStack);
-  if (pathStack.length === 0) {
-    //If we're here, then we're looking at root, this should only happen once.
-    //console.log(`libTree before divination:  ${JSON.stringify(libFileTree)}`);
-  }
-
-  let parentFolder = node.path ? (node.path + path.sep) : '';
-  let count = 0;
-  for (let i=0; i<node.folders.length; i++) {
-    let folder = node.folders[i];
-    let stackAppend = folder.path.replace(parentFolder, '');
-    count += divineCollections(folder, pathStack.concat(stackAppend));
-  }
-  count += (node.videos) ? node.videos.length : 0;
-  if (count > 1 && pathStack.length > 1) {
-    node.collection = pathStack.slice(1);
-  }
-
-  if (pathStack.length === 0) {
-    //Again, we're on root.
-    //console.log(`libTree after divination:  ${JSON.stringify(libFileTree)}`);
-    confirmCurrentVideos().catch(err => {
-      console.error(`Watchfolder reconciliation failed: ${err}`);
-      win.webContents.send('status-update', {action: ''});
-    });
-  } else {
-    return count;
-  }
-}
-
 async function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
   // all there, removing from libFileTree as we go
   //console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
   console.log(`Running confirmCurrentVideos.`)
-  for (let h=library.media.length-1; h>=0; h--) {
+
+  // Match subtitles while the complete scanned tree is still intact. Doing
+  // this once, subtitle-first, lets us use folder structure and all candidate
+  // videos instead of recursively handing one video every subtitle beneath it.
+  const preparedSubtitles = prepareSubtitleMatches(libFileTree, unavailableWatchFolders);
+  subtitleReconciliationContext = {
+    detectedOwners: preparedSubtitles.detectedOwners,
+    legacyCounts: buildLegacySubtitleCounts(library.media, library.inactive_media)
+  };
+  console.log(
+    `Matched ${preparedSubtitles.stats.matchedSubtitles.size} of ` +
+    `${preparedSubtitles.stats.numSubtitles} subtitle files ` +
+    `(${preparedSubtitles.stats.multiplyAssignedSubtitles.size} shared by multiple editions).`
+  );
+  if (preparedSubtitles.stats.unmatched.length > 0) {
+    console.log('Subtitle files left unmatched:', preparedSubtitles.stats.unmatched);
+  }
+  for (let h = library.media.length - 1; h >= 0; h--) {
     let video = library.media[h];
     if (!video) {
       // library.remove(`media.${h}`);
@@ -537,7 +543,7 @@ async function confirmCurrentVideos() {
           break;
         }
       }
-      if (problem) {throw true}
+      if (problem) { throw true }
       // A failed scan means we do not know whether any file in this
       // watchfolder is present. Preserve its library entries until a later,
       // successful scan can determine that safely.
@@ -548,13 +554,13 @@ async function confirmCurrentVideos() {
       let libTreeLoc = libFileTree
       let pathComps = [conWatchFolder].concat(filename.replace(conWatchFolder + path.sep, '').split(path.sep));
       let pathComp = '';
-      for (let j=0; j<pathComps.length; j++) {
+      for (let j = 0; j < pathComps.length; j++) {
         problem = true;
-        let pathAdd =  (j===0) ? pathComps[j] : path.sep + pathComps[j];
+        let pathAdd = (j === 0) ? pathComps[j] : path.sep + pathComps[j];
         pathComp = pathComp + pathAdd;
         let lastOne = j === (pathComps.length - 1);
         if (!lastOne) {
-          for (let k=0; k<libTreeLoc.folders.length; k++) {
+          for (let k = 0; k < libTreeLoc.folders.length; k++) {
             if (libTreeLoc.folders[k].path === pathComp) {
               libTreeLoc = libTreeLoc.folders[k];
               problem = false;
@@ -562,11 +568,11 @@ async function confirmCurrentVideos() {
             }
           }
         } else {
-          for (let k=0; k<libTreeLoc.videos.length; k++) {
+          for (let k = 0; k < libTreeLoc.videos.length; k++) {
             if (libTreeLoc.videos[k].filename === filename) {
 
               // before deleting existing video from libFileTree, check for any subtitle changes
-              updateVideoSubs(video.subtitles,getVideoSubs(path.basename(filename,path.extname(filename)), libTreeLoc),h);
+              updateVideoSubs(video, libTreeLoc.videos[k].subtitles);
 
               // If we've gotten here, then we have confirmed the video exists,
               // so delete it from libFileTree
@@ -577,10 +583,10 @@ async function confirmCurrentVideos() {
             }
           }
         }
-        if (problem) {throw true}
+        if (problem) { throw true }
       }
 
-    } catch(err) {
+    } catch (err) {
       console.log(err)
       // A thrown error means we didn't find the video where we expected to,
       // so move it to inactive media.
@@ -600,19 +606,10 @@ async function confirmCurrentVideos() {
 }
 
 function mulchVideoTree(folderNode) {
-  win.webContents.send('status-update', {action: 'add'});
+  win.webContents.send('status-update', { action: 'add' });
   // Do not add, remove, or update anything from an incomplete watchfolder scan.
   if (folderNode.path && unavailableWatchFolders.has(folderNode.path)) {
     return;
-  }
-  // If there is a collection assigned to this folder, make sure it exists,
-  // and if not, make it.
-  if (folderNode.collection) {
-    if (!collections.ensureExists(folderNode.collection)) {
-      console.log(`We had a problem ensuring collection ${folderNode.collection}.`)
-    } else {
-      //library.replace('collections', collections.getAll());
-    }
   }
   if (folderNode.folders && folderNode.folders.length > 0) {
     for (let childFolder of folderNode.folders) {
@@ -621,24 +618,6 @@ function mulchVideoTree(folderNode) {
   }
   if (folderNode.videos && folderNode.videos.length > 0) {
     for (let video of folderNode.videos) {
-
-      let fileBasename = path.basename(video.filename,path.extname(video.filename));
-
-      // then check for subtitles
-      video.subtitles = getVideoSubs(fileBasename,folderNode);
-
-      // If we've divined a collection for videos in this folder, make sure that this
-      // video is in it.
-      if (folderNode.collection) {
-        let collectionAddress = folderNode.collection
-        // If there are subfolders, we need to ensure a terminal collection for this
-        // video to go into named "Other".
-        if (folderNode.folders.length > 0) {
-          collectionAddress = folderNode.collection.concat(`Other`);
-        }
-        video.collection = collectionAddress;
-      }
-
       libMulch.push(video);
       //addVideoFile(folderNode, videoFilename, rootFolder).catch((err) => {console.log(err)});
     }
@@ -650,9 +629,9 @@ async function addVideoController() {
   let addStart = new Date();
   let newMedia = [];
   let numNewVids = 0;
-  win.webContents.send('status-update', {action: 'add', numTotal: libMulch.length});
-  for (let i=0; i<libMulch.length; i++) {
-    win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
+  win.webContents.send('status-update', { action: 'add', numTotal: libMulch.length });
+  for (let i = 0; i < libMulch.length; i++) {
+    win.webContents.send('status-update', { action: 'add', numCurrent: i + 1, numTotal: libMulch.length });
     let video = libMulch[i];
     let procVideo = await addVideoFile(video);
     if (procVideo) {
@@ -661,15 +640,12 @@ async function addVideoController() {
     }
   }
   let addEnd = new Date();
-  console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
+  console.log(`Adding ${newMedia.length} new videos took ${addEnd - addStart}ms.`);
   let combinedMedia = library.media.concat(newMedia);
   await replaceLibrary('media', combinedMedia);
 
-  // replace collections with updated version
-  await replaceLibrary('collections', collections.getAll());
-
   // tell the user how many videos we added
-  win.webContents.send('videos_added',numNewVids);
+  win.webContents.send('videos_added', numNewVids);
 
   // now let's try and get some metadata.
   // eventually we want to do all this after the above media replacement library call
@@ -698,7 +674,7 @@ async function addVideoController() {
   for (let v of unchecked) {
     if (v !== null && !v.metadata.checked) {
       numChecked++;
-      win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
+      win.webContents.send('status-update', { action: 'metadata', numCurrent: numChecked, numTotal: numTotal });
       let metadata = await getMetadata(v);
       if (metadata.hasOwnProperty('checked') && Object.keys(metadata).length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
       metadataToAdd[v.id] = metadata;
@@ -717,25 +693,25 @@ async function addVideoController() {
 
   // save to library
   await replaceLibrary('media', updatedMedia);
-  win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
+  win.webContents.send('status-update', { action: 'metadata_save', numTotal: numSuccessful });
   console.log(`Added metadata for ${numSuccessful} videos`)
 
   setTimeout(() => {
-    win.webContents.send('status-update', {action: ''});
-  },3000);
+    win.webContents.send('status-update', { action: '' });
+  }, 3000);
 }
 
 // Takes a video object and fills it out
 async function addVideoFile(video) {
   // console.log(video)
   let file = video.filename;
-  let fileBasename = path.basename(file,path.extname(file));
+  let fileBasename = path.basename(file, path.extname(file));
   let id = await createVideoID(video.filename);
 
   //There are four major possibilities for this video's situation:
   //1. We already have this video in the library (either because:
-    //confirmCurrentVideos missed it or
-    //We have multiple copies of an identical file in our watchfolder
+  //confirmCurrentVideos missed it or
+  //We have multiple copies of an identical file in our watchfolder
   //2. We don't have it in the library, but have another copy in libFileTree
   //3. We have it in inactive media, probably because file was moved.
   //4. We don't have it anywhere, it's new.
@@ -755,7 +731,7 @@ async function addVideoFile(video) {
   newIDs.push(id);
   let vidObj;
 
-  switch(situation) {
+  switch (situation) {
     //########### VIDEO IS ALREADY IN LIBRARY ###########//
 
     // if the video is already in the library, update the subtitles
@@ -766,7 +742,13 @@ async function addVideoFile(video) {
       console.log(`${file} has the same id as ${library.media[indexOfVideoInLibrary(id)].title}`);
       let vidIndex = indexOfVideoInLibrary(id);
       let libraryVideo = library.media[vidIndex];
-      updateVideoSubs(libraryVideo.subtitles,video.subtitles,vidIndex);
+      // The same content may exist at more than one path. Keep subtitles
+      // detected beside the already-confirmed copy as well as this duplicate.
+      const duplicateDetectedSubtitles = [
+        ...(libraryVideo.detected_subtitles || []),
+        ...(video.subtitles || [])
+      ];
+      updateVideoSubs(libraryVideo, duplicateDetectedSubtitles);
       return;
 
     case 2:
@@ -799,7 +781,7 @@ async function addVideoFile(video) {
 
           await deleteFromInactive(vidObj, inactiveVidIndex);
 
-        } catch(err) {
+        } catch (err) {
           console.log(`Error: found video object for ${fileBasename} in library.inactive_media but could not remove: ${err}`);
           return;
         }
@@ -823,7 +805,7 @@ async function addVideoFile(video) {
         try {
           // get the date the file was added, from the OS
           vidObj.dateadded = await getFileBirthtime(file);
-        } catch(err) {
+        } catch (err) {
           // if we couldn't get the file creation/added date from the OS, just use now
           vidObj.dateadded = Math.floor(Date.now() / 1000);
           console.log(err);
@@ -833,36 +815,26 @@ async function addVideoFile(video) {
       //########### ADD VIDEO TO (ACTIVE) LIBRARY ###########//
       //#### BOTH FOR NEW VIDEOS AND FOR INACTIVE VIDEOS ####//
 
-      //Start by adding (or readding in case 3) video to any relevant collections.
-      if (video.collection) {
-        //Ensure collection exists, add the video to it if not already there
-        if (collections.ensureExists(video.collection)) {
-          let targetCollection = collections.ensureExists(video.collection);
-          if (!collections.containsVideo(targetCollection, id)) {
-            if (video.kind === 'show') {
-              let seasonEpisode = findSeasonEpisode(video, fileBasename);
-              //If we got results from findSeasonEpisode, store info in video object
-              //unless it already has data (case 3).
-              vidObj.series = vidObj.series || seasonEpisode.series || undefined;
-              vidObj.season = vidObj.season || seasonEpisode.season || undefined;
-              vidObj.episode = vidObj.episode || seasonEpisode.episode || undefined;
-            }
-            if (vidObj.episode) {
-              collections.addVideo(targetCollection, id, vidObj.episode);
-            } else {
-              collections.addVideo(targetCollection, id);
-            }
-          }
+      // Infer show information from the relative folder path and filename.
+      // Keep any values already stored on a rescued video.
+      if (vidObj.kind === 'show') {
+        let seasonEpisode = findSeasonEpisode(video, fileBasename);
+        vidObj.series = vidObj.series || seasonEpisode.series || '';
+        vidObj.season = vidObj.season || seasonEpisode.season || '';
+        vidObj.episode = vidObj.episode || seasonEpisode.episode || '';
+        // Only assign a detected title when creating a brand-new video.
+        // A rescued video keeps the title already stored in the library.
+        if (situation === 4) {
+          vidObj.title = seasonEpisode.title || fileBasename;
         }
-        delete video.collection;
       }
+      delete video.folderParts;
 
       if (typeof vidObj === 'object' && vidObj !== null) {
-        // add any new subtitles, removing duplicates
-        vidObj.subtitles = [...new Set([...vidObj.subtitles, ...video.subtitles])];
+        updateVideoSubs(vidObj, video.subtitles);
         return vidObj;
       }
-    }
+  }
 }
 
 async function getMetadata(video) {
@@ -905,11 +877,11 @@ async function getMetadata(video) {
         //   console.log(`Taking duration (${stream.duration}) from ${stream.codec_type} stream`);
         //   vidObj.metadata.duration = Number(stream.duration);
         // }
-      } catch(err) {
+      } catch (err) {
         console.log(`Error storing ffprobe metadata for ${file}: ${err}`);
       }
     }
-  } catch(err) {
+  } catch (err) {
     console.log(`Unable to retrieve metadata with ffprobe for ${file}: ${err}`);
   }
 
@@ -917,10 +889,10 @@ async function getMetadata(video) {
   // in this case, we analyze the file with ffmpeg to obtain the duration
   if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
     try {
-      let ffmpegData = await getMetadataFromFFmpeg(file,video.id);
+      let ffmpegData = await getMetadataFromFFmpeg(file, video.id);
       console.log(ffmpegData);
-      returnObj = {...ffmpegData, ...returnObj};
-    } catch(err) {
+      returnObj = { ...ffmpegData, ...returnObj };
+    } catch (err) {
       console.log(`Unable to retrieve metadata with ffmpeg for ${file}: ${err}`);
     }
   }
@@ -936,7 +908,7 @@ async function getMetadata(video) {
 
 // create a uuid based on a hash of the video file; this will be the video's id in the library
 async function createVideoID(filepath) {
-  return new Promise((resolve,reject) => {
+  return new Promise((resolve, reject) => {
     let baseStats;
     try {
       baseStats = fs.lstatSync(filepath)
@@ -947,7 +919,7 @@ async function createVideoID(filepath) {
 
     // If the path points to a directory, we're dealing with a DVD rip
     // Find the appropriate file and hash it
-    if(baseStats.isDirectory()) {
+    if (baseStats.isDirectory()) {
       try {
         if (fs.existsSync(path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO'))) {
           hashPath = path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO');
@@ -963,7 +935,7 @@ async function createVideoID(filepath) {
             let size = 0;
             try {
               size = fs.statSync(file).size;
-            } catch(err) {
+            } catch (err) {
               console.log(err);
             }
             if (size > biggestSize) {
@@ -982,7 +954,7 @@ async function createVideoID(filepath) {
       }
     }
 
-    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex'}).
+    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex' }).
       pipe(crypto.createHash('sha1').setEncoding('hex')).
       on('finish', function () {
         filehash = this.read();
@@ -1004,18 +976,18 @@ function getFilesRecursive(folder) {
   let contents = [];
   try {
     contents = fs.readdirSync(folder);
-  } catch(err) {
+  } catch (err) {
     console.log(err);
   }
   for (let content of contents) {
     let fullPath = path.join(folder, content);
     try {
       if (fs.lstatSync(fullPath).isDirectory()) {
-        files = [...files,...getFilesRecursive(fullPath)];
+        files = [...files, ...getFilesRecursive(fullPath)];
       } else {
         files.push(fullPath);
       }
-    } catch(err) {
+    } catch (err) {
       console.log(err);
     }
   }
@@ -1023,83 +995,9 @@ function getFilesRecursive(folder) {
 }
 
 
-// get subtitles for the given video from its clade in libFileTree,
-// (which ones depend on whether it's the only video in that clade or not)
-function getVideoSubs(fileBasename, folderNode) {
-  let allSubs = getNodeSubs(folderNode); // get all subtitles from this clade
-  let subtitles = [];
-  if (folderNode.videos.length === 1) {
-    // if this is the only video in this folder
-    // we assume any subtitle file belongs to this video
-    // in this folder and in any subfolders
-    subtitles = allSubs;
-  } else {
-    // otherwise, we'll only consider subtitle files that have the same filename
-    // or whose filenames contain the video's filename as a substring
-    for (let sub of allSubs) {
-      if (new RegExp('^' + fileBasename).test(path.basename(sub))) {
-        subtitles.push(sub);
-      }
-    }
-  }
-
-  return subtitles
-}
-
-// get all subtitles from a given clade in libFileTree
-function getNodeSubs(folderNode) {
-  let subs = [];
-  // get subtitles from this folder
-  if (folderNode.subtitles) {
-    subs = [...folderNode.subtitles];
-  }
-  // get subtitles from all child folders
-  if (folderNode.folders) {
-    for (let folder of folderNode.folders) {
-      subs = [...subs,...getNodeSubs(folder)];
-    }
-  }
-  return subs;
-}
-
-function updateVideoSubs(librarySubs, libFileTreeSubs, libVidIndex) {
-  // console.log(`librarySubs: ${JSON.stringify(librarySubs)}`);
-  // console.log(`libFileTreeSubs: ${JSON.stringify(libFileTreeSubs)}`);
-
-
-  if (!_.isEqual(libFileTreeSubs,librarySubs)) {
-    console.log(`Subtitle files have changed for ${path.basename(library.media[libVidIndex].filename)}. Updating subtitles.`);
-    // We don't want to remove any subtitles
-    // the user has manually added from other locations,
-    // but we do want to remove any subtitles from the searched folders that
-    // no longer exist (as well as adding any new ones);
-
-    // if any subtitles were manually added (i.e. not found by getVideoSubs() and put into libFileTree),
-    // this conditional will fire, seeing a difference between libFileTreeSubs and librarySubs;
-    // in this case, the combined set of the two should be identical to librarySubs,
-    // hence the conditional below in which we don't do a library update if that's the case;
-    // otherwise any video with manually added subtitles would cause a library call every time
-
-    // remove any subtitles that no longer exist
-    for (let i=librarySubs.length-1; i>=0; i--) {
-      let subAddress = librarySubs[i];
-      try {
-        if (!fs.existsSync(subAddress)) {
-          librarySubs.splice(i,1);
-          // library.remove(`media.${libVidIndex}.subtitles.${i}`);
-        }
-      } catch(err) {
-        console.log(`problem checking existence of/removing ${subAddress}: ${err}`);
-      }
-    }
-
-    // add any new subtitles, removing duplicates
-    let updated = [...new Set([...librarySubs, ...libFileTreeSubs])];
-
-    // update library
-    if (!_.isEqual(updated,librarySubs)) {
-      library.replace(`media.${libVidIndex}.subtitles`,updated);
-    }
+function updateVideoSubs(video, detectedSubtitles) {
+  if (reconcileVideoSubtitles(video, detectedSubtitles || [], subtitleReconciliationContext)) {
+    console.log(`Subtitle files have changed for ${path.basename(video.filename)}. Updating subtitles.`);
   }
 }
 
@@ -1109,7 +1007,7 @@ function updateVideoSubs(librarySubs, libFileTreeSubs, libVidIndex) {
 // instead of from library.media
 function indexOfVideoInLibrary(id, checkInactive) {
   let media = checkInactive ? library.inactive_media : library.media;
-  for (let i=0; i<media.length; i++) {
+  for (let i = 0; i < media.length; i++) {
     // if (media[i].filename === filepath) {
     if (media[i] && media[i].id === id) {
       return i;
@@ -1118,12 +1016,12 @@ function indexOfVideoInLibrary(id, checkInactive) {
   return null;
 }
 function indexOfVideoInInactiveMedia(id) {
-  return indexOfVideoInLibrary(id,true);
+  return indexOfVideoInLibrary(id, true);
 }
 
 function getFileBirthtime(file) {
   return new Promise((resolve, reject) => {
-    fs.stat(file,(err, stats) => {
+    fs.stat(file, (err, stats) => {
       if (err) {
         reject(`Error. Could not retrieve file stats for ${file} : ${err}`);
       } else {
@@ -1133,7 +1031,7 @@ function getFileBirthtime(file) {
         let dateadded;
         try {
           dateadded = Math.floor(stats.birthtimeMs / 1000);
-        } catch(e) {
+        } catch (e) {
           reject(`Unable to add dateadded to file: ${e}`);
         }
 
@@ -1145,7 +1043,7 @@ function getFileBirthtime(file) {
   });
 }
 
-function getMetadataFromFFmpeg(filepath,id) {
+function getMetadataFromFFmpeg(filepath, id) {
   return new Promise((resolve, reject) => {
     try {
       console.log('Could not find duration with ffprobe, trying with ffmpeg...');
@@ -1219,13 +1117,13 @@ function getMetadataFromFFmpeg(filepath,id) {
           // audio layout and audio channels
           data.audio_details.map(detail => {
             let poss_values = {
-              'mono' : 1,
-              'stereo' : 2,
-              '2.0' : 2,
-              '2.1' : 3,
-              '5.1' : 6,
-              '6.1' : 7,
-              '7.1' : 8
+              'mono': 1,
+              'stereo': 2,
+              '2.0': 2,
+              '2.1': 3,
+              '5.1': 6,
+              '6.1': 7,
+              '7.1': 8
             }
             if (Object.keys(poss_values).includes(detail)) {
               metadata.audio_layout = detail;
@@ -1255,59 +1153,354 @@ function getMetadataFromFFmpeg(filepath,id) {
       //   console.log('ffmpeg just wrote ' + chunk.length + ' bytes');
       // });
 
-    } catch(err) {
+    } catch (err) {
       console.log('----- Error in getMetadataFromFFmpeg -----');
       reject(err);
     }
   });
 }
 
-function findSeasonEpisode(video, fileBasename) {
-  let seRegexes = [/[s]?(\d{1,3})(?:[. _]|(?:episode|ep|e)|[. _](?:episode|ep|e))[ _]?(\d{1,3})/i];
-  let eRegexes = [/(?:episode|ep|e)?([0-9]{1,3})/i];
-  let result = {};
-  if (video.collection) {
-    //console.log(`findSeasonEpisode: video collection for ${fileBasename} is ${video.collection}`);
-    if (video.collection[video.collection.length-1].match(/episode/i)) {
-      if (video.collection[video.collection.length-2].match(/season/i)) {
-        if (video.collection.length > 2) {
-          result.series = video.collection[video.collection.length-3];
-        }
-      } else if (video.collection.length > 1) {
-        result.series = video.collection[video.collection.length-2];
-      }
-    } else if (video.collection[video.collection.length-1].match(/season/i) && video.collection.length > 1) {
-      result.series = video.collection[video.collection.length-2];
+function titleCaseDetectedTitle(title) {
+  // Preserve intentional capitalization in mixed-case titles and acronyms.
+  // The filenames that need correction are the ones whose letters are all
+  // lowercase; exact-basename fallbacks never reach this function.
+  if (!/[a-z]/.test(title) || /[A-Z]/.test(title)) {
+    return title;
+  }
+
+  const minorWords = new Set([
+    'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into',
+    'nor', 'of', 'on', 'onto', 'or', 'over', 'per', 'so', 'the', 'to', 'up',
+    'via', 'vs', 'with', 'yet'
+  ]);
+  const uppercaseWords = new Set(['ac3', 'dvd', 'er', 'fs', 'sfm', 'ws']);
+  const romanNumerals = /^(?:i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii|xiii|xiv|xv|xvi|xvii|xviii|xix|xx)$/;
+  const wordRegex = /[a-z][a-z0-9]*(?:['’][a-z0-9]+)*/g;
+  const words = title.match(wordRegex) || [];
+  let wordIndex = 0;
+
+  return title.replace(wordRegex, (word, offset) => {
+    const isFirst = wordIndex === 0;
+    const isLast = wordIndex === words.length - 1;
+    wordIndex++;
+
+    const previousCharacter = title[offset - 1];
+    const nextCharacter = title[offset + word.length];
+    const isDottedInitial = word.length === 1 &&
+      (previousCharacter === '.' || nextCharacter === '.');
+    const beginsSubtitle = /(?:[:–—]|(?:^|\s)-)\s*$/.test(title.slice(0, offset));
+
+    if (isDottedInitial || romanNumerals.test(word) || uppercaseWords.has(word)) {
+      return word.toUpperCase();
+    }
+    if (!isFirst && !isLast && !beginsSubtitle && minorWords.has(word)) {
+      return word;
+    }
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+}
+
+function findEpisodeTitle(fileBasename, extrasDetected) {
+  const fallback = fileBasename;
+  const titleMarkers = [
+    // S02E03, including multi-part forms such as S02E03-E04,
+    // S02E03&E04, S02E03&04, or S02E03X02.
+    /(?:^|[^a-z0-9])s\d{1,3}[. _-]*e[. _-]*\d{1,3}(?:(?:[. _-]*e[. _-]*\d{1,3})|(?:&[. _-]*e?[. _-]*\d{1,3})|(?:x\d{1,2}))*(?!\d)/i,
+    // Season 2 Episode 3.
+    /season[. _-]*\d{1,3}[. _-]*(?:episode|ep|e)[. _-]*\d{1,3}(?:-\d{1,3})?(?!\d)/i,
+    // 2x03.
+    /(?:^|[^\d])\d{1,2}[ _-]*x[ _-]*\d{1,2}(?:-\d{1,2})?(?!\d)/i,
+    // 02.03 at the beginning, but not a title or date such as 11.22.63.
+    /^\d{1,2}\.\d{1,3}(?![.\d])/,
+    // A compact code such as 203 when followed by a title separator.
+    /(?:^|-\s*)[1-9]\d{2}(?=\s*-\s)/,
+    // Episode 3, Ep03, or E03.
+    /(?:^|[^a-z0-9])(?:episode|ep|e)[. _-]*\d{1,3}(?:-\d{1,3})?(?!\d)/i
+  ];
+
+  if (extrasDetected) {
+    // Strong extras formats found in the real TV folder inventory.
+    titleMarkers.push(
+      /(?:^|[^a-z0-9])extras?[. _-]+season[. _-]*\d{1,3}(?!\d)/i,
+      /season[. _-]*\d{1,3}[. _-]+extras?[. _-]*\d{1,3}(?!\d)/i
+    );
+  }
+
+  // A leading episode number followed by a clear title separator.
+  titleMarkers.push(/^\d{1,4}(?!\d)(?:\s*[-–—]\s+|[._](?!\d))/);
+
+  let marker = null;
+  for (let regex of titleMarkers) {
+    marker = fileBasename.match(regex);
+    if (marker) {
+      break;
     }
   }
-  for (let i=0; i<seRegexes.length; i++) {
-    let regex  = seRegexes[i];
+  if (!marker) {
+    return fallback;
+  }
+
+  let title = fileBasename.slice(marker.index + marker[0].length);
+  title = title.replace(/^[\s_\-\]\)–—]+/, '');
+  // A single dot is commonly a filename separator. Preserve an ellipsis or a
+  // leading decimal that may genuinely be part of the title.
+  if (/^\.(?=[a-z])/i.test(title)) {
+    title = title.slice(1).replace(/^\s+/, '');
+  }
+
+  const hasReleaseDetails = value => {
+    return /(?:^|[\s._-])(?:\d{3,4}[pi]|\d{3,4}x\d{3,4}|web[ ._-]?(?:dl|rip)|blu[ ._-]?ray|(?:bd|br|dvd)[ ._-]?rip|hdtv|remux|repack|proper|[hx][ ._-]?26[45]|hevc|xvid|10[ ._-]?bit|aac|ac3|eac3|ddp)(?![a-z0-9])/i.test(value);
+  };
+
+  // Remove trailing bracketed groups only when they contain unmistakable
+  // technical details. Keep title details such as "(1)" or "(1948)".
+  let previousTitle;
+  do {
+    previousTitle = title;
+    title = title.replace(/\s*(?:\(([^()]*)\)|\[([^\[\]]*)\])\s*$/, (whole, parenContents, bracketContents) => {
+      return hasReleaseDetails(parenContents || bracketContents) ? '' : whole;
+    });
+  } while (title !== previousTitle);
+
+  // This exact suffix occurs in the 11.22.63 release and is clearly not part
+  // of any episode title.
+  title = title.replace(/\s+-\s+mini[ -]?series\b.*$/i, '');
+
+  // Stop at the first unbracketed technical release marker. Deliberately do
+  // not strip generic years, words, or parenthetical text.
+  let releaseMatch = title.match(/(?:^|[\s._\[(,\-])(?:\d{3,4}[pi]|\d{3,4}x\d{3,4}|web[ ._-]?(?:dl|rip)|blu[ ._-]?ray|(?:bd|br|dvd)[ ._-]?rip|hdtv|remux|repack|proper|[hx][ ._-]?26[45]|hevc|xvid|10[ ._-]?bit)(?![a-z0-9])/i);
+  if (releaseMatch) {
+    title = title.slice(0, releaseMatch.index);
+  }
+
+  title = title.replace(/_/g, ' ').trim();
+
+  // Release-formatted titles often use dots as spaces. Only replace them when
+  // the candidate contains no real spaces, while preserving ellipses, dotted
+  // initials such as M.I.A., and dotted-number titles such as 11.22.63.
+  const isDottedInitialism = /^(?:[a-z]\.){2,}(?:[a-z]\.?)?$/i.test(title);
+  const isDottedNumber = /^\d+(?:\.\d+){2,}$/.test(title);
+  if (!/\s/.test(title) && title.includes('.') && !isDottedInitialism && !isDottedNumber) {
+    let protectedDots = [];
+    title = title.replace(/\.{2,}/g, dots => {
+      protectedDots.push(dots);
+      return `\u0000${protectedDots.length - 1}\u0000`;
+    });
+    title = title.replace(/\./g, ' ');
+    title = title.replace(/\u0000(\d+)\u0000/g, (whole, index) => protectedDots[Number(index)]);
+  }
+
+  title = title.replace(/\s{2,}/g, ' ').replace(/^[\s_\-\]\)–—]+|[\s_\-–—]+$/g, '');
+
+  // If the marker had no title after it, or only a short release label was
+  // left, retain the complete basename instead of guessing.
+  if (!/[a-z0-9]/i.test(title) || /^(?:fs|dsr|ws|multi|web|repack|proper)$/i.test(title)) {
+    return fallback;
+  }
+  return titleCaseDetectedTitle(title);
+}
+
+function findSeasonEpisode(video, fileBasename) {
+  const normalizeNumber = value => value.replace(/^0+(?=\d)/, '');
+  let seRegexes = [
+    // S02E03, S02-E03, S02 E03, etc.
+    /(?:^|[^a-z0-9])s(\d{1,3})[. _-]*e[. _-]*(\d{1,3})(?!\d)/i,
+    // Season 2 Episode 3, Season_2_Ep_3, etc.
+    /season[. _-]*(\d{1,3})[. _-]*(?:episode|ep|e)[. _-]*(\d{1,3})(?!\d)/i,
+    // 2x03, 2 X 03, etc. Limit both numbers to two digits so codecs such as x264 are ignored.
+    /(?:^|[^\d])(\d{1,2})[ _-]*x[ _-]*(\d{1,2})(?!\d)/i,
+    // 02.03 at the beginning of a filename, but not a date such as 11.22.63.
+    /^(\d{1,2})\.(\d{1,3})(?![.\d])/,
+    // 203 surrounded by separators means season 2, episode 03.
+    /(?:^|-\s*)([1-9])(\d{2})(?=\s*-\s)/
+  ];
+  let eRegexes = [/(?:^|[^a-z0-9])(?:episode|ep|e)[. _-]*(\d{1,3})(?!\d)/i];
+  let seasonRegexes = [
+    /season[. _-]*(\d{1,3})(?!\d)/i,
+    /(?:^|[^a-z0-9])s(\d{1,3})(?!\d)/i,
+    /(\d{1,3})(?:st|nd|rd|th)[. _-]*season/i
+  ];
+  let result = {};
+
+  function findSeasonNumber(value) {
+    // A range describes several seasons, so it cannot provide one season number.
+    if (/season[. _-]*\d{1,3}\s*(?:-\s*|to\s+)\d{1,3}/i.test(value) ||
+      /(?:^|[^a-z0-9])s\d{1,3}\s*-\s*s?\d{1,3}(?!\d)/i.test(value)) {
+      return null;
+    }
+    for (let regex of seasonRegexes) {
+      let match = value.match(regex);
+      if (match) {
+        return normalizeNumber(match[1]);
+      }
+    }
+    return null;
+  }
+
+  function cleanSeriesName(folderName) {
+    let name = folderName.trim();
+    const originalName = name;
+    let releaseDetailsRemoved = false;
+
+    // A release folder such as "11.22.63 - Stephen King 8 Part Mini Series..."
+    // normally puts the actual title before the first separator.
+    let miniSeriesMatch = name.match(/^(.+?)\s+-\s+.*\b(?:mini[ -]?series|miniseries)\b.*$/i);
+    if (miniSeriesMatch) {
+      name = miniSeriesMatch[1];
+      releaseDetailsRemoved = true;
+    }
+
+    // Remove only explicit release markers. Avoid generic removal of years,
+    // resolutions, or punctuation that could legitimately be part of a title.
+    let releaseSuffixes = [
+      /[\s._-]*(?:\(|\[)?complete(?:[ ._-]+original)?(?:[ ._-]+tv)?[ ._-]+series\b.*$/i,
+      /[\s._-]+(?:complete[\s._-]+)?seasons?[\s._-]*\d{1,3}(?!\d).*$/i,
+      /[\s._-]+s\d{1,3}(?!\d)(?:\s*-\s*s?\d{1,3})?\b.*$/i,
+      /\s+BD\s*\(\d{3,4}x\d{3,4}\).*$/i
+    ];
+    for (let regex of releaseSuffixes) {
+      let cleanedName = name.replace(regex, '');
+      if (cleanedName !== name) {
+        name = cleanedName;
+        releaseDetailsRemoved = true;
+      }
+    }
+
+    // Remove release-year ranges. A single trailing year is removed only when
+    // another explicit release marker has already established that it is metadata.
+    name = name.replace(/\s*[\[(](?:19|20)\d{2}\s*-\s*(?:19|20)\d{2}[\])]\s*$/, '');
+    name = name.replace(/[\s._-]+(?:19|20)\d{2}\s*-\s*(?:19|20)\d{2}\s*$/, '');
+    if (releaseDetailsRemoved) {
+      name = name.replace(/[\s._-]+(?:19|20)\d{2}\s*$/, '');
+    }
+
+    // Dot/underscore replacement is limited to clearly release-formatted names,
+    // so a title such as "11.22.63" keeps its punctuation.
+    if (/\.(?:season|s\d{1,3}|complete)(?:\.|$)/i.test(originalName)) {
+      name = name.replace(/[._]+/g, ' ');
+    }
+
+    name = name.replace(/^[\s._-]+|[\s._-]+$/g, '').replace(/\s{2,}/g, ' ');
+    return name || folderName.trim();
+  }
+
+  function normalizeCategoryName(value) {
+    return value.toLowerCase().replace(/[._-]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  function isExtrasFolderName(folderName) {
+    const name = normalizeCategoryName(folderName);
+
+    // Mixed release folders such as "Season 1 + Extras" are only a weak
+    // signal. A strong SxxEyy-style filename below will still take priority.
+    if (/(?:\+|&|\band\b)\s*extras?\b/.test(name)) {
+      return true;
+    }
+
+    // Match category-like folder names and suffixes, but do not treat a
+    // generic occurrence of words such as "special" as an extras marker.
+    return /(?:^| )(?:extras?|featurettes?|special features?|specials|bonus(?: features?| material| content| disc)?|deleted scenes?|behind the scenes|making of|bloopers?|gag reels?|supplements?|interviews?|trailers?)$/.test(name);
+  }
+
+  function isExtrasFilename(filename) {
+    const name = normalizeCategoryName(filename);
+
+    // Filename detection is intentionally narrower than folder detection.
+    // These phrases are strong evidence for bonus material; ordinary uses of
+    // "special", "interview", or "trailer" are left alone.
+    return /(?:^| )(?:featurettes?|special features?|bonus(?: features?| material| content)|deleted scenes?|behind the scenes|making of|bloopers?|gag reels?|supplements?)(?: |$)/.test(name) ||
+      /^extras?(?: \d{1,3})?(?: |$)/.test(name) ||
+      /(?:^| )dvd extras?(?: |$)/.test(name);
+  }
+
+  let extrasDetected = false;
+
+  if (Array.isArray(video.folderParts) && video.folderParts.length > 0) {
+    const folders = video.folderParts;
+    // The first folder beneath a show watchfolder is its most reliable series
+    // grouping, even when files are directly inside it or nested under Extras.
+    result.series = cleanSeriesName(folders[0]);
+
+    // The first folder is the series name, so only examine folders beneath it
+    // for an extras category. This avoids misclassifying a show actually named
+    // "Extras" or "Specials".
+    extrasDetected = folders.slice(1).some(isExtrasFolderName);
+
+    // Use the closest folder that describes one specific season. This also
+    // works when the video is inside an Extras or Episodes subfolder.
+    for (let i = folders.length - 1; i >= 0; i--) {
+      let folderSeason = findSeasonNumber(folders[i]);
+      if (folderSeason !== null) {
+        result.season = folderSeason;
+        break;
+      }
+    }
+  }
+  if (!extrasDetected) {
+    extrasDetected = isExtrasFilename(fileBasename);
+  }
+  result.title = findEpisodeTitle(fileBasename, extrasDetected);
+
+  // Explicit filename numbering is stronger evidence than an extras folder.
+  // This preserves real season-zero entries such as Specials/S00E01.
+  for (let i = 0; i < seRegexes.length; i++) {
+    let regex = seRegexes[i];
     let match = fileBasename.match(regex);
     if (match) {
-      result.season = match[1].replace(/^0+/, '');
-      result.episode = match[2].replace(/^0+/, '');
+      result.season = normalizeNumber(match[1]);
+      result.episode = normalizeNumber(match[2]);
       //console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
       return result;
     }
   }
-  for (let j=0; j<eRegexes.length; j++) {
-    let regex  = eRegexes[j];
+
+  // When no explicit season/episode pair was found, an extras category takes
+  // priority over a numbered season inherited from a parent release folder.
+  if (extrasDetected) {
+    result.season = 'extras';
+  }
+
+  // This primarily covers DVD-rip folders whose own name contains the season.
+  if (!result.season) {
+    let basenameSeason = findSeasonNumber(fileBasename);
+    if (basenameSeason !== null) {
+      result.season = basenameSeason;
+    }
+  }
+
+  for (let j = 0; j < eRegexes.length; j++) {
+    let regex = eRegexes[j];
     let match = fileBasename.match(regex);
     if (match) {
-      result.season = null;
-      result.episode = match[1].replace(/^0+/, '');
+      result.episode = normalizeNumber(match[1]);
       return result;
     }
+  }
+
+  // A number at the beginning followed by a title separator is an episode
+  // number. If it is a compact season/episode code (201, 801, etc.), use the
+  // season found in the folder to separate the two numbers.
+  let leadingMatch = fileBasename.match(/^(\d{1,4})(?!\d)(?:\s*[-–—]\s+|[._](?!\d))/);
+  if (leadingMatch) {
+    let leadingNumber = leadingMatch[1];
+    let episode = leadingNumber;
+    if (result.season && leadingNumber.startsWith(result.season) &&
+      leadingNumber.length - result.season.length === 2) {
+      episode = leadingNumber.slice(result.season.length);
+    } else if (leadingNumber.length > 3) {
+      return result;
+    }
+    result.episode = normalizeNumber(episode);
   }
   //console.log(`seasonEpisode result for ${fileBasename} is ${JSON.stringify(result)}`);
   return result;
 }
 
 function downloadFile(url, destination) {
-  return new Promise(function(resolve, reject) {
-    let response = {success:false, message:''};
+  return new Promise(function (resolve, reject) {
+    let response = { success: false, message: '' };
     // event.sender.send('cancel-download', dl.canceller, "hi");
-    dl.download(url,destination, (args) => {
+    dl.download(url, destination, (args) => {
       try {
         // if successful, we'll receive an object with the path at "path"
         if (args.hasOwnProperty('path')) {
@@ -1321,7 +1514,7 @@ function downloadFile(url, destination) {
           response.message = args;
           reject(response);
         }
-      } catch(error) {
+      } catch (error) {
         response.success = false;
         response.message = error;
         reject(response);
@@ -1332,16 +1525,16 @@ function downloadFile(url, destination) {
 }
 
 async function autoTag() {
-  win.webContents.send('status-update', {action: 'autotag'});
+  win.webContents.send('status-update', { action: 'autotag' });
   let newMedia = library.media.filter(medium => (medium.new && !medium.autotag_tried));
-  let autoStats = {totalVideos: newMedia.length};
+  let autoStats = { totalVideos: newMedia.length };
   let autoLog = [];
   let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
 
   // entire library loop
-  for (let i=0; i<newMedia.length; i++) {
+  for (let i = 0; i < newMedia.length; i++) {
     // tell the user what number we're on
-    win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
+    win.webContents.send('status-update', { action: 'autotag', numCurrent: i + 1, numTotal: newMedia.length });
 
     // create new video object
     let newVideo = newMedia[i];
@@ -1425,13 +1618,13 @@ async function autoTag() {
   console.log(autoLog.join('\n'));
 
   // clear the user notification
-  win.webContents.send('status-update', {action: ''});
+  win.webContents.send('status-update', { action: '' });
 }
 
 function saveBatch(batch) {
   let saveMedia = library.media;
   batch.map(newVid => {
-    for (let i=0; i<saveMedia.length; i++) {
+    for (let i = 0; i < saveMedia.length; i++) {
       if (saveMedia[i].id === newVid.id) {
         saveMedia[i] = newVid;
         break;
@@ -1442,11 +1635,11 @@ function saveBatch(batch) {
   // but we do need to make sure library.media is getting updated as we go,
   // otherwise queued library saves will overwrite each other's updates
   library.media = saveMedia;
-  library.replace('media',saveMedia);
+  library.replace('media', saveMedia);
 }
 
 async function exportFiles(drive) {
-  win.webContents.send('status-update', {action: 'export'});
+  win.webContents.send('status-update', { action: 'export' });
   console.log(`Starting exportFiles.`);
   let fileLocation = path.join(drive, "Mynda Manifest.json");
   let manifest;
@@ -1454,18 +1647,18 @@ async function exportFiles(drive) {
     manifest = JSON.parse(fs.readFileSync(fileLocation));
     //console.log('Loaded manifest.')
   } else {
-    manifest = {media: []};
+    manifest = { media: [] };
     console.log("Couldn't load manifest, assuming all new.")
   }
   let matchedMedia = [];
   let unmatchedMedia = [];
-  for (let i=0; i<library.media.length; i++) {
+  for (let i = 0; i < library.media.length; i++) {
     let homeVideo = library.media[i];
     let match = null;
-    for (let j=0; j<manifest.media.length; j++) {
+    for (let j = 0; j < manifest.media.length; j++) {
       let awayVideo = manifest.media[j];
       if (homeVideo.id === awayVideo.id) {
-        match = {id : homeVideo.id, file : homeVideo.filename}
+        match = { id: homeVideo.id, file: homeVideo.filename }
         matchedMedia.push(match);
         break;
       }
@@ -1475,8 +1668,8 @@ async function exportFiles(drive) {
     }
   }
   console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
-  unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
-  for (let k=0; k<unmatchedMedia.length; k++) {
+  unmatchedMedia.sort((a, b) => { return b.dateadded - a.dateadded });
+  for (let k = 0; k < unmatchedMedia.length; k++) {
     let video = unmatchedMedia[k];
     //console.log(`Starting export process on ${video.title}`);
     if (video.dvd) {
@@ -1484,7 +1677,7 @@ async function exportFiles(drive) {
     }
     let filename = video.filename;
     let conWatchFolder = '';
-    for (let l=0; l<library.settings.watchfolders.length; l++) {
+    for (let l = 0; l < library.settings.watchfolders.length; l++) {
       let watchfolder = library.settings.watchfolders[l];
       //console.log(`Checking watchfolder ${watchfolder.path}`)
       if (filename.includes(watchfolder.path)) {
@@ -1499,7 +1692,7 @@ async function exportFiles(drive) {
     let filePathTrim = conWatchFolder.replace(path.basename(conWatchFolder), '');
     let subtitles = video.subtitles;
     let totalSize = fs.lstatSync(filename).size;
-    for (let m=0; m<subtitles.length; m++) {
+    for (let m = 0; m < subtitles.length; m++) {
       let subtitle = subtitles[m];
       totalSize += fs.lstatSync(subtitle).size;
     }
@@ -1517,7 +1710,7 @@ async function exportFiles(drive) {
         let destDir = destFile.replace(path.basename(destFile), '');
         fs.mkdirSync(destDir, { recursive: true });
         fs.copyFileSync(filename, destFile, fs.constants.COPYFILE_EXCL);
-        for (let m=0; m<subtitles.length; m++) {
+        for (let m = 0; m < subtitles.length; m++) {
           let subtitle = subtitles[m];
           let subDestFile = path.join(drive, subtitle.replace(filePathTrim, ''));
           let subDestDir = subDestFile.replace(path.basename(subDestFile), '');
@@ -1533,16 +1726,17 @@ async function exportFiles(drive) {
       break;
     }
   }
-  win.webContents.send('status-update', {action: ''});
+  win.webContents.send('status-update', { action: '' });
 }
 
 ipcMain.on('settings-folder-select', (event) => {
-  let options = {properties: ['openDirectory']};
+  let options = { properties: ['openDirectory'] };
   dialog.showOpenDialog(null, options).then(result => {
-  event.sender.send('settings-folder-selected', result.filePaths[0]);
-}).catch(err => {
-  console.log(err)
-})})
+    event.sender.send('settings-folder-selected', result.filePaths[0]);
+  }).catch(err => {
+    console.log(err)
+  })
+})
 
 ipcMain.on('settings-watchfolder-add', (event, args) => {
   const folder = args['address'];
@@ -1551,12 +1745,12 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
   // check if path exists and is a folder, not a file
   fs.lstat(folder, (err, stats) => {
     // if path exists and is a folder
-    if(!err && stats.isDirectory()) {
+    if (!err && stats.isDirectory()) {
 
       // if we don't already have this watchfolder, add it
       if (library.settings.watchfolders.filter(wf => path.resolve(wf.path) === path.resolve(folder)).length === 0) {
         // add to library
-        let folderObject = {"path" : folder, "kind" : kind, "videos" : []};
+        let folderObject = { "path": folder, "kind": kind, "videos": [] };
         library.add('settings.watchfolders.push', folderObject, () => {
           checkWatchFolders();
 
@@ -1566,18 +1760,18 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
       } else {
         // if this folder is already a watchfolder, display a dialog
         dialog.showMessageBox({
-          type : 'warning',
-          buttons : ['Ok'],
-          message : 'This directory is already a watchfolder!'
+          type: 'warning',
+          buttons: ['Ok'],
+          message: 'This directory is already a watchfolder!'
         });
       }
 
     } else {
       // if not a directory or we got an error, display an error dialog
       dialog.showMessageBox({
-        type : 'error',
-        buttons : ['Ok'],
-        message : 'Error: not a valid directory'
+        type: 'error',
+        buttons: ['Ok'],
+        message: 'Error: not a valid directory'
       });
     }
   });
@@ -1588,11 +1782,11 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
 
   // first, show the user a confirmation dialog
   const options = {
-    type : 'warning',
-    buttons : ['Cancel','Remove Folder'],
-    message : 'Are you sure you want to remove following folder from the library?\n\n' +
-              path + '\n\n' +
-              'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
+    type: 'warning',
+    buttons: ['Cancel', 'Remove Folder'],
+    message: 'Are you sure you want to remove following folder from the library?\n\n' +
+      path + '\n\n' +
+      'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
   };
   dialog.showMessageBox(options).then(result => {
     // if the user said okay
@@ -1601,7 +1795,7 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
       // the callback function will return only after the watchfolder
       // has actually been removed from the library, so we can tell the front end
       // whether we succeeded or not, and it can use the info to update itself
-      removeWatchfolder(path,(err) => {
+      removeWatchfolder(path, (err) => {
         // tell the client side what happened
         event.sender.send('settings-watchfolder-remove', path, !err); // <-- pass !err to the front end, which expects a boolean for success or failure
 
@@ -1620,18 +1814,19 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
 
 ipcMain.on('editor-artwork-select', (event) => {
   let options = {
-    filters: [{name: 'Images', extensions: ['jpg', 'png', 'gif']}],
+    filters: [{ name: 'Images', extensions: ['jpg', 'png', 'gif'] }],
     properties: ['openFile']
   };
   dialog.showOpenDialog(null, options).then(result => {
-  event.sender.send('editor-artwork-selected', result.filePaths[0]);
-}).catch(err => {
-  console.log(err)
-})});
+    event.sender.send('editor-artwork-selected', result.filePaths[0]);
+  }).catch(err => {
+    console.log(err)
+  })
+});
 
 ipcMain.on('editor-subtitle-select', (event) => {
   let options = {
-    filters: [{name: 'Subtitles', extensions: subtitleExtensions}],
+    filters: [{ name: 'Subtitles', extensions: subtitleExtensions }],
     properties: ['openFile']
   };
   dialog.showOpenDialog(null, options).then(result => {
@@ -1642,9 +1837,9 @@ ipcMain.on('editor-subtitle-select', (event) => {
 });
 
 ipcMain.on('download', (event, url, destination) => {
-    downloadFile(url, destination)
-      .then(response => event.sender.send('downloaded', response))
-      .catch(response => event.sender.send('downloaded', response))
+  downloadFile(url, destination)
+    .then(response => event.sender.send('downloaded', response))
+    .catch(response => event.sender.send('downloaded', response))
 })
 
 ipcMain.on('autotag', (event) => {
@@ -1674,9 +1869,9 @@ ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
   }
 
   let options = {
-    type : 'question',
-    buttons : ['Yes','No'],
-    message : message
+    type: 'question',
+    buttons: ['Yes', 'No'],
+    message: message
   };
 
   if (showSkipDialog) {
@@ -1684,17 +1879,18 @@ ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
   }
 
   dialog.showMessageBox(options).then(result => {
-  event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
-}).catch(err => {
-  console.log(err)
-})})
+    event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
+  }).catch(err => {
+    console.log(err)
+  })
+})
 
 ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
   console.log('generic-confirm!!!');
 
   let options = {
-    type : 'question',
-    buttons : ['Yes','No'],
+    type: 'question',
+    buttons: ['Yes', 'No'],
   };
 
   // if the opts parameter is a string
@@ -1705,32 +1901,15 @@ ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
 
   // if it's an object, add its data to the options
   if (typeof opts === 'object' && opts !== null) {
-    options = {...options, ...opts};
+    options = { ...options, ...opts };
   }
 
   dialog.showMessageBox(options).then(result => {
-  event.sender.send(returnTo, result.response, data, result.checkboxChecked);
-}).catch(err => {
-  console.log(err)
-})})
-
-ipcMain.on('delete-collection-confirm', (event, collection) => {
-  console.log('delete-collection-confirm!!!');
-
-  const id = collection.id;
-
-  let options = {
-    type : 'question',
-    buttons : ['Remove Videos','Delete Collection(s)','Cancel'],
-    message : 'Do you want to delete this entire collection and all its child collections (bearing in mind, it may contain videos that are not in this playlist)?\n\n' +
-              'Or would you like to just remove the videos in this playlist from the collection?'
-  };
-
-  dialog.showMessageBox(options).then(result => {
-  event.sender.send('delete-collection-confirm', result.response, id);
-}).catch(err => {
-  console.log(err)
-})})
+    event.sender.send(returnTo, result.response, data, result.checkboxChecked);
+  }).catch(err => {
+    console.log(err)
+  })
+})
 
 ipcMain.on('exportFiles', (event, drive) => {
   exportFiles(drive);

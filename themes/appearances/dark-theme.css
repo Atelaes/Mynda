@@ -133,12 +133,10 @@
   --movie-row-date-font-size: calc(var(--main-font-size) * 5 / 6);
   --movie-row-year-font-size: calc(var(--main-font-size) * 7 / 8);
   --movie-row-ratings-font-size: var(--movie-row-year-font-size);
-  --collectionheader-font: var(--main-font);
-  --collectionheader-font-size: var(--main-font-size);
-  --collectionheader-font-weight: 600;
-  --collectionheader-font-style: inherit;
-  --settings-collectionheader-font-size: calc(var(--collectionheader-font-size) * .8);
-  --settings-collectionvideo-font-size: var(--settings-collectionheader-font-size);
+  --seriesheader-font: var(--main-font);
+  --seriesheader-font-size: var(--main-font-size);
+  --seriesheader-font-weight: 600;
+  --seriesheader-font-style: inherit;
   --details-font-size: calc(var(--main-font-size) * 5 / 6);
   --detailtitle-font-size: calc(var(--main-font-size) * 25 / 6);
   --detailtags-font-style: italic;
@@ -345,34 +343,16 @@
 /* } */
 
 /* #library-pane { */
-  --collection-marginleft: .7em;
+  --seriesheader-bg: var(--lighter-bg);
+  --seriesheader-bg-hover: var(--light-bg);
+  --seriesheader-bg-expanded: var(--lightest-bg);
+  --seriesheader-text: var(--library-bg);
+  --seriesheader-text-hover: var(--library-bg);
+  --seriesheader-margin-bottom: 3px; /* pixels keep the divider visually consistent */
+  --seriesheader-margin: 0em 0em var(--seriesheader-margin-bottom) 0em;
+  --seriesheader-padding-padding: .5em;
+  --seriesheader-padding: var(--seriesheader-padding-padding) 0em var(--seriesheader-padding-padding) var(--seriesheader-padding-padding);
 
-  --collectionheader-bg: var(--lighter-bg);
-  --collectionheader-bg-hover: var(--light-bg);
-  --collectionheader-bg-drag: var(--med-bg);
-  --collectionheader-bg-expanded: var(--lightest-bg);
-  --collectionheader-text: var(--library-bg);
-  --collectionheader-text-hover: var(--library-bg);
-  --collectionheader-text-drag: var(--dim-text);
-  --collectionheader-margin-bottom: 3px; /* one of the few times we use pixels instead of em's, because in this case, consistency is more important than scalability */
-  --collectionheader-margin: 0em 0em var(--collectionheader-margin-bottom) 0em;
-  --collectionheader-padding-padding: .5em;
-  --collectionheader-padding: var(--collectionheader-padding-padding) 0em var(--collectionheader-padding-padding) var(--collectionheader-padding-padding);
-
-  --settings-collectionheader-padding: .3em 0em .3em .3em;
-
-  --settings-addcollection-width: 2em;
-  --settings-addcollection-bg: var(--light-bg);
-  --settings-addcollection-bg-delete: rgba(54,59,69,.75);
-  --settings-addcollection-bg-trans: rgba(36,39,46,0.5);
-  --settings-addcollection-bg-moretrans: rgba(36,39,46,0.3);
-  /* --settings-addcollection-bg: linear-gradient(30deg, var(--lighter-bg) .5em, var(--medlight-bg) 4em, var(--medlight-bg) 60%, var(--medlight-bg-rgba0) 100%); */
-  --settings-addcollection-bg-hover: var(--med-bg);
-  --settings-addcollection-text: var(--library-bg);
-  --settings-addcollection-text-hover: var(--dim-text);
-  --settings-addcollection-padding: .3em 0em .3em 0em; /*.3em 0em .3em .3em;*/
-
-  --dropdownarrow-color: var(--collectionheader-text);
 /* } */
 
 /* .movie-table { */
@@ -666,34 +646,6 @@
   --editartwork-revert-text-hover: var(--med-text);
   --editartwork-revert-textshadow-hover: 0em 0em .05em black, 0em 0em .15em black;
 
-  --collections-fontsize-factor: .8;
-  --collections-fontsize: calc(var(--collections-fontsize-factor) * 1em);
-
-  --colname-text: inherit;
-  --colname-font: inherit;
-  --colname-fontsize: inherit;
-  --colname-fontstyle: normal;
-  --colname-fontweight: 200;
-  --colname-texttransform: none;
-
-  --coltermnode-bg: initial;
-  --coltermnode-bg-color: var(--listwidget-item-bg-color); /*rgba(37,39,43,1);*/
-  --coltermnode-text: inherit;
-  --coltermnode-borderradius-radius: var(--listwidget-item-borderradius-radius);
-  --coltermnode-borderradius: 0em var(--coltermnode-borderradius-radius) var(--coltermnode-borderradius-radius) var(--coltermnode-borderradius-radius);
-  --coltermnode-height: var(--listwidget-item-height);
-  --coltermnode-width: initial;
-  --coltermnode-margin: 0em 0em 1em var(--collection-marginleft);
-  --coltermnode-padding-top: 0em; /*var(--listwidget-item-padding-top); /*.2em;*/
-  --coltermnode-padding: var(--coltermnode-padding-top) 0em var(--coltermnode-padding-top) calc(1.7em * (1 / var(--collections-fontsize-factor))); /*.5em;*/
-  --coltermnode-font: var(--main-font);
-  --coltermnode-fontsize-size: .8;
-  --coltermnode-fontsize: calc(var(--coltermnode-fontsize-size) * 1em);
-  --coltermnode-fontstyle: initial;
-  --coltermnode-fontweight: 300;
-  --coltermnode-ellipsis-grad: linear-gradient(90deg, rgba(37,39,43,0) 0%, var(--coltermnode-bg-color) 30%);
-  --coltermnode-ellipsis-width: 2rem;
-
   --editratings-fontsize: .8rem;
   --editratings-borderradius-radius: var(--textinput-borderradius);
   --editratings-borderradius: var(--editratings-borderradius-radius) 0em 0em var(--editratings-borderradius-radius);
@@ -798,15 +750,6 @@ in lieu of that, we will use a negative margin on the selected element instead (
   /*border-width: var(--playlisttab-borderwidth-width) 0em var(--playlisttab-borderwidth-width) 0em;
 } */
 
-/* specifically set a selected tab of a hierarchical playlist to match the collection header background */
-#nav-playlists li.selected.hierarchical {
-  background-image: none !important;
-  background-color: var(--collectionheader-bg) !important;
-  border-bottom: var(--playlisttab-borderwidth-width) solid var(--collectionheader-bg);
-  color: var(--collectionheader-text);
-  font-weight: calc(var(--playlist-tab-font-weight) + 200);
-}
-
 /* line extending to the right of the tabs to match the tab borders */
 #nav-playlists::after {
   content:"";
@@ -819,58 +762,11 @@ in lieu of that, we will use a negative margin on the selected element instead (
   display:none;
 }
 
-/* bump the table right up to the collection header in hierarchical playlists */
-.collection .movie-table {
-  margin-top: calc(-1 * var(--collectionheader-margin-bottom));
-}
-
-/* add a little inset shadow over the first child collection of an open collection header element */
-.collection.expanded .collection:first-of-type > h1 {
-  box-shadow: inset -.5em .2em .3em .0em rgba(0,0,0,.5);
-  width: calc(100% + .5em); /* so we can't see the shadow on the right vertical side */
-}
-
-/* remove the margin from the first child collection of an open collection header */
-.collection.expanded .collection:first-of-type {
-  margin-top: calc(-1 * var(--collectionheader-margin-bottom));
-}
-
-/* .collection.collapsed h1 {
-  box-shadow: none;
-  margin-bottom: var(--collectionheader-margin-bottom);
-} */
-
-
 /* make the dateadded text spacing skinnier */
 .movie-table .mono {
   word-spacing: -.3em;
   /* position: relative;
   bottom: 0.5px; */
-}
-
-/* add right-facing triangle icon to the h1 of a collapsed collection div */
-.collection.collapsed > :first-child::before {
-  content:"\25B8";
-  padding-right:.2em;
-  color: var(--dropdownarrow-color);
-}
-.collection.collapsed > :first-child:hover::before { /* and the same thing hovered */
-  content:"\25B8";
-  padding-right:.2em;
-  color: var(--dim-text);
-  text-shadow: 0em 0em .2em var(--dark-bg);
-}
-/* add down-facing triangle icon to the h1 of an expanded collection div */
-.collection.expanded > :first-child::before {
-  content:"\25BE";
-  padding-right:.2em;
-  color: var(--dropdownarrow-color);
-}
-.collection.expanded > :first-child:hover::before { /* and the same thing hovered */
-  content:"\25BE";
-  padding-right:.2em;
-  color: var(--dim-text);
-  text-shadow: 0em 0em .2em var(--dark-bg);
 }
 
 /* add slight black shadow to big title text in details pane */
@@ -1160,121 +1056,6 @@ in lieu of that, we will use a negative margin on the selected element instead (
   border-bottom: .3em dotted var(--lighter-bg);
 } */
 
-.collection-terminal-node .inline-delete-button {
-  /* reverse left-right padding and positioning */
-  right: var(--listwidgetdel-item-left);
-  left: var(--listwidgetdel-item-right);
-}
-
-/* input field for the order of video in a collection in the editor pane */
-#editor-pane .collection-terminal-node input[type=text] {
-  background: linear-gradient(90deg, var(--textinput-bg-color) 0%, rgba(0,0,0,.15)  100%);
-}
-
-/* validator tip for order input */
-.collection-order .tip {
-  position: absolute;
-  right: 0em;
-}
-
-#editor-pane {
-  --collectionheader-width: 60%;
-  --collectionheader-paddingleft: .5em;
-  --collectionheader-borderleftwidth: 4px; /*.17em;*/
-  --collectionheader-borderbottomwidth: 3px; /*.12em;*/
-}
-
-#editor-pane .collection-header,
-#editor-pane .add-collection-form select {
-  /* --border-grad: linear-gradient(90deg, var(--light-bg) 0%, var(--light-bg-rgba0) 100%); */
-  border-bottom-width: var(--collectionheader-borderbottomwidth);
-  border-left-width: var(--collectionheader-borderleftwidth);
-  border-bottom-style: solid;
-  border-left-style: solid;
-  border-left-color: var(--med-bg);
-  border-bottom-color: var(--med-bg);
-  /* border: .3em solid grey; */
-  /* border-image: var(--border-grad);
-  border-image-slice: 1; */
-  /* border-radius: 0em 0em 0em .5em; */
-  border-bottom-left-radius: var(--collectionheader-paddingleft);
-  padding-left: var(--collectionheader-paddingleft);
-
-  /* background: var(--border-grad);
-  -webkit-mask-image: radial-gradient(transparent 0 65px, #000 65.5px);
-          mask-image: radial-gradient(transparent 0 65px, #000 65.5px); */
-}
-
-/* Create vertical gradient border to show hierarchical level,
-   but only when there's another collection below your parent, i.e. an aunt */
-#editor-pane .collection.older-sister > .children::after {
-/* #editor-pane .collection .children::after { */
-  content:'';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0em;
-  left: 0;
-  --border-grad: linear-gradient(0deg, var(--med-bg) 0%, var(--med-bg-rgba0) 90%);
-  /* border-left-width: .15rem; */
-  border-left-style: solid;
-  box-sizing: border-box;
-  border-image: var(--border-grad);
-  border-image-slice: 1;
-  border-image-width: 0em 0em 0em var(--collectionheader-borderleftwidth);
-}
-
-#editor-pane .collection-header {
-  width: var(--collectionheader-width);
-  white-space: nowrap;
-}
-
-#editor-pane .collection::after {
-  content:'';
-  position: absolute;
-  top: 0;
-  right: 0;
-  /* bottom: 0; */
-  left: calc(var(--collectionheader-width) + var(--collectionheader-paddingleft) + var(--collectionheader-borderleftwidth));
-  width: calc((100% - var(--collectionheader-width)) - var(--collectionheader-paddingleft) - var(--collectionheader-borderleftwidth));
-  --border-grad: linear-gradient(90deg, var(--med-bg) 0%, var(--med-bg-rgba0) 80%);
-  /* border-left-width: .15rem; */
-  border-bottom-style: solid;
-  /* box-sizing: border-box; */
-  border-image: var(--border-grad);
-  border-image-slice: 1;
-  border-image-width: 0em 0em var(--collectionheader-borderbottomwidth) 0em;
-}
-#editor-pane .collection-header,
-#editor-pane .collection::after {
-  height: 1.3em;
-}
-
-#editor-pane .add-collection-form {
-  margin-left: var(--collection-marginleft);
-  border-top-left-radius: 0em;
-}
-
-#editor-pane .add-collection-form select {
-  border-top-left-radius: 0em;
-  /* border-bottom-left-radius: 0em; */
-}
-
-.collection-terminal-node,
-.collection-header {
-  animation: collection-flash 1s ease 1;
-  animation-delay: 0s;
-  animation-direction: alternate;
-}
-
-@keyframes collection-flash {
-  0% {
-    background-color: var(--lightest-bg);
-  }
-  100% {
-  }
-}
-
 .edit-field.ratings .edit-field-editor {
   border-radius: var(--textinput-borderradius);
   padding-left:.5rem;
@@ -1371,19 +1152,4 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 #settings-pane .columns-list.used li.col img {
   opacity: var(--ratingsicon-opacity-hover);
-}
-
-#settings-collections .collections header {
-  /* overflow:hidden; */
-}
-
-#settings-collections header .collection-btn {
-    margin-left: 0;
-    /* position:absolute;
-    right:0;
-    top:0; */
-    /* height:100%;*/
-    line-height:100%;
-    padding:0;
-    z-index: calc(var(--openablepane-zindex) + 2);
 }

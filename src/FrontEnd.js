@@ -12,7 +12,6 @@ const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const Library = require("./Library.js");
-const Collections = require('./Collections.js');
 const OmdbHelper = require('./OmdbHelper.js');
 const omdb = require('../omdb');
 const axios = require('axios');
@@ -46,7 +45,6 @@ class Mynda extends React.Component {
     this.state = {
       videos : library.media,
       playlists : library.playlists,
-      collections : library.collections,
       settings: library.settings,
       recentlyWatched: library.recently_watched, // a list of the id's of the x most-recently-watched videos
       // recentlyWatched : ["a14fdec2-97db-5d2f-b537-f001493f0c48","f7fb6360-d4d9-582e-b162-f35c5fe1d406","72b9f3a0-aafe-50c6-8411-c0598b7cded8","d487a789-1799-5ed4-b2a9-786ddc474cf5","dd6d32e1-4427-5c9a-8a62-be284ea7ae00"],
@@ -54,13 +52,14 @@ class Mynda extends React.Component {
       filteredVideos : [], // list of videos to display: can be filtered by a playlist or a search query or whatever; this is what is displayed
       playlistVideos : [], // list of videos filtered by the playlist only; this is used to execute a search query on
       playlistLength : {}, // will contain the number of videos in each playlist (playlist id as key)
-      view : "flat", // whether to display a flat table or a hierarchical view
+      view : "flat", // whether to display a flat table or a series view
       columns : [], // the list of columns to display for the current playlist
       detailVideo : null,
       detailVideoRowIndex: null, // keep the row index of the detail video in state so we can go to prev/next video even if the video leaves the table after being edited
       currentPlaylistID : null,
       prevQuery : '',
       selectedRows : {},
+      playlistRowManifest : [],
 
       detailsPaneShowing : true,
 
@@ -160,7 +159,6 @@ class Mynda extends React.Component {
     this.setState({
       videos : library.media,
       playlists : library.playlists,
-      collections : library.collections,
       settings: library.settings
     });
   }
@@ -224,64 +222,16 @@ class Mynda extends React.Component {
   }
 
   getAllSelected() {
-    let highestRow = '' + Number.MAX_SAFE_INTEGER;
     let selected = [];
     Object.keys(this.state.selectedRows).map(tableID => {
-      // add the selected videos from this table
       selected = [...selected, ...this.state.selectedRows[tableID].rows];
-
-      // // if this table's highest row is higher than the highest so far,
-      // // save this table's highest row as highestRow;
-      // // the comparison itself is a little cutesy; since the row ID is what we have,
-      // // and the row id takes the form ${videoID}_${collectionID}, where the collection id
-      // // is an ordered series of indices describing where the collection is in the structure
-      // // (e.g. '0-3-1' being the 2nd child of the 4th child of the 1st collection),
-      // // we can take advantage of this by converting the string to a number and doing a simple
-      // // numerical comparison: for instance, '0-3-1' becomes 0.031, and is smaller than '1-3-1' (0.131);
-      // // the only wrinkle being that if we're in a flat playlist that only contains one table,
-      // // there is no collection ID appended to the video ID, the row ID is just identical to the video ID;
-      // // so we have to test for that before doing the comparison
-      // if (/_/.test(this.state.selectedRows[tableID].highestRow)) {
-      //   let thisRowCompare = Number(this.state.selectedRows[tableID].highestRow.replace(/^.*_/,'').replace(/\D+/g,'').replace(/^/,'.'));
-      //   let highestRowCompare = Number(highestRow.replace(/^.*_/,'').replace(/\D+/g,'').replace(/^/,'.'));
-      //   if (thisRowCompare < highestRowCompare) {
-      //     highestRow = this.state.selectedRows[tableID].highestRow;
-      //   }
-      // } else {
-      //   highestRow = this.state.selectedRows[tableID].highestRow;
-      // }
-
-      // if there is no underscore, then this should be the only table,
-      // so this table's highest row is the overall highest row
-      if (!/_/.test(this.state.selectedRows[tableID].highestRow)) {
-        highestRow = this.state.selectedRows[tableID].highestRow;
-      } else {
-        // otherwise, store what was after the underscore (which will either be
-        // a collection id like '0-3-1', or 'uncategorized') so that
-        // we can compare it to the overall highest row so far to see which is higher on the page
-        // (keeping in mind that lower numbers are higher on the page)
-
-        let thisRowCompare = this.state.selectedRows[tableID].highestRow.replace(/^.*_/,'').replace('uncategorized',(Number.MAX_SAFE_INTEGER - 1) + '').split('-')
-        let highestRowCompare = highestRow.replace(/^.*_/,'').replace('uncategorized',(Number.MAX_SAFE_INTEGER - 1) + '').split('-');
-
-        // now compare each element, hierarchically
-        for (let i=0; i<thisRowCompare.length; i++) {
-          if (i >= highestRowCompare.length) break; // if b ran out, but we were equal up to this point, a should be later than b, so we leave highest row as highest row
-          // if (thisRowCompare[i] > highestRowCompare[i]) return 1;
-          if (Number(thisRowCompare[i]) < Number(highestRowCompare[i])) {
-            highestRow = this.state.selectedRows[tableID].highestRow;
-            break;
-          }
-          // if the value at this array index was equal for both rows, we loop to the next one,
-          // and so on, until we find the earliest index where the values are not equal
-        }
-      }
-
     });
 
-    if (selected.length === 0) {
-      highestRow = null;
-    }
+    selected = [...new Set(selected)];
+    const selectedSet = new Set(selected);
+    const firstSelectedManifestRow = (this.state.playlistRowManifest || [])
+      .find(row => selectedSet.has(row.vidID));
+    const highestRow = firstSelectedManifestRow ? firstSelectedManifestRow.rowID : null;
 
     let results = {
       rows: selected,
@@ -350,7 +300,7 @@ class Mynda extends React.Component {
       batchObject.id = 'batch'; // but set the id to 'batch' so that the editor knows what we're doing
       delete batchObject.metadata; // and delete metadata, since that is derived from the files themselves and is uneditable
       Object.keys(batchObject).map(key => {
-        if (key === 'id' || key === 'metadata' || key === 'collections') return;
+        if (key === 'id' || key === 'metadata') return;
         // test each video's value for this key against that of the first video
         let testValue = videos[0][key];
         // loop through and test all the videos against that value
@@ -500,7 +450,7 @@ class Mynda extends React.Component {
 
   // tells if the table row for a given video id
   // is visible: i.e. it is within the viewport (not scrolled offscreen)
-  // and its collections hierarchy is expanded (if applicable)
+  // within the viewport (not scrolled offscreen)
   isRowVisible(rowID) {
     return false; // just until we get the rest of the infrastructure written
 
@@ -616,7 +566,7 @@ class Mynda extends React.Component {
       id = playlist.id
     }
 
-    let view = playlist ? playlist.view : null; // set the view state variable to this playlist's view
+    let view = playlist && playlist.view === 'series' ? 'series' : 'flat';
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
     let flatDefaultSort = playlist ? playlist.flatDefaultSort : null; // default sort column for this playlist, but only applies when viewed in flat view
     if (id !== this.state.currentPlaylistID) {
@@ -746,20 +696,11 @@ class Mynda extends React.Component {
 
   // id is optional; if not provided, will play the detailVideo
   // (this is normally what happens, when the user plays a video from a row)
-  // if it is provided, it could either be a video id or a row id;
-  // if it's a row id, select that row and play the video;
-  // if it's a video id, find the highest row featuring that video,
-  // select that row, then play the video;
+  // if it is provided, find its row, select it, then play the video;
   async playVideo(id) {
     if (id) {
-      let row, vidID;
-      if (/_/.test(id)) {
-        row = this.state.playlistRowManifest.filter(r => r.rowID === id)[0];
-        if (row) vidID = row.vidID;
-      } else {
-        row = this.findVideoRows(id)[0];
-        vidID = id;
-      }
+      let row = this.findVideoRows(id)[0];
+      let vidID = id;
       if (row) {
         // we found a row of this video in the current playlist, so select that,
         // which will make it the detail vid, which will be played
@@ -810,16 +751,6 @@ class Mynda extends React.Component {
     show[name] = true;
     this.setState({show:show});
 
-    // let paneJSX;
-    // switch(name) {
-    //   case "settingsPane":
-    //     paneJSX = <MynSettings settings={this.state.settings} playlists={this.state.playlists} collections={this.state.collections} displayColumnName={this.displayColumnName} hideFunction={() => {this.hideOpenablePane(name)}}/>
-    //     break;
-    //   case "editorPane":
-    //     paneJSX = <MynEditor video={this.state.detailVideo} collections={this.state.collections} settings={this.state.settings} hideFunction={() => {this.hideOpenablePane(name)}}/>
-    //     break;
-    // };
-    // this.setState({openablePane:paneJSX});
   }
 
   hideOpenablePane(name) {
@@ -866,26 +797,6 @@ class Mynda extends React.Component {
     // the view in real time whenever that happens
     savedPing.saved = (address) => {
       console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
-
-      // if the collections were changed
-      if (address.includes('collections')) {
-        console.log('collections was edited');
-        this.setState({collections : this.props.library.collections}, () => {
-          // we don't need to update the playlist here, because
-          // if the collections were edited, a video was edited too with
-          // the corresponding change to the video object;
-          // and that will cause the playlist to re-render
-
-          // ^^ THE ABOVE IS NO LONGER TRUE; we've since removed the redundant
-          // collections information from the video objects; it remains to be
-          // seen whether we need to update the playlist explicitly here or not
-
-          // update video in details pane (we don't know if this video was affected, but just in case)
-          this.refreshDetails(timeout);
-          // this.setState({detailVideo : this.state.videos.filter(video => video.id === this.state.detailVideo.id)[0]});
-          // this.setState({detailVideo : null}); // for some reason this appears to work, and the above (commented) line does not. Not sure why.
-        });
-      }
 
       // if the whole media array was replaced at one time
       // (this happens when a watchfolder is removed)
@@ -1004,7 +915,6 @@ class Mynda extends React.Component {
         <ErrorBoundary>
           <MynLibrary
             videos={this.state.filteredVideos}
-            collections={this.state.collections}
             settings={this.state.settings}
             playlistID={this.state.currentPlaylistID}
             view={this.state.view}
@@ -1044,7 +954,6 @@ class Mynda extends React.Component {
           settings={this.state.settings}
           videos={this.state.videos}
           playlists={this.state.playlists}
-          collections={this.state.collections}
           displayColumnName={this.displayColumnName}
           hideFunction={() => {this.hideOpenablePane('settingsPane')}}
         />
@@ -1052,7 +961,6 @@ class Mynda extends React.Component {
           show={this.state.show.editorPane}
           video={this.state.detailVideo}
           batch={this.state.batchVids}
-          collections={this.state.collections}
           settings={this.state.settings}
           hideFunction={() => {this.hideOpenablePane('editorPane')}}
           goToPrevious={() => this.incrementDetailVid(-1)}
@@ -1189,808 +1097,87 @@ class MynNavPlaylistMiniEdit extends React.Component {
   }
 }
 
-// ###### Library Pane: parent of MynLibTable, decides whether to display one table (in a flat view), or a hierarchy of tables (in the hierarchical view) ###### //
+// ###### Library Pane: displays either a flat table or tables grouped by series ###### //
 class MynLibrary extends React.Component {
   constructor(props) {
     super(props)
 
     this.state = {
-      videos: _.cloneDeep(props.videos),
-      collections: _.cloneDeep(props.collections),
-      hierarchy : null,
-      vidsInHierarchy : [],
-      sortReport : {},
-      dragging : false,
-      addToExistingColID : '',
-      manifest: {},
-      isExpanded: {},
       compact: false
     }
+    this.manifest = {};
+    this.manifestPlaylistID = props.playlistID;
+    this.manifestVideos = props.videos;
 
-    this.deleteBtn = object => {
-      if (object.id === 'uncategorized') { return null }
-      else {
-        return (
-          <div className="delete-collection clickable" onClick={(e) => this.deleteCollection(e,object)}>{'\u2715'}</div>
-        );
-      }
-    };
-
-    this.addBtn = object => {
-      if (object.id === 'uncategorized') { return null }
-      else {
-        return (
-          <Droppable droppableId={object.id + '-'} direction="horizontal">
-            {(provided) => (
-              <div className="collection-btn-container add collection-btn clickable" ref={provided.innerRef} {...provided.droppableProps}>
-                {'\uFF0B'}
-              </div>
-            )}
-          </Droppable>
-        );
-      }
-    };
-
-    this.render = this.render.bind(this);
-    this.createCollectionsMap = this.createCollectionsMap.bind(this);
-    this.onDragEnd = this.onDragEnd.bind(this);
-    this.onDragStart = this.onDragStart.bind(this);
-    this.reportSort = this.reportSort.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
     this.toggleCompact = this.toggleCompact.bind(this);
-
-
-    // this.findCollections = this.findCollections.bind(this);
-
-
-
-    ipcRenderer.on('MynLibrary-confirm-convertTerminalCol', (event, response, dragData, checked) => {
-      // console.log('CONFIRMATION OF ADDING A CHILD COLLECTION TO A TERMINAL COLLECTION HAS FIRED')
-      // console.log(event);
-      // if the user checked the checkbox to override the confirmation dialog,
-      // set that preference in the settings
-      if (checked) {
-        console.log('option to override dialog was checked!');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs['MynLibrary-confirm-convertTerminalCol'] = true;
-        library.replace("settings.preferences",prefs);
-      }
-
-      if (response === 0) { // yes
-        // add the collection
-        this.addCollection(dragData);
-      } else {
-        console.log('Creation of collection canceled by user');
-      }
-    });
   }
 
   shouldComponentUpdate(nextProps, nextState) {
-    // TEMPORARY HOVER-LAG DIAGNOSTIC:
-    // Mynda updates its own state whenever the hovered video's details change.
-    // Do not re-render the whole library when every MynLibrary input is unchanged.
-    // console.count('[hover diagnostic] MynLibrary update requested');
-
     const oldPropKeys = Object.keys(this.props);
     const nextPropKeys = Object.keys(nextProps);
     const propsChanged = oldPropKeys.length !== nextPropKeys.length ||
       nextPropKeys.some(key => nextProps[key] !== this.props[key]);
     const stateChanged = nextState !== this.state;
 
-    if (!propsChanged && !stateChanged) {
-      // console.count('[hover diagnostic] MynLibrary update skipped');
-      return false;
-    }
-
-    return true;
+    return propsChanged || stateChanged;
   }
 
-  componentDidUpdate(oldProps) {
-    let videos = false;
-    let collections = false;
-    let playlist = false;
-
-    if (!_.isEqual(oldProps.videos,this.props.videos)) {
-      console.log('MynLibrary videos was changed!');
-      videos = true;
-    }
-    if (!_.isEqual(oldProps.collections,this.props.collections)) {
-      console.log('MynLibrary collections was changed!');
-      collections = true;
-    }
-    if (!_.isEqual(oldProps.columns,this.props.columns)) {
-      console.log('MynLibrary columns was changed!');
-      videos = true;
-    }
-    if (oldProps.settings.preferences.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg) {
-      console.log('MynLibrary include_user_rating_in_avg was changed!');
-      videos = true;
-    }
-
-    if (oldProps.playlistID !== this.props.playlistID) {
-      console.log('MynLibrary playlist was changed!');
-      playlist = true;
-    }
-
-    // force collections to be false for testing purposes, since we're no longer using collections
-    collections = false;
-
-    // if (videos) this.setState({videos:_.cloneDeep(this.props.videos)});
-    // if (collections) this.setState({collections:_.cloneDeep(this.props.collections)});
-    // if (videos || collections) this.createCollectionsMap();
-    if (videos && !collections) {
-      this.setState({videos:_.cloneDeep(this.props.videos)},()=>this.createCollectionsMap());
-    } else if (collections && !videos) {
-      this.setState({collections:_.cloneDeep(this.props.collections)},()=>this.createCollectionsMap());
-    } else if (collections && videos) {
-      this.setState({
-        videos:_.cloneDeep(this.props.videos),
-        collections:_.cloneDeep(this.props.collections)
-      },()=>this.createCollectionsMap());
-    }
-
-    if (collections || playlist) this.state.manifest = {};
-  }
-
-  componentDidMount() {
-
-    this.createCollectionsMap();
-  }
-
-  createCollectionsMap() {
-    console.log("Creating new collections map");
-    this.state.hierarchy = this.state.collections.map(collection => this.findCollections(collection));
-
-    // create dummy collection of leftover videos, if any
-    let leftovers = this.state.videos.filter(v => !this.state.vidsInHierarchy.includes(v.id));
-    let uncategorized = {
-      id: 'uncategorized',
-      name: '[Uncategorized]',
-      videos: leftovers.map(v => {return {id:v.id}})
-    }
-    // and add it to the hierarchy
-    this.state.hierarchy.push(this.findCollections(uncategorized));
-
-    console.log("...finished creating collections map");
-
-    this.setState({hierarchy:this.state.hierarchy}, () => {
-      
-    });
-  }
-
-  // recursive function that walks down the collections and returns each branch
-  // as JSX if and only if it contains one of the videos in our playlist
-  findCollections(object) {
-    if (!object) return null;
-
-    // if this object contains sub-collections
-    if (object.collections) {
-      let results = []
-      // loop through the subcollections and call ourselves recursively on each one
-      for (let i=0; i<object.collections.length; i++) {
-        let jsx = this.findCollections(object.collections[i]);
-        // if jsx is not null, that means the recursive call returned some JSX
-        // containing collections with videos from our playlist
-        if (jsx !== null) {
-          results.push(jsx);
-        }
-      }
-      // if there were any videos returned from the level below,
-      // wrap them in a div and return them upward to the next level
-      if (results.length > 0) {
-        let editColNameValid;
-
-        let colContainerID = `collection-${object.id}`;
-
-        return (
-          <div className={'collection' + (!this.state.isExpanded[colContainerID] ? ' collapsed' : ' expanded')} key={object.name}>
-            <h1
-              className="collection-header"
-              onClick={(e) => this.toggleExpansion(e,colContainerID)}
-              onMouseOver={(e) => {this.expandOnDragOver(e,colContainerID); if (this.state.dragging) e.target.parentNode.classList.add('drag-over')}}
-              onMouseOut={(e) => {e.target.parentNode.classList.remove('drag-over')}}
-            >
-              <MynClickToEditText
-                object={object}
-                property='name'
-                update={(prop,value) => { if (editColNameValid) object.name = value }}
-                save={() => {
-                  if (editColNameValid) {
-                    let cols = new Collections(this.state.collections);
-                    cols.sortAll();
-                    library.replace("collections", cols.getAll());
-                  }
-                }}
-                options={null}
-                validator={/^[^=;{}]+$/}
-                validatorTip={'Not allowed: = ; { }'}
-                allowedEmpty={true}
-                reportValid={(prop,valid) => { editColNameValid = valid }}
-                noClear={true}
-                setFocus={true}
-                doubleClick={true}
-              />
-            </h1>
-            {this.deleteBtn(object)}
-            {this.addBtn(object)}
-            <div className={'container' + (!this.state.isExpanded[colContainerID] ? ' hidden' : '')}>{results}</div>
-          </div>
-        );
-      } else {
-        return null;
-      }
-    } else {
-      // we're at a bottom-level collection
-      let vidsWereFound = false;
-      let collectionVids = []
-      try {
-        // if this collection has a video in our playlist
-        for (let i=0; i<object.videos.length; i++) {
-          if (this.state.videos.filter(v => (object.videos[i].id === v.id)).length > 0) {
-            // add video to list of videos for this collection
-            collectionVids.push(object.videos[i]);
-            // also add its id to the vidsInHierarchy list
-            // (later we'll compare this to this.state.videos to see what leftovers we have;
-            // i.e. videos in the playlist that are not part of any collections)
-            if (object.name !== '[Uncategorized]') { // we don't want to add the leftovers themselves to vidsInHierarchy, or else they won't be displayed
-              this.state.vidsInHierarchy.push(object.videos[i].id);
-            }
-            // set flag
-            vidsWereFound = true;
-          }
-        }
-      } catch(e) {
-        // console.log("No videos found in this collection: " + e.toString());
-      }
-      // if the flag is true, that means there were videos from our playlist
-      // in this collection, so wrap them in JSX and return them upward
-      if (vidsWereFound) {
-        // find only the video objects (from the playlist) that match the videos found in this collection
-        let colVidsInPlaylist = this.state.videos.filter(playlistVideo => (collectionVids.filter(collectionVideo => (collectionVideo.id === playlistVideo.id)).length > 0))
-        // console.log('videos: ' + JSON.stringify(colVidsInPlaylist) + '\nVideos from collection: ' + JSON.stringify(collectionVids));
-        try {
-          // add the 'order' property to each video for this collection
-          // (making a deep copy of each video object)
-          colVidsInPlaylist = colVidsInPlaylist.map(v => {
-            const vidCopy = _.cloneDeep(v); //JSON.parse(JSON.stringify(v));
-            vidCopy.order = collectionVids.filter(collectionVideo => (collectionVideo.id === vidCopy.id))[0].order;
-            // console.log(JSON.stringify(vidCopy));
-            return vidCopy;
-          });
-          // console.log(JSON.stringify(colVidsInPlaylist))
-        } catch(e) {
-          console.log('Error assigning order to videos in collection ' + object.name + ': ' + e.toString());
-        }
-
-        let editColNameValid; // used in MynClickToEditText props below
-        let name;
-        if (object.id === 'uncategorized') {
-          name = object.name;
-        } else {
-          name = (
-           <MynClickToEditText
-             object={object}
-             property='name'
-             update={(prop,value) => { if (editColNameValid) object.name = value }}
-             save={() => {
-               if (editColNameValid) {
-                 let cols = new Collections(this.state.collections);
-                 cols.sortAll();
-                 library.replace("collections", cols.getAll());
-               }
-             }}
-             options={null}
-             validator={/^[^=;{}]+$/}
-             validatorTip={'Not allowed: = ; { }'}
-             allowedEmpty={true}
-             reportValid={(prop,valid) => { editColNameValid = valid }}
-             noClear={true}
-             setFocus={true}
-             doubleClick={true}
-           />
-         );
-        }
-
-        let tableID = 'table-' + object.id;
-        let colContainerID = `collection-${object.id}`;
-        // if (!this.state.manifest[tableID]) this.state.manifest[tableID] = [];
-
-        // console.log('Creating table for collection: ' + JSON.stringify(object));
-        // console.log(JSON.stringify(colVidsInPlaylist));
-        // wrap the videos in the last collection div,
-        // then hand them off to MynLibTable with an initial sort by 'order'
-        return (
-          <div className={'collection' + (!this.state.isExpanded[colContainerID] ? ' collapsed' : ' expanded')} key={object.name}>
-          <h1
-            className="collection-header"
-            onClick={(e) => this.toggleExpansion(e,colContainerID)}
-            onMouseOver={(e) => {this.expandOnDragOver(e,colContainerID); if (this.state.dragging) e.target.classList.add('drag-over')}}
-            onMouseOut={(e) => {e.target.classList.remove('drag-over')}}
-          >
-            {name}
-            {object.id === 'uncategorized' ? (<MynTooltip shade='dark' tip={`Videos in this playlist that are not part of any collection appear here. Use the dropdown below to add them to an existing collection, or drag and drop them to any collections above, or you can add a video to collections from the video editor (by clicking on the Edit button in the details pane). To view and edit the entire collections structure, go to Settings ${'\u279E'} Collections.`} />) : null}
-          </h1>
-            {this.deleteBtn(object)}
-            {this.addBtn(object)}
-            <div className={'container' + (!this.state.isExpanded[colContainerID] ? ' hidden' : '')}>
-              {object.id === 'uncategorized' ? (
-                <Droppable droppableId={this.state.addToExistingColID ? this.state.addToExistingColID : 'dummy'}>
-                  {(provided, snapshot) => (
-                    <MynLibAddExistingCollection
-                      collections={this.state.collections}
-                      choose={(id) => { this.setState({addToExistingColID:id}) }}
-                      provided={provided}
-                      snapshot={snapshot}
-                      selected={this.state.addToExistingColID !== ''}
-                    />
-                  )}
-                </Droppable>
-              ) : null }
-              <Droppable droppableId={object.id}>
-                {(provided) => (
-                  <MynLibTable
-                    tableID={tableID}
-                    movies={colVidsInPlaylist}
-                    collections={_.cloneDeep(this.state.collections)}
-                    settings={this.props.settings}
-                    playlistID={this.props.playlistID}
-                    view={this.props.view}
-                    isExpanded={this.state.isExpanded[colContainerID]}
-                    initialSort={this.state.sortReport[object.id] ? this.state.sortReport[object.id].key : "order"}
-                    initialSortAscending={this.state.sortReport[object.id] ? this.state.sortReport[object.id].ascending : true}
-                    columns={this.props.columns}
-                    displayColumnName={this.props.displayColumnName}
-                    calcAvgRatings={this.props.calcAvgRatings}
-                    collectionID={object.id}
-                    showDetails={this.props.showDetails}
-                    playVideo={this.props.playVideo}
-                    handleSelectedRows={this.props.handleSelectedRows}
-                    handleHoveredRow={this.props.handleHoveredRow}
-                    selectedRows={this.props.selectedRows}
-                    reportSort={this.reportSort}
-                    reportSortedManifest={this.reportSortedManifest}
-                    provided={provided}
-                  />
-                )}
-              </Droppable>
-            </div>
-          </div>
-        )
-      } else {
-        return null;
-      }
-    }
-  }
-
-  // expand or collapse a collection
-  toggleExpansion(e,colContainerID) {
-    //console.log('TOGGLING!');
-    console.log(colContainerID);
-    // 'e' may either be an event or an element
-    let element;
-    if (e.target) {
-      element = findNearestOfClass(e.target,'collection-header');
-    } else {
-      element = e;
-    }
-    // let siblings = Array.from(element.parentNode.childNodes).filter(node => (node !== e.target));
-    // siblings.map(node => (node.classList.toggle("hidden")));
-    let childrenContainer = element.parentNode.getElementsByClassName("container")[0];
-    childrenContainer.classList.toggle("hidden");
-    element.parentNode.classList.toggle("expanded");
-    element.parentNode.classList.toggle("collapsed");
-
-    this.state.isExpanded[colContainerID] = !this.state.isExpanded[colContainerID];
-
-    // this.setState({isExpanded:this.state.isExpanded});
-
-    // So.........
-    // this here (below) is not ideal, but let me explain:
-    // this.createCollectionsMap() used to be called IN the render function,
-    // so it was happening all the fucking time; this is better than that;
-    // since I took that out, when a collection is expanded,
-    // the table within it no longer knows that it has been expanded,
-    // since the JSX for the table is in the state.hierarchy variable, which only gets
-    // updated from this.createCollectionsMap(), so we're calling it here manually;
-    // ultimately, the real solution is to rewrite MynLibrary and MynLibTable
-    // altogether (because we should be toggling whole subsets of collections, not
-    // just the tables at their bottom); a medium-term solution would be to move
-    // the MynLibTable call outside the hierarchy, emptying and replacing it here
-    // when its collection gets toggled; I'm just not interested in doing that now;
-    this.createCollectionsMap();
-  }
-
-  // when dragging a video row over a collapsed collection header, expand that collection (after a delay)
-  expandOnDragOver(e,colContainerID) {
-    // console.log('OVER!');
-    // console.log('this.state.dragging == ' + this.state.dragging);
-
-    let btn = e.target;
-
-    // only do anything if we're dragging something
-    if (this.state.dragging) {
-      // if the button we're dragging over is for a collapsed collection,
-      // we wait a second and then expand it
-      let collection = findNearestOfClass(e.target,'collection');
-      console.log(collection.className);
-      console.log(collection.key);
-      if (collection.classList.contains('collapsed')) {
-        console.log('COLLAPSED!');
-        setTimeout(() => this.toggleExpansion(btn,colContainerID),1000);
-      }
-    }
-  }
-
-  // when an instance of MynTable is sorted, it reports back here
-  // so that we can keep track. The only reason we need to do that
-  // is because we only allow drag-n-drop to work if a table is sorted by order
-  reportSort(id,key,ascending) {
-    this.state.sortReport[id] = {key:key,ascending:ascending};
-    // console.log(JSON.stringify(this.state.sortReport));
-  }
-
-  onDragStart() {
-    this.setState({dragging:true});
-    let cols = Array.from(document.getElementById('library-pane').getElementsByClassName('collection'));
-    cols.map(el => {
-      el.classList.add('dragging');
-    });
-  }
-
-  onDragEnd(result) {
-    this.setState({dragging:false});
-    let cols = Array.from(document.getElementById('library-pane').getElementsByClassName('collection'));
-    cols.map(el => {
-      el.classList.remove('dragging');
-    });
-
-    console.log(JSON.stringify(result));
-    const { destination, source, draggableId } = result;
-
-    // if anything moved at all
-    if (destination) {
-      // check if we have dropped the video onto a '+' button,
-      // and if we did, we want to create a new collection as a child of
-      // the collection whose '+' button it was
-      if (destination.droppableId[destination.droppableId.length-1] === '-') {
-        this.addCollectionConfirm(result);
-        return;
-      }
-
-      // first, if the destination table isn't sorted by order,
-      // do nothing, and inform the user
-      try {
-        // console.log('Table ' + destination.droppableId + ' sort report----------');
-        // console.log('key: ' + this.state.sortReport[destination.droppableId].key);
-        // console.log('asc: ' + this.state.sortReport[destination.droppableId].ascending);
-        if (this.state.sortReport[destination.droppableId].key !== 'order') {
-          // ultimately of course we'll want something less invasive than an alert here
-          alert('Sort by Order to drag n\' drop');
-          return;
-        }
-      } catch(err) {
-        console.error('Error getting sort report for table ' + destination.droppableId);
-      }
-
-
-      let rows = [];
-
-      // if multiple videos were selected, and the dragged video was one of them,
-      // we need to move them all; if the dragged video was not one of them,
-      // we just need to move that one, but then also deselect the others
-      // to make that clearer to the user
-      if (this.props.selectedRows) {
-        let selectedFlag = false;
-        Object.keys(this.props.selectedRows).map(key => {
-          if (this.props.selectedRows[key].rows) {
-            this.props.selectedRows[key].rows.map(vidID => {
-              let row = `${vidID}_${key.replace(/^table-/,'')}`;
-              console.log(`Row: ${row}, draggableId: ${draggableId}`)
-              rows.push(row);
-              if (row === draggableId) selectedFlag = true;
-            });
-          }
-        });
-
-        // if the dragged row was NOT among the selected,
-        // empty the rows array and just put the one video into it
-        if (!selectedFlag) {
-          rows = [];
-          rows.push(draggableId);
-        }
-        // either way, we now have an array of rows to move
-      }
-      console.log('ROWS ********* ')
-      console.log(rows);
-
-      // make a deep copy of the whole collections object for modification, which we'll save when we're done
-      let colsCopy = new Collections(_.cloneDeep(this.state.collections));
-
-      // loop through all selected rows and move them
-      rows.map((row,addedIndex) => {
-        // get video id
-        let videoID = row.split('_')[0];
-        let srcID = row.split('_')[1];
-
-        let newOrder, newIndex;
-
-        // get source collection and destination collection
-        let srcCol, destCol;
-        let oldOrder = 0;
-        if (destination.droppableId !== 'uncategorized') {
-          destCol = colsCopy.get(destination.droppableId);
-        }
-        // if (source.droppableId !== 'uncategorized') {
-        if (srcID && srcID !== 'uncategorized') {
-          srcCol = colsCopy.get(srcID);
-          oldOrder = colsCopy.get(srcID).videos.filter(v => v && v.id === videoID)[0].order;
-        }
-        // console.log('old order: ' + oldOrder);
-
-        // only do anything if
-        if (
-          // the video was moved to a different collection that doesn't already contain it (or destCol doesn't exist, i.e. the video was moved to 'uncategorized')
-          (destination.droppableId !== srcID && (!destCol || !colsCopy.containsVideo(destCol,videoID)))
-          ||
-          // or the video was moved to a different position within the same collection
-          (destination.index !== source.index && destination.droppableId === srcID)
-        ) {
-
-          // remove video from original position
-          if (srcCol) {
-            colsCopy.removeVideo(srcCol,videoID);
-          }
-
-          // add video to new position
-          if (destCol) {
-
-            // first we must find the proper index where the video was dropped
-            newIndex = destination.index + addedIndex;
-            // if (destination.droppableId === source.droppableId && source.index < destination.index) {
-            //   // for the special case that we're dropping the video later in the same collection, the index must be adjusted
-            //   newIndex = destination.index + 1;
-            // }
-            // apparently not anymore???
-
-            // add the video (the addVideo method will figure out the correct order property,
-            // so we just pass it null and let it figure it out)
-            colsCopy.addVideo(destCol, videoID, null, newIndex, oldOrder);
-          }
-        }
-      });
-
-      // prior to saving, we'll update the state variables;
-      // saving will cause a re-render, but it's slow, so we want
-      // to force one before then
-      // this.state.videos.splice(vidIndex,1,video);
-      this.setState({videos:this.state.videos,collections:colsCopy.getAll()});
-
-      // save the updated video and collections object
-      // library.replace("media." + vidIndex, video);
-      library.replace("collections", colsCopy.getAll());
-    }
-  }
-
-  // when a video is dragged to the plus button on the right side of a collection,
-  // this function is called; it creates a new child collection and adds the dragged video to it
-  addCollectionConfirm(result) {
-    const { destination, source, draggableId } = result;
-    // console.log('ADDING COLLECTION AS CHILD OF ' + destination.droppableId);
-    // console.log('AND ADDING VIDEO ' + draggableId + ' TO IT.');
-
-    // get parent collection
-    let cols = new Collections(this.state.collections);
-    const parent = cols.get(destination.droppableId.slice(0,-1));
-    console.log('destination.droppableId == ' + destination.droppableId);
-    console.log('Adding child collection to ' + parent.name);
-
-    // if the user is trying to add a child collection to a terminal collection
-    // i.e. one that contains videos,
-    // the only way that is allowed is to make the collection non-terminal,
-    // which means removing all the videos from it.
-    // so we have to give the user a confirmation dialog before doing that.
-    if (parent.videos) {
-      // if the user hasn't previously selected the preference to override this confirmation dialog
-      if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibrary-confirm-convertTerminalCol']) {
-        ipcRenderer.send(
-          'generic-confirm',
-          'MynLibrary-confirm-convertTerminalCol',
-          {
-            message: `Are you sure you want to add a child collection to ${parent.name}? Doing this will remove all videos from this collection, including any videos in it that don't appear in this playlist.`,
-            checkboxLabel: `Don't show this dialog again`
-          },
-          result
-        );
-      } else {
-        // the user had checked the box to override the confirmation dialog
-        this.addCollection(result);
-      }
-    } else {
-      // if the collection is not terminal, we don't need a confirmation dialog, just add a child collection to it
-      this.addCollection(result);
-    }
-  }
-
-  addCollection(result) {
-    const { destination, source, draggableId } = result;
-    const videoID = draggableId.split('_')[0];
-    const cols = new Collections(this.state.collections);
-    const parent = cols.get(destination.droppableId.slice(0,-1));
-
-    // if the parent is a terminal collection,
-    // convert it to a non-terminal collection;
-    // (at this point we've already gotten confirmation from the user)
-    if (parent.videos) {
-      delete parent.videos;
-    }
-
-    // create new collection and add video to it
-    const newCol = cols.addChild(parent,'');
-    cols.addVideo(newCol,videoID);
-
-    // delete video from old collection
-    if (source.droppableId !== 'uncategorized') {
-      const srcCol = cols.get(source.droppableId);
-      cols.removeVideo(srcCol,videoID);
-    }
-
-    // save changes
-    library.replace("collections", cols.getAll());
-  }
-
-  deleteCollection(e,object) {
-    console.log("DELETING COLLECTION");
-    console.log(JSON.stringify(object));
-
-    ipcRenderer.once('delete-collection-confirm', (event, response, collectionID) => {
-      console.log(response);
-      console.log('collectionID == ' + collectionID);
-
-      const collections = new Collections(this.state.collections);
-      const collection = collections.get(collectionID);
-
-      if (response === 0) { // remove videos
-        console.log('Removing videos')
-        this.state.videos.map(v => {
-          collections.removeVideo(collection,v.id);
-        });
-        console.log(JSON.stringify(collection));
-        library.replace("collections", collections.getAll());
-
-      } else if (response === 1) { // delete collection
-        console.log('Deleting collection');
-        collections.deleteCollection(collectionID);
-        library.replace("collections", collections.getAll());
-
-      } else { // cancel, do nothing
-        console.log('Deletion canceled by user')
-      }
-    });
-
-    ipcRenderer.send('delete-collection-confirm', object);
-  }
-
-  reportSortedManifest(tableID, rows) {
-    // console.log(rows);
-
-    // if (rows.length > 0) this.state.sortedManifest.push(rows);
+  reportSortedManifest(tableID, rows, tableOrder = 0) {
     if (rows.length === 0) {
-      delete this.state.manifest[tableID];
+      delete this.manifest[tableID];
     } else {
-      this.state.manifest[tableID] = rows;
+      this.manifest[tableID] = {rows: rows, order: tableOrder};
     }
 
-    let sortedManifest = [];
-    Object.keys(this.state.manifest).map(key => {
-      sortedManifest.push(this.state.manifest[key])
-    });
+    const sortedManifest = Object.values(this.manifest)
+      .sort((a,b) => a.order - b.order)
+      .reduce((allRows, table) => [...allRows, ...table.rows], []);
 
-    sortedManifest.sort((a,b) => {
-      // a_col and b_col should be the collection id of that table,
-      // or if in a flat playlist, they will be undefined
-      // (in which case there should only be one table anyway)
-      try {
-        let a_col = a[0].rowID.split('_')[1];
-        let b_col = b[0].rowID.split('_')[1];
-      } catch(err) {
-        console.log(err);
-        return 0;
-      }
-
-      // if either one is undefined, we shouldn't even be here, but return 0 anyway just in case;
-      if (typeof a_col === "undefined" || typeof b_col === "undefined") return 0;
-
-      // ensure 'uncategorized' ends up at the end;
-      a_col = a_col.replace('uncategorized',Number.MAX_SAFE_INTEGER);
-      b_col = b_col.replace('uncategorized',Number.MAX_SAFE_INTEGER);
-
-      // split the collection id into an array
-      a_col = a_col.split('-');
-      b_col = b_col.split('-');
-
-      // now sort by each element, hierarchically
-      for (let i=0; i<a_col.length; i++) {
-        if (i >= b_col.length) return 1; // if b ran out, but we were equal up to this point, a should be later than b
-        if (a_col[i] > b_col[i]) return 1;
-        if (a_col[i] < b_col[i]) return -1;
-      }
-      return 0; // if we made it all the way through the loop, that means the collection id's were identical
-    });
-
-    // now that it's sorted, create a single array of every row
-    // in the playlist to be passed to up to Mynda
-    let sortedManifestFlat = [];
-    sortedManifest.map(table => {
-      sortedManifestFlat = [...sortedManifestFlat, ...table];
-    })
-
-    // console.log('==== sortedManifestFlat ====');
-    // console.log(sortedManifestFlat);
-    this.props.reportSortedManifest(sortedManifestFlat);
+    this.props.reportSortedManifest(sortedManifest);
   }
 
   toggleCompact() {
-    console.log('toggling compact');
     this.setState({compact: !this.state.compact});
   }
 
   render() {
-    // TEMPORARY HOVER-LAG DIAGNOSTIC
-    // console.count('[hover diagnostic] MynLibrary render');
-
     let tables = null;
-    this.state.manifest = {};
 
-    // if the playlist view is hierarchical, create multiple tables
-    // in a hierarchy based on the collections that the videos in this
-    // playlist are members of, and display that hierarchy
-    if (this.props.view === "hierarchical") {
-      // this.createCollectionsMap();
+    if (this.manifestPlaylistID !== this.props.playlistID || this.manifestVideos !== this.props.videos) {
+      this.manifest = {};
+      this.manifestPlaylistID = this.props.playlistID;
+      this.manifestVideos = this.props.videos;
+    }
 
+    if (this.props.view === "series") {
       tables = (
-        <DragDropContext onDragEnd={this.onDragEnd} onDragStart={this.onDragStart}>
-          <div id="collections-container">
-            {this.state.hierarchy}
-          </div>
-        </DragDropContext>
-      )
-    } else if (this.props.view === "series") {
-
-      tables = (
-          <div id="series-container">
-            <MynLibSeries
-              videos={this.state.videos}
-              settings={this.props.settings}
-              playlistID={this.props.playlistID}
-              view={this.props.view}
-              flatDefaultSort={this.props.flatDefaultSort}
-              columns={this.props.columns}
-              displayColumnName={this.props.displayColumnName}
-              calcAvgRatings={this.props.calcAvgRatings}
-              showDetails={this.props.showDetails}
-              playVideo={this.props.playVideo}
-              handleSelectedRows={this.props.handleSelectedRows}
-              handleHoveredRow={this.props.handleHoveredRow}
-              selectedRows={this.props.selectedRows}
-              reportSortedManifest={this.reportSortedManifest}
-              compact={this.state.compact}
-            />
-          </div>
-      )
-
-    // if the playlist view is flat, we only need to display one table
+        <div id="series-container">
+          <MynLibSeries
+            videos={this.props.videos}
+            settings={this.props.settings}
+            playlistID={this.props.playlistID}
+            view={this.props.view}
+            flatDefaultSort={this.props.flatDefaultSort}
+            columns={this.props.columns}
+            displayColumnName={this.props.displayColumnName}
+            calcAvgRatings={this.props.calcAvgRatings}
+            showDetails={this.props.showDetails}
+            playVideo={this.props.playVideo}
+            handleSelectedRows={this.props.handleSelectedRows}
+            handleHoveredRow={this.props.handleHoveredRow}
+            selectedRows={this.props.selectedRows}
+            reportSortedManifest={this.reportSortedManifest}
+            compact={this.state.compact}
+          />
+        </div>
+      );
     } else if (this.props.view === "flat") {
-
-      let tableID = 'table';
-      // this.state.manifest[tableID] = [];
-
       tables = (
         <MynLibTable
-          tableID={tableID}
-          movies={this.state.videos}
+          tableID="table"
+          tableOrder={0}
+          movies={this.props.videos}
           settings={this.props.settings}
           playlistID={this.props.playlistID}
           view={this.props.view}
@@ -2006,33 +1193,27 @@ class MynLibrary extends React.Component {
           reportSortedManifest={this.reportSortedManifest}
           compact={this.state.compact}
         />
-      )
-
+      );
     } else {
-      console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "hierarchical" or "series"');
-      return null
+      console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "series"');
+      return null;
     }
 
     let playlist;
     try {
       playlist = library.playlists.filter(p => p.id === this.props.playlistID)[0];
     } catch(err) {}
-    let playlistBar = (
-      <MynPlaylistBar
-        playlist={playlist}
-        view={this.props.view}
-        recentlyWatched={this.props.recentlyWatched}
-        collections={this.state.collections}
-        playVideo={this.props.playVideo}
-        toggleCompact={this.toggleCompact}
-        compact={this.state.compact}
-      />
-    );
-
 
     return (
       <div id="library-pane" className="pane">
-        {playlistBar}
+        <MynPlaylistBar
+          playlist={playlist}
+          view={this.props.view}
+          recentlyWatched={this.props.recentlyWatched}
+          playVideo={this.props.playVideo}
+          toggleCompact={this.toggleCompact}
+          compact={this.state.compact}
+        />
         {tables}
       </div>
     );
@@ -2107,13 +1288,21 @@ class MynLibSeries extends React.Component {
   }
 
   componentDidUpdate(oldProps) {
+    let needsRender = false;
+
     if (!_.isEqual(this.props.columns,oldProps.columns)) {
       this.state.columns = _.cloneDeep(this.props.columns);
-      this.setState({ columns: this.addEpisodeToColumns() });
+      this.addEpisodeToColumns();
+      needsRender = true;
     }
 
     if (!_.isEqual(this.props.videos, oldProps.videos)) {
       this.createManifest();
+      needsRender = true;
+    }
+
+    if (needsRender) {
+      this.setState({columns:this.state.columns, manifest:this.state.manifest});
     }
   }
 
@@ -2128,28 +1317,37 @@ class MynLibSeries extends React.Component {
     // });
 
     // go through the manifest and create a table for each season
+    let tableOrder = 0;
     let JSX = seriesKeys.map(series => {
 
       // sort the seasons by season number in ascending order
       let seasons = Object.keys(this.state.manifest[series]);
       seasons.sort((a,b) => {
-        return parseFloat(a) - parseFloat(b);
+        const seasonSortValue = season => {
+          const number = parseFloat(season);
+          if (!Number.isNaN(number)) return number;
+          if (season === 'extras') return Number.MAX_SAFE_INTEGER-1;
+          return Number.MAX_SAFE_INTEGER;
+        };
+        return seasonSortValue(a) - seasonSortValue(b);
       });
 
       let seriesJSX = seasons.map(season => {
         let seasonVideos = this.state.manifest[series][season];
         let tableID = `${series}.${season}`;
+        let thisTableOrder = tableOrder++;
 
         return (
-          <div class="season">
-            <h2 class="season-header">{season === 'none' ? '[No Season]' : `Season ${season}`}</h2>
+          <div className="season" key={tableID}>
+            <h2 className="season-header">{season === 'none' ? '[No Season]' : (season === 'extras' ? 'Extras' : `Season ${season}`)}</h2>
             <MynLibTable
               tableID={tableID}
+              tableOrder={thisTableOrder}
               movies={seasonVideos}
               settings={this.props.settings}
               playlistID={this.props.playlistID}
               view={this.props.view}
-              flatDefaultSort={'episode'}
+              flatDefaultSort={season === 'extras' ? 'title' : 'episode'}
               columns={this.state.columns}
               displayColumnName={this.props.displayColumnName}
               calcAvgRatings={this.props.calcAvgRatings}
@@ -2166,9 +1364,9 @@ class MynLibSeries extends React.Component {
       });
 
       return (
-        <div class={"series " + (this.state.collapsed[series] ? "collapsed" : "expanded")}>
-          <h1 class={"series-header " + (this.props.compact ? 'compact' : '')} onClick={(e) => this.toggleExpansion(e,series)}>{series}</h1>
-          <div class={"seasons-container " + (this.state.collapsed[series] ? "hidden" : "")}>
+        <div className={"series " + (this.state.collapsed[series] ? "collapsed" : "expanded")} key={series}>
+          <h1 className={"series-header " + (this.props.compact ? 'compact' : '')} onClick={(e) => this.toggleExpansion(e,series)}>{series}</h1>
+          <div className={"seasons-container " + (this.state.collapsed[series] ? "hidden" : "")}>
             {seriesJSX}
           </div>
         </div>
@@ -2202,7 +1400,7 @@ class MynPlaylistBar extends React.Component {
 
         <div className="pb-element recent">
           <div className="pb-text">Recently Viewed:</div>
-          <MynRecentlyWatched list={this.props.recentlyWatched} collections={this.props.collections} selected={0} playVideo={this.props.playVideo} />
+          <MynRecentlyWatched list={this.props.recentlyWatched} selected={0} playVideo={this.props.playVideo} />
         </div>
 
         <button className="pb-element compact" onClick={(e) => this.props.toggleCompact()}>{this.props.compact ? 'Large' : 'Compact'}</button>
@@ -2213,7 +1411,6 @@ class MynPlaylistBar extends React.Component {
             <select value={this.props.view} onChange={(e) => this.changeView(e.target.value)}>
               <option value='flat'>Flat</option>
               <option value='series'>Series</option>
-              {/* <option value='hierarchical'>Hierarchical</option> */}
             </select>
           </div>
         </div>
@@ -2231,18 +1428,7 @@ class MynLibTable extends React.Component {
 
     this._isMounted = false;
 
-    // create an id for this table;
-    // if it appears within a hierarchical playlist,
-    // there could be multiple tables (one for each collection that appears in the playlist),
-    // so in a hierarchical playlist, we append the collection id
-    if (this.props.tableID) {
-      this.tableID = this.props.tableID;
-    } else {
-      this.tableID = 'table';
-      if (props.view === 'hierarchical' && props.collectionID) {
-        this.tableID = 'table-' + props.collectionID;
-      }
-    }
+    this.tableID = this.props.tableID || 'table';
 
     this.clickTimer = null;
 
@@ -2252,10 +1438,8 @@ class MynLibTable extends React.Component {
       sortKey: null,
       sortAscending: true,
       sortedRows: [],
-      displayOrderColumn: "table-cell",
       batchSelected: [],
-      rowID: (vidID) => vidID + (this.props.collectionID ? `_${this.props.collectionID}` : ''),
-      idFromRowID: (rowID) => (this.props.collectionID ? rowID.replace(new RegExp('_' + this.props.collectionID + '$'),'') : rowID),
+      rowID: (vidID) => vidID,
       shiftDown: false,
       ctrlDown: false,
       include_user_rating_in_avg: props.settings.preferences.include_user_rating_in_avg
@@ -2448,8 +1632,7 @@ class MynLibTable extends React.Component {
   // if 'overwrite' is true, then we tell the Mynda component
   // to overwrite any rows previously selected by other tables;
   // otherwise, we simply want to add this batch to any existing batches
-  // (which would have been selected from other collections in the same playlist,
-  // i.e. in other instances of MynLibTable)
+  // (for example, from other season tables in the series view)
   handleBatch(overwrite) {
     // first, add the 'selected' class to all the selected rows
     Array.from(document.getElementById(this.tableID).getElementsByClassName('movie-row')).map(row => {
@@ -2533,7 +1716,6 @@ class MynLibTable extends React.Component {
      seen: (a, b) => [a.seen, b.seen],
      ratings_user: (a, b) => {let a_r = a.ratings.user || -1; let b_r = b.ratings.user || -1; return [a_r, b_r];},
      dateadded: (a, b) => {let a_added = isNaN(parseInt(a.dateadded)) ? -1 : parseInt(a.dateadded); let b_added = isNaN(parseInt(b.dateadded)) ? -1 : parseInt(b.dateadded); return [a_added, b_added];},
-     order: (a, b) => [a.order, b.order],
      kind: (a, b) => [a.kind.toLowerCase(), b.kind.toLowerCase()],
      lastseen: (a, b) => {let a_ls = isNaN(parseInt(a.lastseen)) ? -1 : parseInt(a.lastseen); let b_ls = isNaN(parseInt(b.lastseen)) ? -1 : parseInt(b.lastseen); return [a_ls, b_ls];},
      ratings_rt: (a, b) => {let a_r = a.ratings.rt ? a.ratings.rt : -1; let b_r = b.ratings.rt ? b.ratings.rt : -1; return [a_r, b_r]},
@@ -2602,11 +1784,7 @@ class MynLibTable extends React.Component {
           video={movie}
           index={index}
           rowID={rowID}
-          displayOrderColumn={this.state.displayOrderColumn}
-          vidOrderDisplay={this.state.vidOrderDisplay}
           settings={this.props.settings}
-          collections={this.props.collections}
-          collectionID={this.props.collectionID}
           calcAvgRatings={this.props.calcAvgRatings}
           columns={this.props.columns}
           rowHovered={(...args) => this.rowHovered(...args)}
@@ -2614,33 +1792,7 @@ class MynLibTable extends React.Component {
           rowClick={(...args) => this.rowClick(...args)}
         />
       );
-
-      // if this table is part of a hierarchical playlist,
-      // then the rows are meant to be drag-n-droppable (using react-beautiful-dnd)
-      // in which case MynLibrary will have given us the 'provided' prop,
-      // so if it has, we add the appropriate bits to make the table body droppable
-      if (this.props.provided) {
-        // row.props.ref = this.props.provided.innerRef;
-        // row.props = {...row.props, ...this.props.provided.draggableProps}
-        row.jsx = (
-          <Draggable key={rowID} draggableId={rowID} index={index}>
-            {(provided, snapshot) => {
-              // adjust style of row while it's being dragged
-              let draggableProps = _.cloneDeep(provided.draggableProps);
-              draggableProps.style.opacity = snapshot.isDragging ? 0.5 : 1;
-
-              return React.cloneElement(rowJSX,
-                {
-                  innerInnerRef: provided.innerRef,
-                  innerDragP: draggableProps,
-                  innerDragHP: provided.dragHandleProps
-                });
-            }}
-          </Draggable>
-        );
-      } else {
-        row.jsx = rowJSX;
-      }
+      row.jsx = rowJSX;
 
       return row;
     });
@@ -2655,92 +1807,42 @@ class MynLibTable extends React.Component {
     this.state.sortAscending = ascending;
     this.state.sortedRows = rows;
 
-    // report the sort state to MynLibrary
-    if (this.props.reportSort) {
-      this.props.reportSort(this.props.collectionID,key,ascending);
-    }
-
     console.log("...finished sorting");
   }
 
-  // this is the method that causes the table to render with all its content;
-  // it checks if the table should be visible (i.e. in a flat playlist, or expanded in a hierarchical playlist),
-  // and sorts the rows either by an initial value, if sortValue is passed as "initial-sort" (i.e. when first opened/expanded)
-  // or, if sortValue is a valid column name, sorts by that column (i.e. when the user clicks on a column header)
-  // or, if nothing is passed, by the current sort value (i.e. when re-rendering an already open table for various reasons)
+  // Sort the rows and rebuild the table content.
   reset(sortValue) {
     console.log("======== MynLibTable RESET WAS CALLED ========");
-    // if in a hierarchical playlist and this table is collapsed, render nothing
-    if (this.props.view === 'hierarchical' && !this.props.isExpanded) {
-      this.setState({tBodyContent:null, tHeadContent:null});
 
-    // otherwise, whether in an expanded table in a hierarchical playlist,
-    // or in a table in a flat playlist, render the table
+    if (sortValue === "initial-sort" || this.state.sortKey === null) {
+      this.state.sortKey = null;
+      if (this.props.flatDefaultSort && this.props.columns.includes(this.props.flatDefaultSort)) {
+        this.requestSort(this.props.flatDefaultSort);
+      } else {
+        this.requestSort('title');
+      }
+    } else if (this.props.columns.includes(sortValue)) {
+      this.requestSort(sortValue);
     } else {
-
-      // display 'order' column only if we're in a hierarchical playlist
-      if (this.props.view === 'hierarchical') {
-        this.state.displayOrderColumn = "table-cell";
-      } else {
-        this.state.displayOrderColumn = "none";
-      }
-
-      // ==== sort the table === //
-
-      // if we're told to set to initial values (or if there is no current value)
-      if (sortValue === "initial-sort" || this.state.sortKey === null) {
-        console.log("sortValue: " + sortValue);
-        console.log("this.state.sortKey: " + this.state.sortKey);
-        console.log("this.props.initialSort: " + this.props.initialSort);
-        console.log("this.props.initialSortAscending: " + this.props.initialSortAscending);
-
-        // sort by initial (default) values
-        this.state.sortKey = null;
-        try {
-          this.requestSort(this.props.initialSort, this.props.initialSortAscending);
-          console.log('sorting by initialSort')
-        } catch(e) {
-          console.log("No initial sort parameter")
-          console.log(`flatDefaultSort: ${this.props.flatDefaultSort}
-                     \ncolumns: ${this.props.columns}`);
-          // no initial sort parameter, so if the playlist has a default sort column, use that
-          if (this.props.flatDefaultSort && this.props.columns.includes(this.props.flatDefaultSort)) {
-            console.log("Sorting by flatDefaultSort: " + this.props.flatDefaultSort);
-            this.requestSort(this.props.flatDefaultSort);
-          } else {
-            console.log("Also, no flatDefaultSort, so sorting by [Title]");
-            // if not, sort by title
-            this.requestSort('title');
-          }
-        }
-      } else if (this.props.columns.includes(sortValue) || sortValue === "order") {
-        // if the sortValue is one of our columns, sort by that column
-        this.requestSort(sortValue);
-      } else {
-        // if no sort value was passed, sort by the current value
-        console.log("Sort key is not null?: " + this.state.sortKey);
-        this.requestSort(this.state.sortKey, this.state.sortAscending);
-      }
-
-      // report the sorted rows to MynLibrary
-      // console.log(`The sorted rows are ${this.state.sortedRows}.`);
-      this.props.reportSortedManifest(this.tableID,this.state.sortedRows);
-
-      // === create the table content and cause the table to re-render === //
-
-      let tBodyContent = this.state.sortedRows.map(row => row.jsx);
-
-      let tHeadContent = (
-        <tr id="main-table-header-row">
-          <th onClick={() => this.reset('order')} style={{display:this.state.displayOrderColumn}}>#</th>
-          {this.props.columns.map(col => (
-            <th key={col} class={col} onClick={() => this.reset(col)}>{this.props.displayColumnName(col)}</th>
-          ))}
-        </tr>
-      );
-
-      this.setState({tBodyContent:tBodyContent, tHeadContent:tHeadContent});
+      this.requestSort(this.state.sortKey, this.state.sortAscending);
     }
+
+    this.props.reportSortedManifest(
+      this.tableID,
+      this.state.sortedRows,
+      this.props.tableOrder || 0
+    );
+
+    let tBodyContent = this.state.sortedRows.map(row => row.jsx);
+    let tHeadContent = (
+      <tr id="main-table-header-row">
+        {this.props.columns.map(col => (
+          <th key={col} className={col} onClick={() => this.reset(col)}>{this.props.displayColumnName(col)}</th>
+        ))}
+      </tr>
+    );
+
+    this.setState({tBodyContent:tBodyContent, tHeadContent:tHeadContent});
   }
 
   removeArticle(string) {
@@ -2784,8 +1886,7 @@ class MynLibTable extends React.Component {
     //   this.reset(true,true);
     // }
 
-    // if the playlist was changed, reset the playlist,
-    // sorting by the table by initial values (props.initialSort if it exists, or flatDefaultSort)
+    // If the playlist changed, reset it using the playlist's default sort.
     if (oldProps.playlistID !== this.props.playlistID) {
       console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
       // setTimeout(() => this.reset(true,true), 1000);
@@ -2827,11 +1928,6 @@ class MynLibTable extends React.Component {
       }
     }
 
-    if (oldProps.isExpanded !== this.props.isExpanded) {
-      console.log(`isExpanded change from ${oldProps.isExpanded} to ${this.props.isExpanded}`);
-      this.reset();
-    }
-
   }
 
   componentDidMount(props) {
@@ -2868,22 +1964,9 @@ class MynLibTable extends React.Component {
           <thead>
             {this.state.tHeadContent}
           </thead>
-          {(() => {
-            if (this.props.provided) {
-              return (
-                <tbody ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
-                  {this.state.tBodyContent}
-                  {this.props.provided.placeholder}
-                </tbody>
-              );
-            } else {
-              return (
-                <tbody>
-                  {this.state.tBodyContent}
-                </tbody>
-              );
-            }
-          })()}
+          <tbody>
+            {this.state.tBodyContent}
+          </tbody>
         </table>
       </div>
     );
@@ -3007,47 +2090,7 @@ class MynLibTableRow extends React.Component {
     let video = this.props.video;
     let index = this.props.index;
 
-    // set the JSX for the 'order' column (which is only displayed in a hierarchical playlist) separately,
-    // because it's rather wordy. It's editable by double clicking, so we need to use MynClickToEditText
-    // let order;
-    // let orderJSX = (
-    //   <td key="order" className="order" style={{display:this.props.displayOrderColumn}}>
-    //     <MynClickToEditText
-    //       object={video}
-    //       property='order'
-    //       update={(prop,value) => { console.log(value); /*if (valid)*/ order = value}}
-    //       options={null}
-    //       storeTransform={v => {v = v.replace(/\s+/g,''); if (v === '') {return v} else {return Math.round(Number(v) * 10) / 10}}}
-    //       validator={{test:v => !isNaN(Number(v))}}
-    //       validatorTip={'#'}
-    //       allowedEmpty={true}
-    //       reportValid={(prop,value) => {/*valid = value;*/}}
-    //       noClear={true}
-    //       setFocus={true}
-    //       doubleClick={true}
-    //       save={() => {
-    //         console.log('Saving order as ' + order);
-
-    //         // update the order and save to library
-    //         if (order && this.props.collections) {
-    //           let cols = new Collections(this.props.collections);
-    //           let col = cols.get(this.props.collectionID);
-    //           cols.removeVideo(col,video.id);
-    //           cols.addVideo(col,video.id,order);
-    //           library.replace("collections", cols.getAll());
-    //         } else {
-    //           // if 'order' is falsy (e.g. null will be passed if the user hits escape)
-    //           // then we just keep the old order
-    //           order = video.order;
-    //         }
-    //       }}
-    //   />
-    //   </td>
-    // );
-
     let cellJSX = {
-      // order: (<td key="order" className="order" style={{display:this.props.displayOrderColumn}}>{this.props.vidOrderDisplay[video.id]}</td>),
-      // order: orderJSX,
       title: (<td key="title" className="title">{video.title}</td>),
       // title: (<td key="title" className="title"><MynOverflowTextMarquee class="table-title-text" text={video.title} ellipsis='fade' /></td>),
       year: (<td key="year" className="year centered mono">{video.year}</td>),
@@ -3085,95 +2128,14 @@ class MynLibTableRow extends React.Component {
       <tr
         className={"movie-row " + rowID}
         id={rowID}
-        ref={this.props.innerInnerRef}
-        {...this.props.innerDragP}
-        {...this.props.innerDragHP}
         vid_id={video.id}
         onMouseEnter={(e) => this.props.rowHovered(video, rowID, index, e)}
         onClick={(e) => this.props.rowClick(video.id, rowID, index, e)}
       >
-        {/* {cellJSX.order} */}
         {cells}
       </tr>
     );
     // onMouseOut = {(e) => this.props.rowOut(video.id, rowID, e)}
-  }
-}
-
-// A dropdown list of terminal collections,
-// meant to be displayed at the top of the 'Uncategorized' collection
-// and used as a drop-zone for a video row, to add that video to the chosen collection;
-// this allows the user to add a video in the playlist to an existing collection
-// that doesn't already appear in the playlist
-class MynLibAddExistingCollection extends React.Component {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      options: this.getOptions()
-    }
-
-    this.render = this.render.bind(this);
-    this.handleChange = this.handleChange.bind(this);
-  }
-
-  getOptions() {
-    let options = {};
-    let cols = new Collections(this.props.collections);
-    // get all terminal collections as a flat list (pass 'true' to include barren collections that aren't technically designated terminal)
-    cols.getAllTerminal(true).map((c) => {
-      let idArr = c.id.split('-');
-      let ancestry = idArr.map((el,i) => {
-        let id = idArr.slice(0,i+1).join('-');
-        let ancestor = cols.get(id);
-        return ancestor ? ancestor.name : null;
-      });
-      let displayStr = ancestry.join(' \u27A5 ');
-
-      options[displayStr] = c.id;
-    });
-
-    console.log(JSON.stringify(options))
-
-    return options;
-  }
-
-  handleChange(e) {
-    console.log("CHANGE")
-    let container = document.getElementById('library-addToExistingCollection');
-     if (container) {
-       console.log("adding class")
-       container.classList.add('changing');
-       setTimeout(() => {container.classList.remove('changing')},1000);
-
-       container.classList.add('selected');
-     }
-     this.props.choose(e.target.value);
-  }
-
-  componentDidUpdate(oldProps) {
-    if (!_.isEqual(oldProps.collections,this.props.collections)) {
-      this.setState({options:this.getOptions()});
-    }
-  }
-
-  render() {
-    return (
-      <div id="library-addToExistingCollection" ref={this.props.provided.innerRef} {...this.props.provided.droppableProps}>
-        {/*<label className="edit-field-name" htmlFor="collections">Drop to Add: </label>*/}
-        <div className="select-container select-alwaysicon">
-          <select name="collections" defaultValue="" onChange={this.handleChange}>
-            <option value="" disabled hidden>[Choose a collection and drop a video here to add to it]</option>
-            {Object.keys(this.state.options).map((opt,i) => (
-              <option key={i} value={this.state.options[opt]}>{opt}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{height:'0'}}>
-          {this.props.provided.placeholder}
-        </div>
-      </div>
-    );
   }
 }
 
@@ -4089,7 +3051,6 @@ class MynSettings extends MynOpenablePane {
     let views = {
       folders :     (<MynSettingsFolders      save={this.save} folders={this.props.settings.watchfolders} kinds={this.props.settings.used.kinds} />),
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
-      // collections : (<MynSettingsCollections  save={this.save} collections={this.props.collections} videos={this.props.videos} settings={this.props.settings} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />),
       sync : (<MynSettingsSync                save={this.save} settings={this.props.settings} />)
@@ -4667,30 +3628,13 @@ class MynSettingsPrefs extends React.Component {
       'MynEditorSearch-confirm-select' : 'Confirm selection of search result in video editor',
       'MynEditor-confirm-exit' : 'Confirm on exiting video editor without saving',
       'MynEditorEdit-confirm-revert' : 'Confirm on reverting to saved values in video editor',
-      'MynLibrary-confirm-convertTerminalCol' : (
-        <span>
-          {'Confirm on dragging a video to a collection in the library pane'}
-          <br/>
-          {'when it would mean deleting its child collections'}
-          <MynTooltip tip={`A collection can either contain other collections or videos, but not both. If it contains videos, it is a 'terminal' collection. If you drag a video into a non-terminal collection, it must remove any child collections from itself (and grandchildren, etc., recursively) in order to convert itself to a terminal collection which can contain the video(s) you want to add to it. This will permanently delete all of its descendant collections (though any videos contained therein will not be affected aside from their participation in the deleted collections).`} />
-        </span>
-      ),
       'MynLibTable-confirm-inlineEdit' : (
         <span>
           {'Confirm when editing a video directly from a widget'}
           <br/>
           {'in a table row (e.g. the rating stars)'}
         </span>
-      ),
-      'MynSettingsCollections-confirm-convertToNonTerminal' : (
-        <span>
-          {'Confirm adding a child collection in the settings pane'}
-          <br/>
-          {'when it would mean removing the videos from the parent collection'}
-          <MynTooltip tip={`A collection can either contain other collections or videos, but not both. If it contains videos, it is a 'terminal' collection. If you add a child collection to a terminal collection (by clicking its ${'\uFF0B'} button in the Settings ${'\u279E'} Collections pane), it must remove any videos from itself in order to convert itself to a non-terminal collection. This will NOT remove the videos from the library itself, nor from any other collections they might be in.`} />
-        </span>
-      ),
-      'MynSettingsCollections-confirm-delete' : 'Confirm deletion of collections in the settings pane'
+      )
     }
 
     return (
@@ -4950,7 +3894,6 @@ class MynSettingsPlaylistsTableRow extends React.Component {
           <select value={playlist.view} onChange={(e) => this.props.updateValue(this.props.index,'view',e.target.value)}>
             <option value='flat'>Flat</option>
             <option value='series'>Series</option>
-            {/* <option value='hierarchical'>Hierarchical</option> */}
           </select>
         </div>
       </div>
@@ -4984,365 +3927,6 @@ class MynSettingsPlaylistsTableRow extends React.Component {
       </div>
     );
 
-  }
-}
-
-class MynSettingsCollections extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      collections : _.cloneDeep(props.collections)
-    }
-
-
-    ipcRenderer.on('MynSettingsCollections-confirm-delete', (event, response, id, checked) => {
-      if (response === 0) { // yes
-        // delete the collection
-        // we were passed the id, but we need to pass the actual collection to deleteCollection
-        // (the dialog can't pass the whole collection through ipcRenderer because it seems
-        // to break the reference to the actual object, so we just pass the id and pick it back up on the other side)
-        let collections = new Collections(this.state.collections);
-        let c = collections.get(id);
-        this.deleteCollection(null, c, null, true);
-
-        // if the user checked the option to override this dialog next time
-        if (checked) {
-          console.log('option to override dialog was checked!');
-          let prefs = _.cloneDeep(this.props.settings.preferences);
-          if (!prefs.override_dialogs) {
-            prefs.override_dialogs = {};
-          }
-          prefs.override_dialogs['MynSettingsCollections-confirm-delete'] = true;
-          library.replace("settings.preferences",prefs);
-        }
-      } else {
-        console.log('Deletion canceled by user')
-      }
-    });
-
-    ipcRenderer.on('MynSettingsCollections-confirm-convertToNonTerminal', (event, response, parentID, checked) => {
-      if (response === 0) { // yes
-        // add the collection
-        // console.log("Yes Add Collection!!! Hurray!!");
-
-        // we were passed the id, but we need to pass the actual collection to addCollection
-        // (the dialog can't pass the whole collection through ipcRenderer because it seems
-        // to break the reference to the actual object, so we just pass the id and pick it back up on the other side)
-        let collections = new Collections(this.state.collections);
-        let c = collections.get(parentID);
-        this.addCollection(null, c, false);
-
-        // if the user checked the option to override this dialog next time
-        if (checked) {
-          console.log('option to override dialog was checked!');
-          let prefs = _.cloneDeep(this.props.settings.preferences);
-          if (!prefs.override_dialogs) {
-            prefs.override_dialogs = {};
-          }
-          prefs.override_dialogs['MynSettingsCollections-confirm-convertToNonTerminal'] = true;
-          library.replace("settings.preferences",prefs);
-        }
-      } else {
-        console.log('Add collection canceled by user')
-      }
-    });
-
-    this.onDragEnd = this.onDragEnd.bind(this);
-    this.onDragStart = this.onDragStart.bind(this);
-  }
-
-  addCollection(e, parentCol, isTerminal) {
-    if (e) e.stopPropagation();
-
-    let parentID;
-    if (parentCol) parentID = parentCol.id;
-
-    console.log(JSON.stringify(parentCol))
-
-    // if this is a terminal collection, and
-    // if the user hasn't previously checked the option to override it,
-    // show the user a confirmation dialog before adding a collection,
-    // (because that will necessitate deleting any videos it has)
-    if (isTerminal && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`MynSettingsCollections-confirm-convertToNonTerminal`])) {
-      ipcRenderer.send(
-        'generic-confirm',
-        'MynSettingsCollections-confirm-convertToNonTerminal',
-        {
-          message: `Are you sure you want to add a child collection to '${parentCol.name}'? This will remove all the videos from this collection (though the videos themselves will remain in the library).`,
-          checkboxLabel: `Don't show this dialog again`
-        },
-        parentID
-      );
-      return;
-    }
-
-    let collections = new Collections(this.state.collections);
-    let newCol;
-
-    // if we got a parent collection
-    if (parentCol) {
-      // convert it to non-terminal if needed (removing any videos it has)
-      // and add the new child
-      // if (!parentCol.c) parentCol = new Collection(parentCol); // wrap it in a class if it isn't already
-      collections.convertToNonTerminal(parentCol);
-      newCol = collections.addChild(parentCol);
-    } else {
-      // if we weren't given a parentID we assume we're adding a child to the
-      // top-level collections object
-      newCol = collections.addCollection({name:''},true);
-    }
-
-    // console.log('NEW COLLECTION: ' + JSON.stringify(newCol));
-    // console.log('NEW COLLECTION from master: ' + JSON.stringify(collections.get(newCol.id)));
-
-    // this.state.collections is actually altered in place
-    // but we need to explicitly set it in order to get a re-render
-    // after which we save to the library
-    this.setState({collections: collections.getAll()}, () => {
-      this.props.save({'collections':this.state.collections});
-    });
-  }
-
-  deleteCollection(e, c, isTerminal, dialogConfirmed) {
-    if (e) e.stopPropagation();
-
-    // if the user hasn't previously checked the option to override it,
-    // show the user a confirmation dialog before deleting the collection
-    if (!dialogConfirmed && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`MynSettingsCollections-confirm-delete`])) {
-      ipcRenderer.send(
-        'generic-confirm',
-        'MynSettingsCollections-confirm-delete',
-        {
-          message: `Are you sure you want to delete '${c.name}'? (${ !isTerminal ? 'this will delete all of its child collections as well, though ' : '' }the videos themselves will remain in the library)`,
-          checkboxLabel: `Don't show this dialog again`
-        },
-        c.id
-      );
-      return;
-    }
-
-    // if we're here, the user has either confirmed the dialog or
-    // they have opted to skip the dialog,
-    // so delete the collection
-    console.log('Deleting ' + c.name);
-    let collections = new Collections(this.state.collections);
-    collections.deleteCollection(c.id);
-
-    // this.state.collections is actually altered in place
-    // but we need to explicitly set it in order to get a re-render
-    // after which we save to the library
-    this.setState({collections: collections.getAll()}, () => {
-      this.props.save({'collections':this.state.collections});
-    });
-  }
-
-  createAddCollectionBtn(c, isTerminal) {
-    return (
-      <div key='add' className={'add collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.addCollection(e,c,isTerminal)}>
-        <h1>{'\uFF0B'}</h1>
-      </div>
-    );
-  }
-
-  createDeleteCollectionBtn(c, isTerminal) {
-    return (
-      <div key='delete' className={'delete collection-btn clickable' + (isTerminal ? ' terminal' : '')} onClick={(e) => this.deleteCollection(e,c,isTerminal)}>
-        <h1><div style={{transform: 'rotate(45deg)'}}>{'\uFF0B'}</div></h1>
-      </div>
-    );
-  }
-
-  onDragStart() {
-    this.setState({dragging:true});
-  }
-
-  onDragEnd(result) {
-    this.setState({dragging:false});
-
-    const { destination, source, draggableId } = result;
-    // if the user actually moved an item
-    if (destination && (destination.droppableId !== source.droppableId || destination.index !== source.index)) {
-      console.log(`
-        dragged ID: ${draggableId}\n
-        src ID:     ${source.droppableId}\n
-        dst ID:     ${destination.droppableId}\n
-        src index:  ${source.index}\n
-        dst index:  ${destination.index}
-      `);
-    } else {
-      console.log('Drag did not result in a move');
-    }
-  }
-
-  findCollections(collections) {
-    if (!collections) return null;
-
-    // if collections is a class object, unwrap it
-    if (collections.c) collections = collections.c;
-
-    let collectionsJSX = collections.map(collection => {
-      if (!collection) return null;
-
-      let children = null;
-      let isTerminal = false;
-
-      // if this collection has child collections
-      if (collection.collections) {
-        // attach those collections as children
-        children = this.findCollections(collection.collections);
-
-      // if the collection does not have child collections,
-      // it is a bottom-level collection, probably containing videos
-      // (though it may not contain videos)
-      // so if it contains videos, attach those videos as children
-      } else if (collection.videos && collection.videos.length > 0) {
-        // set isTerminal to true in order to tell the addButton
-        // (which we create later) to give the user a confirmation dialog
-        // before adding a child (because doing so will delete its videos)
-        isTerminal = true;
-
-        let childrenEls = collection.videos.sort((a,b) => a.order > b.order ? 1 : a.order < b.order ? -1 : 0).map(vidToken => {
-          let video = null;
-          try {
-            video = this.props.videos.filter(video => video && video.id === vidToken.id)[0];
-
-            return (
-              <div key={vidToken.order} className='video'>
-                <div className='order'>{vidToken.order}</div> {video.title}
-              </div>
-            );
-          } catch(err) {
-            console.error(`MynSettingsCollections Error: could not find video (id: ${vidToken.id}) from collection "${collection.name}" in library`);
-          }
-          return null;
-        });
-
-        children = (
-          <div className='videos' style={{ display : (this.state.dragging ? 'none' : 'block') }}>
-            {childrenEls}
-          </div>
-        );
-
-      // if the collection contains neither collections nor videos
-      // it is an empty bottom-level collection, in which case the user
-      // is still allowed to create a child collection for it
-      // (making it no longer a bottom-level collection)
-      // so we leave isTerminal false
-      } else {
-      }
-
-      // create an add button so the user can create more child collections;
-      // in the case of a terminal collection containing videos, isTerminal
-      // will tell the button to use a confirmation dialog, because adding a child
-      // collection will convert it to a non-terminal collection,
-      // deleting all the videos in it
-      let addButton = this.createAddCollectionBtn(collection, isTerminal);
-
-      let deleteButton = this.createDeleteCollectionBtn(collection, isTerminal);
-
-      let editColNameValid;
-      let index = parseInt(collection.id.match(/\d+$/)[0]);
-      // console.log("INDEX for " + collection.id + " : " + index);
-
-      return (
-        <Draggable key={collection.id} draggableId={collection.id} index={index}>
-          {(provided, snapshot) => {
-
-            // let draggableProps = _.cloneDeep(provided.draggableProps);
-            // draggableProps.style.opacity = snapshot.isDragging ? 0.5 : 1;
-            // console.log(JSON.stringify(snapshot));
-
-            return (
-              <div
-                key={collection.id}
-                id={'settings-col_' + collection.id}
-                className='collection'
-                ref={provided.innerRef}
-                {...provided.draggableProps}
-              >
-                <header>
-                  <h1 {...provided.dragHandleProps} style={{cursor:'grab'}}>
-                    <MynClickToEditText
-                      object={collection}
-                      property='name'
-                      update={(prop,value) => { if (editColNameValid) collection.name = value }}
-                      save={() => {
-                        if (editColNameValid) {
-                          let cols = new Collections(this.state.collections);
-                          cols.sortAll();
-                          library.replace("collections", cols.getAll());
-                        }
-                      }}
-                      options={null}
-                      validator={/^[^=;{}]+$/}
-                      validatorTip={'Not allowed: = ; { }'}
-                      allowedEmpty={true}
-                      reportValid={(prop,valid) => { editColNameValid = valid }}
-                      noClear={true}
-                      setFocus={true}
-                      doubleClick={true}
-                    />
-
-                    ({collection.id})
-                  </h1>
-                  <div className='collection-btn-container'>
-                    {deleteButton}
-                    {addButton}
-                  </div>
-                </header>
-                <div style={{display: (snapshot.isDragging ? 'none' : 'block') }}>
-                  {children}
-                </div>
-              </div>
-            )
-          }}
-        </Draggable>
-      );
-    });
-
-    // create a droppableId for this collections level
-    // by recreating the parent collection's id from its 1st member
-    let droppableId = '-';
-    for (let col of collections) {
-      try {
-        let match = col.id.match(/.+(?=-\d+$)/);
-        if (match !== null && match.length > 0) {
-          droppableId = match[0];
-          break;
-        }
-      } catch(err) {
-        // do nothing, keep looping
-      }
-    }
-    // console.log('DROPPABLE ID matches == ' + JSON.stringify(id));
-
-    return (
-      <Droppable droppableId={droppableId}>
-        {(provided, snapshot) => {
-          // console.log(JSON.stringify(snapshot));
-          return (
-            <div className='collections' ref={provided.innerRef} {...provided.droppableProps}>
-              {collectionsJSX}
-              <div style={{display:'none'}/*{ maxHeight: '45px', border: '1px solid red', overflow : 'hidden', backgroundColor : (snapshot.isUsingPlaceholder ? 'red' : 'initial') }*/}>
-                {provided.placeholder}
-              </div>
-            </div>
-          )
-        }}
-      </Droppable>
-    );
-  }
-
-  render() {
-    return (
-      <div id='settings-collections'>
-        {this.createAddCollectionBtn()}
-        <DragDropContext onDragStart={this.onDragStart} onDragEnd={this.onDragEnd}>
-          {this.findCollections(this.state.collections)}
-        </DragDropContext>
-      </div>
-    );
   }
 }
 
@@ -5446,19 +4030,11 @@ class MynEditor extends MynOpenablePane {
     super(props)
 
     this._isMounted = false;
-    let collections = props.collections ? new Collections(_.cloneDeep(props.collections)) : null;
-    // let vidCols = props.video && collections ? collections.getVideoCollections(props.video.id) : {};
-    // // let videoWithCols = {...props.video, ...vidCols};
-    // let videoWithCols = props.video;
-    // if (videoWithCols) videoWithCols.collections = vidCols;
 
     this.state = {
       paneID: 'editor-pane',
-      // video: /_.cloneDeep(videoWithCols), // add collections to video object during editing, so we can use the validation machinery (and the hash, to see if the user has made a change)
-      collections: collections,
       placeholderImage: placeholderImage,
       valid: {},
-      // saveHash: hashObject(videoWithCols),
       changed: new Set()
     }
 
@@ -5523,74 +4099,6 @@ class MynEditor extends MynOpenablePane {
 
     this._isMounted && this.setState({video : update});
 
-    // in addition to updating the video object, in the special case that the collections were changed,
-    // we need to update the master collections object in the library
-    if (args[0] == "collections" || args[0].collections) { // collections was updated
-      // console.log("args[0] == " + JSON.stringify(args[0]));
-      const collectionUpdate = args[1] || args[0].collections;
-      // console.log("collectionUpdate == " + JSON.stringify(collectionUpdate));
-      // console.log("original collections == " + JSON.stringify(this.state.video.collections));
-
-      let collectionsCopy = new Collections(this.state.collections.getAll(true)); // pass 'true' to get a deep copy
-
-      // add video to any new collections
-      const addedIDs = Object.keys(collectionUpdate).filter((key) => !Object.keys(this.state.video.collections).includes(key));
-      // console.log(`addedIDs == ${addedIDs}`);
-      for (const id of addedIDs) {
-        // let collection = getCollectionObject(id, collectionsCopy, false);
-        // if (collection) {
-        //   collection.videos.push({
-        //     id: this.state.video.id,
-        //     order: collectionUpdate[id]
-        //   });
-        // } else {
-        //   console.error(`Unable to add ${this.state.video.title} to collection ${id}. Unable to retrieve collection object from that id.`);
-        // }
-        let collection = collectionsCopy.get(id);
-        if (collection) {
-          collectionsCopy.addVideo(collection,this.state.video.id,collectionUpdate[id]);
-        } else {
-          console.error(`Unable to add ${this.state.video.title} to collection ${id}. Unable to retrieve collection object from that id.`);
-        }
-      }
-
-      // delete video from any deleted collections
-      Object.keys(this.state.video.collections).forEach((id) => {
-        if (!Object.keys(collectionUpdate).includes(id)) {
-          // let collection = getCollectionObject(id, collectionsCopy, false);
-          let collection = collectionsCopy.get(id);
-          if (collection) {
-            collectionsCopy.removeVideo(collection,this.state.video.id);
-            // collection.videos = collection.videos.filter(video => video.id !== this.state.video.id);
-          } else {
-            console.error(`Unable to remove ${this.state.video.title} from collection ${id}. Unable to retrieve collection object from that id.`);
-          }
-        }
-      });
-
-      // update any changes to the order number of this video in its collections
-      const ids = Object.keys(collectionUpdate);
-      for (const id of ids) {
-        let collection = collectionsCopy.get(id);//getCollectionObject(id, collectionsCopy, false);
-        if (collection) {
-          try {
-            // console.log("Updating order of collection " + id + " to " + collectionUpdate[id]);
-            // let index = collection.videos.indexOf(collection.videos.filter(v => v.id === this.state.video.id)[0]);
-            // collection.videos[index].order = collectionUpdate[id];
-            let success = collectionsCopy.updateOrder(collection,this.state.video.id,collectionUpdate[id]);
-            // console.log("success? " + success);
-          } catch(err) {
-            console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Video not found in that collection.`);
-          }
-        } else {
-          console.error(`Unable to update order property for ${this.state.video.title} in collection ${id}. Unable to retrieve collection object from that id.`);
-        }
-      }
-
-      // console.log("collections after change: " + JSON.stringify(collectionsCopy));
-      this._isMounted && this.setState({collections : collectionsCopy});
-    }
-
     // just for debugging:
     let changedFields = []
     this.state.changed.forEach(field => {changedFields.push(field)});
@@ -5598,14 +4106,6 @@ class MynEditor extends MynOpenablePane {
   }
 
   revertChanges() {
-    // console.log('reverting...');
-    // event.preventDefault();
-    // this._isMounted && this.setState(
-    //   {
-    //     video : _.cloneDeep(this.props.video),
-    //     collections : _.cloneDeep(this.props.collections)
-    //   }
-    // );
     this.componentDidUpdate({video:null});
 
   }
@@ -5730,7 +4230,8 @@ class MynEditor extends MynOpenablePane {
 
           // save this video to the library
           let temp = _.cloneDeep(video);
-          delete temp.collections;
+          // Transient signal for Library.js; it is removed before saving.
+          temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
           let index = library.media.findIndex(v => v.id === video.id);
           library.replace("media." + index, temp);
         });
@@ -5741,18 +4242,12 @@ class MynEditor extends MynOpenablePane {
     } else {
       // SINGLE VIDEO
       // save the video data in library.media
-      // (delete the temporary collections information from the video,
-      // we don't want to save this)
       let temp = _.cloneDeep(this.state.video);
-      delete temp.collections;
       temp.autotag_tried = false; // reset this flag whenever a video is saved
+      // Transient signal for Library.js; it is removed before saving.
+      temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
       let index = library.media.findIndex((video) => video && video.id === this.props.video.id);
       library.replace("media." + index, temp);
-    }
-
-    // then, if any collections were changed, save the collections object in library.collections
-    if (!_.isEqual(this.props.collections,this.state.collections.getAll())) {
-      library.replace("collections", this.state.collections.getAll());
     }
 
     // then, add any new tags to the library.settings.used.tags list so they'll be available
@@ -5784,50 +4279,22 @@ class MynEditor extends MynOpenablePane {
   }
 
   componentDidUpdate(oldProps) {
-    let collections = this.props.collections ? new Collections(_.cloneDeep(this.props.collections)) : null;
-    let vidCols = this.props.video && collections ? collections.getVideoCollections(this.props.video.id) : {};
-    let oldVidCols = oldProps.video ? oldProps.video.collections : {};
-
-
-    // if the video has changed (and we have to check whether its collections have changed independently,
-    // since the collections information is no longer contained in the video object itself)
-    if (!_.isEqual(oldProps.video,this.props.video) || !_.isEqual(oldVidCols,vidCols)) {
-      // console.log('MynEditor props.video has changed!!!\n' + JSON.stringify(this.props.video));
-
-      if (this.props.video) this.props.video.collections = vidCols;
-
-      // create a copy of the video for editing
+    if (!_.isEqual(oldProps.video, this.props.video)) {
       let videoEditPrepped = _.cloneDeep(this.props.video);
 
       if (videoEditPrepped) {
-        // attach a temporary collections object to each video,
-        // containing information on all the collections the video is a part of;
-        // videoEditPrepped.collections = vidCols;
-
-        // if we're dealing with a 'batch object', which is to say,
-        // we're editing multiple videos (for which the batch object
-        // contains only the values all the videos have in common),
-        // save an unedited copy of this batch object for comparison
-        // when it's time to save the changes
         if (videoEditPrepped.id === 'batch') {
           this.state.batchObjectUnedited = _.cloneDeep(videoEditPrepped);
         }
 
-        // set the 'new' property to false, so that when the movie is saved,
-        // it will be removed from the 'New' playlist
+        // Saving an edited video removes it from the built-in New playlist.
         videoEditPrepped.new = false;
-
-        // fix any broken properties/values
         validateVideo(videoEditPrepped);
 
-        // console.log('object when something changed:');
-        // console.log(videoEditPrepped);
-
         this.setState({
-          video : videoEditPrepped,
-          collections : collections,
-          changed : new Set(),
-          saveHash: hashObject(videoEditPrepped) // when a new video is loaded, update the saveHash (which is used for testing whether or not anything has changed since last save)
+          video: videoEditPrepped,
+          changed: new Set(),
+          saveHash: hashObject(videoEditPrepped)
         });
       }
     }
@@ -5886,7 +4353,6 @@ class MynEditor extends MynOpenablePane {
           show={this.props.show}
           video={this.state.video}
           batch={this.props.batch}
-          collections={this.state.collections ? this.state.collections.c : []}
           settings={this.props.settings}
           handleChange={this.handleChange}
           revertChanges={this.revertChanges}
@@ -6100,6 +4566,14 @@ class MynEditorEdit extends React.Component {
         posint: {
           exp: { test: value => Number.isInteger(Number(value)) && Number(value)>0 },
           tip: "Positive integer"
+        },
+        nonnegativeInteger: {
+          exp: { test: value => String(value).trim() !== '' && Number.isInteger(Number(value)) && Number(value)>=0 },
+          tip: "Integer 0 or greater"
+        },
+        season: {
+          exp: { test: value => String(value).toLowerCase() === 'extras' || (String(value).trim() !== '' && Number.isInteger(Number(value)) && Number(value)>=0) },
+          tip: "Integer 0 or greater, or extras"
         },
         number: {
           exp: { test: value => !isNaN(Number(value)) },
@@ -6457,8 +4931,8 @@ class MynEditorEdit extends React.Component {
             className="edit-field-season"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.posint.exp}
-            validatorTip={this.state.validators.posint.tip}
+            validator={this.state.validators.season.exp}
+            validatorTip={this.state.validators.season.tip}
             reportValid={this.props.reportValid}
           />
         </div>
@@ -6476,8 +4950,8 @@ class MynEditorEdit extends React.Component {
             className="edit-field-episode"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.posint.exp}
-            validatorTip={this.state.validators.posint.tip}
+            validator={this.state.validators.nonnegativeInteger.exp}
+            validatorTip={this.state.validators.nonnegativeInteger.tip}
             reportValid={this.props.reportValid}
           />
         </div>
@@ -6571,26 +5045,6 @@ class MynEditorEdit extends React.Component {
         <label className="edit-field-name" htmlFor="rating">Rating: </label>
         <div className="edit-field-editor">
           <MynEditRatingWidget movie={this.props.video} update={this.props.handleChange} cancelBtn={true} />
-        </div>
-      </div>
-    );
-
-    /* COLLECTIONS */
-    let collections = (
-      <div className='edit-field collections'>
-        <label className="edit-field-name" htmlFor="collections">Collections: </label>
-        <MynParagraphFolder className="edit-field-description" lede="Add and subtract the video to and from existing collections here." paragraph="In order to create new collections or edit the existing structure, go to the settings pane. Deleting and adding collections can also be done directly in the library pane (when viewing a playlist hierarchically)." />
-        <div className="edit-field-editor">
-          <MynEditCollections
-            video={this.props.video}
-            property="collections"
-            collections={this.props.collections}
-            update={this.props.handleChange}
-            validator={this.state.validators.number.exp}
-            validatorTip={this.state.validators.number.tip}
-            reportValid={this.props.reportValid}
-            batch={!!this.props.batch}
-          />
         </div>
       </div>
     );
@@ -6818,7 +5272,6 @@ class MynEditorEdit extends React.Component {
           {dateadded}
           {artwork}
           {subtitles}
-          {/* {collections} */}
           {ratings}
           {boxoffice}
           {rated}
@@ -7005,495 +5458,6 @@ class MynEditRatings extends MynEdit {
   }
 }
 
-class MynEditCollections extends MynEdit {
-  constructor(props) {
-    super(props)
-
-    this.state = {
-    }
-
-    this.render = this.render.bind(this);
-    // this.addCollection = this.addCollection.bind(this);
-
-  }
-
-  createAddCollectionBtn(parentID) {
-    return (
-      <div
-        className="collection-add clickable"
-        onClick={this.showAddField}
-        title="Add a sub-collection to this collection"
-      >
-        {"\uFE62"}
-      </div>
-    )
-  }
-
-  showAddField(event) {
-    try {
-      let field = findNearestOfClass(event.target,'collection').getElementsByClassName("add-collection-form")[0];
-      // event.target.parentNode.parentNode.getElementsByClassName("add-collection-form")[0].style.display = "block";
-
-      field.style.display = field.style.display == "block" ? "none" : "block";
-    } catch(err) {
-      console.error('There are no subcollections to add to');
-    }
-  }
-
-  addCollection(event, name, parent) {
-    event.preventDefault();
-
-    // hide the add node form
-    findNearestOfClass(event.target,'add-collection-form').style.display = "none";
-
-    // get the collection object the user wants to add
-    let parentList;
-    if (parent) {
-      parentList = parent.collections;
-    } else {
-      // if no parent was passed, we take it from the top level
-      parentList = this.props.collections;
-    }
-
-    let collection;
-    try {
-      collection = parentList.filter(collection => collection && collection.name === name)[0];
-    } catch(err) {
-      console.error(`Could not find collection to add video to it: ${err}`);
-    }
-
-    try {
-      // if this is not a terminal node,
-      if (collection.collections) {
-
-        // reveal the jsx for that collection
-        document.getElementById("collection-" + collection.id).style.display = 'block';
-
-        // add a dropdown form for the children
-        // let names = collection.collections.map(child => child.name);
-        // event.target.parentNode.parentNode.appendChild(this.createAddNodeForm(names));
-
-        // if this is a terminal node
-        // all we have to do is add this video to this node and trigger a re-render
-      } else if (collection.videos) {
-        console.log('adding this video to ' + collection.name + '!!!');
-
-        // initially, set the order to the smallest (positive) unused (integer) order number
-        // in this collection; the user can edit it to whatever they want afterwards
-        let order = 0;
-        let used = true;
-        while (used) {
-          order++;
-          used = collection.videos.filter(vid => vid.order == order).length > 0;
-        }
-
-        let updated = _.cloneDeep(this.props.video.collections);
-        updated[collection.id] = order;
-        this.update({ collections : updated });
-        // the update function will take care of updating the library.collections object to correspond to our edit
-      }
-    } catch(err) {
-      console.error('Unable to add video to collection: ' + err);
-    }
-  }
-
-  // addCollection(event, name, parentID) {
-  //   event.preventDefault();
-  //
-  //   // make a deep copy of the whole collections object for this video,
-  //   // we will alter the copy, and then update the video object with the copy
-  //   let copy = _.cloneDeep(this.props.video.collections);
-  //
-  //   // find the parent collection object by traversing the parentID
-  //   let parent = copy;
-  //   // console.log(parent);
-  //   let map = parentID.split('-');
-  //   map.map((nodeIndex, index) => {
-  //     console.log(parent);
-  //     if (index < map.length - 1) {
-  //       parent = parent[nodeIndex].collections;
-  //     } else {
-  //       parent = parent[nodeIndex];
-  //     }
-  //   });
-  //
-  //   // if parent.order then this is a terminal node.
-  //   // since non-terminal nodes cannot contain videos, and adding a child to this collection
-  //   // will make it no longer terminal, we must warn the user;
-  //   // in particular because there may be other videos occupying this node as well,
-  //   // and adding a child will erase them from this collection
-  //   let order;
-  //   if (parent.order) {
-  //     // later we'll make this into a proper confirmation dialog
-  //     alert('Warning! AAAHHHH what are you doing!?!!!');
-  //
-  //     order = parent.order;
-  //     delete parent.order;
-  //     parent.collections = [];
-  //   }
-  //
-  //   event.target.parentNode.querySelector('input').value = "";
-  //   event.target.parentNode.style.display = "none";
-  //
-  //   // create new collection to be added
-  //   let newCollection = {
-  //     id : parentID + '-' + parent.collections.length,
-  //     name : name,
-  //     order : 0
-  //   };
-  //
-  //   // if the parent was a terminal node, we'll take the order property for this video
-  //   // from that node and make it the order property for this video of this node instead
-  //   // otherwise we'll just default to an order of 0 and let the user edit it after the update
-  //   if (order) {
-  //     newCollection.order = order;
-  //   }
-  //   parent.collections.push(newCollection);
-  //
-  //   // console.log(copy);
-  //
-  //   // do the update
-  //   this.props.update({'collections':copy});
-  // }
-
-  // addToCollection(collectionID, video, order) {
-  //
-  // }
-
-  deleteFromCollection(collection) {
-    // alert('deleting from collection ' + collection.name);
-
-    let collectionUpdate = _.cloneDeep(this.props.video.collections);
-    delete collectionUpdate[collection.id];
-    this.update({ collections : collectionUpdate });
-  }
-
-  createAddNodeForm(options,collection) {
-    options = options.map(option => (<option key={option}>{option}</option>));
-
-    if (options.length > 0) {
-      return (
-        <div className="add-collection-form select-container inline select-alwaysicon" style={{display:"none"}}>
-          <select name="name">{options}</select>
-          <button className="editor-inline-button" onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('select').value,collection)}>{"\uFE62"}</button>
-        </div>
-      );
-    } else {
-      return null;
-    }
-  }
-
-  // createCollectionNode(collection, index) {
-  //   let contents;
-  //   // if this collection has child collections
-  //   if (collection.collections) {
-  //     try {
-  //       // recurse on those children
-  //       contents = collection.collections.map((child, index) => this.createCollectionNode(child, index));
-  //     } catch(err) {
-  //       contents = "[Error: sub-collections found, but unable to display]";
-  //       console.error(contents + ': ' + err);
-  //     }
-  //   } else {
-  //     // this collection does not have child collections
-  //     // which means it's a terminal node, so display the movie order and the delete button
-  //     try {
-  //       contents = (
-  //         <div className="collection-terminal-node">
-  //           <div className="collection-order">order: {collection.order}</div>
-  //           <div className="delete-btn clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
-  //         </div>
-  //       );
-  //     } catch(err) {
-  //       contents = "[Error: unable to find terminal node]";
-  //       console.error(contents + ': ' + err);
-  //     }
-  //   }
-  //
-  //   return (
-  //     <div className="collection" key={index}>
-  //       <div className="collection-name">{collection.name}</div>
-  //       {this.createAddCollectionBtn(collection.id)}
-  //       <div className="add-collection-form" style={{display:"none"}}>
-  //         <input type="text" name="name" placeholder="Collection Name" />
-  //         <button onClick={(e) => this.addCollection(e,e.target.parentNode.querySelector('input').value,collection.id)}>Add</button>
-  //       </div>
-  //       {contents}
-  //     </div>
-  //   );
-  // }
-
-  // create display of tree of collections in which this movie participates
-  createCollectionsMap() {
-    // console.log("Creating new collections map");
-    let results = []
-    this.props.collections.map(collection => (this.findCollections(collection))).map(result => {
-      if (!result) return;
-
-      // put hidden collections (ones that this video doesn't belong to, but the user might add it to)
-      // at the top of the list, so that when they're added, the user can see them easily
-      if (result.show) {
-        results.push(result.jsx);
-      } else {
-        results.unshift(result.jsx);
-      }
-    });
-
-    // return results, adding the 'older-sister' class
-    // to all but the last one
-    return results.map((jsx,i) =>{
-      if (i < results.length-1) {
-        return React.cloneElement(jsx,
-          {
-            className : 'collection older-sister'
-          });
-      }
-      return jsx;
-    });
-  }
-
-  // recursive function that walks down the collections and returns each branch as JSX
-  // if it contains this video, display it to the user, otherwise hide it
-  findCollections(collection) {
-    if (!collection) return null;
-
-    let results = []
-    let childrenOpts = []
-    let show = false;
-
-    // if this object contains sub-collections, then it's a non-terminal node,
-    // so we recurse on its children
-    if (collection.collections && collection.collections.length > 0) {
-      // loop through the subcollections and call ourselves recursively on each one
-      for (let i=0; i<collection.collections.length; i++) {
-        let child = this.findCollections(collection.collections[i]);
-
-        // if this child isn't being shown (i.e. our video isn't in its branch)
-        // add it to the beginning of the results array, so that if the user adds it, it appears at the top;
-        // also add it to the list of options to display to the user for adding the video to its branch
-        if (child) {
-          try {
-            if (child.show === false) {
-              results.unshift(child)
-              childrenOpts.push(collection.collections[i].name);
-            } else {
-              // if the child IS being shown, add it to the end of the results array,
-              // so that it appears after any hidden collections that the user might add
-              results.push(child);
-            }
-          } catch(err) {
-            console.error(err);
-            console.log(`i==${i}, collection.collections[i]==${JSON.stringify(collection.collections[i])}`);
-          }
-        }
-      }
-      // if there are no child collections within this collection;
-      // add the terminal node JSX to the results array
-      // test whether one of the videos is this video
-      // and if it is, show the terminal node; otherwise, hide it
-    } else if (collection.videos || !collection.collections || collection.collections.length === 0) {
-      // we're at a bottom-level collection
-
-      // if there is no videos array, create one
-      if (!collection.videos) {
-        collection.videos = [];
-        delete collection.collections;
-      }
-
-      try {
-        let index = collection.videos.findIndex(video => video.id == this.props.video.id);
-        if (index !== -1) {
-          show = true; // if our video was in this collection, show the node, otherwise hide it
-        } else {
-          show = false;
-        }
-
-        let contents;
-        try {
-          // create JSX for the terminal node. If our video is not in this collection,
-          // the order will be undefined (we display an empty string), but nothing will be shown anyway
-          contents = (
-            <div key={'terminal-' + collection.id} className="collection-terminal-node">
-              {!this.props.batch ? (<div className="collection-order">Order: <input type="text" className="filled" value={this.props.video.collections[collection.id] || ''} onChange={(e) => this.updateOrder(e.target.value, e.target, collection)} /><div className="input-clear-button always" onClick={(e) => this.clearOrder(e, collection)}></div></div>) : null }
-              <div className="inline-delete-button clickable" onClick={() => this.deleteFromCollection(collection)}>{"\u2715"}</div>
-            </div>
-          );
-        } catch(err) {
-          contents = "[Error: unable to display terminal node]";
-          console.error(contents + ': ' + err);
-        }
-        results.push({jsx: contents});
-      } catch(err) {
-        console.error("Error, no videos found in this terminal collection node. That should not happen (malformed collections object in library settings?): " + err);
-      }
-    }
-
-    // if there were any collections returned from the level below,
-    // or any videos found at this level, they will be in the results array;
-    // place them within this collection and return them upward to the next level;
-    // if (results.length > 0) {
-    // if (true) {
-      // if any results have their 'show' as positive
-      // set show here to true
-      for (const result of results) {
-        if (result && result.show === true) {
-          show = true;
-          break;
-        }
-      }
-
-      return {
-        show: show,
-        jsx: (
-          <div key={collection.id} className="collection" id={"collection-" + collection.id} style={{display: show ? 'block' : 'none'}}>
-            <div className="collection-header">
-              <div className="collection-name">{collection.name}</div>
-              {childrenOpts.length > 0 ? this.createAddCollectionBtn(collection.id) : null}
-            </div>
-            {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,collection) : null}
-            <div className="children">
-              {results.map((result,i) => {
-                if (!result) return null;
-
-                // console.log('child show ? ' + result.show);
-                // figure out if this child is an older sister to any
-                // other collections that are visible
-                // (just so we can add a class for display purposes)
-                let olderSister = false;
-                for (let j=i+1; j<results.length; j++) {
-                  if (results[j].show === true) {
-                    olderSister = true;
-                    break;
-                  }
-                }
-                if (olderSister) {
-                  // console.log("OLDER SISTER")
-                  // then we're an older sister, and we want to display a vertical gradient border
-                  // below ourselves, for which we have to add class 'older-sister' to the jsx
-                  return React.cloneElement(result.jsx,
-                    {
-                      className : 'collection older-sister'
-                    });
-                }
-                return result.jsx;
-              })}
-            </div>
-          </div>
-      )};
-      // return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden">{results}</div></div>);
-    // } else {
-      // if there were no sub-collections found, or in the case of a terminal node,
-      // if none of the videos was this video, return null
-      // return null;
-    // }
-    // let vidsWereFound = false;
-    // let videos = []
-    // try {
-    //   // if this collection contains our video
-    //   for (let i=0; i<collection.videos.length; i++) {
-    //     if (this.props.movies.filter(movie => (collection.videos[i].id === movie.id)).length > 0) {
-    //       videos.push(object.videos[i]);
-    //       vidsWereFound = true;
-    //     }
-    //   }
-    // } catch(e) {
-    //   console.log("Error, no videos found in this collection: " + e.toString());
-    // }
-    // // if the flag is true, that means there were videos from our playlist
-    // // in this collection, so wrap them in JSX and return them upward
-    // if (vidsWereFound) {
-    //   // find only the movie objects (from the playlist) that match the videos found in this collection
-    //   let movies = this.props.movies.filter(movie => (videos.filter(collectionVideo => (collectionVideo.id === movie.id)).length > 0))
-    //   // console.log('movies: ' + JSON.stringify(movies) + '\nVideos from collection: ' + JSON.stringify(videos));
-    //   try {
-    //     // add the 'order' property to each movie for this collection
-    //     // (making a deep copy of each movie object)
-    //     movies = movies.map(movie => {
-    //       const movieCopy = _.cloneDeep(movie); //JSON.parse(JSON.stringify(movie));
-    //       movieCopy.order = videos.filter(collectionVideo => (collectionVideo.id === movieCopy.id))[0].order;
-    //       // console.log(JSON.stringify(movieCopy));
-    //       return movieCopy;
-    //     });
-    //     // console.log(JSON.stringify(movies))
-    //   } catch(e) {
-    //     console.log('Error assigning order to videos in collection ' + object.name + ': ' + e.toString());
-    //   }
-    //   // console.log(JSON.stringify(movies));
-    //   // wrap the movies in the last collection div,
-    //   // then hand them off to MynLibTable with an initial sort by 'order'
-    //   return (<div className="collection collapsed" key={object.name}><h1 onClick={(e) => this.toggleExpansion(e)}>{object.name}</h1><div className="container hidden"><MynLibTable movies={movies} initialSort="order" showDetails={this.props.showDetails} /></div></div>)
-    // } else {
-    //   return null;
-    // }
-  }
-
-  clearOrder(event, collection) {
-    this.updateOrder('',findNearestOfClass(event.target,'collection-order').getElementsByTagName("input")[0],collection);
-  }
-
-  updateOrder(order, target, collection) {
-    if (!collection) return;
-
-    // let target = event.target;
-    // let order = event.target.value;
-    // order = !isNaN(Number(order)) && Number(order) !== 0 ? Number(order) : !isNaN(parseInt(order)) ? parseInt(order) : '';
-    // order = !isNaN(Number(order)) ? Math.round(Number(order) * 10)/10 : '';
-    console.log(order);
-    let updated = _.cloneDeep(this.props.video.collections);
-    // console.log("Before: " + JSON.stringify(updated));
-    updated[collection.id] = order;
-    // console.log("After: " + JSON.stringify(updated));
-    this.update({collections: updated});
-
-    if (this.props.validator.test(order)) {
-      super.handleValidity(true,this.props.property,target);
-    } else {
-      super.handleValidity(false,this.props.property,target,this.props.validatorTip);
-    }
-
-    if (order !== '') {
-      target.classList.add('filled');
-    } else {
-      target.classList.remove('filled');
-    }
-  }
-
-  update(prop) {
-    // hide the add forms
-    Array.from(document.getElementById('editor-pane').getElementsByClassName('add-collection-form')).forEach(form => {form.style.display = 'none'});
-
-    this.props.update(prop);
-  }
-
-  render() {
-    let collections;
-    // if (this.props.video.collections && Object.keys(this.props.video.collections).length > 0) {
-      collections = this.createCollectionsMap();
-    // } else {
-    //   collections = (<div>[No Collections]</div>);
-    // }
-
-    // get list of top-level collections that this video does not belong within,
-    // in order to display as dropdown options when the user clicks the top level + button
-    let childrenOpts = this.props.collections.filter(collection => collection && Object.keys(this.props.video.collections).filter(key => key.split('-')[0] === collection.id).length == 0).map(collection => collection.name);
-
-    return (
-      <div className="top-level collection">
-      <div className="collection-header">
-        {childrenOpts.length > 0 ? this.createAddCollectionBtn(null) : null}
-      </div>
-      {childrenOpts.length > 0 ? this.createAddNodeForm(childrenOpts,null) : null}
-      <div className="children">
-        {collections}
-      </div>
-      </div>
-    );
-  }
-}
-
-// a wrapper for MynEditText that only shows the edit field when clicked
-// (otherwise just shows the value), and takes a save function that's
-// triggered when the user hits 'enter'
 class MynClickToEditText extends React.Component {
   constructor(props) {
     super(props)
@@ -8720,48 +6684,36 @@ class MynRecentlyWatched extends MynDropdown {
     this.playNextVideo = this.playNextVideo.bind(this);
   }
 
-  // given a video id,
-  // find the next video (by order) in all of its collections;
-  // return an array of objects, where each object is of the form
-  // {
-  //   v_id: next_video_id,
-  //   c_id: collection_id,
-  //   order: next_video_order
-  // }
-  findNextVideoInCollection(id) {
-    let allCols = new Collections(this.props.collections);
-    let ourVidCols = allCols.getVideoCollections(id);
-    return Object.keys(ourVidCols).map(c_id => {
-      let c = allCols.get(c_id);
-      if (c) {
-        let nextVidID = allCols.getNextVideo(c,ourVidCols[c_id]);
+  findNextVideoInSeries(id) {
+    const current = library.media.find(video => video && video.id === id);
+    if (!current || !current.series) return null;
 
-        // if we found a video and it exists in media (because it could be in inactive_media)
-        if (nextVidID && library.media.filter(v => v.id === nextVidID).length > 0) {
-          return {
-            v_id:nextVidID,
-            c_id:c_id,
-            order: allCols.getVidOrder(c,nextVidID)
-          }
-        }
-      }
-    });
+    const sortNumber = value => {
+      const parsed = parseFloat(value);
+      return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+    };
+
+    const related = library.media
+      .filter(video => video && video.series === current.series)
+      .sort((a,b) => {
+        const seasonDiff = sortNumber(a.season) - sortNumber(b.season);
+        if (seasonDiff !== 0) return seasonDiff;
+
+        const episodeDiff = sortNumber(a.episode) - sortNumber(b.episode);
+        if (episodeDiff !== 0) return episodeDiff;
+
+        return a.title.localeCompare(b.title);
+      });
+
+    const currentIndex = related.findIndex(video => video.id === id);
+    return currentIndex >= 0 && related[currentIndex + 1]
+      ? related[currentIndex + 1].id
+      : null;
   }
 
-  playNextVideo(vidInfo) {
-    // vidInfo takes the form
-    // {
-    //   v_id: video_id,
-    //   c_id: collection_id,
-    //   order: video_order
-    // }
-
-    if (vidInfo) {
-      console.log('playing next video');
-      console.log(vidInfo);
-
-      this.props.playVideo(vidInfo.v_id);
-
+  playNextVideo(id) {
+    if (id) {
+      this.props.playVideo(id);
     } else {
       console.error('Cannot play next video; none was found');
     }
@@ -8779,27 +6731,14 @@ class MynRecentlyWatched extends MynDropdown {
 
   createListItems() {
     if (this.props.list && Array.isArray(this.props.list)) {
-      this.state.list = this.props.list.map(id => {
+      const list = this.props.list.map(id => {
+        let video = library.media.find(video => video && video.id === id);
+        if (!video) return null;
 
-        let video = library.media.filter(v => v.id === id);
-        if (video.length > 0) {
-          video = video[0];
-        } else {
-          return null;
-        }
-
-        // console.log(`Videos after ${video.title}`);
-        // console.log(this.findNextVideoInCollection(id));
-
-        // find the next video after this one in all its collections;
-        // if the video isn't in any collections, or it's the last one in its collections,
-        // we'll get an empty array;
-        // for now, we're just going to link to ONE of the collections;
-        // later, we'll need to offer the user a choice of which one
-        let nextVidID = this.findNextVideoInCollection(id)[0];
+        let nextVidID = this.findNextVideoInSeries(id);
 
         return (
-          <div className='container'>
+          <div className='container' key={id}>
             <div className='video' onClick={() => this.props.playVideo(video.id)}>
               <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
               <div className='title-position-container'>
@@ -8807,10 +6746,11 @@ class MynRecentlyWatched extends MynDropdown {
                 {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
               </div>
             </div>
-            <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../images/ff-icon_white.png' title='Play next video in collection' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
+            <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../images/ff-icon_white.png' title='Play next video in series' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
           </div>
         );
       });
+      this.setState({list:list});
     }
   }
 
@@ -8818,7 +6758,6 @@ class MynRecentlyWatched extends MynDropdown {
     return super.render();
   }
 }
-
 
 // accepts a 'lede' prop and a 'paragraph' prop;
 // displays only the lede
@@ -9021,7 +6960,6 @@ function validateVideo(video) {
     'filename':'string',
     'artwork':'string',
     'subtitles':'array',
-    'collections':'object',
     'boxoffice':'number',
     'rated':'string',
     'languages':'array',
@@ -9039,7 +6977,7 @@ function validateVideo(video) {
     // if (vidProps.includes(property)) {
       // repair any malformed properties
       switch(properties[property]) {
-        // ratings, collections, metadata
+        // ratings and metadata
         case 'object' :
           if (typeof video[property] === 'undefined' || typeof video[property] !== 'object' || typeof video[property] === null) {
             if (property === 'metadata') {
@@ -9065,8 +7003,13 @@ function validateVideo(video) {
             repaired[property] = [];
           }
           break;
-        // id, year, position, dateadded, lastseen
+        // year, season, episode, position, dateadded, lastseen
+        // season also permits the special "extras" category
         case 'integer' :
+          if (property === 'season' && String(video[property]).toLowerCase() === 'extras') {
+            repaired[property] = 'extras';
+            break;
+          }
           repaired[property] = parseInt(video[property]);
           if (!Number.isInteger(repaired[property])) {
             repaired[property] = ''; // going with empty string instead of some integer like 0 or -1, for a variety of reasons
@@ -9141,40 +7084,6 @@ function isValidURL(s) {
 function findNearestOfClass(element, targetClass) {
   while (!element.classList.contains(targetClass) && (element = element.parentElement));
   return element;
-}
-
-// finds and returns a collection object in <collectionsRoot> from its id (<id>);
-// if <copy> (a boolean) is true, return a copy instead of the original;
-// <collectionsRoot> should be (optionally a copy of) the entire library.collections array;
-function getCollectionObject(id, collectionsRoot, copy) {
-  // initially set collections to the root of the master collections array
-  // then we'll walk down the tree using the id, which is descriptive of the tree structure
-  let collections = collectionsRoot;
-
-  // split the id into an array that we can loop over
-  const map = id.split('-');
-
-  // find the collection object by traversing the id
-  let result;
-  try {
-    map.map((nodeIndex, index) => {
-      try {
-        result = collections[nodeIndex];
-        if (collections[nodeIndex].collections) {
-          collections = collections[nodeIndex].collections;
-        }
-      } catch (err) {
-        throw `Could not find collection object: failed at element ${index} of ${map}. ${err}`;
-      }
-    });
-  } catch(err) {
-    console.error(err);
-    // in case of error, return nothing
-    return;
-  }
-
-  // return the collection
-  return copy ? _.cloneDeep(result) : result;
 }
 
 // https://stackoverflow.com/a/40610459
