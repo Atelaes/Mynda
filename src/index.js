@@ -24,6 +24,7 @@ try {
 } catch(err) {console.log('Warning: ffprobe-static not installed')}
 const Logger = require('./Logger.js');
 const OmdbHelper = require('./OmdbHelper.js');
+const MovieSearch = require('./MovieSearch.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
@@ -635,10 +636,13 @@ function isInUnavailableWatchFolder(filepath) {
   return false;
 }
 
-// if the filename ends with 'sample' or 'Sample' and it's less than 100 MB, we say it's a sample video
-// if the filename is 'ETRG' or 'RARBG.com' and it's less than 100 MB, we say it's a garbage video
+// Small release samples are not library videos. In addition to a plain
+// "...sample" suffix, the shared helper recognizes observed forms such as
+// "...(Sample)", "...-SAMPLE_TTL", and files inside composite directories
+// such as "Sample,Screens" or "Movie and Sample". The 100 MB guard remains so
+// a large, intentionally named video is never discarded solely by its name.
+// The same helper also preserves the existing ETRG/RARBG.com garbage check.
 function isSampleVideo(filepath) {
-  let fileBasename = path.basename(filepath, path.extname(filepath));
   let size;
 
   try {
@@ -648,10 +652,10 @@ function isSampleVideo(filepath) {
     return false;
   }
 
-  const endsWithSample = /sample$/i.test(fileBasename);
-  const isGarbageFilename = /^(?:ETRG|RARBG\.com)$/i.test(fileBasename);
+  const hasSampleOrGarbageBasename = MovieSearch.basenameLooksLikeSampleOrGarbage(filepath);
+  const isInsideSampleArea = MovieSearch.pathContainsSampleArea(filepath);
 
-  if ((endsWithSample || isGarbageFilename) && size < 100000000) {
+  if ((hasSampleOrGarbageBasename || isInsideSampleArea) && size < 100000000) {
     console.log('Ignoring "SAMPLE"/garbage video: ' + filepath);
     return true;
   }
@@ -1927,32 +1931,15 @@ async function autoTag() {
       // check results
       if (resultsObject.success) {
         let results = resultsObject.data;
-        // if we got more than one result (or an empty array of results, I suppose?)
+        // A result array represents choices for the editor, not permission for
+        // unattended code to pick whichever OMDb happened to list first. The
+        // helper now resolves a uniquely validated movie itself and returns a
+        // video object; any remaining array is genuinely ambiguous. Record the
+        // attempt and leave the video in New for the user to choose manually.
         if (Array.isArray(results)) {
-          // if there were between 1 and 4 results (inclusive), pick the first one
-          if (results.length > 0 && results.length <= 4) {
-            // in order to pick the first result, we get the imdbID and search again using that
-            newVideo.imdbID = results[0].imdbID;
-            resultsObject = await OmdbHelper.search(newVideo);
-            results = resultsObject.data;
-            // if successful in picking the first result, save it
-            if (resultsObject.success && !Array.isArray(results)) {
-              results = prepareSuccessfulAutoTagResult(results);
-              batchSave.push(results);
-              // library.replace(`media.id=${newVideo.id}`, results);
-              disposition = 'Success';
-            } else {
-              disposition = 'Failure after getting imdb id??';
-            }
-          } else {
-            // there were too many results (or an empty array of results?)
-            // but we still want to save the video object so we can set autotag_tried to true
-            //This means we've tried and failed in a predicted manner, let's not try again.
-            newVideo.autotag_tried = true;
-            batchSave.push(newVideo);
-            // library.replace(`media.id=${newVideo.id}`, newVideo);
-            disposition = 'Too many results';
-          }
+          newVideo.autotag_tried = true;
+          batchSave.push(newVideo);
+          disposition = results.length > 0 ? 'Ambiguous results' : 'No results';
         } else {
           // we got just a single result, so save it
           results = prepareSuccessfulAutoTagResult(results);
@@ -1994,8 +1981,8 @@ async function autoTag() {
       };
       if (disposition === 'Success') {
         autoTagLog.info('Automatic tagging finished for video', resultLog);
-      } else if (disposition === 'Failure after getting imdb id??' ||
-                 (!resultsObject.success && !['No results', 'Not enough data', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure))) {
+      } else if (!resultsObject.success &&
+                 !['No results', 'Not enough data', 'Ambiguous results', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure)) {
         autoTagLog.error('Automatic tagging failed for video', resultLog);
       } else {
         autoTagLog.warn('Automatic tagging did not tag video', resultLog);

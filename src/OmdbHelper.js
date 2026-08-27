@@ -8,6 +8,7 @@ const electron = require('electron');
 const dl = require('./download');
 const { ipcRenderer } = require('electron');
 const Logger = require('./Logger.js');
+const MovieSearch = require('./MovieSearch.js');
 
 const log = Logger.child('OMDb');
 
@@ -95,7 +96,7 @@ function logSearchFinished(context, result) {
   let details = Object.assign({searchID: context.searchID}, summarizeSearchResult(result));
   if (result && result.success) {
     log.info('Tagging search finished', details);
-  } else if (result && ['No results', 'Not enough data', 'Ambiguous series', 'Episode mismatch'].includes(result.failure)) {
+  } else if (result && ['No results', 'Not enough data', 'Ambiguous results', 'Ambiguous series', 'Episode mismatch'].includes(result.failure)) {
     log.warn('Tagging search finished without a match', details);
   } else {
     log.error('Tagging search failed', details);
@@ -103,10 +104,11 @@ function logSearchFinished(context, result) {
 }
 
 // Public entry point for every OMDb lookup. It sends untagged show episodes to
-// the stricter series/season/episode workflow; movies and objects with an IMDb
-// ID use the original general search workflow. Returns a consistent object with
-// either {success: true, data: ...} or failure information. A caller may pass a
-// seriesImdbID option after presenting returned series choices to a user.
+// the stricter series/season/episode workflow, title-based movies to the
+// conservative movie matcher, and pasted IMDb IDs to the exact-ID workflow.
+// Returns a consistent object with either {success: true, data: ...} or failure
+// information. A caller may pass a seriesImdbID option after presenting returned
+// series choices to a user.
 async function search(video, options = {}) {
   options = options || {};
   let context = {searchID: `${process.pid}-${++nextSearchNumber}`};
@@ -132,6 +134,14 @@ async function performSearch(video, context, options) {
   // ID that may still be present in an editor object.
   if (video && video.kind === 'show' && (options.seriesImdbID || !hasImdbID(video))) {
     return searchShowEpisode(video, context, options.seriesImdbID);
+  }
+
+  // A pasted IMDb ID remains authoritative and continues through the exact-ID
+  // path below. All title-based movie/custom-kind searches first remove common
+  // release text and then validate OMDb's answer; this replaces the old loop
+  // that repeatedly removed the filename's final word until *anything* matched.
+  if (!hasImdbID(video)) {
+    return searchGeneralVideoByTitle(video, context);
   }
 
   //start by pulling and formatting useful information
@@ -282,6 +292,717 @@ async function performSearch(video, context, options) {
   }
 }
 
+// Searches a movie (or any non-show custom kind) from a short, ordered title
+// plan. A normal clean title/year still completes in one request. Additional
+// requests happen only after that precise path fails: first a broad search with
+// the same year, then (for the primary candidate) one search without the year
+// so punctuation and regional release-year discrepancies can surface. Search
+// rows are evaluated in confidence tiers: exact normalized titles first,
+// leading-article equivalents second, and canonical expansions last. If the
+// ordinary plan exposes no such candidate, two final discovery-only queries may
+// restore likely punctuation or use distinctive title words.
+//
+// Lightweight OMDb search rows are never applied directly. Before unattended
+// tagging, the selected IMDb ID is expanded to a full record and checked
+// against the local video's duration. Yearless matches additionally need a
+// comparable runtime and a meaningful vote history. If those checks cannot
+// identify one safe record, the collected choices go back to the editor.
+async function searchGeneralVideoByTitle(video, context) {
+  const MAX_TITLE_REQUESTS = 8;
+  const MAX_NORMALIZED_DISCOVERY_REQUESTS = 2;
+  const MAX_AMBIGUOUS_DETAIL_PROBES = 7;
+  let candidates = MovieSearch.buildSearchCandidates(video);
+  if (candidates.length === 0) {
+    return predictableFailure('Not enough data', 'No usable title or filename was available');
+  }
+
+  let titleRequestCount = 0;
+  let normalizedDiscoveryRequestCount = 0;
+  let choicesByID = new Map();
+  let sawAmbiguousResponse = false;
+  let sawUnresolvedExactAmbiguity = false;
+  let sawUnresolvedArticleAmbiguity = false;
+  let attemptedTitles = [];
+  let type = MovieSearch.omdbTypeForKind(video.kind || video.type);
+  let fullResultCache = new Map();
+  let deferredArticleGroups = [];
+  let deferredCanonicalGroups = [];
+
+  log.info('Prepared conservative movie tagging search', {
+    searchID: context.searchID,
+    candidates: candidates.slice(0, MAX_TITLE_REQUESTS)
+  });
+
+  // Retrieves and validates one lightweight search choice. A rejection is a
+  // normal branch, not a search failure: continue through the bounded plan in
+  // case another query exposes the real movie.
+  async function trySearchChoice(result, candidate, validationOptions, stage) {
+    let fetched = await fetchGeneralVideoResult(
+      result.imdbID, context, fullResultCache, stage
+    );
+    if (!fetched.success) {
+      // A lightweight row can outlive its full OMDb record. Treat that one row
+      // as unusable and continue; authentication, transport, and other errors
+      // still stop the operation so Auto-Tag can retry them later.
+      return fetched.failure === 'No results' ? {} : {terminalResult: fetched};
+    }
+
+    let evaluation = MovieSearch.evaluateFullResult(
+      fetched.data, candidate, video, validationOptions
+    );
+    logFullMovieEvaluation(context, candidate, fetched.data, evaluation, stage);
+    if (!evaluation.confident) return {};
+
+    return {
+      terminalResult: await applyGeneralVideoResult(video, fetched.data, context)
+    };
+  }
+
+  // When several lightweight rows have equally good title/year evidence, probe
+  // at most seven full records. Runtime plausibility often leaves one real
+  // feature and rejects a short, fan record, or compilation with the same name.
+  // The limit is per result group, not global: an ambiguous early filename
+  // interpretation must not consume the probes needed by a later, cleaner
+  // parent-folder or spelling variant. The shared full-result cache prevents
+  // duplicate requests when groups contain the same IMDb IDs.
+  async function tryAmbiguousChoices(results, candidate, validationOptions, stage) {
+    let uniqueResults = Array.from(new Map(results.map(result => [result.imdbID, result])).values());
+    if (uniqueResults.length < 2) return {};
+    if (uniqueResults.length > MAX_AMBIGUOUS_DETAIL_PROBES) {
+      log.info('Movie result tier exceeded the bounded detail-probe limit', {
+        searchID: context.searchID,
+        stage: stage,
+        candidate: candidate,
+        resultCount: uniqueResults.length,
+        maximumDetailProbes: MAX_AMBIGUOUS_DETAIL_PROBES,
+        consideredImdbIDs: uniqueResults.map(result => result.imdbID)
+      });
+      return {unresolvedAmbiguity: true, plausibleCount: null};
+    }
+
+    let plausible = [];
+    for (let result of uniqueResults) {
+      let fetched = await fetchGeneralVideoResult(
+        result.imdbID, context, fullResultCache, `${stage} candidate detail`
+      );
+      if (!fetched.success) {
+        if (fetched.failure === 'No results') continue;
+        return {terminalResult: fetched};
+      }
+
+      let evaluation = MovieSearch.evaluateFullResult(
+        fetched.data, candidate, video, validationOptions
+      );
+      logFullMovieEvaluation(context, candidate, fetched.data, evaluation, stage);
+      if (evaluation.confident) plausible.push(fetched.data);
+    }
+
+    if (plausible.length === 1) {
+      log.info('Runtime evidence resolved otherwise ambiguous movie results', {
+        searchID: context.searchID,
+        candidate: candidate,
+        selectedImdbID: plausible[0].imdbID,
+        consideredImdbIDs: uniqueResults.map(result => result.imdbID)
+      });
+      return {
+        terminalResult: await applyGeneralVideoResult(video, plausible[0], context)
+      };
+    }
+    if (plausible.length > 1) {
+      log.info('Full movie evidence left multiple records equally plausible', {
+        searchID: context.searchID,
+        stage: stage,
+        candidate: candidate,
+        plausibleImdbIDs: plausible.map(result => result.imdbID)
+      });
+    }
+    return {
+      unresolvedAmbiguity: plausible.length > 1,
+      plausibleCount: plausible.length
+    };
+  }
+
+  // Runs one already-filtered confidence tier. A single row still receives a
+  // full-record plausibility check; a small tie is resolved by runtime/votes;
+  // a large or still-indistinguishable tie remains manual. Keeping this helper
+  // tier-specific is what prevents weaker canonical rows from inflating an
+  // otherwise manageable exact-title group.
+  async function tryResultTier(results, candidate, validationOptions, stage) {
+    let uniqueResults = Array.from(new Map(
+      (results || []).map(result => [result.imdbID, result])
+    ).values());
+    if (uniqueResults.length === 0) return {};
+    if (uniqueResults.length === 1) {
+      return trySearchChoice(uniqueResults[0], candidate, validationOptions, stage);
+    }
+    return tryAmbiguousChoices(uniqueResults, candidate, validationOptions, stage);
+  }
+
+  async function runBroadSearch(candidate, requestYear, validationOptions, stage, requestOptions = {}) {
+    let useDiscoveryBudget = Boolean(requestOptions.useDiscoveryBudget);
+    if (useDiscoveryBudget) {
+      if (normalizedDiscoveryRequestCount >= MAX_NORMALIZED_DISCOVERY_REQUESTS) return {};
+      normalizedDiscoveryRequestCount++;
+    } else {
+      if (titleRequestCount >= MAX_TITLE_REQUESTS) return {};
+      titleRequestCount++;
+    }
+    let queryTitle = requestOptions.queryTitle || candidate.title;
+
+    let response;
+    try {
+      response = await pollOMDB(createURLParts({
+        title: queryTitle,
+        year: requestYear || null,
+        type: type || null
+      }), {searchID: context.searchID, stage: stage});
+    } catch(err) {
+      return {terminalResult: {success: false, failure: 'Error', data: err}};
+    }
+
+    if (!response || response.status !== 200) {
+      return {
+        terminalResult: {
+          success: false,
+          failure: response ? response.status : 'Error',
+          data: response ? response.statusText : 'No response from OMDb'
+        }
+      };
+    }
+
+    if (response.data && response.data.Response === 'True' && Array.isArray(response.data.Search)) {
+      let evaluation = MovieSearch.evaluateSearchResults(
+        response.data.Search, candidate, video, validationOptions
+      );
+      for (let result of evaluation.rankedResults) {
+        if (!choicesByID.has(result.imdbID)) choicesByID.set(result.imdbID, result);
+      }
+      log.info('Evaluated conservative movie tagging results', {
+        searchID: context.searchID,
+        candidate: candidate,
+        queryTitle: queryTitle,
+        requestYear: requestYear || null,
+        allowCanonicalTitle: Boolean(validationOptions.allowCanonicalTitle),
+        allowAdjacentYear: Boolean(validationOptions.allowAdjacentYear),
+        allowDistantYear: Boolean(validationOptions.allowDistantYear),
+        resultCount: response.data.Search.length,
+        acceptableResultCount: evaluation.acceptableResults.length,
+        exactResultCount: evaluation.exactResults.length,
+        articleResultCount: evaluation.articleResults.length,
+        canonicalResultCount: evaluation.canonicalResults.length,
+        selectedImdbID: evaluation.confident && evaluation.confident.imdbID
+      });
+
+      // During the query phase, only exact normalized titles may finish the
+      // search. Article-only and canonical matches are retained, but evaluated
+      // after every parsed candidate and strict discovery query has had a
+      // chance to expose an exact title.
+      let strictOptions = Object.assign({}, validationOptions, {allowCanonicalTitle: false});
+      let exactAttempt = await tryResultTier(
+        evaluation.exactResults, candidate, strictOptions, `${stage} exact-title tier`
+      );
+      if (exactAttempt.terminalResult) return exactAttempt;
+      if (exactAttempt.unresolvedAmbiguity) {
+        sawUnresolvedExactAmbiguity = true;
+        return {};
+      }
+
+      if (evaluation.articleResults.length > 0) {
+        deferredArticleGroups.push({
+          results: evaluation.articleResults,
+          candidate: candidate,
+          validationOptions: strictOptions,
+          stage: `${stage} article-only tier`
+        });
+      }
+      if (validationOptions.allowCanonicalTitle && evaluation.canonicalResults.length > 0) {
+        deferredCanonicalGroups.push({
+          results: evaluation.canonicalResults,
+          candidate: candidate,
+          validationOptions: validationOptions,
+          stage: `${stage} canonical-title tier`
+        });
+      }
+      return {};
+    }
+
+    if (isTooManyResultsResponse(response.data)) {
+      sawAmbiguousResponse = true;
+      return {};
+    }
+    if (isNotFoundResponse(response.data)) return {};
+    return {
+      terminalResult: {
+        success: false,
+        failure: 'Error',
+        data: response.data && response.data.Error ?
+          response.data.Error : 'Unexpected OMDb response'
+      }
+    };
+  }
+
+  // OMDb's list search can occasionally miss a correctly punctuated two-word
+  // possessive even with its known year (notably "Pan's Labyrinth"). After that
+  // strict discovery request fails, spend the remaining discovery request on
+  // the exact-title endpoint. Acceptance remains tied to the original parsed
+  // title and year, so this changes discovery without relaxing matching.
+  async function runStrictNormalizedExactLookup(candidate, queryTitle, stage) {
+    if (!candidate.year ||
+        normalizedDiscoveryRequestCount >= MAX_NORMALIZED_DISCOVERY_REQUESTS) return {};
+    normalizedDiscoveryRequestCount++;
+
+    let response;
+    try {
+      response = await pollOMDB(createURLParts({
+        exactTitle: queryTitle,
+        year: candidate.year,
+        type: type || null
+      }), {searchID: context.searchID, stage: stage});
+    } catch(err) {
+      return {terminalResult: {success: false, failure: 'Error', data: err}};
+    }
+
+    if (!response || response.status !== 200) {
+      return {
+        terminalResult: {
+          success: false,
+          failure: response ? response.status : 'Error',
+          data: response ? response.statusText : 'No response from OMDb'
+        }
+      };
+    }
+    if (response.data && response.data.Response === 'True') {
+      if (response.data.imdbID) fullResultCache.set(response.data.imdbID, response.data);
+      let validationOptions = {allowCanonicalTitle: false};
+      let evaluation = MovieSearch.evaluateFullResult(
+        response.data, candidate, video, validationOptions
+      );
+      logFullMovieEvaluation(context, candidate, response.data, evaluation, stage);
+      if (evaluation.confident && evaluation.matchKind === 'exact') {
+        return {
+          terminalResult: await applyGeneralVideoResult(video, response.data, context)
+        };
+      }
+      return {};
+    }
+    if (isTooManyResultsResponse(response.data)) {
+      sawAmbiguousResponse = true;
+      return {};
+    }
+    if (isNotFoundResponse(response.data)) return {};
+    return {
+      terminalResult: {
+        success: false,
+        failure: 'Error',
+        data: response.data && response.data.Error ?
+          response.data.Error : 'Unexpected OMDb response'
+      }
+    };
+  }
+
+  function isTwoWordPossessiveDiscovery(candidateTitle, queryTitle) {
+    let candidateWords = String(candidateTitle || '').trim().split(/\s+/).filter(Boolean);
+    return candidateWords.length === 2 &&
+      !/[\u2019']/.test(String(candidateTitle || '')) &&
+      /[\u2019']s\b/i.test(String(queryTitle || '')) &&
+      MovieSearch.titleKey(candidateTitle) === MovieSearch.titleKey(queryTitle);
+  }
+
+  // Try every parser-derived title once before spending requests on spelling
+  // variants. This round-robin ordering prevents an and/ampersand or alias
+  // retry for a noisy filename from exhausting the bounded request plan before
+  // a clean parent-folder candidate can run.
+  let queryPlans = [];
+  let plannedTitles = new Set();
+  function addQueryPlan(candidate, candidateIndex, title, variantReason) {
+    title = String(title || '').replace(/\s+/g, ' ').trim();
+    let key = `${title.toLowerCase()}\u0000${candidate.year || ''}`;
+    if (!title || plannedTitles.has(key)) return;
+    plannedTitles.add(key);
+    queryPlans.push({
+      candidate: candidate,
+      candidateIndex: candidateIndex,
+      title: title,
+      variantReason: variantReason
+    });
+  }
+
+  candidates.forEach((candidate, candidateIndex) => {
+    addQueryPlan(candidate, candidateIndex, candidate.title, 'parsed title');
+  });
+  candidates.forEach((candidate, candidateIndex) => {
+    let variants = andAmpersandTitleAlternates(candidate.title)
+      .map(title => ({title: title, reason: 'and/ampersand alternative'}))
+      .concat(MovieSearch.buildTitleQueryVariants(candidate.title));
+    for (let variant of variants) {
+      addQueryPlan(candidate, candidateIndex, variant.title, variant.reason);
+      for (let conjunctionVariant of andAmpersandTitleAlternates(variant.title)) {
+        addQueryPlan(
+          candidate, candidateIndex, conjunctionVariant,
+          `${variant.reason}; and/ampersand alternative`
+        );
+      }
+    }
+  });
+
+  for (let plan of queryPlans) {
+    if (titleRequestCount >= MAX_TITLE_REQUESTS) break;
+    let candidate = plan.candidate;
+    let title = plan.title;
+    let requestCandidate = Object.assign({}, candidate, {
+      title: title,
+      variantReason: plan.variantReason
+    });
+    attemptedTitles.push({
+      title: title,
+      year: candidate.year || '',
+      source: candidate.source,
+      variantReason: plan.variantReason
+    });
+
+    // A known year makes OMDb's title endpoint both precise and fast: it
+    // returns the full metadata record in the same request. If OMDb responds
+    // with a merely similar title, strict full-record validation rejects it and
+    // the ordinary search below can still provide choices for manual selection.
+    if (candidate.year && titleRequestCount < MAX_TITLE_REQUESTS) {
+      titleRequestCount++;
+      let exactResponse;
+      try {
+        exactResponse = await pollOMDB(createURLParts({
+          exactTitle: title,
+          year: candidate.year,
+          type: type || null
+        }), {
+          searchID: context.searchID,
+          stage: 'cleaned exact-title lookup'
+        });
+      } catch(err) {
+        return {success: false, failure: 'Error', data: err};
+      }
+
+      if (!exactResponse || exactResponse.status !== 200) {
+        return {
+          success: false,
+          failure: exactResponse ? exactResponse.status : 'Error',
+          data: exactResponse ? exactResponse.statusText : 'No response from OMDb'
+        };
+      }
+      if (exactResponse.data && exactResponse.data.Response === 'True') {
+        if (exactResponse.data.imdbID) {
+          fullResultCache.set(exactResponse.data.imdbID, exactResponse.data);
+        }
+        let exactValidationOptions = {
+          allowCanonicalTitle: true,
+          allowAdjacentYear: true,
+          allowDistantYear: true,
+          maxYearDifference: 3
+        };
+        let fullEvaluation = MovieSearch.evaluateFullResult(
+          exactResponse.data, requestCandidate, video, exactValidationOptions
+        );
+        logFullMovieEvaluation(
+          context, requestCandidate, exactResponse.data, fullEvaluation,
+          'cleaned exact-title lookup'
+        );
+        if (fullEvaluation.confident && fullEvaluation.matchKind === 'exact') {
+          return applyGeneralVideoResult(video, exactResponse.data, context);
+        }
+        if (fullEvaluation.confident && fullEvaluation.matchKind === 'article') {
+          deferredArticleGroups.push({
+            results: [exactResponse.data],
+            candidate: requestCandidate,
+            validationOptions: Object.assign({}, exactValidationOptions, {
+              allowCanonicalTitle: false
+            }),
+            stage: 'cleaned exact-title lookup article-only tier'
+          });
+        } else if (fullEvaluation.confident && fullEvaluation.matchKind === 'canonical') {
+          deferredCanonicalGroups.push({
+            results: [exactResponse.data],
+            candidate: requestCandidate,
+            validationOptions: exactValidationOptions,
+            stage: 'cleaned exact-title lookup canonical-title tier'
+          });
+        }
+        if (exactResponse.data.imdbID && !choicesByID.has(exactResponse.data.imdbID)) {
+          choicesByID.set(exactResponse.data.imdbID, exactResponse.data);
+        }
+      } else if (isTooManyResultsResponse(exactResponse.data)) {
+        sawAmbiguousResponse = true;
+      } else if (!isNotFoundResponse(exactResponse.data)) {
+        return {
+          success: false,
+          failure: 'Error',
+          data: exactResponse.data && exactResponse.data.Error ?
+            exactResponse.data.Error : 'Unexpected OMDb response'
+        };
+      }
+    }
+
+    let broadResult = await runBroadSearch(
+      requestCandidate,
+      candidate.year || null,
+      {
+        allowCanonicalTitle: true,
+        requireStrongEvidence: !candidate.year
+      },
+      'cleaned general-title search'
+    );
+    if (broadResult.terminalResult) return broadResult.terminalResult;
+
+    // The primary parsed title gets one bounded year-relaxed retry. A one-year
+    // discrepancy retains the established behavior. A two/three-year result
+    // is eligible only for an exact normalized title; full validation then
+    // additionally requires a close runtime and meaningful IMDb vote history.
+    if (plan.candidateIndex === 0 && candidate.year && titleRequestCount < MAX_TITLE_REQUESTS) {
+      let relaxedResult = await runBroadSearch(
+        requestCandidate,
+        null,
+        {
+          allowCanonicalTitle: true,
+          allowAdjacentYear: true,
+          allowDistantYear: true,
+          maxYearDifference: 3
+        },
+        'cleaned year-relaxed title search'
+      );
+      if (relaxedResult.terminalResult) return relaxedResult.terminalResult;
+    }
+  }
+
+  // OMDb can return "Movie not found" for a complete title merely because a
+  // filename lost catalog punctuation: "Oceans Eleven" versus "Ocean's
+  // Eleven", "310 to Yuma" versus "3:10 to Yuma", and dotted initialisms are
+  // common examples. Spend at most two separately budgeted search requests on
+  // repaired/keyword queries. The query is allowed to be shorter, but matching
+  // is not: runBroadSearch validates rows against the complete original
+  // candidate with canonical matching disabled. This fallback runs only when
+  // the ordinary searches exposed no article/canonical candidate at all, so it
+  // does not add requests to already-working canonical matches.
+  if (!sawUnresolvedExactAmbiguity &&
+      deferredArticleGroups.length === 0 && deferredCanonicalGroups.length === 0) {
+    let discoveryVariants = candidates.map(candidate =>
+      MovieSearch.buildNormalizedDiscoveryQueries(candidate.title));
+    let maximumVariants = discoveryVariants.reduce(
+      (maximum, variants) => Math.max(maximum, variants.length), 0
+    );
+    let discoveryPlans = [];
+    let discoveryKeys = new Set();
+    for (let variantIndex=0; variantIndex<maximumVariants; variantIndex++) {
+      candidates.forEach((candidate, candidateIndex) => {
+        let variant = discoveryVariants[candidateIndex][variantIndex];
+        if (!variant) return;
+        let key = `${variant.title.toLowerCase()}\u0000${candidate.year || ''}`;
+        if (plannedTitles.has(key) || discoveryKeys.has(key)) return;
+        discoveryKeys.add(key);
+        discoveryPlans.push({candidate: candidate, variant: variant});
+      });
+    }
+
+    for (let plan of discoveryPlans) {
+      if (normalizedDiscoveryRequestCount >= MAX_NORMALIZED_DISCOVERY_REQUESTS ||
+          sawUnresolvedExactAmbiguity) break;
+      attemptedTitles.push({
+        title: plan.variant.title,
+        year: plan.candidate.year || '',
+        source: plan.candidate.source,
+        variantReason: plan.variant.reason
+      });
+      log.info('Retrying movie search with strict normalized-title discovery', {
+        searchID: context.searchID,
+        candidate: plan.candidate,
+        queryTitle: plan.variant.title,
+        reason: plan.variant.reason,
+        requestNumber: normalizedDiscoveryRequestCount + 1,
+        maximumRequests: MAX_NORMALIZED_DISCOVERY_REQUESTS
+      });
+      let discoveryResult = await runBroadSearch(
+        plan.candidate,
+        plan.candidate.year || null,
+        {
+          allowCanonicalTitle: false,
+          requireStrongEvidence: !plan.candidate.year
+        },
+        'strict normalized-title discovery search',
+        {queryTitle: plan.variant.title, useDiscoveryBudget: true}
+      );
+      if (discoveryResult.terminalResult) return discoveryResult.terminalResult;
+
+      // Keep this retry deliberately narrower than general punctuation repair:
+      // the query must only restore a possessive in a two-word title, its year
+      // must be known, and an unresolved exact-title tier still blocks it.
+      if (!sawUnresolvedExactAmbiguity &&
+          isTwoWordPossessiveDiscovery(plan.candidate.title, plan.variant.title) &&
+          normalizedDiscoveryRequestCount < MAX_NORMALIZED_DISCOVERY_REQUESTS) {
+        attemptedTitles.push({
+          title: plan.variant.title,
+          year: plan.candidate.year,
+          source: plan.candidate.source,
+          variantReason: `${plan.variant.reason}; exact-title endpoint`
+        });
+        log.info('Retrying strict normalized title through exact-title lookup', {
+          searchID: context.searchID,
+          candidate: plan.candidate,
+          queryTitle: plan.variant.title,
+          requestNumber: normalizedDiscoveryRequestCount + 1,
+          maximumRequests: MAX_NORMALIZED_DISCOVERY_REQUESTS
+        });
+        let exactDiscoveryResult = await runStrictNormalizedExactLookup(
+          plan.candidate,
+          plan.variant.title,
+          'strict normalized-title exact lookup'
+        );
+        if (exactDiscoveryResult.terminalResult) {
+          return exactDiscoveryResult.terminalResult;
+        }
+      }
+    }
+  }
+
+  // Only after every query has failed to produce an exact normalized title do
+  // we evaluate article-only equivalents. A still-ambiguous exact tier is a
+  // deliberate stop: weaker title evidence must never override it.
+  if (!sawUnresolvedExactAmbiguity) {
+    for (let group of deferredArticleGroups) {
+      let articleAttempt = await tryResultTier(
+        group.results, group.candidate, group.validationOptions, group.stage
+      );
+      if (articleAttempt.terminalResult) return articleAttempt.terminalResult;
+      if (articleAttempt.unresolvedAmbiguity) sawUnresolvedArticleAmbiguity = true;
+    }
+  }
+
+  // Canonical expansions remain available for the cases fix03 already handled,
+  // but only after exact and article-only tiers have both failed cleanly.
+  if (!sawUnresolvedExactAmbiguity && !sawUnresolvedArticleAmbiguity) {
+    for (let groupIndex=0; groupIndex<deferredCanonicalGroups.length; groupIndex++) {
+      let group = deferredCanonicalGroups[groupIndex];
+      let canonicalAttempt = await tryResultTier(
+        group.results, group.candidate, group.validationOptions, group.stage
+      );
+      if (canonicalAttempt.terminalResult) return canonicalAttempt.terminalResult;
+      if (canonicalAttempt.unresolvedAmbiguity) {
+        // A broad subtitle fragment can expose more rows than the bounded probe
+        // limit even when a later, more specific query exposes one of those same
+        // rows as its sole canonical result. Validate that corroborated singleton
+        // before stopping; small or genuinely competing ambiguities keep fix04's
+        // existing behavior unchanged.
+        if (canonicalAttempt.plausibleCount === null) {
+          let blockedImdbIDs = new Set(
+            group.results.map(result => result && result.imdbID).filter(Boolean)
+          );
+          let corroboratingSingleton = deferredCanonicalGroups
+            .slice(groupIndex + 1)
+            .find(laterGroup => {
+              let laterIDs = Array.from(new Set(
+                laterGroup.results.map(result => result && result.imdbID).filter(Boolean)
+              ));
+              return laterIDs.length === 1 && blockedImdbIDs.has(laterIDs[0]);
+            });
+          if (corroboratingSingleton) {
+            log.info('Validating a canonical singleton corroborated by an oversized result tier', {
+              searchID: context.searchID,
+              blockedCandidate: group.candidate,
+              candidate: corroboratingSingleton.candidate,
+              imdbID: corroboratingSingleton.results[0].imdbID
+            });
+            let singletonAttempt = await tryResultTier(
+              corroboratingSingleton.results,
+              corroboratingSingleton.candidate,
+              corroboratingSingleton.validationOptions,
+              corroboratingSingleton.stage
+            );
+            if (singletonAttempt.terminalResult) return singletonAttempt.terminalResult;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  let choices = Array.from(choicesByID.values());
+  if (choices.length > 0) {
+    log.info('Movie tagging search remained ambiguous; returning choices', {
+      searchID: context.searchID,
+      attemptedTitles: attemptedTitles,
+      choiceCount: choices.length
+    });
+    return {success: true, data: choices};
+  }
+  if (sawAmbiguousResponse) {
+    return predictableFailure(
+      'Ambiguous results',
+      'OMDb found too many possible matches to choose one safely'
+    );
+  }
+  return predictableFailure('No results', 'OMDb found no safely matching title');
+}
+
+// Fetches one full movie record by ID, reusing any full response returned by an
+// earlier exact-title request. Full-detail probes are deliberately separate
+// from the title-request budget because they occur only after a small set of
+// lightweight results has already passed title/year screening.
+async function fetchGeneralVideoResult(imdbID, context, cache, stage) {
+  if (cache.has(imdbID)) return {success: true, data: cache.get(imdbID)};
+
+  let response;
+  try {
+    response = await pollOMDB(createURLParts({id: imdbID}), {
+      searchID: context.searchID,
+      stage: stage || 'selected movie IMDb-ID lookup'
+    });
+  } catch(err) {
+    return {success: false, failure: 'Error', data: err};
+  }
+  let failure = requestFailure(response);
+  if (failure) return failure;
+  if (!response.data || response.data.imdbID !== imdbID) {
+    return {
+      success: false,
+      failure: 'Error',
+      data: 'OMDb returned a different record than the selected IMDb ID'
+    };
+  }
+  cache.set(imdbID, response.data);
+  return {success: true, data: response.data};
+}
+
+function logFullMovieEvaluation(context, candidate, omdbData, evaluation, stage) {
+  let details = {
+    searchID: context.searchID,
+    stage: stage,
+    candidate: candidate,
+    imdbID: omdbData && omdbData.imdbID,
+    omdbTitle: omdbData && omdbData.Title,
+    omdbYear: omdbData && omdbData.Year,
+    accepted: evaluation.confident,
+    titleMatchKind: evaluation.matchKind,
+    yearDifference: evaluation.yearDifference,
+    localRuntimeMinutes: evaluation.plausibility.localRuntimeMinutes,
+    omdbRuntimeMinutes: evaluation.plausibility.omdbRuntimeMinutes,
+    imdbVotes: evaluation.plausibility.imdbVotes,
+    splitFile: evaluation.plausibility.splitFile,
+    reasons: evaluation.reasons
+  };
+  if (evaluation.confident) {
+    log.info('Full movie result passed plausibility validation', details);
+  } else {
+    log.warn('Full movie result was not safe to auto-select', details);
+  }
+}
+
+// Applies one already-validated full OMDb record and downloads its artwork.
+// This is shared by ordinary search results and the exact-title fallback.
+async function applyGeneralVideoResult(video, omdbData, context) {
+  let taggedVideo = addTagsToVideo(_.cloneDeep(video), omdbData, context);
+  taggedVideo.artwork = await downloadArtworkWithSeriesFallback(
+    omdbData,
+    omdbData.Type === 'episode' ? omdbData.seriesID : null,
+    context
+  );
+  return {success: true, data: taggedVideo};
+}
+
 // True only when a video has a nonempty string IMDb ID. An existing ID is more
 // precise than any title-based lookup and therefore takes precedence.
 function hasImdbID(video) {
@@ -303,6 +1024,13 @@ function normalizeEpisodeNumber(value) {
 // authentication, quota, network, and other errors that should remain retryable.
 function isNotFoundResponse(data) {
   return data && data.Response === 'False' && /not found|no results/i.test(data.Error || '');
+}
+
+// OMDb reports broad search ambiguity as a Response:false payload rather than
+// an HTTP error. Treating it as a normal server failure caused Auto-Tag to retry
+// the same title forever; it is a predictable, user-resolvable outcome.
+function isTooManyResultsResponse(data) {
+  return data && data.Response === 'False' && /too many results/i.test(data.Error || '');
 }
 
 // Builds a failure that another identical auto-tag pass cannot resolve by
@@ -334,6 +1062,9 @@ function requestFailure(response) {
   }
   if (isNotFoundResponse(response.data)) {
     return predictableFailure('No results', response.data.Error);
+  }
+  if (isTooManyResultsResponse(response.data)) {
+    return predictableFailure('Ambiguous results', response.data.Error);
   }
   return {
     success: false,
@@ -555,6 +1286,9 @@ function summarizeOMDbResponse(response) {
     year: data.Year,
     type: data.Type,
     imdbID: data.imdbID,
+    runtime: data.Runtime,
+    genre: data.Genre,
+    imdbVotes: data.imdbVotes,
     seriesID: data.seriesID,
     season: data.Season,
     episode: data.Episode
@@ -1614,8 +2348,8 @@ function extractParts(video) {
 // URL-encodes every value, and returns an array that pollOMDB() can join with &.
 function createURLParts(persisting) {
   let urlParts = [`https://www.omdbapi.com/?apikey=${encodeURIComponent(omdb.key)}`];
-  let possibleParts = ['id', 'title', 'year', 'type', 'series', 'season', 'episode'];
-  let prefixes = {id: 'i', title: 's', year: 'y', type: 'type', series: 't', season: 'Season', episode: 'Episode'};
+  let possibleParts = ['id', 'title', 'exactTitle', 'year', 'type', 'series', 'season', 'episode'];
+  let prefixes = {id: 'i', title: 's', exactTitle: 't', year: 'y', type: 'type', series: 't', season: 'Season', episode: 'Episode'};
   for (let part of possibleParts) {
     if (persisting[part] !== null && typeof persisting[part] !== 'undefined' && persisting[part] !== '') {
       urlParts.push(`${prefixes[part]}=${encodeURIComponent(persisting[part])}`);
@@ -1660,8 +2394,9 @@ async function pollOMDB(urlParts, context = {}) {
 
 // Mutates a Mynda video with the full metadata from one OMDb title or episode.
 // It normalizes OMDb field names, merges genres into existing tags, preserves
-// unrelated Mynda-only fields (including series/season/episode), and treats an
-// unavailable individual field as nonfatal so the rest can still be applied.
+// unrelated Mynda-only fields (including kind, series, season, and episode),
+// and treats an unavailable individual field as nonfatal so the rest can still
+// be applied.
 function addTagsToVideo(video, data, context = {}) {
   //console.log(JSON.stringify(video));
   video.imdbID = data.imdbID;
@@ -1674,7 +2409,9 @@ function addTagsToVideo(video, data, context = {}) {
   video.year = data.Year;
   delete video.Year;
   video.director = data.Director,
-  video.kind = data.Type === 'episode' ? 'show' : data.Type;
+  // OMDb's Type describes its record, not the user's Mynda category. In
+  // particular, overwriting this field destroyed custom kinds. The video was
+  // already categorized before tagging, so preserve that value unchanged.
   delete video.Type;
   video.country = data.Country;
   video.rated = data.Rated;
