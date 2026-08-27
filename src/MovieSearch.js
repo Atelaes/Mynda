@@ -214,7 +214,7 @@ function preservesStructuralMarker(value, marker) {
   return true;
 }
 
-// Recognizes small release samples and the two known garbage filenames before
+// Recognizes release samples and the two known garbage filenames before
 // either the watchfolder scanner or Auto-Tag treats them as real movies. The
 // sample suffix deliberately permits punctuation, brackets, and the observed
 // "_TTL" suffix, but does not match a normal title merely containing "sample".
@@ -240,7 +240,7 @@ function parentLooksAuxiliary(value) {
   // Composite folders made entirely from auxiliary labels (for example,
   // "Sample,Screens") are auxiliary too. If even one part is a real movie
   // label ("Movie and Sample", "Lifeboat + Extras"), keep the parent eligible;
-  // the scanner's size-aware sample check will reject only the small clip.
+  // the scanner's runtime-aware sample check will reject only the short clip.
   let parts = cleaned.split(/\s*(?:[,;+&/]|\band\b)\s*/i).filter(Boolean);
   return parts.length > 1 && parts.every(part => AUXILIARY_PARENT.test(part));
 }

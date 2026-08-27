@@ -25,6 +25,8 @@ try {
 const Logger = require('./Logger.js');
 const OmdbHelper = require('./OmdbHelper.js');
 const MovieSearch = require('./MovieSearch.js');
+const VideoExclusion = require('./VideoExclusion.js');
+const VideoRuntimeVerifier = require('./VideoRuntimeVerifier.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
@@ -55,6 +57,15 @@ let appStartTime = new Date();
 let autoTagRunning = false;
 let autoTagCancelRequested = false;
 let autoTagCancellationDecision = null;
+const videoRuntimeVerifier = new VideoRuntimeVerifier({
+  ffmpegPath: pathToFFmpeg
+});
+const videoExclusion = new VideoExclusion({
+  library: library,
+  probeMetadata: getMetadata,
+  verifyMinimumRuntime: options => videoRuntimeVerifier.hasMinimumRuntime(options),
+  log: message => console.log(message)
+});
 
 app.whenReady().then(start);
 
@@ -510,6 +521,7 @@ function checkWatchFolders() {
   newIDs = [];
   unavailableWatchFolders = new Set();
   subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
+  videoExclusion.reset();
 
   win.webContents.send('status-update', {action: 'check'});
   // reset libFileTree
@@ -554,7 +566,7 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
   const kind = folderNode.kind;
 
   // read the contents of this folder
-  fs.readdir(folder, {withFileTypes : true}, function (err, components) {
+  fs.readdir(folder, {withFileTypes : true}, async function (err, components) {
     // handling error
     if (err) {
         unavailableWatchFolders.add(rootWatchFolder);
@@ -591,15 +603,21 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
         // otherwise, it must be a file
         let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
 
-        if (videoExtensions.includes(fileExt) && !isSampleVideo(compAddress)) {
-          //console.log(`We're about to add ${component.name} to libTree.`);
-          // if it's a video file, add it as a video
-          // console.log(`${compAddress} is a regular video file`);
-          folderNode.videos.push({
-            filename: compAddress,
-            kind: kind,
-            folderParts: path.relative(rootWatchFolder, folder).split(path.sep).filter(Boolean)
-          }); // add the video to this node of the libFileTree
+        if (videoExtensions.includes(fileExt)) {
+          // Only filenames/folders with explicit sample, garbage, or trailer
+          // evidence need a runtime probe. Await it before adding the file to
+          // libFileTree so a rejected video never enters the library, even on
+          // the first watchfolder scan.
+          if (!await videoExclusion.shouldExclude(compAddress)) {
+            //console.log(`We're about to add ${component.name} to libTree.`);
+            // if it's a video file, add it as a video
+            // console.log(`${compAddress} is a regular video file`);
+            folderNode.videos.push({
+              filename: compAddress,
+              kind: kind,
+              folderParts: path.relative(rootWatchFolder, folder).split(path.sep).filter(Boolean)
+            }); // add the video to this node of the libFileTree
+          }
         } else if (subtitleExtensions.includes(fileExt)) {
           // if it's a subtitle file, add it as a subtitle
           // console.log(`${compAddress} is a subtitle file`);
@@ -633,33 +651,6 @@ function isInUnavailableWatchFolder(filepath) {
       return true;
     }
   }
-  return false;
-}
-
-// Small release samples are not library videos. In addition to a plain
-// "...sample" suffix, the shared helper recognizes observed forms such as
-// "...(Sample)", "...-SAMPLE_TTL", and files inside composite directories
-// such as "Sample,Screens" or "Movie and Sample". The 100 MB guard remains so
-// a large, intentionally named video is never discarded solely by its name.
-// The same helper also preserves the existing ETRG/RARBG.com garbage check.
-function isSampleVideo(filepath) {
-  let size;
-
-  try {
-    size = fs.statSync(filepath).size;
-  } catch (err) {
-    console.log(`Could not determine file size of ${filepath}: ${err}`);
-    return false;
-  }
-
-  const hasSampleOrGarbageBasename = MovieSearch.basenameLooksLikeSampleOrGarbage(filepath);
-  const isInsideSampleArea = MovieSearch.pathContainsSampleArea(filepath);
-
-  if ((hasSampleOrGarbageBasename || isInsideSampleArea) && size < 100000000) {
-    console.log('Ignoring "SAMPLE"/garbage video: ' + filepath);
-    return true;
-  }
-
   return false;
 }
 
