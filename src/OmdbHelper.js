@@ -23,6 +23,10 @@ const failedArtworkURLs = new Set();
 let nextSearchNumber = 0;
 let nextArtworkDownloadNumber = 0;
 
+function validSeriesImdbID(value) {
+  return typeof value === 'string' && /^tt\d+$/.test(value.trim());
+}
+
 function summarizeVideo(video) {
   return {
     id: video && video.id,
@@ -31,6 +35,7 @@ function summarizeVideo(video) {
     kind: video && video.kind,
     year: video && video.year,
     series: video && video.series,
+    seriesImdbID: video && video.seriesImdbID,
     season: video && video.season,
     episode: video && video.episode,
     imdbID: video && video.imdbID
@@ -86,6 +91,7 @@ function summarizeSearchResult(result) {
     year: result.data && result.data.year,
     kind: result.data && result.data.kind,
     series: result.data && result.data.series,
+    seriesImdbID: result.data && result.data.seriesImdbID,
     season: result.data && result.data.season,
     episode: result.data && result.data.episode,
     imdbID: result.data && result.data.imdbID
@@ -1810,7 +1816,8 @@ async function disambiguateSeriesByEpisode(candidates, season, episode, localTit
 // guess when several candidates match, and uses OMDb's single-title endpoint as
 // a carefully validated fallback. Expected failures and API errors are returned
 // in the same result format as search().
-async function resolveSeries(video, season, episode, localTitle, context) {
+async function resolveSeries(video, season, episode, localTitle, context, options = {}) {
+  options = options || {};
   let series = typeof video.series === 'string' ? video.series.trim() : '';
   let searchParts = seriesSearchPartsForVideo(video);
   log.info('Resolving series for episode lookup', {
@@ -1826,7 +1833,18 @@ async function resolveSeries(video, season, episode, localTitle, context) {
   }
 
   let cacheKey = seriesCacheKey(searchParts);
-  if (seriesIdCache.has(cacheKey)) {
+  if (!options.ignoreStoredSeriesImdbID && validSeriesImdbID(video.seriesImdbID)) {
+    let storedID = video.seriesImdbID.trim();
+    seriesIdCache.set(cacheKey, storedID);
+    log.info('Using stored IMDb series ID', {
+      searchID: context.searchID,
+      queryTitle: searchParts.title,
+      queryYear: searchParts.year,
+      imdbID: storedID
+    });
+    return {success: true, data: storedID};
+  }
+  if (!options.ignoreSeriesCache && seriesIdCache.has(cacheKey)) {
     let cachedID = seriesIdCache.get(cacheKey);
     log.info('Using cached IMDb series ID', {
       searchID: context.searchID,
@@ -2055,6 +2073,79 @@ async function resolveSeries(video, season, episode, localTitle, context) {
   }
 }
 
+// Resolve one authoritative parent-series ID before a homogeneous selected
+// batch begins saving episodes. Stored IDs and the process cache are bypassed:
+// this path is specifically for an unsettled batch, including one whose videos
+// disagree about their saved seriesImdbID values. Prefer a usable episode with
+// an independently extracted local title because it supplies the strongest
+// evidence when same-name originals and remakes both exist.
+async function resolveSeriesForBatch(videos) {
+  const context = {searchID: `${process.pid}-${++nextSearchNumber}`};
+  const candidates = (Array.isArray(videos) ? videos : [])
+    .filter(video => video && video.kind === 'show' &&
+      typeof video.series === 'string' && video.series.trim() &&
+      normalizeEpisodeNumber(video.season) !== null &&
+      normalizeEpisodeNumber(video.episode) !== null)
+    .map(video => ({
+      video: video,
+      season: normalizeEpisodeNumber(video.season),
+      episode: normalizeEpisodeNumber(video.episode),
+      localTitle: localEpisodeTitleForVerification(video)
+    }));
+
+  const representative = candidates.find(candidate => candidate.localTitle) || candidates[0];
+  log.info('Selected-batch series preflight started', {
+    searchID: context.searchID,
+    videoCount: Array.isArray(videos) ? videos.length : 0,
+    usableEpisodeCount: candidates.length,
+    representative: representative ? summarizeVideo(representative.video) : undefined
+  });
+
+  if (!representative) {
+    const failure = predictableFailure(
+      'Not enough data',
+      'No selected episode has usable series, season, and episode values for series preflight'
+    );
+    log.warn('Selected-batch series preflight could not start', {
+      searchID: context.searchID,
+      failure: failure.failure,
+      data: failure.data
+    });
+    return failure;
+  }
+
+  const result = await resolveSeries(
+    representative.video,
+    representative.season,
+    representative.episode,
+    representative.localTitle,
+    context,
+    {
+      ignoreStoredSeriesImdbID: true,
+      ignoreSeriesCache: true
+    }
+  );
+
+  if (result.success && validSeriesImdbID(result.data)) {
+    const success = {success: true, data: result.data.trim()};
+    log.info('Selected-batch series preflight finished', {
+      searchID: context.searchID,
+      series: representative.video.series,
+      seriesImdbID: success.data
+    });
+    return success;
+  }
+
+  log.warn('Selected-batch series preflight did not resolve a series', {
+    searchID: context.searchID,
+    series: representative.video.series,
+    failure: result.failure,
+    choiceType: result.choiceType,
+    choiceCount: Array.isArray(result.choices) ? result.choices.length : 0
+  });
+  return result;
+}
+
 // Final guard before metadata is applied. The response must describe an episode
 // with an IMDb ID and exactly the requested series, season, and episode numbers.
 function episodeResponseMatches(data, seriesID, season, episode) {
@@ -2179,9 +2270,10 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
   let localTitle = localEpisodeTitleForVerification(video);
   let seriesResult;
   if (typeof selectedSeriesImdbID !== 'undefined') {
-    if (!/^tt\d+$/.test(String(selectedSeriesImdbID))) {
+    if (!validSeriesImdbID(String(selectedSeriesImdbID))) {
       return predictableFailure('Invalid series selection', 'The selected series did not have a valid IMDb ID');
     }
+    selectedSeriesImdbID = String(selectedSeriesImdbID).trim();
     log.info('Using caller-selected series for episode lookup', {
       searchID: context.searchID,
       series: series,
@@ -2278,6 +2370,7 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     }
 
     let taggedVideo = addTagsToVideo(_.cloneDeep(video), episodeData, context);
+    taggedVideo.seriesImdbID = seriesID;
     taggedVideo.artwork = await downloadArtworkWithSeriesFallback(
       episodeData,
       seriesID,
@@ -2400,6 +2493,15 @@ async function pollOMDB(urlParts, context = {}) {
 function addTagsToVideo(video, data, context = {}) {
   //console.log(JSON.stringify(video));
   video.imdbID = data.imdbID;
+  if (video.kind === 'show') {
+    if (validSeriesImdbID(data.seriesID)) {
+      video.seriesImdbID = data.seriesID.trim();
+    } else if (!validSeriesImdbID(video.seriesImdbID)) {
+      video.seriesImdbID = '';
+    }
+  } else {
+    video.seriesImdbID = '';
+  }
   video.title = data.Title;
   delete video.Title;
   video.description = data.Plot;
@@ -2571,4 +2673,4 @@ function downloadArt(url, context = {}) {
   });
 }
 
-module.exports = {search};
+module.exports = {search, resolveSeriesForBatch};

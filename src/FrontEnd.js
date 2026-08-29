@@ -64,6 +64,19 @@ function editorSelectionKey(video, batch) {
   return `batch:${JSON.stringify(ids)}`;
 }
 
+// A batch checkbox needs three display states: checked when every selected
+// video is New, unchecked when none are New, and indeterminate when the
+// selection is mixed. Null is used only by the editable batch summary; the
+// individual videos retain ordinary boolean values.
+function batchNewState(videos) {
+  if (!Array.isArray(videos) || videos.length === 0) return false;
+
+  const numberNew = videos.filter(video => video && video.new === true).length;
+  if (numberNew === videos.length) return true;
+  if (numberNew === 0) return false;
+  return null;
+}
+
 
 // let savedPing = {};
 
@@ -401,6 +414,10 @@ class Mynda extends React.Component {
         // so assign this value to the batch object
         batchObject[key] = testValue;
       });
+      // `new` is not part of validateVideo's ordinary editable template. Add
+      // its three-state batch summary explicitly so the checkbox reflects what
+      // an untouched batch save will actually preserve.
+      batchObject.new = batchNewState(videos);
       console.log(JSON.stringify(batchObject));
 
       this.setState({detailRowID: rowID, detailVideo: batchObject, batchVids: batchVids}, callback);
@@ -2982,6 +2999,218 @@ class MynOpenablePane extends React.Component {
   }
 }
 
+// Turn node-mpv's string, Error, and structured IPC rejection shapes into a
+// concise user-facing detail without falling back to "[object Object]".
+function describePlaybackError(error) {
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  if (error && typeof error.message === 'string' && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (error && typeof error.error === 'string' && error.error.trim()) {
+    return error.error.trim();
+  }
+  if (error && typeof error.reason === 'string' && error.reason.trim()) {
+    return error.reason.trim();
+  }
+  if (error !== null && typeof error !== 'undefined' && typeof error !== 'object') {
+    return String(error);
+  }
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized && serialized !== '{}') return serialized;
+  } catch(err) {
+    // Circular or otherwise non-serializable errors fall through to the stable
+    // message below instead of creating another playback error.
+  }
+  return 'MPV returned an unknown error';
+}
+
+const MPV_START_TIMEOUT_MS = 10000;
+const MPV_LOAD_TIMEOUT_MS = 30000;
+const MPV_COMMAND_TIMEOUT_MS = 5000;
+let mpvDvdSupportPromise = null;
+
+// node-mpv's own load timeout is event-count based rather than time based, so
+// a failed load can remain pending forever if MPV stops sending IPC data.
+function withPlaybackTimeout(promise, timeout, message) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      const error = new Error(message);
+      error.code = 'MYNDA_PLAYBACK_TIMEOUT';
+      reject(error);
+    }, timeout);
+
+    Promise.resolve(promise).then((result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    }, (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
+// MPV's DVD protocol is an optional build feature. In particular, an MPV
+// executable can play ordinary files perfectly while dvd:// is unavailable.
+// Cache this inexpensive process check for the lifetime of the renderer.
+function mpvSupportsDvdPlayback() {
+  if (mpvDvdSupportPromise) return mpvDvdSupportPromise;
+
+  mpvDvdSupportPromise = new Promise((resolve) => {
+    let finished = false;
+    let output = '';
+    let childProcess;
+    let timer;
+
+    const finish = (supported) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      resolve(supported);
+    };
+
+    try {
+      childProcess = spawn('mpv', ['--no-config', '--list-protocols']);
+    } catch(err) {
+      resolve(null);
+      return;
+    }
+
+    timer = setTimeout(() => {
+      try { childProcess.kill(); } catch(err) {}
+      finish(null);
+    }, MPV_START_TIMEOUT_MS);
+
+    childProcess.stdout.on('data', (data) => { output += data.toString(); });
+    childProcess.stderr.on('data', (data) => { output += data.toString(); });
+    childProcess.once('error', () => finish(null));
+    childProcess.once('close', (code) => {
+      if (code !== 0) {
+        finish(null);
+        return;
+      }
+      finish(/(?:^|\s)dvd(?:nav)?:\/\/(?:\s|$)/im.test(output));
+    });
+  });
+
+  return mpvDvdSupportPromise;
+}
+
+function uniqueMpvSocketPath() {
+  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  if (process.platform === 'win32') return `\\\\.\\pipe\\mynda-mpv-${suffix}`;
+  return path.join(os.tmpdir(), `mynda-mpv-${suffix}.sock`);
+}
+
+// node-mpv's quit() first writes a command to the IPC socket. When MPV has
+// already closed that socket, Node can emit ERR_SOCKET_CLOSED outside the
+// returned promise, which an await/catch cannot intercept. Tear down the
+// renderer-owned process and socket directly instead.
+function stopMpvSafely(player) {
+  if (!player) return;
+
+  // Make any concurrently running node-mpv polling reject as "not running"
+  // before its socket is dismantled.
+  player.running = false;
+  try { clearInterval(player.timepositionListenerId); } catch(err) {}
+  try { player.removeAllListeners(); } catch(err) {}
+
+  const child = player.mpvPlayer;
+  if (child) {
+    // Prevent node-mpv's close handler from attempting an automatic restart.
+    try { child.removeAllListeners('close'); } catch(err) {}
+  }
+
+  const socket = player.socket && player.socket.socket;
+  if (socket) {
+    try {
+      socket.removeAllListeners('close');
+      socket.removeAllListeners('data');
+      socket.removeAllListeners('error');
+      socket.on('error', (error) => console.warn('MPV socket closed during cleanup:', describePlaybackError(error)));
+      socket.destroy();
+    } catch(err) {}
+  }
+
+  if (child && child.exitCode === null && child.signalCode === null) {
+    try { child.kill(); } catch(err) {}
+  }
+}
+
+// Watch MPV's actual file lifecycle before sending loadfile. This avoids a
+// race in node-mpv's load() implementation and preserves MPV's end-file detail.
+function loadDvdInMpv(player) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const ipc = player && player.socket;
+    const child = player && player.mpvPlayer;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (ipc && typeof ipc.removeListener === 'function') ipc.removeListener('message', onMessage);
+      if (child && typeof child.removeListener === 'function') child.removeListener('close', onProcessClose);
+    };
+    const succeed = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onMessage = (message) => {
+      if (!message || typeof message !== 'object') return;
+      if (message.event === 'file-loaded') {
+        succeed();
+        return;
+      }
+      if (message.event === 'end-file') {
+        const detail = message.file_error || message.error || message.reason;
+        const error = new Error(detail ?
+          `MPV could not open this DVD (${detail})` :
+          'MPV could not open this DVD');
+        error.code = 'MYNDA_MPV_LOAD_FAILED';
+        fail(error);
+      }
+    };
+    const onProcessClose = (code, signal) => {
+      const ending = signal ? `signal ${signal}` : `exit code ${code}`;
+      const error = new Error(`MPV closed while trying to open this DVD (${ending})`);
+      error.code = 'MYNDA_MPV_CLOSED';
+      fail(error);
+    };
+    const timer = setTimeout(() => {
+      const error = new Error(
+        'MPV did not finish loading this DVD within 30 seconds. The DVD folder may be unreadable.'
+      );
+      error.code = 'MYNDA_PLAYBACK_TIMEOUT';
+      fail(error);
+    }, MPV_LOAD_TIMEOUT_MS);
+
+    if (!ipc || typeof ipc.on !== 'function') {
+      fail(new Error('Mynda could not monitor MPV while loading this DVD'));
+      return;
+    }
+
+    // The listeners must exist before the command: DVD failures can emit
+    // start-file/end-file before node-mpv finishes awaiting its command reply.
+    ipc.on('message', onMessage);
+    if (child && typeof child.once === 'function') child.once('close', onProcessClose);
+    Promise.resolve(player.command('loadfile', ['dvd://', 'replace'])).catch(fail);
+  });
+}
+
 // ###### Player Pane: plays the video ###### //
 class MynPlayer extends MynOpenablePane {
   constructor(props) {
@@ -2996,6 +3225,8 @@ class MynPlayer extends MynOpenablePane {
     }
 
     this.loadingIndicator = null;
+    this.mpv = null;
+    this.playbackAttempt = 0;
 
     this.render = this.render.bind(this);
     this.setUpVideo = this.setUpVideo.bind(this);
@@ -3008,18 +3239,18 @@ class MynPlayer extends MynOpenablePane {
   }
 
   // called when exiting MynPlayer pane
-  async onExit() {
-    try {
-      await this.mpv.quit();
-    } catch(e) {
-      // mpv player probably already closed
-    }
+  onExit() {
+    clearTimeout(this.logPlayTimeout);
+    this.playbackAttempt += 1;
+    const player = this.mpv;
+    this.mpv = null;
+    stopMpvSafely(player);
   }
 
   // called when quitting mpv player or video stopping
   onExitVideo() {
     console.log('MPV PLAYER CLOSED');
-    this.setState({playingMessage: null});
+    this.setState({showPlayingMessage: false});
 
     clearTimeout(this.logPlayTimeout);
 
@@ -3081,24 +3312,102 @@ class MynPlayer extends MynOpenablePane {
     //   console.error('Error launching MPV:', error);
     // });
 
-    this.mpv = new mpvAPI({ "time_update": 5 });
+    const attempt = ++this.playbackAttempt;
     const video = this.state.video;
+    // Mynda represents a copied DVD as the directory containing its VIDEO_TS
+    // structure. MPV expects that directory as --dvd-device and the special
+    // dvd:// playback URL; passing the directory to load() as a normal file is
+    // rejected. With no explicit title, MPV selects the longest DVD title.
+    if (!video || typeof video.filename !== 'string' || !video.filename.trim()) {
+      this.setState({
+        errorMessage: 'Problem playing video: the library record has no media path',
+        showLoadingIndicator: false,
+        showPlayingMessage: false
+      });
+      return;
+    }
+    if (video.dvd && !fs.existsSync(video.filename)) {
+      this.setState({
+        errorMessage: 'Problem playing DVD: the DVD folder is no longer available',
+        showLoadingIndicator: false,
+        showPlayingMessage: false
+      });
+      return;
+    }
+
+    if (video.dvd) {
+      const dvdSupported = await mpvSupportsDvdPlayback();
+      if (attempt !== this.playbackAttempt) return;
+      if (dvdSupported === false) {
+        this.setState({
+          errorMessage: 'Problem playing DVD: this installation of MPV does not include DVD playback support, so Mynda cannot play DVDs with it.',
+          showLoadingIndicator: false,
+          showPlayingMessage: false
+        });
+        return;
+      }
+    }
+
+    const mpvArguments = video && video.dvd ?
+      [`--dvd-device=${video.filename}`] : [];
+    const playbackTarget = video && video.dvd ? 'dvd://' : video.filename;
+    const player = new mpvAPI({
+      "time_update": 5,
+      "auto_restart": false,
+      "socket": uniqueMpvSocketPath()
+    }, mpvArguments);
+    this.mpv = player;
+
+    const ensureCurrentAttempt = () => {
+      if (attempt !== this.playbackAttempt || this.mpv !== player) {
+        const error = new Error('Playback was canceled');
+        error.code = 'MYNDA_PLAYBACK_CANCELED';
+        throw error;
+      }
+    };
 
     // console.log(mpv); 
 
     // starts MPV
     try {
-      await this.mpv.start();
+      await withPlaybackTimeout(
+        player.start(),
+        MPV_START_TIMEOUT_MS,
+        'MPV did not start within 10 seconds'
+      );
+      ensureCurrentAttempt();
       // load the video file
-      await this.mpv.load(video.filename);
+      if (video.dvd) {
+        await loadDvdInMpv(player);
+      } else {
+        await withPlaybackTimeout(
+          player.load(playbackTarget),
+          MPV_LOAD_TIMEOUT_MS,
+          'MPV did not finish loading this video within 30 seconds'
+        );
+      }
+      ensureCurrentAttempt();
       // file is playing, go to saved position
-      await this.mpv.goToPosition(video.position);
+      await withPlaybackTimeout(
+        player.goToPosition(Number.isFinite(video.position) ? video.position : 0),
+        MPV_COMMAND_TIMEOUT_MS,
+        'MPV did not respond while restoring the playback position'
+      );
       // add subtitle files
-      for (const sub of video.subtitles) {
-        await this.mpv.addSubtitles(sub)
+      for (const sub of (Array.isArray(video.subtitles) ? video.subtitles : [])) {
+        await withPlaybackTimeout(
+          player.addSubtitles(sub),
+          MPV_COMMAND_TIMEOUT_MS,
+          'MPV did not respond while adding subtitles'
+        );
       }
       // manually play in case the video isn't already playing
-      await this.mpv.play();
+      await withPlaybackTimeout(
+        player.play(),
+        MPV_COMMAND_TIMEOUT_MS,
+        'MPV did not respond to the play command'
+      );
+      ensureCurrentAttempt();
 
       // turn off loading indicator
       this.setState({ showLoadingIndicator: false, showPlayingMessage: true});
@@ -3106,32 +3415,42 @@ class MynPlayer extends MynOpenablePane {
       this.logPlayTimeout = setTimeout(() => { console.log('Logging that we played ' + this.state.video.title); this.props.logPlayed(this.state.video.id) }, 10000);
 
 
-      this.mpv.on('timeposition', (pos) => {
+      player.on('timeposition', (pos) => {
         this.updatePosition(pos);
       });
 
-      this.mpv.on('seek', (seeked) => {
+      player.on('seek', (seeked) => {
         this.updatePosition(seeked.end);
       });
 
-      this.mpv.on('stopped', () => {
+      player.on('stopped', () => {
         this.onExitVideo();
       });
 
-      this.mpv.on('quit', () => {
+      player.on('quit', () => {
+        if (this.mpv === player) this.mpv = null;
         this.onExitVideo();
         this.props.hideFunction();
       });
 
-      this.mpv.on('crashed', () => {
+      player.on('crashed', () => {
+        if (this.mpv === player) this.mpv = null;
         this.onExitVideo();
         this.props.hideFunction();
       });
     }
     catch (error) {
-      // handle errors here
       console.error(error);
-      this.setState({errorMessage: `Problem playing video: ${error}`});
+      const isCurrentAttempt = attempt === this.playbackAttempt && this.mpv === player;
+      stopMpvSafely(player);
+      if (this.mpv === player) this.mpv = null;
+      if (!isCurrentAttempt || (error && error.code === 'MYNDA_PLAYBACK_CANCELED')) return;
+      const mediaType = video && video.dvd ? 'DVD' : 'video';
+      this.setState({
+        errorMessage: `Problem playing ${mediaType}: ${describePlaybackError(error)}`,
+        showLoadingIndicator: false,
+        showPlayingMessage: false
+      });
     }
   }
 
@@ -3151,6 +3470,10 @@ class MynPlayer extends MynOpenablePane {
       this.setUpVideo();
     }
 
+    if (oldProps.show && !this.props.show && this.mpv) {
+      this.onExit();
+    }
+
     if (!this.props.show) {
       this.state.errorMessage = null;
       this.state.showLoadingIndicator = false;
@@ -3166,13 +3489,21 @@ class MynPlayer extends MynOpenablePane {
 
       jsx = (
         <div id="video-container" onKeyUp={(e) => this.keyCommand(e)}>
-          <div style={{ visibility: this.state.showPlayingMessage ? "visible" : "hidden" }}>
-            <h3>Now Playing</h3>
-            <h1 className='video-title'>{this.state.video ? this.state.video.title : ''}</h1>
-            <h3>in MPV player</h3>
-          </div>
-          {this.state.showLoadingIndicator ? (<img className='loading' src='../images/loading-icon.gif' />) : null}
-          {this.state.errorMessage}
+          {this.state.showPlayingMessage ? (
+            <div className='playing-message'>
+              <h3>Now Playing</h3>
+              <h1 className='video-title'>{this.state.video ? this.state.video.title : ''}</h1>
+              <h3>in MPV player</h3>
+            </div>
+          ) : null}
+          {this.state.showLoadingIndicator ? (
+            <div className='player-loading'>
+              <img className='loading' src='../images/loading-icon.gif' />
+            </div>
+          ) : null}
+          {this.state.errorMessage ? (
+            <div className='error-message'>{this.state.errorMessage}</div>
+          ) : null}
         </div>
       );
     }
@@ -3736,6 +4067,10 @@ class MynSettingsPrefs extends React.Component {
       hide_description : props.settings.preferences.hide_description,
       include_new_vids_in_playlists : props.settings.preferences.include_new_vids_in_playlists,
       remove_autotagged_from_new: props.settings.preferences.remove_autotagged_from_new,
+      exclude_samples_from_library :
+        props.settings.preferences.exclude_samples_from_library !== false,
+      exclude_trailers_from_library :
+        props.settings.preferences.exclude_trailers_from_library !== false,
       include_user_rating_in_avg : props.settings.preferences.include_user_rating_in_avg,
       kinds : props.settings.used.kinds.filter(kind => !!kind),
       override_dialogs : props.settings.preferences.override_dialogs
@@ -3766,6 +4101,14 @@ class MynSettingsPrefs extends React.Component {
       case "remove-autotagged-new":
         address = "settings.preferences.remove_autotagged_from_new";
         this.setState({ remove_autotagged_from_new: value });
+        break;
+      case "exclude-samples":
+        address = "settings.preferences.exclude_samples_from_library";
+        this.setState({exclude_samples_from_library:value});
+        break;
+      case "exclude-trailers":
+        address = "settings.preferences.exclude_trailers_from_library";
+        this.setState({exclude_trailers_from_library:value});
         break;
       case "kinds" :
         address = "settings.used.kinds";
@@ -3831,6 +4174,27 @@ class MynSettingsPrefs extends React.Component {
               validatorTip={"Not allowed: = ; { }"}
               reportValid={() => {}}
             />
+          </li>
+          <li id='settings-prefs-libraryexclusions' className='subsection'>
+            <h2>Library Exclusions:</h2>
+            <div>
+              <input
+                type='checkbox'
+                checked={this.state.exclude_samples_from_library}
+                onChange={(e) => this.update('exclude-samples',e.target.checked)}
+              />
+              Exclude sample videos from library
+              <MynTooltip tip="If checked, short release samples and known release-group garbage clips will be excluded on the next watchfolder scan" />
+            </div>
+            <div>
+              <input
+                type='checkbox'
+                checked={this.state.exclude_trailers_from_library}
+                onChange={(e) => this.update('exclude-trailers',e.target.checked)}
+              />
+              Exclude trailers from library
+              <MynTooltip tip="If checked, short videos whose filenames identify them as trailers will be excluded on the next watchfolder scan" />
+            </div>
           </li>
           <li id='settings-prefs-includenew' className='subsection'>
             <h2>Include New:</h2>
@@ -4244,8 +4608,12 @@ class MynEditor extends MynOpenablePane {
     // console.log("UPDATING");
 
     let update;
+    let suppliedChanges;
+    const previousSeries = this.state.video && this.state.video.series;
+    const previousKind = this.state.video && this.state.video.kind;
     // if we were passed two arguments, treat them as prop,value
     if (args.length == 2 && typeof args[0] === "string") {
+      suppliedChanges = {[args[0]]: args[1]};
       update = this.state.video;
       update[args[0]] = args[1];
 
@@ -4262,6 +4630,7 @@ class MynEditor extends MynOpenablePane {
     // the keys are video props, and the values are those props' values
     else if (args.length == 1 && typeof args[0] === "object") {
       //console.log(JSON.stringify(args[0]));
+      suppliedChanges = args[0];
       update = { ...this.state.video, ...args[0] };
       //console.log(JSON.stringify(update));
 
@@ -4277,6 +4646,27 @@ class MynEditor extends MynOpenablePane {
       });
     } else {
       throw 'Incorrect parameters passed to handleChange in MynEditor';
+    }
+
+    // seriesImdbID identifies the parent show represented by `series`. A
+    // manual series rename makes the old ID unsafe, and changing a video's
+    // kind away from show makes it meaningless. Explicit OMDb results include
+    // their own seriesImdbID and therefore are not cleared here.
+    const suppliedSeries = Object.prototype.hasOwnProperty.call(suppliedChanges, 'series');
+    const suppliedSeriesID = Object.prototype.hasOwnProperty.call(suppliedChanges, 'seriesImdbID');
+    const seriesChanged = suppliedSeries && suppliedChanges.series !== previousSeries;
+    const kindChangedAwayFromShow =
+      Object.prototype.hasOwnProperty.call(suppliedChanges, 'kind') &&
+      suppliedChanges.kind !== previousKind && suppliedChanges.kind !== 'show';
+    const batchWillSaveSeries = this.state.video && this.state.video.id === 'batch' ?
+      this.state.changed.has('series') : true;
+
+    if ((seriesChanged && !suppliedSeriesID && batchWillSaveSeries) || kindChangedAwayFromShow) {
+      update.seriesImdbID = '';
+      // Empty values are normally removed from the batch changed set. This
+      // empty value is an intentional clear and must be applied to every video
+      // whose series/kind edit invalidated the old parent ID.
+      this.state.changed.add('seriesImdbID');
     }
 
     this._isMounted && this.setState({video : update});
@@ -4648,6 +5038,8 @@ class MynEditor extends MynOpenablePane {
           // replaceMediaBatch() will merge every prepared video into the
           // freshest media array and commit that array with one library write.
           let temp = _.cloneDeep(video);
+          temp.seriesImdbID = temp.kind === 'show' &&
+            typeof temp.seriesImdbID === 'string' ? temp.seriesImdbID : '';
           temp.autotag_tried = false; // reset this flag whenever a video is saved
           // Transient signal for Library.js; it is removed before saving.
           temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
@@ -4689,6 +5081,8 @@ class MynEditor extends MynOpenablePane {
       // SINGLE VIDEO
       // save the video data in library.media
       let temp = _.cloneDeep(this.state.video);
+      temp.seriesImdbID = temp.kind === 'show' &&
+        typeof temp.seriesImdbID === 'string' ? temp.seriesImdbID : '';
       temp.autotag_tried = false; // reset this flag whenever a video is saved
       // Transient signal for Library.js; it is removed before saving.
       temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
@@ -4779,10 +5173,13 @@ class MynEditor extends MynOpenablePane {
       if (videoEditPrepped) {
         if (videoEditPrepped.id === 'batch') {
           this.state.batchObjectUnedited = _.cloneDeep(videoEditPrepped);
+        } else {
+          // A single-video save replaces the complete editable object, so its
+          // established behavior remains: saving removes it from New unless
+          // the user explicitly checks the box to keep/re-add it.
+          videoEditPrepped.new = false;
         }
 
-        // Saving an edited video removes it from the built-in New playlist.
-        videoEditPrepped.new = false;
         validateVideo(videoEditPrepped);
 
         this.setState({
@@ -4797,7 +5194,17 @@ class MynEditor extends MynOpenablePane {
     }
   }
 
+  isBatchEdit() {
+    // Check both sources so a control from the preceding render cannot navigate
+    // during the brief props/state handoff into or out of a batch selection.
+    return Boolean(
+      (this.props.video && this.props.video.id === 'batch') ||
+      (this.state.video && this.state.video.id === 'batch')
+    );
+  }
+
   goToPrevious() {
+    if (this.isBatchEdit()) return;
     if (this.props.detailRowBoundaryFlag !== 'first') {
       if (this.state.changed.size > 0)
         this.saveChanges();
@@ -4806,6 +5213,7 @@ class MynEditor extends MynOpenablePane {
   }
 
   goToNext() {
+    if (this.isBatchEdit()) return;
     if (this.props.detailRowBoundaryFlag !== 'last') {
       if (this.state.changed.size > 0)
         this.saveChanges();
@@ -4827,24 +5235,35 @@ class MynEditor extends MynOpenablePane {
     //   video={this.state.video}
     // />
 
+    const hasUnsavedChanges = Boolean(this.state.video) && (
+      this.state.saveHash !== hashObject(this.state.video) ||
+      this.state.resetFromFilenamePending ||
+      Object.keys(this.state.pendingFilenameResetPatches || {}).length > 0
+    );
+    const navigationControls = this.isBatchEdit() ? null : (
+      <div className={'editor-next-prev-btns ' + this.props.detailRowBoundaryFlag}>
+        <div className='btn editor-prev-btn' onClick={()=>this.goToPrevious()}>
+          <div style={{display:"inline-block",transform:"scaleX(-1)"}}>{'\u25B8'}</div> Previous
+        </div>
+        <div className='separator'>|</div>
+        <div className='btn editor-next-btn' onClick={()=>this.goToNext()}>
+          Next <div style={{display:"inline-block"}}>{'\u25B8'}</div>
+        </div>
+      </div>
+    );
+
     return (
       <div>
         <MynEditorSearch
           video={this.state.video}
+          batch={this.props.batch}
           settings={this.props.settings}
           placeholderImage={this.state.placeholderImage}
           handleChange={this.handleChange}
+          hasUnsavedChanges={hasUnsavedChanges}
         />
 
-        <div className={'editor-next-prev-btns ' + this.props.detailRowBoundaryFlag}>
-          <div className='btn editor-prev-btn' onClick={()=>this.goToPrevious()}>
-            <div style={{display:"inline-block",transform:"scaleX(-1)"}}>{'\u25B8'}</div> Previous
-          </div>
-          <div className='separator'>|</div>
-          <div className='btn editor-next-btn' onClick={()=>this.goToNext()}>
-            Next <div style={{display:"inline-block"}}>{'\u25B8'}</div>
-          </div>
-        </div>
+        {navigationControls}
 
         <MynEditorEdit
           show={this.props.show}
@@ -4928,6 +5347,26 @@ class MynEditorSearch extends React.Component {
   // search online movie database to auto-fill fields
   async handleSearch(event) {
     event.preventDefault();
+
+    // The editor's synthetic batch summary is not a searchable video. Send
+    // only the real selected IDs to the main process, which resolves fresh
+    // library records, confirms the scope, and runs the normal Auto-Tag path.
+    if (this.props.video && this.props.video.id === 'batch') {
+      if (this.props.hasUnsavedChanges) {
+        alert('Save or Revert the current batch edits before auto-tagging the selected videos.');
+        return;
+      }
+      const selectedIDs = (this.props.batch || [])
+        .map(video => video && video.id)
+        .filter(Boolean);
+      if (selectedIDs.length === 0) {
+        alert('No videos are selected for Auto-Tag.');
+        return;
+      }
+      ipcRenderer.send('autotag-selected', selectedIDs);
+      return;
+    }
+
     this.setState({searching:true});
     let resultsObject = await OmdbHelper.search(this.props.video);
     this.setState({searching:false});
@@ -5037,6 +5476,17 @@ class MynEditorSearch extends React.Component {
     })
   }
 
+  componentDidUpdate(previousProps) {
+    const previousSelection = editorSelectionKey(previousProps.video, previousProps.batch);
+    const currentSelection = editorSelectionKey(this.props.video, this.props.batch);
+    if (previousSelection !== currentSelection && (this.state.results || this.state.searching)) {
+      // Search rows belong to one concrete video. Never carry them into a
+      // different video—or into a batch where selecting one row would apply a
+      // single title's metadata to every selected item.
+      this.setState({results: null, searching: false});
+    }
+  }
+
   componentDidMount() {
     ipcRenderer.on('MynEditorSearch-confirm-select', this.handleConfirmSelect);
   }
@@ -5046,12 +5496,39 @@ class MynEditorSearch extends React.Component {
   }
 
   render() {
-    let clearBtn = this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
-    let searchBtn = this.state.searching ? (<img src='../images/loading-icon.gif' className='loading-icon' />) : (<button id='edit-search-button' onClick={this.handleSearch} title='Search OMDb for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
+    const isBatch = this.props.video && this.props.video.id === 'batch';
+    let clearBtn = !isBatch && this.state.results ? (<div id='edit-search-clear-button' className='clickable' onClick={this.clearSearch} title='Clear search results'>{"\u2715"}</div>) : null;
+    let searchBtn;
+    let batchMessage = null;
+    if (isBatch) {
+      const title = this.props.hasUnsavedChanges ?
+        'Save or Revert the current batch edits before auto-tagging.' :
+        'Auto-tag only the selected videos. Mynda will ask for confirmation before making changes.';
+      searchBtn = (
+        <span title={title}>
+          <button
+            type='button'
+            id='edit-search-button'
+            onClick={this.handleSearch}
+            disabled={this.props.hasUnsavedChanges}
+          >
+            Auto-Tag Selected…
+          </button>
+        </span>
+      );
+      if (this.props.hasUnsavedChanges) {
+        batchMessage = <span className='edit-search-batch-message'>Save or Revert this batch before Auto-Tag.</span>;
+      }
+    } else {
+      searchBtn = this.state.searching ?
+        (<img src='../images/loading-icon.gif' className='loading-icon' />) :
+        (<button type='button' id='edit-search-button' onClick={this.handleSearch} title='Search OMDb for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
+    }
     return (
         <div id='edit-search'>
           <div id='edit-search-controls'>
             {searchBtn}
+            {batchMessage}
           </div>
           <table id='edit-search-results'>
             <thead>
@@ -5063,7 +5540,7 @@ class MynEditorSearch extends React.Component {
               </tr>
             </thead>
             <tbody>
-              {this.state.results}
+              {isBatch ? null : this.state.results}
             </tbody>
           </table>
         </div>
@@ -5734,17 +6211,24 @@ class MynEditorEdit extends React.Component {
       </div>
     );
 
+    const batchNewMixed = this.props.video.id === 'batch' && this.props.video.new === null;
+    const newDescription = this.props.video.id === 'batch' ?
+      "Keep selected videos in the 'New' playlist. A dash means the selection is mixed; leave it untouched to preserve each video's current status." :
+      "Check to re-add this video to the 'New' playlist";
     let new_ = (
       <div className='edit-field new'>
         <label className="edit-field-name" htmlFor="new">New: </label>
         <div className="edit-field-editor">
           <input
             type='checkbox'
-            checked={this.props.video.new}
-            onChange={(e) => this.props.handleChange({'new': !this.props.video.new})}
+            ref={(input) => {
+              if (input) input.indeterminate = batchNewMixed;
+            }}
+            checked={this.props.video.new === true}
+            onChange={(e) => this.props.handleChange({'new': e.target.checked})}
           />
         </div>
-        <div className='edit-field-description'>Check to re-add this video to the 'New' playlist</div>
+        <div className='edit-field-description'>{newDescription}</div>
       </div>
     );
 
@@ -5785,6 +6269,7 @@ class MynEditorEdit extends React.Component {
     let batchNotification = null;
     let videoTable = null;
     if (this.props.video.id === 'batch') {
+      const batchCount = Array.isArray(this.props.batch) ? this.props.batch.length : 0;
       // create a list of the videos we're editing
       if (this.props.batch) {
         videoTable = (
@@ -5821,7 +6306,7 @@ class MynEditorEdit extends React.Component {
       batchNotification = (
         <MynParagraphFolder
           id="edit-batch-notification"
-          lede="Editing Multiple Videos"
+          lede={`Editing ${batchCount} Video${batchCount === 1 ? '' : 's'}`}
           paragraph={videoTable}
           keepEllipsis={true}
         />
@@ -7620,6 +8105,7 @@ function validateVideo(video) {
     'country':'string',
     'metadata':'object',
     'imdbID':'string',
+    'seriesImdbID':'string',
     'autotag_tried':'boolean',
     'dvd':'boolean',
     'watchlater':'boolean'
@@ -7692,6 +8178,13 @@ function validateVideo(video) {
     //   // the property doesn't exist, so create it
     //   repaired[property] = '';
     // }
+  }
+
+  // Video fields are intentionally universal rather than kind-dependent.
+  // Keep the parent-series field present everywhere, but never retain a value
+  // on a movie or custom kind where it would have no meaning.
+  if (repaired.kind !== 'show') {
+    repaired.seriesImdbID = '';
   }
 
   // if no id, create one

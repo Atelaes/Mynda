@@ -18,11 +18,14 @@ function basenameLooksLikeTrailer(filepath) {
 }
 
 function candidateKind(filepath) {
+  // An explicit trailer basename is stronger evidence than its containing
+  // folder. This keeps the two preferences independent when, for example, a
+  // trailer happens to be stored inside a directory named Sample.
+  if (basenameLooksLikeTrailer(filepath)) return 'trailer';
   if (MovieSearch.basenameLooksLikeSampleOrGarbage(filepath) ||
       MovieSearch.pathContainsSampleArea(filepath)) {
     return 'sample/garbage';
   }
-  if (basenameLooksLikeTrailer(filepath)) return 'trailer';
   return '';
 }
 
@@ -59,6 +62,8 @@ class VideoExclusion {
     this.library = options.library || {media: [], inactive_media: []};
     this.probeMetadata = options.probeMetadata;
     this.verifyMinimumRuntime = options.verifyMinimumRuntime;
+    this.isExclusionEnabled = typeof options.isExclusionEnabled === 'function' ?
+      options.isExclusionEnabled : () => true;
     this.log = typeof options.log === 'function' ? options.log : () => {};
     this.maxDurationSeconds = usableDuration(options.maxDurationSeconds) ||
       DEFAULT_MAX_DURATION_SECONDS;
@@ -133,6 +138,18 @@ class VideoExclusion {
   async shouldExclude(filepath) {
     let kind = candidateKind(filepath);
     if (!kind) return false;
+
+    // Preference checks happen before stored metadata lookup or any external
+    // probe, so opting into samples or trailers has no hidden scan cost.
+    try {
+      if (this.isExclusionEnabled(kind) === false) return false;
+    } catch (err) {
+      this.log(
+        `Could not read exclusion preference for possible ${kind} video; ` +
+        `retaining ${filepath}: ${err}`
+      );
+      return false;
+    }
 
     let metadata = this.storedMetadata(filepath);
     let duration = usableDuration(metadata && metadata.duration);

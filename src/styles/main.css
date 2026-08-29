@@ -197,6 +197,16 @@ button:hover, input[type=submit]:hover {
   border: var(--button-border-hover);
 }
 
+/* Native disabled state shared by every standard button. Keeping this tied to
+   :disabled avoids requiring each caller to remember an extra CSS class. */
+button:disabled, input[type=submit]:disabled {
+  cursor: default;
+  color: var(--button-text-disabled);
+  background: var(--button-bgcolor-disabled);
+  background-color: var(--button-bgcolor-disabled);
+  border: var(--button-border-disabled);
+}
+
 .ratings-icon {
   opacity: var(--ratingsicon-opacity);
 }
@@ -1055,11 +1065,7 @@ table.compact .movie-row {
 }
 
 #player-pane .error-message {
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform: translateX(-50%) translateY(-50%);
-
+  margin: 2em 1em;
   font-size: max(.5rem,2vw);
   line-height:1em;
   text-align:center;
@@ -1070,8 +1076,13 @@ table.compact .movie-row {
   text-shadow: .2em .2em .1em black;
   line-height:1em;
 }
-#player-pane .loading {
+#player-pane .player-loading {
   --size: max(1rem,8vw);
+  min-height: var(--size);
+  margin: 2em 0;
+  position:relative;
+}
+#player-pane .loading {
   width: var(--size);
   height: var(--size);
   position:absolute;
@@ -2125,6 +2136,11 @@ table.compact .movie-row {
   width: 12em;
 }
 
+#edit-search-controls .edit-search-batch-message {
+  margin-left: .75em;
+  font-size: .7em;
+}
+
 #edit-search-button {
 }
 
@@ -2253,7 +2269,7 @@ table.compact .movie-row {
   white-space: nowrap;
   flex: 0 1 auto;
 }
-.pb-element.autotag.cancel {
+.pb-element.autotag.cancel:not(:disabled) {
   background: var(--button-bgcolor-alert);
   background-color: var(--button-bgcolor-alert);
   border: var(--button-border-alert);
@@ -2265,14 +2281,6 @@ table.compact .movie-row {
   border: var(--button-border-alert-hover);
   box-shadow: var(--button-boxshadow-alert-hover);
 }
-.pb-element.autotag.cancel:disabled {
-  cursor: wait;
-  color: var(--button-text-disabled);
-  background: var(--button-bgcolor-disabled);
-  background-color: var(--button-bgcolor-disabled);
-  border: var(--button-border-disabled);
-}
-
 .pb-element.recent > .pb-text {
   /* flex: 0 0 auto; */
 }

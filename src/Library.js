@@ -87,11 +87,39 @@ class Library {
       this[key] = typeof data[key] === 'undefined' ? _.cloneDeep(defaultLibrary[key]) : data[key];
     });
 
-    // Remove the retired per-video field from both active and inactive media.
+    // Existing libraries predate some preference fields. Add new preferences
+    // individually so a user's explicit false value is preserved, while a
+    // missing or malformed value receives the current default.
+    if (!this.settings || typeof this.settings !== 'object' || Array.isArray(this.settings)) {
+      this.settings = _.cloneDeep(defaultLibrary.settings);
+    }
+    if (!this.settings.preferences ||
+        typeof this.settings.preferences !== 'object' ||
+        Array.isArray(this.settings.preferences)) {
+      this.settings.preferences = _.cloneDeep(defaultLibrary.settings.preferences);
+    }
+    for (const preferenceName of [
+      'exclude_samples_from_library',
+      'exclude_trailers_from_library'
+    ]) {
+      if (typeof this.settings.preferences[preferenceName] !== 'boolean') {
+        this.settings.preferences[preferenceName] =
+          defaultLibrary.settings.preferences[preferenceName];
+      }
+    }
+
+    // Remove the retired per-video field and add the persistent parent-series
+    // identifier to every active and inactive video. The video schema remains
+    // universal: non-show videos carry an empty string rather than omitting a
+    // show-only property, while existing show IDs survive ordinary startups
+    // and backup recovery.
     for (const listName of ['media', 'inactive_media']) {
       if (Array.isArray(this[listName])) {
         this[listName].forEach(video => {
-          if (video && typeof video === 'object') delete video.collections;
+          if (!video || typeof video !== 'object') return;
+          delete video.collections;
+          video.seriesImdbID = video.kind === 'show' &&
+            typeof video.seriesImdbID === 'string' ? video.seriesImdbID : '';
         });
       }
     }
@@ -842,7 +870,9 @@ const defaultLibrary = {
       },
       "include_user_rating_in_avg": false,
       "include_new_vids_in_playlists": true,
-      "remove_autotagged_from_new": true
+      "remove_autotagged_from_new": true,
+      "exclude_samples_from_library": true,
+      "exclude_trailers_from_library": true
     },
     "used": {
       "kinds": [
