@@ -19,9 +19,12 @@ const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(pathToFFmpeg);
 const ffprobe = require('ffprobe');
 let ffprobeStatic = {};
+let ffprobeStaticLoadError = null;
 try {
   ffprobeStatic = require('ffprobe-static');
-} catch(err) {console.log('Warning: ffprobe-static not installed')}
+} catch(err) {
+  ffprobeStaticLoadError = err;
+}
 const Logger = require('./Logger.js');
 const OmdbHelper = require('./OmdbHelper.js');
 const MovieSearch = require('./MovieSearch.js');
@@ -32,6 +35,7 @@ const checkDiskSpace = require('check-disk-space').default
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
 
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
+const MIN_SCAN_RESULT_STATUS_MS = 2000;
 const videoExtensions = [
   '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
   'f4v', 'flv',  'm2ts', 'm2v', 'm4p', 'm4v', 'mkv',  'mov',  'mp2', 'mp4',
@@ -43,7 +47,11 @@ let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const backendLog = Logger.child('Backend');
+const scanLog = Logger.child('WatchfolderScan');
+const metadataLog = Logger.child('Metadata');
 const autoTagLog = Logger.child('AutoTag');
+const exportLog = Logger.child('Export');
+const videoExclusionLog = Logger.child('VideoExclusion');
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let libMulch = [];  //After libFileTree has been created and chewed up, this is the flattened version
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
@@ -64,7 +72,9 @@ const videoRuntimeVerifier = new VideoRuntimeVerifier({
 });
 const videoExclusion = new VideoExclusion({
   library: library,
-  probeMetadata: getMetadata,
+  probeMetadata: video => getMetadata(video, {
+    purpose: 'get duration for sample/trailer exclusion'
+  }),
   verifyMinimumRuntime: options => videoRuntimeVerifier.hasMinimumRuntime(options),
   isExclusionEnabled: kind => {
     let preferences = library.settings && library.settings.preferences || {};
@@ -73,7 +83,7 @@ const videoExclusion = new VideoExclusion({
     }
     return preferences.exclude_samples_from_library !== false;
   },
-  log: message => console.log(message)
+  log: videoExclusionLog
 });
 
 app.whenReady().then(start);
@@ -88,6 +98,11 @@ async function start() {
     platform: process.platform,
     architecture: process.arch
   });
+  if (ffprobeStaticLoadError) {
+    metadataLog.debug('ffprobe-static is unavailable; FFmpeg metadata fallback will be used', {
+      error: ffprobeStaticLoadError
+    });
+  }
 
   // Library construction happens before Electron is ready, when it is too
   // early to display a native dialog. Once ready, resolve any recorded load
@@ -106,22 +121,30 @@ async function start() {
   try {
     let reactToolsLoc;
     if (process.platform === "win32") {
-      console.log('Windows');
       reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
     } else {
-      console.log('Not Windows');
       reactToolsLoc = path.join('~/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
     }
+    backendLog.debug('React developer-tools extension path selected', {
+      platform: process.platform,
+      extensionPath: reactToolsLoc
+    });
     //await electron.session.defaultSession.loadExtension(reactToolsLoc)
   } catch (err) {
-    console.log(`Couldn't load React tools.`);
-    console.log(err);
+    backendLog.warn('Could not load React developer tools', {error: err});
   }
 
   // make the temp folder if it doesn't already exist
   const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
   fs.mkdir(tempFolder, (err) => {
-    if (err) console.log(err);
+    if (err && err.code === 'EEXIST') {
+      backendLog.debug('Temporary image directory already exists', {path: tempFolder});
+    } else if (err) {
+      backendLog.error('Could not create temporary image directory', {
+        path: tempFolder,
+        error: err
+      });
+    }
   });
 
   await createWindow();  //createWindow needs to come first else we get a big delay.
@@ -284,22 +307,31 @@ function eraseTempImages() {
 
   fs.readdir(folderPath, (err, files) => {
     if (err) {
-      return console.error('Can\'t delete temp images. Unable to scan directory: ' + err);
+      backendLog.warn('Could not scan temporary image directory for cleanup', {
+        path: folderPath,
+        error: err
+      });
+      return;
     }
 
     // loop over all the files in the temp folder and delete them
     files.forEach(file => {
-      //console.log(`trying to delete ${file}`);
       try {
         fs.unlink(path.join(folderPath, file), (err) => {
           if (err) {
-            console.error(`An error ocurred deleting the temp file ${file}\n${err.message}`);
+            backendLog.warn('Could not delete temporary image', {
+              filename: file,
+              error: err
+            });
             return;
           }
-          console.log(`...successfully deleted ${file}`);
+          backendLog.debug('Deleted temporary image', {filename: file});
         });
       } catch(err) {
-        console.error(err);
+        backendLog.warn('Could not start temporary image deletion', {
+          filename: file,
+          error: err
+        });
       }
     });
   });
@@ -334,8 +366,11 @@ function removeWatchfolder(path,cb) {
   // in case we're currently adding media, we need to delete the removed
   // watchfolder from libFileTree, otherwise videos may get re-added as they get removed
   libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== path);
-  console.log('Removing watchfolder from libFileTree');
-  console.log(JSON.stringify(libFileTree));
+  scanLog.info('Removing watchfolder', {watchfolder: path});
+  scanLog.debug('Removed watchfolder from the current scan tree', {
+    watchfolder: path,
+    remainingWatchfolders: libFileTree.folders.length
+  });
 
   // remove videos
   removeWatchfolderVideosFromLibrary(path);
@@ -353,7 +388,9 @@ function removeWatchfolder(path,cb) {
 
 
 async function removeWatchfolderVideosFromLibrary(folder) {
-  console.log('REMOVING videos from library in ' + folder);
+  scanLog.info('Moving videos from removed watchfolder to inactive media', {
+    watchfolder: folder
+  });
 
   let vidIDs;
   // try {
@@ -380,10 +417,16 @@ function removeVideo(video, index, fromInactive) {
   return new Promise((resolve,reject) => {
     let address;
     if (fromInactive) {
-      console.log(`Deleting ${video.filename} from library.inactive_media`);
+      scanLog.debug('Deleting video from inactive media', {
+        filename: video.filename,
+        id: video.id
+      });
       address = 'inactive_media';
     } else {
-      console.log(`Removing ${video.filename} from library.media and adding to library.inactive_media`);
+      scanLog.debug('Moving video from active to inactive media', {
+        filename: video.filename,
+        id: video.id
+      });
       address = 'media';
     }
 
@@ -538,9 +581,11 @@ function checkWatchFolders() {
   libFileTree = {name:'root', folders:[]};
 
   // Search watchfolders for new files and add any new videos to the library
-  console.log(`-- Parsing watchfolder structure, looking for video and subtitle files...`);
   numNewVids = 0; // reset the number of new videos found
   let folders = library.settings.watchfolders;
+  scanLog.info('Watchfolder scan started', {
+    watchfolderCount: folders.filter(Boolean).length
+  });
   for (let i=0; i<folders.length; i++) {
     let thisFolder = folders[i];
     if (thisFolder) {
@@ -557,7 +602,7 @@ function checkWatchFolders() {
     }
   }
   if (folders.length === 0) {
-    console.log('Done parsing. No watchfolders found.');
+    scanLog.info('Watchfolder scan finished; no watchfolders are configured');
     win.webContents.send('status-update', {action: ''});
   }
 }
@@ -580,7 +625,11 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
     // handling error
     if (err) {
         unavailableWatchFolders.add(rootWatchFolder);
-        console.log(`Unable to scan directory: ${err}\nSkipping unavailable watchfolder: ${rootWatchFolder}`);
+        scanLog.warn('Skipping unavailable watchfolder', {
+          watchfolder: rootWatchFolder,
+          directory: folder,
+          error: err
+        });
         components = []; // in case of error, components will be undefined, so we make it an empty array instead
     }
 
@@ -646,7 +695,7 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
     }
     if (!stillGoing) {
       confirmCurrentVideos().catch(err => {
-        console.error(`Watchfolder reconciliation failed: ${err}`);
+        scanLog.error('Watchfolder reconciliation failed', {error: err});
         win.webContents.send('status-update', {action: ''});
       });
     }
@@ -667,8 +716,7 @@ function isInUnavailableWatchFolder(filepath) {
 async function confirmCurrentVideos() {
   //Once libFileTree is built, check videos in library and make sure they're
   // all there, removing from libFileTree as we go
-  //console.log(`libTree before confirm:  ${JSON.stringify(libFileTree)}`);
-  console.log(`Running confirmCurrentVideos.`)
+  scanLog.debug('Reconciling scanned files with the current library');
 
   // Match subtitles while the complete scanned tree is still intact. Doing
   // this once, subtitle-first, lets us use folder structure and all candidate
@@ -678,13 +726,16 @@ async function confirmCurrentVideos() {
     detectedOwners: preparedSubtitles.detectedOwners,
     legacyCounts: buildLegacySubtitleCounts(library.media, library.inactive_media)
   };
-  console.log(
-    `Matched ${preparedSubtitles.stats.matchedSubtitles.size} of ` +
-    `${preparedSubtitles.stats.numSubtitles} subtitle files ` +
-    `(${preparedSubtitles.stats.multiplyAssignedSubtitles.size} shared by multiple editions).`
-  );
+  scanLog.info('Subtitle matching finished', {
+    subtitleFiles: preparedSubtitles.stats.numSubtitles,
+    matchedSubtitleFiles: preparedSubtitles.stats.matchedSubtitles.size,
+    sharedSubtitleFiles: preparedSubtitles.stats.multiplyAssignedSubtitles.size,
+    unmatchedSubtitleFiles: preparedSubtitles.stats.unmatched.length
+  });
   if (preparedSubtitles.stats.unmatched.length > 0) {
-    console.log('Subtitle files left unmatched:', preparedSubtitles.stats.unmatched);
+    scanLog.debug('Subtitle files left unmatched', {
+      files: preparedSubtitles.stats.unmatched
+    });
   }
   for (let h=library.media.length-1; h>=0; h--) {
     let video = library.media[h];
@@ -755,17 +806,17 @@ async function confirmCurrentVideos() {
       }
 
     } catch(err) {
-      console.log(err)
       // A thrown error means we didn't find the video where we expected to,
       // so move it to inactive media.
-      console.log(`========= VIDEO FILE NOT FOUND =======`);
-      console.log(`${filename} appears to have disappeared, moving to inactive media.`)
+      scanLog.info('Video was not found during a successful watchfolder scan; moving it to inactive media', {
+        filename: filename,
+        id: video.id,
+        reconciliationReason: err
+      });
       await removeVideo(video);
     }
   }
-  //console.log(`libTree after confirm: \n ${JSON.stringify(libFileTree)}`);
-  console.log("Parsing done, checking parsed tree for new videos/subtitles...");
-  //console.log(JSON.stringify(libFileTree));
+  scanLog.debug('Watchfolder tree reconciliation finished; checking unmatched videos');
 
   // walk through libFileTree, adding all the videos to the library
   // (and making our best guess as to which subtitles go with which videos)
@@ -774,7 +825,6 @@ async function confirmCurrentVideos() {
 }
 
 function mulchVideoTree(folderNode) {
-  win.webContents.send('status-update', {action: 'add'});
   // Do not add, remove, or update anything from an incomplete watchfolder scan.
   if (folderNode.path && unavailableWatchFolders.has(folderNode.path)) {
     return;
@@ -794,26 +844,85 @@ function mulchVideoTree(folderNode) {
 }
 
 async function addVideoController() {
-  let addStart = new Date();
+  let checkStart = new Date();
   let newMedia = [];
-  let numNewVids = 0;
-  win.webContents.send('status-update', {action: 'add', numTotal: libMulch.length});
+  let candidateOutcomes = {
+    newVideos: 0,
+    reactivatedVideos: 0,
+    activeDuplicates: 0,
+    batchDuplicates: 0,
+    failedVideos: 0
+  };
   for (let i=0; i<libMulch.length; i++) {
-    win.webContents.send('status-update', {action: 'add', numCurrent: i+1, numTotal: libMulch.length});
+    // libMulch contains paths that were not matched by filename during the
+    // scan, not necessarily new videos. Keep this phase labeled as checking
+    // until each file's content-derived ID establishes whether it is new,
+    // inactive, or a duplicate of an active/current-batch video.
+    win.webContents.send('status-update', {
+      action: 'check',
+      numCurrent: i+1,
+      numTotal: libMulch.length
+    });
     let video = libMulch[i];
-    let procVideo = await addVideoFile(video);
-    if (procVideo) {
-      newMedia.push(procVideo);
-      numNewVids++;
+    let result = await addVideoFile(video);
+    switch(result && result.disposition) {
+      case 'new':
+      case 'reactivated':
+        if (result.video) {
+          newMedia.push(result.video);
+          candidateOutcomes[result.disposition === 'new' ? 'newVideos' : 'reactivatedVideos']++;
+        } else {
+          candidateOutcomes.failedVideos++;
+        }
+        break;
+      case 'duplicate-active':
+        candidateOutcomes.activeDuplicates++;
+        break;
+      case 'duplicate-batch':
+        candidateOutcomes.batchDuplicates++;
+        break;
+      default:
+        candidateOutcomes.failedVideos++;
     }
   }
-  let addEnd = new Date();
-  console.log(`Adding ${newMedia.length} new videos took ${addEnd-addStart}ms.`);
+  let duplicateVideos = candidateOutcomes.activeDuplicates + candidateOutcomes.batchDuplicates;
+  let checkEnd = new Date();
+  backendLog.info('Watchfolder video candidates checked', {
+    candidateVideos: libMulch.length,
+    videosToAdd: newMedia.length,
+    duplicateVideos: duplicateVideos,
+    activeDuplicates: candidateOutcomes.activeDuplicates,
+    batchDuplicates: candidateOutcomes.batchDuplicates,
+    newVideos: candidateOutcomes.newVideos,
+    reactivatedVideos: candidateOutcomes.reactivatedVideos,
+    failedVideos: candidateOutcomes.failedVideos,
+    elapsedMs: checkEnd-checkStart
+  });
+
   let combinedMedia = library.media.concat(newMedia);
-  await replaceLibrary('media', combinedMedia);
+  let minimumResultStatus = Promise.resolve();
+  if (newMedia.length > 0 || duplicateVideos > 0) {
+    // The potentially slow content-ID work is complete, so this total now
+    // describes videos that will really enter active media and duplicates that
+    // were really skipped. Run the minimum display time alongside the save: a
+    // slow save adds no delay, while a fast one cannot make the result summary
+    // flash by unreadably.
+    win.webContents.send('status-update', {
+      action: 'add',
+      numTotal: newMedia.length,
+      duplicateVideos: duplicateVideos
+    });
+    minimumResultStatus = new Promise(resolve => {
+      setTimeout(resolve, MIN_SCAN_RESULT_STATUS_MS);
+    });
+  }
+  await Promise.all([
+    replaceLibrary('media', combinedMedia),
+    minimumResultStatus
+  ]);
 
   // tell the user how many videos we added
-  win.webContents.send('videos_added',numNewVids);
+  win.webContents.send('videos_added',newMedia.length);
 
   // now let's try and get some metadata.
   // eventually we want to do all this after the above media replacement library call
@@ -843,7 +952,9 @@ async function addVideoController() {
     if (v !== null && !v.metadata.checked) {
       numChecked++;
       win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
-      let metadata = await getMetadata(v);
+      let metadata = await getMetadata(v, {
+        purpose: 'populate technical metadata for unchecked library video'
+      });
       if (metadata.hasOwnProperty('checked') && Object.keys(metadata).length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
       metadataToAdd[v.id] = metadata;
     }
@@ -862,7 +973,11 @@ async function addVideoController() {
   // save to library
   await replaceLibrary('media', updatedMedia);
   win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
-  console.log(`Added metadata for ${numSuccessful} videos`)
+  backendLog.info('Video metadata scan finished', {
+    videosChecked: numChecked,
+    videosWithMetadata: numSuccessful,
+    elapsedMs: new Date()-metaStart
+  });
 
   setTimeout(() => {
     win.webContents.send('status-update', {action: ''});
@@ -906,10 +1021,13 @@ async function addVideoFile(video) {
     // and update the video in the library, check to make sure the id
     // is in the watchfolder manifest, and then we're done
     case 1:
-      console.log(`========= VIDEO ALREADY IN LIBRARY =======`);
-      console.log(`${file} has the same id as ${library.media[indexOfVideoInLibrary(id)].title}`);
       let vidIndex = indexOfVideoInLibrary(id);
       let libraryVideo = library.media[vidIndex];
+      scanLog.debug('Rejected duplicate of an active library video', {
+        filename: file,
+        duplicateOfID: libraryVideo.id,
+        duplicateOfTitle: libraryVideo.title
+      });
       // The same content may exist at more than one path. Keep subtitles
       // detected beside the already-confirmed copy as well as this duplicate.
       const duplicateDetectedSubtitles = [
@@ -917,22 +1035,28 @@ async function addVideoFile(video) {
         ...(video.subtitles || [])
       ];
       updateVideoSubs(libraryVideo, duplicateDetectedSubtitles);
-      return;
+      return {disposition: 'duplicate-active'};
 
     case 2:
       // If we have another new video with the same id, just skip it for now.
       //Long term we want to mention to user and figure out which to use.
-      return;
+      scanLog.debug('Rejected duplicate within the current watchfolder scan', {
+        filename: file,
+        id: id
+      });
+      return {disposition: 'duplicate-batch'};
 
     case 3:
     case 4:
       if (situation === 3) {
-        console.log(`========= VIDEO FOUND IN INACTIVE_MEDIA =======`);
-
         // ------------- VIDEO IS IN LIBRARY.INACTIVE_MEDIA ------------- //
         // remove the video object from inactive media (it will be added to active media below)
-        console.log(`There is a video object for ${fileBasename} in library.inactive_media. Moving to library.media...`);
         let inactiveVidIndex = indexOfVideoInInactiveMedia(id);
+        scanLog.info('Reactivating video found in inactive media', {
+          filename: file,
+          id: id,
+          inactiveIndex: inactiveVidIndex
+        });
 
         try {
           vidObj = _.cloneDeep(library.inactive_media[inactiveVidIndex]);
@@ -950,12 +1074,16 @@ async function addVideoFile(video) {
           await deleteFromInactive(vidObj, inactiveVidIndex);
 
         } catch(err) {
-          console.log(`Error: found video object for ${fileBasename} in library.inactive_media but could not remove: ${err}`);
-          return;
+          scanLog.error('Could not reactivate video from inactive media', {
+            filename: file,
+            id: id,
+            error: err
+          });
+          return {disposition: 'failed'};
         }
       } else {
         // ------------- VIDEO IS BRAND NEW ------------- //
-        console.log(`========= NEW VIDEO FOUND =======`);
+        scanLog.debug('New video found', {filename: file, id: id});
 
         // otherwise, add the video from scratch
 
@@ -976,7 +1104,10 @@ async function addVideoFile(video) {
         } catch(err) {
           // if we couldn't get the file creation/added date from the OS, just use now
           vidObj.dateadded = Math.floor(Date.now() / 1000);
-          console.log(err);
+          scanLog.warn('Could not read video creation time; using the current time', {
+            filename: file,
+            error: err
+          });
         }
       }
 
@@ -1000,16 +1131,29 @@ async function addVideoFile(video) {
 
       if (typeof vidObj === 'object' && vidObj !== null) {
         updateVideoSubs(vidObj, video.subtitles);
-        return vidObj;
+        return {
+          disposition: situation === 3 ? 'reactivated' : 'new',
+          video: vidObj
+        };
       }
     }
+  return {disposition: 'failed'};
 }
 
-async function getMetadata(video) {
+function metadataPurpose(options) {
+  let purpose = options && options.purpose;
+  return typeof purpose === 'string' && purpose.trim() ?
+    purpose.trim() : 'retrieve video metadata';
+}
+
+async function getMetadata(video, options = {}) {
   // get video data from the file itself (duration, codec, dimensions, whatever)
   let file = video.filename;
+  let purpose = metadataPurpose(options);
+  let logContext = {filename: file, purpose: purpose};
   let returnObj = {};
   returnObj.checked = true;
+  metadataLog.debug('Video metadata retrieval started', logContext);
   try {
     // vidObj.metadata = await getVideoMetadata(file);
     if (typeof ffprobeStatic.path === "undefined") {
@@ -1046,22 +1190,36 @@ async function getMetadata(video) {
         //   vidObj.metadata.duration = Number(stream.duration);
         // }
       } catch(err) {
-        console.log(`Error storing ffprobe metadata for ${file}: ${err}`);
+        metadataLog.debug('Could not store one ffprobe metadata stream', {
+          ...logContext,
+          error: err
+        });
       }
     }
   } catch(err) {
-    console.log(`Unable to retrieve metadata with ffprobe for ${file}: ${err}`);
+    // ffprobe-static is optional in this build and FFmpeg is the normal
+    // fallback on installations where its bundled binary is unavailable.
+    metadataLog.debug('ffprobe metadata retrieval failed; trying FFmpeg fallback', {
+      ...logContext,
+      error: err
+    });
   }
 
   // some files (.mkv) will give us metadata, but do not store the duration for some reason;
   // in this case, we analyze the file with ffmpeg to obtain the duration
   if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
     try {
-      let ffmpegData = await getMetadataFromFFmpeg(file,video.id);
-      console.log(ffmpegData);
+      let ffmpegData = await getMetadataFromFFmpeg(file, video.id, {purpose: purpose});
+      metadataLog.debug('FFmpeg metadata retrieved', {
+        ...logContext,
+        metadata: ffmpegData
+      });
       returnObj = {...ffmpegData, ...returnObj};
     } catch(err) {
-      console.log(`Unable to retrieve metadata with ffmpeg for ${file}: ${err}`);
+      metadataLog.warn('Could not retrieve video metadata with FFmpeg', {
+        ...logContext,
+        error: err
+      });
     }
   }
 
@@ -1104,7 +1262,10 @@ async function createVideoID(filepath) {
             try {
               size = fs.statSync(file).size;
             } catch(err) {
-              console.log(err);
+              scanLog.warn('Could not read a DVD file while selecting content for hashing', {
+                filename: file,
+                error: err
+              });
             }
             if (size > biggestSize) {
               biggestSize = size;
@@ -1139,13 +1300,16 @@ async function createVideoID(filepath) {
 }
 
 function getFilesRecursive(folder) {
-  console.log(folder);
+  scanLog.debug('Scanning DVD directory for hashable content', {directory: folder});
   let files = [];
   let contents = [];
   try {
     contents = fs.readdirSync(folder);
   } catch(err) {
-    console.log(err);
+    scanLog.warn('Could not read DVD directory', {
+      directory: folder,
+      error: err
+    });
   }
   for (let content of contents) {
     let fullPath = path.join(folder, content);
@@ -1156,7 +1320,10 @@ function getFilesRecursive(folder) {
         files.push(fullPath);
       }
     } catch(err) {
-      console.log(err);
+      scanLog.warn('Could not inspect DVD directory entry', {
+        filename: fullPath,
+        error: err
+      });
     }
   }
   return files;
@@ -1165,7 +1332,10 @@ function getFilesRecursive(folder) {
 
 function updateVideoSubs(video, detectedSubtitles) {
   if (reconcileVideoSubtitles(video, detectedSubtitles || [], subtitleReconciliationContext)) {
-    console.log(`Subtitle files have changed for ${path.basename(video.filename)}. Updating subtitles.`);
+    scanLog.debug('Detected subtitle changes for video', {
+      filename: video.filename,
+      subtitleCount: Array.isArray(video.subtitles) ? video.subtitles.length : 0
+    });
   }
 }
 
@@ -1211,11 +1381,15 @@ function getFileBirthtime(file) {
   });
 }
 
-function getMetadataFromFFmpeg(filepath,id) {
+function getMetadataFromFFmpeg(filepath, id, options = {}) {
   return new Promise((resolve, reject) => {
+    let purpose = metadataPurpose(options);
+    let logContext = {filename: filepath, purpose: purpose};
     try {
-      console.log('Could not find duration with ffprobe, trying with ffmpeg...');
-      console.log(filepath);
+      metadataLog.debug('Starting FFmpeg metadata fallback', {
+        ...logContext,
+        id: id
+      });
 
       let tempFile = `temp-${uuidv4()}.mkv`;
 
@@ -1226,8 +1400,10 @@ function getMetadataFromFFmpeg(filepath,id) {
       }).on('codecData', (data) => {
         cmd.kill();
 
-        console.log('==== FFMPEG codecData ====');
-        console.log(JSON.stringify(data));
+        metadataLog.debug('FFmpeg codec data received', {
+          ...logContext,
+          codecData: data
+        });
         let metadata = {};
 
         // get duration
@@ -1307,7 +1483,10 @@ function getMetadataFromFFmpeg(filepath,id) {
         //console.log('==== FFMPEG end ====');
         //console.log(stdout);
       }).on('error', (err) => {
-        console.log('==== FFMPEG error ====');
+        metadataLog.debug('FFmpeg metadata fallback process failed', {
+          ...logContext,
+          error: err
+        });
         reject(err.message);
         fs.unlink(tempFile, () => {
           //console.log('deleted temp file used by ffmpeg');
@@ -1322,7 +1501,10 @@ function getMetadataFromFFmpeg(filepath,id) {
       // });
 
     } catch(err) {
-      console.log('----- Error in getMetadataFromFFmpeg -----');
+      metadataLog.debug('Could not start FFmpeg metadata fallback', {
+        ...logContext,
+        error: err
+      });
       reject(err);
     }
   });
@@ -2203,8 +2385,7 @@ async function autoTag(options = {}) {
 
       // create new video object
       let newVideo = newMedia[i];
-      console.log(`Running autotag on ${newVideo.title}.`);
-      autoTagLog.info('Automatic tagging started for video', {
+      autoTagLog.debug('Automatic tagging started for video', {
         position: i+1,
         totalVideos: newMedia.length,
         id: newVideo.id,
@@ -2288,7 +2469,7 @@ async function autoTag(options = {}) {
         permanentFailure: Boolean(resultsObject.permanentFailure)
       };
       if (disposition === 'Success') {
-        autoTagLog.info('Automatic tagging finished for video', resultLog);
+        autoTagLog.debug('Automatic tagging finished for video', resultLog);
       } else if (!resultsObject.success &&
                  !['No results', 'Not enough data', 'Ambiguous results', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure)) {
         autoTagLog.error('Automatic tagging failed for video', resultLog);
@@ -2309,11 +2490,11 @@ async function autoTag(options = {}) {
     // IPC send. Wait for the renderer to confirm the final mirror operation as
     // well, so the status banner cannot disappear while older Auto-Tag data is
     // still capable of overwriting a subsequent editor reset.
-    autoTagLog.info('Waiting for automatic tagging saves to synchronize', {
+    autoTagLog.debug('Waiting for automatic tagging saves to synchronize', {
       processedVideos: processedVideos
     });
     await library.whenIdle();
-    autoTagLog.info('Automatic tagging saves synchronized', {
+    autoTagLog.debug('Automatic tagging saves synchronized', {
       processedVideos: processedVideos
     });
 
@@ -2323,14 +2504,15 @@ async function autoTag(options = {}) {
     autoLog.sort();
 
     const canceled = autoTagCancelRequested;
+    let completionStatus;
     if (seriesSelectionCanceled) {
-      console.log('===AutoTag Series Selection Canceled===');
+      completionStatus = 'series-selection-canceled';
       autoTagLog.info('Automatic tagging batch stopped without a series selection', {
         scope: autoTagScope,
         statistics: autoStats
       });
     } else if (seriesPreflightFailure) {
-      console.log('===AutoTag Series Preflight Failed===');
+      completionStatus = 'series-preflight-failed';
       autoTagLog.warn('Automatic tagging batch stopped before processing because series preflight failed', {
         scope: autoTagScope,
         failure: seriesPreflightFailure.failure,
@@ -2338,20 +2520,24 @@ async function autoTag(options = {}) {
         statistics: autoStats
       });
     } else if (canceled) {
-      console.log('===AutoTag Canceled===');
+      completionStatus = 'canceled';
       autoTagLog.info('Automatic tagging batch canceled by user', {
         scope: autoTagScope,
         statistics: autoStats
       });
     } else {
-      console.log('===AutoTag Finished===');
+      completionStatus = 'finished';
       autoTagLog.info('Automatic tagging batch finished', {
         scope: autoTagScope,
         statistics: autoStats
       });
     }
-    console.log(JSON.stringify(autoStats));
-    console.log(autoLog.join('\n'));
+    autoTagLog.debug('Automatic tagging batch diagnostics', {
+      scope: autoTagScope,
+      status: completionStatus,
+      statistics: autoStats,
+      videoResults: autoLog
+    });
     return {
       statistics: autoStats,
       canceled: canceled,
@@ -2371,7 +2557,7 @@ async function autoTag(options = {}) {
 
 function saveBatch(batch) {
   const replacements = batch.map(video => _.cloneDeep(video));
-  autoTagLog.info('Saving automatic tagging batch', {
+  autoTagLog.debug('Saving automatic tagging batch', {
     videoCount: replacements.length
   });
 
@@ -2388,7 +2574,7 @@ function saveBatch(batch) {
         reject(err);
         return;
       }
-      autoTagLog.info('Automatic tagging batch saved locally', {
+      autoTagLog.debug('Automatic tagging batch saved locally', {
         videoCount: replacements.length
       });
       resolve();
@@ -2398,7 +2584,7 @@ function saveBatch(batch) {
 
 async function exportFiles(drive) {
   win.webContents.send('status-update', {action: 'export'});
-  console.log(`Starting exportFiles.`);
+  exportLog.info('Media export started', {destination: drive});
   let fileLocation = path.join(drive, "Mynda Manifest.json");
   let manifest;
   if (fs.existsSync(fileLocation)) {
@@ -2406,7 +2592,9 @@ async function exportFiles(drive) {
     //console.log('Loaded manifest.')
   } else {
     manifest = {media: []};
-    console.log("Couldn't load manifest, assuming all new.")
+    exportLog.info('No export manifest found; treating all media as new', {
+      manifestPath: fileLocation
+    });
   }
   let matchedMedia = [];
   let unmatchedMedia = [];
@@ -2425,7 +2613,10 @@ async function exportFiles(drive) {
       unmatchedMedia.push(homeVideo);
     }
   }
-  console.log(`Found ${matchedMedia.length} matches, and ${unmatchedMedia.length} files to export.`);
+  exportLog.info('Export manifest comparison finished', {
+    alreadyExportedVideos: matchedMedia.length,
+    videosToExport: unmatchedMedia.length
+  });
   unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
   for (let k=0; k<unmatchedMedia.length; k++) {
     let video = unmatchedMedia[k];
@@ -2456,7 +2647,12 @@ async function exportFiles(drive) {
     }
     let diskSpace = await checkDiskSpace(drive);
     let availableSpace = diskSpace.free;
-    console.log(availableSpace);
+    exportLog.debug('Checked export destination capacity', {
+      destination: drive,
+      availableBytes: availableSpace,
+      requiredBytes: totalSize,
+      videoID: video.id
+    });
     //console.log(`Found ${availableDrives.length} drives.`)
 
     if (availableSpace > totalSize) {
@@ -2475,12 +2671,26 @@ async function exportFiles(drive) {
           fs.mkdirSync(subDestDir, { recursive: true });
           fs.copyFileSync(subtitle, subDestFile, fs.constants.COPYFILE_EXCL);
         }
-        console.log(`${video.title} was copied to ${drive} successfully.`);
+        exportLog.info('Video exported successfully', {
+          id: video.id,
+          title: video.title,
+          destination: drive
+        });
       } catch (e) {
-        console.log(`There was a problem copying ${video.title} to ${drive}.`);
-        console.log(e);
+        exportLog.error('Could not export video', {
+          id: video.id,
+          title: video.title,
+          destination: drive,
+          error: e
+        });
       }
     } else {
+      exportLog.warn('Export stopped because the destination has insufficient space', {
+        destination: drive,
+        availableBytes: availableSpace,
+        requiredBytes: totalSize,
+        nextVideoID: video.id
+      });
       break;
     }
   }
@@ -2492,7 +2702,7 @@ ipcMain.on('settings-folder-select', (event) => {
   dialog.showOpenDialog(null, options).then(result => {
   event.sender.send('settings-folder-selected', result.filePaths[0]);
 }).catch(err => {
-  console.log(err)
+  backendLog.error('Could not open folder-selection dialog', {error: err});
 })})
 
 ipcMain.on('settings-watchfolder-add', (event, args) => {
@@ -2556,16 +2766,24 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
         // tell the client side what happened
         event.sender.send('settings-watchfolder-remove', path, !err); // <-- pass !err to the front end, which expects a boolean for success or failure
 
-        if (err) console.log(err);
+        if (err) {
+          backendLog.error('Could not remove watchfolder', {
+            watchfolder: path,
+            error: err
+          });
+        }
       });
     } else {
       // if the user canceled
-      console.log('User canceled the folder removal');
+      backendLog.debug('User canceled watchfolder removal', {watchfolder: path});
       event.sender.send('settings-watchfolder-remove', path, false);
     }
 
   }).catch(err => {
-    console.log(err)
+    backendLog.error('Could not display watchfolder-removal confirmation', {
+      watchfolder: path,
+      error: err
+    });
   });
 })
 
@@ -2577,7 +2795,7 @@ ipcMain.on('editor-artwork-select', (event) => {
   dialog.showOpenDialog(null, options).then(result => {
   event.sender.send('editor-artwork-selected', result.filePaths[0]);
 }).catch(err => {
-  console.log(err)
+  backendLog.error('Could not open artwork-selection dialog', {error: err});
 })});
 
 ipcMain.on('editor-subtitle-select', (event) => {
@@ -2588,7 +2806,7 @@ ipcMain.on('editor-subtitle-select', (event) => {
   dialog.showOpenDialog(null, options).then(result => {
     event.sender.send('editor-subtitle-selected', result.filePaths);
   }).catch(err => {
-    console.log(err)
+    backendLog.error('Could not open subtitle-selection dialog', {error: err});
   })
 });
 
@@ -2767,11 +2985,11 @@ ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
   dialog.showMessageBox(options).then(result => {
   event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
 }).catch(err => {
-  console.log(err)
+  backendLog.error('Could not display video-save confirmation', {error: err});
 })})
 
 ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
-  console.log('generic-confirm!!!');
+  backendLog.debug('Generic confirmation requested', {returnChannel: returnTo});
 
   let options = {
     type : 'question',
@@ -2792,9 +3010,18 @@ ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
   dialog.showMessageBox(options).then(result => {
   event.sender.send(returnTo, result.response, data, result.checkboxChecked);
 }).catch(err => {
-  console.log(err)
+  backendLog.error('Could not display generic confirmation', {
+    returnChannel: returnTo,
+    error: err
+  });
 })})
 
 ipcMain.on('exportFiles', (event, drive) => {
-  exportFiles(drive);
+  exportFiles(drive).catch(err => {
+    exportLog.error('Media export failed', {
+      destination: drive,
+      error: err
+    });
+    win.webContents.send('status-update', {action: ''});
+  });
 });

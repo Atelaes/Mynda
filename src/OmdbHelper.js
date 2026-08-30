@@ -118,7 +118,7 @@ function logSearchFinished(context, result) {
 async function search(video, options = {}) {
   options = options || {};
   let context = {searchID: `${process.pid}-${++nextSearchNumber}`};
-  log.info('Tagging search started', Object.assign({
+  log.debug('Tagging search started', Object.assign({
     searchID: context.searchID,
     selectedSeriesImdbID: options.seriesImdbID
   }, summarizeVideo(video)));
@@ -192,7 +192,7 @@ async function performSearch(video, context, options) {
             let previousTitle = new URL(urlParts.join('&')).searchParams.get('s');
             persisting.title = andAmpersandAlternates.shift();
             urlParts = createURLParts(persisting);
-            log.info('Retrying tagging search with an and/ampersand title alternative', {
+            log.debug('Retrying tagging search with an and/ampersand title alternative', {
               searchID: context.searchID,
               previousTitle: previousTitle,
               nextTitle: persisting.title,
@@ -219,7 +219,7 @@ async function performSearch(video, context, options) {
           // through the normal episode workflow. An actual episode ID retains
           // the established exact-ID behavior below.
           if (video && video.kind === 'show' && omdbData.Type === 'series') {
-            log.info('IMDb ID identified a series for a show episode; continuing with episode lookup', {
+            log.debug('IMDb ID identified a series for a show episode; continuing with episode lookup', {
               searchID: context.searchID,
               suppliedImdbID: video.imdbID,
               seriesImdbID: omdbData.imdbID,
@@ -245,7 +245,7 @@ async function performSearch(video, context, options) {
         let previousTitle = new URL(urlParts.join('&')).searchParams.get('s');
         persisting.title = andAmpersandAlternates.shift();
         urlParts = createURLParts(persisting);
-        log.info('Retrying tagging search with an and/ampersand title alternative', {
+        log.debug('Retrying tagging search with an and/ampersand title alternative', {
           searchID: context.searchID,
           previousTitle: previousTitle,
           nextTitle: persisting.title
@@ -275,7 +275,7 @@ async function performSearch(video, context, options) {
         }
         let previousTitle = new URL(urlParts.join('&')).searchParams.get('s');
         urlParts = createURLParts(persisting);
-        log.info('Retrying tagging search with a simplified title', {
+        log.debug('Retrying tagging search with a simplified title', {
           searchID: context.searchID,
           previousTitle: previousTitle,
           nextTitle: persisting.title
@@ -334,7 +334,7 @@ async function searchGeneralVideoByTitle(video, context) {
   let deferredArticleGroups = [];
   let deferredCanonicalGroups = [];
 
-  log.info('Prepared conservative movie tagging search', {
+  log.debug('Prepared conservative movie tagging search', {
     searchID: context.searchID,
     candidates: candidates.slice(0, MAX_TITLE_REQUESTS)
   });
@@ -375,7 +375,7 @@ async function searchGeneralVideoByTitle(video, context) {
     let uniqueResults = Array.from(new Map(results.map(result => [result.imdbID, result])).values());
     if (uniqueResults.length < 2) return {};
     if (uniqueResults.length > MAX_AMBIGUOUS_DETAIL_PROBES) {
-      log.info('Movie result tier exceeded the bounded detail-probe limit', {
+      log.debug('Movie result tier exceeded the bounded detail-probe limit', {
         searchID: context.searchID,
         stage: stage,
         candidate: candidate,
@@ -404,7 +404,7 @@ async function searchGeneralVideoByTitle(video, context) {
     }
 
     if (plausible.length === 1) {
-      log.info('Runtime evidence resolved otherwise ambiguous movie results', {
+      log.debug('Runtime evidence resolved otherwise ambiguous movie results', {
         searchID: context.searchID,
         candidate: candidate,
         selectedImdbID: plausible[0].imdbID,
@@ -415,7 +415,7 @@ async function searchGeneralVideoByTitle(video, context) {
       };
     }
     if (plausible.length > 1) {
-      log.info('Full movie evidence left multiple records equally plausible', {
+      log.debug('Full movie evidence left multiple records equally plausible', {
         searchID: context.searchID,
         stage: stage,
         candidate: candidate,
@@ -483,7 +483,7 @@ async function searchGeneralVideoByTitle(video, context) {
       for (let result of evaluation.rankedResults) {
         if (!choicesByID.has(result.imdbID)) choicesByID.set(result.imdbID, result);
       }
-      log.info('Evaluated conservative movie tagging results', {
+      log.debug('Evaluated conservative movie tagging results', {
         searchID: context.searchID,
         candidate: candidate,
         queryTitle: queryTitle,
@@ -814,7 +814,7 @@ async function searchGeneralVideoByTitle(video, context) {
         source: plan.candidate.source,
         variantReason: plan.variant.reason
       });
-      log.info('Retrying movie search with strict normalized-title discovery', {
+      log.debug('Retrying movie search with strict normalized-title discovery', {
         searchID: context.searchID,
         candidate: plan.candidate,
         queryTitle: plan.variant.title,
@@ -846,7 +846,7 @@ async function searchGeneralVideoByTitle(video, context) {
           source: plan.candidate.source,
           variantReason: `${plan.variant.reason}; exact-title endpoint`
         });
-        log.info('Retrying strict normalized title through exact-title lookup', {
+        log.debug('Retrying strict normalized title through exact-title lookup', {
           searchID: context.searchID,
           candidate: plan.candidate,
           queryTitle: plan.variant.title,
@@ -906,7 +906,7 @@ async function searchGeneralVideoByTitle(video, context) {
               return laterIDs.length === 1 && blockedImdbIDs.has(laterIDs[0]);
             });
           if (corroboratingSingleton) {
-            log.info('Validating a canonical singleton corroborated by an oversized result tier', {
+            log.debug('Validating a canonical singleton corroborated by an oversized result tier', {
               searchID: context.searchID,
               blockedCandidate: group.candidate,
               candidate: corroboratingSingleton.candidate,
@@ -928,7 +928,7 @@ async function searchGeneralVideoByTitle(video, context) {
 
   let choices = Array.from(choicesByID.values());
   if (choices.length > 0) {
-    log.info('Movie tagging search remained ambiguous; returning choices', {
+    log.debug('Movie tagging search remained ambiguous; returning choices', {
       searchID: context.searchID,
       attemptedTitles: attemptedTitles,
       choiceCount: choices.length
@@ -991,7 +991,7 @@ function logFullMovieEvaluation(context, candidate, omdbData, evaluation, stage)
     reasons: evaluation.reasons
   };
   if (evaluation.confident) {
-    log.info('Full movie result passed plausibility validation', details);
+    log.debug('Full movie result passed plausibility validation', details);
   } else {
     log.warn('Full movie result was not safe to auto-select', details);
   }
@@ -1134,13 +1134,13 @@ async function getSeriesArtwork(seriesID, context) {
     let artwork = usablePosterURL(seriesData.Poster) || '';
     seriesArtworkCache.set(seriesID, artwork);
     if (artwork) {
-      log.info('Found series artwork fallback', {
+      log.debug('Found series artwork fallback', {
         searchID: context.searchID,
         seriesID: seriesID,
         seriesTitle: seriesData.Title
       });
     } else {
-      log.info('Series has no usable artwork fallback', {
+      log.debug('Series has no usable artwork fallback', {
         searchID: context.searchID,
         seriesID: seriesID,
         seriesTitle: seriesData.Title
@@ -1244,7 +1244,7 @@ async function downloadArtworkWithSeriesFallback(data, seriesID, context) {
     return '';
   }
   if (primaryArtwork) {
-    log.info('Trying series artwork after the episode artwork download failed', {
+    log.debug('Trying series artwork after the episode artwork download failed', {
       searchID: context.searchID,
       seriesID: seriesID
     });
@@ -1256,7 +1256,7 @@ async function downloadArtworkWithSeriesFallback(data, seriesID, context) {
     context
   );
   if (downloadedSeriesArtwork) {
-    log.info('Using series artwork fallback', {
+    log.debug('Using series artwork fallback', {
       searchID: context.searchID,
       seriesID: seriesID
     });
@@ -1773,7 +1773,7 @@ async function disambiguateSeriesByEpisode(candidates, season, episode, localTit
     }
   }
 
-  log.info('Episode probes evaluated ambiguous series', {
+  log.debug('Episode probes evaluated ambiguous series', {
     searchID: context.searchID,
     season: season,
     episode: episode,
@@ -1820,7 +1820,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
   options = options || {};
   let series = typeof video.series === 'string' ? video.series.trim() : '';
   let searchParts = seriesSearchPartsForVideo(video);
-  log.info('Resolving series for episode lookup', {
+  log.debug('Resolving series for episode lookup', {
     searchID: context.searchID,
     storedSeries: series,
     queryTitle: searchParts.title,
@@ -1836,7 +1836,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
   if (!options.ignoreStoredSeriesImdbID && validSeriesImdbID(video.seriesImdbID)) {
     let storedID = video.seriesImdbID.trim();
     seriesIdCache.set(cacheKey, storedID);
-    log.info('Using stored IMDb series ID', {
+    log.debug('Using stored IMDb series ID', {
       searchID: context.searchID,
       queryTitle: searchParts.title,
       queryYear: searchParts.year,
@@ -1846,7 +1846,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
   }
   if (!options.ignoreSeriesCache && seriesIdCache.has(cacheKey)) {
     let cachedID = seriesIdCache.get(cacheKey);
-    log.info('Using cached IMDb series ID', {
+    log.debug('Using cached IMDb series ID', {
       searchID: context.searchID,
       queryTitle: searchParts.title,
       queryYear: searchParts.year,
@@ -1893,7 +1893,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
       let queryTitle = query.title;
       if (queryIndex > 0) {
         if (query.terminalAcronym) {
-          log.info('Retrying series search without a terminal acronym', {
+          log.debug('Retrying series search without a terminal acronym', {
             searchID: context.searchID,
             previousTitle: seriesQueries[queryIndex-1].title,
             nextTitle: queryTitle,
@@ -1901,7 +1901,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
             reason: 'The full abbreviated series title did not return a validated match'
           });
         } else {
-          log.info('Retrying series search with an and/ampersand title alternative', {
+          log.debug('Retrying series search with an and/ampersand title alternative', {
             searchID: context.searchID,
             previousTitle: seriesQueries[queryIndex-1].title,
             nextTitle: queryTitle
@@ -1938,7 +1938,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
         // full-title result or a validated acronym expansion can be accepted.
         currentMatches = {matchStrength: 'fuzzy', candidates: []};
       }
-      log.info('Evaluated OMDb series candidates', {
+      log.debug('Evaluated OMDb series candidates', {
         searchID: context.searchID,
         queryTitle: queryTitle,
         requestedTitle: searchParts.title,
@@ -2015,7 +2015,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
     for (let queryIndex=0; queryIndex<exactQueryTitles.length; queryIndex++) {
       let queryTitle = exactQueryTitles[queryIndex];
       if (queryIndex > 0) {
-        log.info('Retrying single-series lookup with an and/ampersand title alternative', {
+        log.debug('Retrying single-series lookup with an and/ampersand title alternative', {
           searchID: context.searchID,
           previousTitle: exactQueryTitles[queryIndex-1],
           nextTitle: queryTitle
@@ -2193,7 +2193,7 @@ async function findNearbyEpisodeByTitle(seriesID, season, episode, localTitle, c
       }
 
       let titleMatches = episodeTitlesMatch(localTitle, response.data.Title);
-      log.info('Compared nearby OMDb episode title', {
+      log.debug('Compared nearby OMDb episode title', {
         searchID: context.searchID,
         localTitle: localTitle,
         omdbTitle: response.data.Title,
@@ -2274,7 +2274,7 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
       return predictableFailure('Invalid series selection', 'The selected series did not have a valid IMDb ID');
     }
     selectedSeriesImdbID = String(selectedSeriesImdbID).trim();
-    log.info('Using caller-selected series for episode lookup', {
+    log.debug('Using caller-selected series for episode lookup', {
       searchID: context.searchID,
       series: series,
       selectedSeriesImdbID: selectedSeriesImdbID
@@ -2460,14 +2460,14 @@ async function pollOMDB(urlParts, context = {}) {
     stage: context.stage,
     parameters: requestParametersForLog(urlParts)
   };
-  log.info('OMDb request started', requestDetails);
+  log.debug('OMDb request started', requestDetails);
   try {
     let response = await axios({
       method: 'get',
       url: urlParts.join('&'),
       timeout: 20000,
     });
-    log.info('OMDb response received', {
+    log.debug('OMDb response received', {
       searchID: context.searchID,
       stage: context.stage,
       request: requestDetails.parameters,
@@ -2574,7 +2574,7 @@ function downloadArt(url, context = {}) {
         try {
           // if successful, we'll receive an object with the path at "path"
           if (args && Object.prototype.hasOwnProperty.call(args, 'path')) {
-            log.info('OMDb artwork download finished', {
+            log.debug('OMDb artwork download finished', {
               searchID: context.searchID,
               artworkSource: context.artworkSource,
               destination: args.path
@@ -2603,7 +2603,7 @@ function downloadArt(url, context = {}) {
       let handleDownload = (event, response) => {
         if (response && response.success) {
           let destination = response.message || filePath;
-          log.info('OMDb artwork download finished', {
+          log.debug('OMDb artwork download finished', {
             searchID: context.searchID,
             artworkSource: context.artworkSource,
             destination: destination

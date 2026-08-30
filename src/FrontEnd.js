@@ -2564,6 +2564,22 @@ class MynNotify extends React.Component {
       return 'Finishing the current video before canceling auto-tagging';
     }
 
+    if (status.action === 'add') {
+      const numberAdded = Number.isFinite(status.numTotal) ? status.numTotal : 0;
+      const numberDuplicates = Number.isFinite(status.duplicateVideos) ?
+        status.duplicateVideos : 0;
+      const addedLabel = numberAdded === 1 ? 'video' : 'videos';
+      const duplicateLabel = numberDuplicates === 1 ? 'duplicate' : 'duplicates';
+
+      if (numberAdded === 0 && numberDuplicates > 0) {
+        return `No new videos added — ${numberDuplicates} ${duplicateLabel} skipped`;
+      }
+      if (numberDuplicates > 0) {
+        return `Adding ${numberAdded} ${addedLabel} — ${numberDuplicates} ${duplicateLabel} skipped`;
+      }
+      return `Adding ${numberAdded} ${addedLabel}`;
+    }
+
     let _c = '';
     let _t = '';
     let _of = '';
@@ -2573,12 +2589,13 @@ class MynNotify extends React.Component {
 
     let textFor = {
       'export'        : `Exporting${_c}${_of}${_t} videos`,
-      'add'           : `Adding${_c}${_of}${_t} videos`,
       'metadata'      : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
       'metadata_save' : `Saving metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
       'batch_save'    : `Saving${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
       'autotag'       : `Auto-tagging${_c}${_of}${_t} videos`,
-      'check'         : 'Checking for new videos'
+      'check'         : status.numTotal ?
+        `Checking${_c}${_of}${_t} new ${status.numTotal === 1 ? 'video' : 'videos'}` :
+        'Scanning watchfolders'
     }
 
     return textFor[status.action];

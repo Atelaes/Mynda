@@ -2,15 +2,18 @@
 const electron = require('electron');
 const path = require('path');
 const fs = require('fs');
+const Logger = require('./Logger.js');
+
+const log = Logger.child('ReadWrite');
 
 class ReadWrite {
   constructor(opts) {
     // Renderer process has to get `app` module via `remote`, whereas the main process can get it directly
     // app.getPath('userData') will return a string of the user's app data directory path.
     const userDataPath = (electron.app || electron.remote.app).getPath('userData');
-    console.log(userDataPath);
     // We'll use the `configName` property to set the file name and path.join to bring it all together as a string
     this.path = path.join(userDataPath, opts.configName + '.' + opts.extension);
+    log.debug('Read/write data path configured', {path: this.path});
 
     this.data = this._parseDataFile(this.path, opts.defaults);
   }
@@ -26,7 +29,10 @@ class ReadWrite {
     try {
       fs.writeFileSync(this.path, JSON.stringify(this.data));
     } catch(e) {
-      console.log("Error writing to file: " + e.toString());
+      log.error('Could not write data file', {
+        path: this.path,
+        error: e
+      });
     }
   }
 
@@ -37,7 +43,14 @@ class ReadWrite {
       return JSON.parse(fs.readFileSync(filePath));
     } catch(error) {
       // if there was some kind of error, return the passed in defaults instead.
-      console.log("No file found, creating default file");
+      if (error && error.code === 'ENOENT') {
+        log.info('Data file was not found; creating it from defaults', {path: filePath});
+      } else {
+        log.warn('Could not read data file; replacing it with defaults', {
+          path: filePath,
+          error: error
+        });
+      }
 
       // Object.keys(defaults).forEach((key) => {
       //   this.set(key, defaults[key]);
@@ -45,7 +58,10 @@ class ReadWrite {
       try {
         fs.writeFileSync(this.path, JSON.stringify(defaults));
       } catch(e) {
-        console.log("Error writing to file: " + e.toString());
+        log.error('Could not write default data file', {
+          path: this.path,
+          error: e
+        });
       }
 
 

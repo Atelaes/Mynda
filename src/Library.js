@@ -15,6 +15,16 @@ const Logger = require('./Logger.js');
 
 const libraryLog = Logger.child('Library');
 
+function summarizeLibraryOperation(operation) {
+  if (!operation || typeof operation !== 'object') return operation;
+  return {
+    opType: operation.opType,
+    address: operation.address,
+    sync: Boolean(operation.sync),
+    hasEntry: typeof operation.entry !== 'undefined' && operation.entry !== null
+  };
+}
+
 class Library {
   constructor() {
     this.env = (electron.app) ? 'server' : 'browser';
@@ -182,7 +192,13 @@ class Library {
   //address: the location of the operation
   //entry: the item to be placed, not used in remove
   //sync, whether this was prompted by counterpart library
-  alter({ opType = null, address = null, entry = null, sync = false, origin = null, cb = (err) => { if (err) console.log(err) } } = {}) {
+  alter({ opType = null, address = null, entry = null, sync = false, origin = null, cb = (err) => {
+    if (err) {
+      libraryLog.error('Library operation failed without a caller-provided callback', {
+        error: err
+      });
+    }
+  } } = {}) {
     //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     //let startTime = new Date();
     try {
@@ -307,7 +323,11 @@ class Library {
                 let found = false;
                 for (let i = 0; i < dest.length; i++) {
                   if (typeof dest[i][prop] !== 'undefined' && dest[i][prop] === val) {
-                    console.log(`found element to replace at index ${i}; replacing...`);
+                    libraryLog.debug('Found array element for replacement', {
+                      address: address,
+                      index: i,
+                      property: prop
+                    });
                     found = true;
                     dest[i] = entry;
                     // we could remove the break statement to replace all instances
@@ -499,7 +519,10 @@ class Library {
     // tell partner to replicate the action.
     argObj.sync = true;
     if (this.waitConfirm) {
-      console.log("Trying to create confirm, but something already at waitConfirm.");
+      libraryLog.warn('A library synchronization confirmation was already pending', {
+        pendingOperation: summarizeLibraryOperation(this.waitConfirm),
+        attemptedOperation: summarizeLibraryOperation(argObj)
+      });
     } else {
       this.waitConfirm = _.cloneDeep(argObj);
     }
@@ -536,16 +559,20 @@ class Library {
     } else if (typeof argObj === "undefined") {
       // sync op was aborted, getConfirm was called manually by the server (from the sync() function) to move to the next queue item
     } else {
-      console.log("Got a confirmation that didn't match what was expected.")
-      console.log(argObj);
-      console.log(this.waitConfirm);
+      libraryLog.warn('Library synchronization confirmation did not match the pending operation', {
+        receivedConfirmation: summarizeLibraryOperation(argObj),
+        expectedConfirmation: summarizeLibraryOperation(this.waitConfirm)
+      });
     }
 
     this.waitConfirm = null;
     if (this.Queue.length > 0) {
-      console.log(`${this.Queue.length} items left in queue, moving to next item...`);
       let nextOp = this.Queue.shift();
-      console.log(`Next item: ${nextOp.opType} ${nextOp.address}`);
+      libraryLog.debug('Starting next queued library operation', {
+        queuedOperationsRemaining: this.Queue.length,
+        operationType: nextOp.opType,
+        address: nextOp.address
+      });
       this.alter(nextOp);
     }
 
@@ -733,7 +760,9 @@ class Library {
       if (error && error.code === 'ENOENT') {
         const newLibrary = _.cloneDeep(defaultLibrary);
         LibraryPersistence.writeLibraryFile(this.path, newLibrary);
-        console.log('No library found; created a default empty library.');
+        libraryLog.info('No library file was found; created a default empty library', {
+          path: this.path
+        });
         return newLibrary;
       }
 
@@ -768,18 +797,21 @@ class Library {
         backupSearchError: backupSearchError
       };
 
-      console.error(`Could not load ${this.path}: ${this.loadIssue.errorMessage}`);
+      libraryLog.error('Could not load the primary library', this.loadIssue);
       if (backup) {
         // "Provisionally" is important: index.js still asks the user before the
         // damaged primary is preserved and replaced on disk.
-        console.log(`Provisionally loaded automatic backup ${backup.path}.`);
+        libraryLog.warn('Provisionally loaded an automatic library backup', {
+          backupPath: backup.path,
+          backupDate: backup.date
+        });
         return _.cloneDeep(backup.data);
       }
 
       // With no usable backup, defaults exist in memory only so construction can
       // finish. Primary saving remains blocked until the user explicitly opts
       // to create an empty library; choosing Quit leaves library.json untouched.
-      console.error('No valid automatic library backup was available.');
+      libraryLog.error('No valid automatic library backup was available', this.loadIssue);
       return _.cloneDeep(defaultLibrary);
     }
   }

@@ -6,6 +6,21 @@ const LEVELS = {debug: 10, info: 20, warn: 30, error: 40};
 const DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024;
 const DEFAULT_MAX_BACKUPS = 4;
 const MAX_LOG_TEXT_LENGTH = 50000;
+const ANSI_RESET = '\u001b[0m';
+const ANSI_TIMESTAMP_COLOR = '\u001b[90m';
+const ANSI_LEVEL_COLORS = {
+  debug: '\u001b[1;32m',
+  info: '\u001b[1;34m',
+  warn: '\u001b[1;33m',
+  error: '\u001b[1;31m'
+};
+const DEVTOOLS_TIMESTAMP_STYLE = 'color: #8b949e;';
+const DEVTOOLS_LEVEL_STYLES = {
+  debug: 'color: #7bc96f; font-weight: 700;',
+  info: 'color: #58a6ff; font-weight: 700;',
+  warn: 'color: #d9a441; font-weight: 700;',
+  error: 'color: #e06c75; font-weight: 700;'
+};
 
 // DEBUG stays in the console. INFO/WARN/ERROR go to mynda-info.log, and ERROR
 // is duplicated into mynda-error.log. Renderer calls are forwarded over IPC so
@@ -92,9 +107,45 @@ function formatEntry(entry) {
   }
   let line = `${entry.timestamp} ${entry.level.toUpperCase()} [${entry.scope}] [${processLabel}] ${entry.message}`;
   if (entry.details) {
+    // Persistent logs deliberately keep one complete event on each line.
     line += ` ${entry.details}`;
   }
   return `${line}\n`;
+}
+
+function formatConsoleDetails(details) {
+  let formatted = String(details);
+  try {
+    formatted = JSON.stringify(JSON.parse(formatted), null, 2);
+  } catch(err) {
+    // Truncated or non-JSON details still belong on their own indented line.
+  }
+  return formatted.split('\n').map(line => `  ${line}`).join('\n');
+}
+
+function consoleEntryParts(entry) {
+  let processLabel = entry.processType;
+  if (entry.pid !== null && typeof entry.pid !== 'undefined') {
+    processLabel += `:${entry.pid}`;
+  }
+  let remainder = `[${entry.scope}] [${processLabel}] ${entry.message}`;
+  if (entry.details) {
+    remainder += `\n${formatConsoleDetails(entry.details)}`;
+  }
+  return {
+    timestamp: entry.timestamp,
+    level: entry.level.toUpperCase(),
+    remainder: remainder
+  };
+}
+
+function consoleSupportsAnsi(entry) {
+  if (typeof process === 'undefined' || !process.env) return false;
+  if (Object.prototype.hasOwnProperty.call(process.env, 'NO_COLOR')) return false;
+  if (process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') return true;
+  let stream = entry.level === 'warn' || entry.level === 'error' ?
+    process.stderr : process.stdout;
+  return Boolean(stream && stream.isTTY);
 }
 
 function backupPath(filePath, index) {
@@ -225,15 +276,44 @@ function persistEntry(entry) {
 }
 
 function writeToConsole(entry) {
-  let output = formatEntry(entry).trimEnd();
+  let outputMethod;
   if (entry.level === 'error') {
-    console.error(output);
+    outputMethod = console.error;
   } else if (entry.level === 'warn') {
-    console.warn(output);
+    outputMethod = console.warn;
   } else if (entry.level === 'debug' && console.debug) {
-    console.debug(output);
+    outputMethod = console.debug;
   } else {
-    console.log(output);
+    outputMethod = console.log;
+  }
+
+  const parts = consoleEntryParts(entry);
+  if (isRendererProcess()) {
+    // Chromium DevTools supports CSS substitutions. Reset the style after both
+    // highlighted fields so wrapped message text retains the console's normal
+    // foreground color.
+    outputMethod.call(
+      console,
+      '%c%s%c %c%s%c %s',
+      DEVTOOLS_TIMESTAMP_STYLE,
+      parts.timestamp,
+      '',
+      DEVTOOLS_LEVEL_STYLES[entry.level],
+      parts.level,
+      '',
+      parts.remainder
+    );
+  } else if (consoleSupportsAnsi(entry)) {
+    // The main Electron process normally writes to a terminal. ANSI resets are
+    // placed immediately after the timestamp and level so only those two
+    // fields are colored, even when the remainder wraps onto another line.
+    outputMethod.call(
+      console,
+      `${ANSI_TIMESTAMP_COLOR}${parts.timestamp}${ANSI_RESET} ` +
+      `${ANSI_LEVEL_COLORS[entry.level]}${parts.level}${ANSI_RESET} ${parts.remainder}`
+    );
+  } else {
+    outputMethod.call(console, `${parts.timestamp} ${parts.level} ${parts.remainder}`);
   }
 }
 

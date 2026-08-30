@@ -57,6 +57,27 @@ function runtimeIsBelowLimit(value, maxDurationSeconds = DEFAULT_MAX_DURATION_SE
   return duration > 0 && duration < maxDurationSeconds;
 }
 
+function normalizeLog(log) {
+  const noop = () => {};
+  if (typeof log === 'function') {
+    return {
+      debug: (message, data) => log(message, data, 'debug'),
+      info: (message, data) => log(message, data, 'info'),
+      warn: (message, data) => log(message, data, 'warn'),
+      error: (message, data) => log(message, data, 'error')
+    };
+  }
+  if (!log || typeof log !== 'object') {
+    return {debug: noop, info: noop, warn: noop, error: noop};
+  }
+  return {
+    debug: typeof log.debug === 'function' ? log.debug.bind(log) : noop,
+    info: typeof log.info === 'function' ? log.info.bind(log) : noop,
+    warn: typeof log.warn === 'function' ? log.warn.bind(log) : noop,
+    error: typeof log.error === 'function' ? log.error.bind(log) : noop
+  };
+}
+
 class VideoExclusion {
   constructor(options = {}) {
     this.library = options.library || {media: [], inactive_media: []};
@@ -64,7 +85,7 @@ class VideoExclusion {
     this.verifyMinimumRuntime = options.verifyMinimumRuntime;
     this.isExclusionEnabled = typeof options.isExclusionEnabled === 'function' ?
       options.isExclusionEnabled : () => true;
-    this.log = typeof options.log === 'function' ? options.log : () => {};
+    this.log = normalizeLog(options.log);
     this.maxDurationSeconds = usableDuration(options.maxDurationSeconds) ||
       DEFAULT_MAX_DURATION_SECONDS;
     this.probeTimeoutMs = usableDuration(options.probeTimeoutMs) || DEFAULT_PROBE_TIMEOUT_MS;
@@ -144,10 +165,11 @@ class VideoExclusion {
     try {
       if (this.isExclusionEnabled(kind) === false) return false;
     } catch (err) {
-      this.log(
-        `Could not read exclusion preference for possible ${kind} video; ` +
-        `retaining ${filepath}: ${err}`
-      );
+      this.log.warn('Could not read video-exclusion preference; retaining candidate', {
+        kind: kind,
+        filename: filepath,
+        error: err
+      });
       return false;
     }
 
@@ -159,23 +181,33 @@ class VideoExclusion {
       try {
         metadata = await this.probedMetadata(filepath);
         duration = usableDuration(metadata && metadata.duration);
+        durationSource = 'file probe';
       } catch (err) {
-        this.log(
-          `Could not determine runtime for possible ${kind} video; retaining ${filepath}: ${err}`
-        );
+        this.log.warn('Could not determine candidate runtime; retaining video', {
+          kind: kind,
+          filename: filepath,
+          error: err
+        });
         return false;
       }
     }
 
     if (!duration) {
-      this.log(`Could not determine runtime for possible ${kind} video; retaining ${filepath}`);
+      this.log.warn('Candidate probe returned no usable runtime; retaining video', {
+        kind: kind,
+        filename: filepath
+      });
       return false;
     }
 
     if (runtimeIsBelowLimit(duration, this.maxDurationSeconds)) {
-      this.log(
-        `Ignoring ${kind} video (${duration.toFixed(2)} seconds from ${durationSource}): ${filepath}`
-      );
+      this.log.info('Excluded short sample/trailer candidate from the library', {
+        kind: kind,
+        filename: filepath,
+        durationSeconds: duration,
+        durationSource: durationSource,
+        maximumDurationSeconds: this.maxDurationSeconds
+      });
       return true;
     }
 
@@ -195,31 +227,58 @@ class VideoExclusion {
           minimumSeconds: this.maxDurationSeconds
         });
       } catch (err) {
-        this.log(
-          `Could not verify reported runtime for possible ${kind} video; ` +
-          `retaining ${filepath}: ${err}`
-        );
+        this.log.warn('Could not verify a candidate with a suspect reported runtime; retaining video', {
+          kind: kind,
+          filename: filepath,
+          reportedDurationSeconds: duration,
+          durationSource: durationSource,
+          error: err
+        });
         return false;
       }
 
       if (!verification || typeof verification.hasMinimumRuntime !== 'boolean') {
-        this.log(
-          `Could not verify reported runtime for possible ${kind} video; retaining ${filepath}`
-        );
+        this.log.warn('Runtime verification returned no usable result; retaining candidate', {
+          kind: kind,
+          filename: filepath,
+          reportedDurationSeconds: duration,
+          durationSource: durationSource
+        });
         return false;
       }
 
       if (!verification.hasMinimumRuntime) {
-        this.log(
-          `Ignoring ${kind} video (reported ${duration.toFixed(2)} seconds from ` +
-          `${durationSource}, but bounded FFmpeg scan reached EOF after ` +
-          `${verification.packetsRead}/${verification.targetPackets} video packets): ` +
-          filepath
-        );
+        this.log.info('Excluded sample/trailer candidate after bounded runtime verification', {
+          kind: kind,
+          filename: filepath,
+          reportedDurationSeconds: duration,
+          durationSource: durationSource,
+          packetsRead: verification.packetsRead,
+          targetPackets: verification.targetPackets,
+          maximumDurationSeconds: this.maxDurationSeconds
+        });
         return true;
       }
+
+      this.log.debug('Retained candidate after bounded runtime verification confirmed sufficient content', {
+        kind: kind,
+        filename: filepath,
+        reportedDurationSeconds: duration,
+        durationSource: durationSource,
+        packetsRead: verification.packetsRead,
+        targetPackets: verification.targetPackets
+      });
+      return false;
     }
 
+    this.log.debug('Retained candidate whose reported runtime exceeds the exclusion limit', {
+      kind: kind,
+      filename: filepath,
+      reportedDurationSeconds: duration,
+      durationSource: durationSource,
+      maximumDurationSeconds: this.maxDurationSeconds,
+      strongCandidateEvidence: hasStrongCandidateEvidence(filepath, kind)
+    });
     return false;
   }
 }
