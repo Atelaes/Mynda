@@ -489,6 +489,14 @@
   --editor-textinput-borderradius: var(--editor-textinput-borderradius-radius); /*var(--editor-textinput-borderradius-radius) 0px 0px var(--editor-textinput-borderradius-radius);*/
   --editor-textinput-padding: var(--textinput-padding);
 
+  --editor-batch-changed-bg-color: rgba(35, 157, 151, .16);
+  --editor-batch-changed-bg: linear-gradient(90deg, rgba(35, 157, 151, .20) 0%, rgba(35, 157, 151, .09) 100%);
+  --editor-batch-changed-boxshadow: inset 0 0 0 .06em rgba(100, 225, 216, .25);
+  --editor-batch-changed-label-text: rgba(100, 225, 216, .75);
+  --editor-batch-changed-control-text: rgba(100, 225, 216, .9);
+  --editor-batch-added-item-bg-color: rgba(35, 157, 151, .28);
+  --editor-batch-added-item-ellipsis-grad: linear-gradient(90deg, rgba(35, 157, 151, 0) 0%, rgba(35, 157, 151, .28) 30%);
+
   --editor-textarea-borderradius: 1em 1em 1em 1em; /*var(--playlisttab-borderradius-radius) 0 0 var(--playlisttab-borderradius-radius);*/
   --editor-textarea-height: 6em;
   --editor-textarea-width: 100%;

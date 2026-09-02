@@ -1974,11 +1974,15 @@ function normalizedBatchSeries(value) {
     value.trim().replace(/\s+/g, ' ').toLocaleLowerCase() : '';
 }
 
-function hasUsableShowEpisodeFields(video) {
+// Mynda may store manually interlaced episode positions such as 3.5, but
+// OMDb's season/episode endpoint accepts only whole-number coordinates. Keep
+// those videos valid in the library while excluding them from coordinate-based
+// Auto-Tag requests that could otherwise target the wrong ordinary episode.
+function hasUsableOMDbShowEpisodeFields(video) {
   return Boolean(video && video.kind === 'show' &&
     String(video.series || '').trim() &&
     /^\d+$/.test(String(video.season).trim()) &&
-    /^\d+$/.test(String(video.episode).trim()));
+    /^\d+(?:\.0)?$/.test(String(video.episode).trim()));
 }
 
 // Resolve renderer-supplied IDs against the main process's freshest library.
@@ -2182,7 +2186,7 @@ async function requestSelectedAutoTag(videoIDs) {
 
     const seriesBatch = sameSeriesShowBatch(selected);
     const incompleteShows = selected.filter(video =>
-      video.kind === 'show' && !hasUsableShowEpisodeFields(video)
+      video.kind === 'show' && !hasUsableOMDbShowEpisodeFields(video)
     ).length;
     const keepInNew = !library.settings.preferences.remove_autotagged_from_new;
     let detail =
@@ -2196,7 +2200,7 @@ async function requestSelectedAutoTag(videoIDs) {
       detail += '\n\nBecause this is not a single-series show batch, ambiguous matches will be skipped without another prompt.';
     }
     if (incompleteShows > 0) {
-      detail += `\n\n${incompleteShows} selected show${incompleteShows === 1 ? '' : 's'} currently lack${incompleteShows === 1 ? 's' : ''} a usable series, season, or episode and cannot be tagged unless those fields are corrected first.`;
+      detail += `\n\n${incompleteShows} selected show${incompleteShows === 1 ? '' : 's'} currently lack${incompleteShows === 1 ? 's' : ''} a usable series or whole-number season/episode for OMDb and cannot be tagged by coordinates. Tag a fractional episode individually by entering its exact IMDb ID.`;
     }
 
     const confirmation = await dialog.showMessageBox({
@@ -2291,6 +2295,10 @@ async function autoTag(options = {}) {
   let autoStats = {totalVideos: newMedia.length};
   let autoLog = [];
   let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
+  // A title-verified adjacent-season match can make later episodes of the same
+  // series try that offset first. This map is scoped to one Auto-Tag run and is
+  // only a request-order hint; OmdbHelper still verifies every episode title.
+  let seasonOffsetHints = new Map();
   let processedVideos = 0;
   let seriesSelectionCanceled = false;
   let seriesPreflightFailure = null;
@@ -2402,8 +2410,10 @@ async function autoTag(options = {}) {
 
       // get search results
       let disposition = '';
-      let searchOptions = sharedSeriesImdbID ?
-        {seriesImdbID: sharedSeriesImdbID} : {};
+      let searchOptions = {seasonOffsetHints: seasonOffsetHints};
+      if (sharedSeriesImdbID) {
+        searchOptions.seriesImdbID = sharedSeriesImdbID;
+      }
       let resultsObject = await OmdbHelper.search(newVideo, searchOptions);
 
       // The preflight has already established this value for homogeneous show

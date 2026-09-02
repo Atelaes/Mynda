@@ -17,14 +17,23 @@ const log = Logger.child('OMDb');
 // episode after the first episode of each series.
 const seriesIdCache = new Map();
 const seriesArtworkCache = new Map();
+// OMDb can contain a valid episode record while its direct
+// series+Season+Episode lookup reports that the episode does not exist. Cache
+// each season's episode-number-to-IMDb-ID index so a batch pays for at most one
+// season-list request before retrying those holes by exact episode ID.
+const seasonEpisodeIndexCache = new Map();
 // Do not keep retrying a poster URL that the artwork server has confirmed no
 // longer exists. This cache lasts only for the current Mynda process.
 const failedArtworkURLs = new Set();
 let nextSearchNumber = 0;
 let nextArtworkDownloadNumber = 0;
 
-function validSeriesImdbID(value) {
+function validImdbID(value) {
   return typeof value === 'string' && /^tt\d+$/.test(value.trim());
+}
+
+function validSeriesImdbID(value) {
+  return validImdbID(value);
 }
 
 function summarizeVideo(video) {
@@ -139,7 +148,12 @@ async function performSearch(video, context, options) {
   // resolves an ambiguity and therefore takes precedence over a stale episode
   // ID that may still be present in an editor object.
   if (video && video.kind === 'show' && (options.seriesImdbID || !hasImdbID(video))) {
-    return searchShowEpisode(video, context, options.seriesImdbID);
+    return searchShowEpisode(
+      video,
+      context,
+      options.seriesImdbID,
+      options.seasonOffsetHints
+    );
   }
 
   // A pasted IMDb ID remains authoritative and continues through the exact-ID
@@ -1016,10 +1030,13 @@ function hasImdbID(video) {
 }
 
 // Converts a nonnegative integer or digit string to OMDb's canonical string
-// form ("003" becomes "3", while zero remains "0"). Returns null for extras,
-// blanks, fractions, negative numbers, and any other nonnumeric value.
+// form ("003" becomes "3", while zero remains "0"). A manually stored value
+// ending in .0 is equivalent to the integer and is accepted. True fractional
+// Mynda positions, extras, blanks, negatives, and other values return null:
+// OMDb cannot safely look up an interlaced position such as episode 3.5.
 function normalizeEpisodeNumber(value) {
   let stringValue = String(value).trim();
+  stringValue = stringValue.replace(/\.0$/, '');
   if (!/^\d+$/.test(stringValue)) {
     return null;
   }
@@ -1305,6 +1322,15 @@ function summarizeOMDbResponse(response) {
       title: result.Title,
       year: result.Year,
       type: result.Type,
+      imdbID: result.imdbID
+    }));
+  }
+  if (Array.isArray(data.Episodes)) {
+    summary.episodeCount = data.Episodes.length;
+    summary.episodes = data.Episodes.slice(0, 30).map(result => ({
+      title: result.Title,
+      released: result.Released,
+      episode: result.Episode,
       imdbID: result.imdbID
     }));
   }
@@ -1648,6 +1674,22 @@ function stripTrailingEpisodeReleaseFlags(title) {
   return stripped ? stripped : original;
 }
 
+// Some episode filenames identify the film or program shown in the episode by
+// appending its release year, while OMDb stores only the episode title. This is
+// especially common for anthology and hosted-film shows (for example,
+// "The Crawling Eye (1958)"). Remove only one final parenthesized/bracketed
+// four-digit year or year range, and use the result for comparison only. A year
+// in ordinary title text remains untouched and the video's stored title is
+// never changed.
+function stripTrailingEpisodeReleaseYear(title) {
+  let original = String(title || '').trim();
+  let stripped = original.replace(
+    /\s*(?:\((?:18|19|20)\d{2}(?:\s*[-–—]\s*(?:18|19|20)\d{2})?\)|\[(?:18|19|20)\d{2}(?:\s*[-–—]\s*(?:18|19|20)\d{2})?\])\s*$/,
+    ''
+  ).trim();
+  return stripped ? stripped : original;
+}
+
 function episodeTitlesMatch(localTitle, omdbTitle) {
   let local = comparableEpisodeTitle(localTitle);
   let omdb = comparableEpisodeTitle(omdbTitle);
@@ -1658,15 +1700,27 @@ function episodeTitlesMatch(localTitle, omdbTitle) {
     return true;
   }
 
-  // Only the local filename-derived title can contain release flags. After
-  // removing a recognized trailing run, still require exact normalized title
-  // equality. The four-character minimum retains useful short titles such as
-  // ER's "Home FS" while rejecting very weak one- or two-letter evidence.
-  let localWithoutReleaseFlags = comparableEpisodeTitle(
-    stripTrailingEpisodeReleaseFlags(localTitle)
-  );
-  return localWithoutReleaseFlags.length >= 4 &&
-    localWithoutReleaseFlags !== local && localWithoutReleaseFlags === omdb;
+  // Only the local filename-derived title can contain release flags or a
+  // trailing source-title year. Try every conservative combination, but still
+  // require exact normalized equality. The four-character minimum retains
+  // useful short titles such as ER's "Home FS" while rejecting very weak one-
+  // or two-letter evidence produced by stripping a suffix.
+  let localVariants = new Set();
+  let withoutReleaseFlags = stripTrailingEpisodeReleaseFlags(localTitle);
+  let withoutReleaseYear = stripTrailingEpisodeReleaseYear(localTitle);
+  localVariants.add(withoutReleaseFlags);
+  localVariants.add(withoutReleaseYear);
+  localVariants.add(stripTrailingEpisodeReleaseYear(withoutReleaseFlags));
+  localVariants.add(stripTrailingEpisodeReleaseFlags(withoutReleaseYear));
+
+  for (let variant of localVariants) {
+    let comparableVariant = comparableEpisodeTitle(variant);
+    if (comparableVariant.length >= 4 && comparableVariant !== local &&
+        comparableVariant === omdb) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // findEpisodeTitle() leaves the complete basename in video.title when it could
@@ -2155,6 +2209,146 @@ function episodeResponseMatches(data, seriesID, season, episode) {
     (!data.seriesID || data.seriesID === seriesID);
 }
 
+function seasonEpisodeIndexKey(seriesID, season) {
+  return `${seriesID}|${season}`;
+}
+
+// Retrieve OMDb's season-level episode list and reduce it to the one piece of
+// information the fallback needs: one unambiguous IMDb ID per episode number.
+// Successful lists and definitive "not found" responses are cached for this
+// process. Transport, authentication, and malformed-response failures are not,
+// so a later search can retry them.
+async function getSeasonEpisodeIndex(seriesID, season, context) {
+  const cacheKey = seasonEpisodeIndexKey(seriesID, season);
+  if (seasonEpisodeIndexCache.has(cacheKey)) {
+    const cachedIndex = seasonEpisodeIndexCache.get(cacheKey);
+    log.debug('Using cached OMDb season episode index', {
+      searchID: context.searchID,
+      seriesID: seriesID,
+      season: season,
+      episodeCount: cachedIndex.size
+    });
+    return {success: true, data: cachedIndex};
+  }
+
+  const response = await pollOMDB(createURLParts({
+    id: seriesID,
+    season: season
+  }), {searchID: context.searchID, stage: 'season episode index fallback'});
+  const failure = requestFailure(response);
+  if (failure) {
+    if (failure.failure === 'No results') {
+      const emptyIndex = new Map();
+      seasonEpisodeIndexCache.set(cacheKey, emptyIndex);
+      log.debug('OMDb had no season episode index for fallback', {
+        searchID: context.searchID,
+        seriesID: seriesID,
+        season: season
+      });
+      return {success: true, data: emptyIndex};
+    }
+    return {success: false, requestFailure: failure};
+  }
+
+  const seasonData = response.data;
+  if (!seasonData || normalizeEpisodeNumber(seasonData.Season) !== season ||
+      !Array.isArray(seasonData.Episodes)) {
+    log.warn('OMDb season episode index did not match the fallback request', {
+      searchID: context.searchID,
+      expected: {seriesID: seriesID, season: season},
+      received: summarizeOMDbResponse(response)
+    });
+    return {success: false};
+  }
+
+  const episodeIndex = new Map();
+  const ambiguousEpisodes = new Set();
+  let unusableEntries = 0;
+  for (const listedEpisode of seasonData.Episodes) {
+    const listedNumber = normalizeEpisodeNumber(listedEpisode && listedEpisode.Episode);
+    const listedImdbID = listedEpisode && typeof listedEpisode.imdbID === 'string' ?
+      listedEpisode.imdbID.trim() : '';
+    if (listedNumber === null || !validImdbID(listedImdbID)) {
+      unusableEntries++;
+      continue;
+    }
+    if (ambiguousEpisodes.has(listedNumber)) {
+      continue;
+    }
+    if (episodeIndex.has(listedNumber) && episodeIndex.get(listedNumber) !== listedImdbID) {
+      episodeIndex.delete(listedNumber);
+      ambiguousEpisodes.add(listedNumber);
+      continue;
+    }
+    episodeIndex.set(listedNumber, listedImdbID);
+  }
+
+  seasonEpisodeIndexCache.set(cacheKey, episodeIndex);
+  log.debug('Cached OMDb season episode index for fallback', {
+    searchID: context.searchID,
+    seriesID: seriesID,
+    season: season,
+    listedEpisodeCount: seasonData.Episodes.length,
+    usableEpisodeCount: episodeIndex.size,
+    unusableEntryCount: unusableEntries,
+    ambiguousEpisodes: Array.from(ambiguousEpisodes)
+  });
+  return {success: true, data: episodeIndex};
+}
+
+// OMDb sometimes fails to discover an episode through series+Season+Episode
+// even though the season list contains its IMDb ID and the full record is
+// available by that ID. Only accept the fallback when the full record confirms
+// the exact parent series, season, and episode requested by Mynda.
+async function findEpisodeViaSeasonIndex(seriesID, season, episode, context) {
+  const indexResult = await getSeasonEpisodeIndex(seriesID, season, context);
+  if (!indexResult.success) {
+    return indexResult;
+  }
+
+  const episodeImdbID = indexResult.data.get(episode);
+  if (!episodeImdbID) {
+    log.debug('OMDb season episode index did not contain the requested episode', {
+      searchID: context.searchID,
+      seriesID: seriesID,
+      season: season,
+      episode: episode
+    });
+    return {success: false};
+  }
+
+  const response = await pollOMDB(createURLParts({id: episodeImdbID}), {
+    searchID: context.searchID,
+    stage: 'season index exact episode fallback'
+  });
+  const failure = requestFailure(response);
+  if (failure) {
+    return {success: false, requestFailure: failure};
+  }
+
+  const episodeData = response.data;
+  if (!episodeResponseMatches(episodeData, seriesID, season, episode) ||
+      episodeData.seriesID !== seriesID || episodeData.imdbID !== episodeImdbID) {
+    log.warn('OMDb season-index episode did not match the fallback request', {
+      searchID: context.searchID,
+      seasonIndexImdbID: episodeImdbID,
+      expected: {seriesID: seriesID, season: season, episode: episode},
+      received: summarizeOMDbResponse(response)
+    });
+    return {success: false};
+  }
+
+  log.info('Recovered episode through OMDb season index fallback', {
+    searchID: context.searchID,
+    seriesID: seriesID,
+    season: season,
+    episode: episode,
+    imdbID: episodeData.imdbID,
+    title: episodeData.Title
+  });
+  return {success: true, data: episodeData};
+}
+
 // Some releases use a different episode order from OMDb (for example, a pilot
 // stored as episode 0 or a small block of episodes rearranged on home video).
 // When Mynda has a real extracted title, inspect the immediately adjacent
@@ -2241,20 +2435,157 @@ async function findNearbyEpisodeByTitle(seriesID, season, episode, localTitle, c
   return {success: false};
 }
 
+function seasonOffsetHintFor(hints, seriesID) {
+  if (!(hints instanceof Map)) return null;
+  let hint = hints.get(seriesID);
+  return hint === -1 || hint === 1 ? hint : null;
+}
+
+function rememberSeasonOffsetHint(hints, seriesID, offset, context) {
+  if (!(hints instanceof Map) || (offset !== -1 && offset !== 1)) return;
+  let previousOffset = seasonOffsetHintFor(hints, seriesID);
+  hints.set(seriesID, offset);
+  if (previousOffset !== offset) {
+    log.debug('Remembered title-verified OMDb season offset for this tagging batch', {
+      searchID: context.searchID,
+      seriesID: seriesID,
+      previousOffset: previousOffset,
+      seasonOffset: offset
+    });
+  }
+}
+
+// Probe one episode at the same episode number in an adjacent OMDb season.
+// The structural response checks are deliberately stronger than an ordinary
+// lookup because this path is correcting Mynda's requested coordinates: OMDb
+// must explicitly confirm the parent series, probed season, and episode, and
+// the filename-derived title must agree exactly under the conservative episode
+// title normalizations above.
+async function probeAdjacentSeasonEpisodeByTitle(
+  seriesID, season, episode, localTitle, offset, context, stage
+) {
+  let adjacentSeasonNumber = Number(season) + offset;
+  if (!Number.isInteger(adjacentSeasonNumber) || adjacentSeasonNumber < 0) {
+    return {success: false};
+  }
+  let adjacentSeason = String(adjacentSeasonNumber);
+  let response = await pollOMDB(createURLParts({
+    id: seriesID,
+    season: adjacentSeason,
+    episode: episode
+  }), {searchID: context.searchID, stage: stage || 'adjacent season title probe'});
+  let failure = requestFailure(response);
+  if (failure) {
+    return failure.failure === 'No results' ?
+      {success: false} : {success: false, requestFailure: failure};
+  }
+
+  if (!episodeResponseMatches(response.data, seriesID, adjacentSeason, episode) ||
+      response.data.seriesID !== seriesID) {
+    log.warn('Adjacent-season OMDb episode response did not match the probe', {
+      searchID: context.searchID,
+      expected: {seriesID: seriesID, season: adjacentSeason, episode: episode},
+      received: summarizeOMDbResponse(response)
+    });
+    return {success: false};
+  }
+
+  let titleMatches = episodeTitlesMatch(localTitle, response.data.Title);
+  log.debug('Compared adjacent-season OMDb episode title', {
+    searchID: context.searchID,
+    localTitle: localTitle,
+    omdbTitle: response.data.Title,
+    requested: {season: season, episode: episode},
+    probed: {season: adjacentSeason, episode: episode},
+    seasonOffset: offset,
+    titleMatches: titleMatches
+  });
+  if (!titleMatches) return {success: false};
+
+  return {
+    success: true,
+    data: response.data,
+    season: adjacentSeason,
+    episode: episode,
+    offset: offset
+  };
+}
+
+// Look only one season in either direction and accept a correction only when
+// exactly one side has the same episode title. This supports alternate season
+// conventions (including a local season zero) without assuming that every show
+// or release follows the same numbering scheme.
+async function findAdjacentSeasonEpisodeByTitle(
+  seriesID, season, episode, localTitle, context
+) {
+  let offsets = [-1, 1].filter(offset => Number(season) + offset >= 0);
+  let matches = [];
+  for (let offset of offsets) {
+    let candidate = await probeAdjacentSeasonEpisodeByTitle(
+      seriesID,
+      season,
+      episode,
+      localTitle,
+      offset,
+      context,
+      'adjacent season title probe'
+    );
+    if (candidate.requestFailure) return candidate;
+    if (candidate.success) matches.push(candidate);
+  }
+
+  if (matches.length !== 1) {
+    if (matches.length > 1) {
+      log.warn('Both adjacent OMDb seasons matched the local episode title; retaining normal lookup behavior', {
+        searchID: context.searchID,
+        localTitle: localTitle,
+        requested: {season: season, episode: episode},
+        matchingSeasons: matches.map(match => match.season)
+      });
+    }
+    return {success: false};
+  }
+
+  let match = matches[0];
+  log.warn('Corrected shifted OMDb season using the local title', {
+    searchID: context.searchID,
+    localTitle: localTitle,
+    requested: {season: season, episode: episode},
+    matched: {
+      season: match.season,
+      episode: match.episode,
+      seasonOffset: match.offset,
+      title: match.data.Title,
+      imdbID: match.data.imdbID
+    }
+  });
+  return match;
+}
+
 // Show-specific auto-tagging workflow. It validates Mynda's series/season/episode
 // fields, resolves and caches the IMDb series ID, retrieves the exact episode,
 // validates that response, applies its metadata, and downloads available art.
 // A confidently extracted local title may correct an OMDb episode number up to
-// two places away, but it never changes the season/episode stored by Mynda.
-async function searchShowEpisode(video, context, selectedSeriesImdbID) {
+// two places away or an adjacent-season numbering convention, but it never
+// changes the season/episode stored by Mynda.
+async function searchShowEpisode(
+  video, context, selectedSeriesImdbID, seasonOffsetHints
+) {
   let series = typeof video.series === 'string' ? video.series.trim() : '';
   let season = normalizeEpisodeNumber(video.season);
   let episode = normalizeEpisodeNumber(video.episode);
 
   if (!series || season === null || episode === null) {
-    let reason = String(video.season).toLowerCase() === 'extras' ?
-      'OMDb does not assign ordinary season and episode numbers to Mynda extras' :
-      'A show needs series, season, and episode values for auto-tagging';
+    let storedEpisode = String(video.episode).trim();
+    let reason;
+    if (String(video.season).toLowerCase() === 'extras') {
+      reason = 'OMDb does not assign ordinary season and episode numbers to Mynda extras';
+    } else if (/^\d+\.[1-9]$/.test(storedEpisode)) {
+      reason = `OMDb cannot search for fractional episode ${storedEpisode}. ` +
+        'Mynda can store and sort this episode position; tag it individually by entering its exact IMDb ID.';
+    } else {
+      reason = 'A show needs a series and whole-number season and episode values for auto-tagging';
+    }
     log.warn('Show episode lookup does not have usable identifiers', {
       searchID: context.searchID,
       series: series,
@@ -2297,8 +2628,47 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     // If ambiguity was just resolved by episode probes, reuse that full episode
     // response instead of making the same OMDb request twice.
     let episodeData = seriesResult.episodeData;
+    let matchedSeason = season;
     let matchedEpisode = episode;
     let lookupFailure = null;
+
+    // A season offset learned earlier in this Auto-Tag batch changes only the
+    // first place we look. The hinted record still has to match this video's
+    // own filename-derived title, so a stale hint cannot authorize a tag.
+    let seasonOffsetHint = seasonOffsetHintFor(seasonOffsetHints, seriesID);
+    if (!episodeData && localTitle && seasonOffsetHint !== null) {
+      let hintedEpisode = await probeAdjacentSeasonEpisodeByTitle(
+        seriesID,
+        season,
+        episode,
+        localTitle,
+        seasonOffsetHint,
+        context,
+        'title-verified season offset hint'
+      );
+      if (hintedEpisode.requestFailure) {
+        return hintedEpisode.requestFailure;
+      }
+      if (hintedEpisode.success) {
+        episodeData = hintedEpisode.data;
+        matchedSeason = hintedEpisode.season;
+        matchedEpisode = hintedEpisode.episode;
+        log.debug('Used title-verified OMDb season offset hint', {
+          searchID: context.searchID,
+          seriesID: seriesID,
+          localTitle: localTitle,
+          requested: {season: season, episode: episode},
+          matched: {
+            season: matchedSeason,
+            episode: matchedEpisode,
+            seasonOffset: seasonOffsetHint,
+            title: episodeData.Title,
+            imdbID: episodeData.imdbID
+          }
+        });
+      }
+    }
+
     if (!episodeData) {
       let response = await pollOMDB(createURLParts({
         id: seriesID,
@@ -2312,10 +2682,26 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     }
 
     if (lookupFailure) {
+      // OMDb occasionally has a complete episode record but a hole in its
+      // direct series+Season+Episode index. Before giving up—or probing nearby
+      // episode numbers—ask for this season's cached episode list and retry the
+      // requested episode by its exact IMDb ID.
+      if (lookupFailure.failure === 'No results') {
+        let seasonIndexResult = await findEpisodeViaSeasonIndex(
+          seriesID, season, episode, context
+        );
+        if (seasonIndexResult.success) {
+          episodeData = seasonIndexResult.data;
+        } else if (seasonIndexResult.requestFailure &&
+                   seasonIndexResult.requestFailure.failure !== 'No results') {
+          return seasonIndexResult.requestFailure;
+        }
+      }
+
       // A missing episode 0 is the common signal for a release whose numbering
       // is shifted by one. Do not broaden the search unless the filename parser
       // supplied a useful title that can verify the nearby result.
-      if (lookupFailure.failure === 'No results' && localTitle) {
+      if (!episodeData && lookupFailure.failure === 'No results' && localTitle) {
         let correction = await findNearbyEpisodeByTitle(
           seriesID, season, episode, localTitle, context
         );
@@ -2327,15 +2713,45 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
           matchedEpisode = correction.episode;
         }
       }
+
+      // A different catalog may count a local season zero as season one and
+      // shift every later season by the same amount. Probe only the same
+      // episode in the immediately adjacent seasons, and require the local
+      // title to uniquely prove the correction.
+      if (!episodeData && lookupFailure.failure === 'No results' && localTitle) {
+        let seasonCorrection = await findAdjacentSeasonEpisodeByTitle(
+          seriesID, season, episode, localTitle, context
+        );
+        if (seasonCorrection.requestFailure) {
+          return seasonCorrection.requestFailure;
+        }
+        if (seasonCorrection.success) {
+          episodeData = seasonCorrection.data;
+          matchedSeason = seasonCorrection.season;
+          matchedEpisode = seasonCorrection.episode;
+          rememberSeasonOffsetHint(
+            seasonOffsetHints,
+            seriesID,
+            seasonCorrection.offset,
+            context
+          );
+        }
+      }
       if (!episodeData) {
         return lookupFailure;
       }
     }
 
-    if (!episodeResponseMatches(episodeData, seriesID, season, matchedEpisode)) {
+    if (!episodeResponseMatches(
+      episodeData, seriesID, matchedSeason, matchedEpisode
+    )) {
       log.warn('OMDb episode response did not match the request', {
         searchID: context.searchID,
-        expected: {seriesID: seriesID, season: season, episode: matchedEpisode},
+        expected: {
+          seriesID: seriesID,
+          season: matchedSeason,
+          episode: matchedEpisode
+        },
         received: summarizeOMDbResponse({status: 200, data: episodeData})
       });
       return predictableFailure(
@@ -2349,7 +2765,7 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
     // match is stronger evidence than the numeric label alone. If no nearby title
     // matches, preserve the existing exact-S/E behavior to avoid introducing
     // false negatives for alternate episode titles.
-    if (matchedEpisode === episode && localTitle &&
+    if (matchedSeason === season && matchedEpisode === episode && localTitle &&
         !episodeTitlesMatch(localTitle, episodeData.Title)) {
       let correction = await findNearbyEpisodeByTitle(
         seriesID, season, episode, localTitle, context
@@ -2358,14 +2774,32 @@ async function searchShowEpisode(video, context, selectedSeriesImdbID) {
         episodeData = correction.data;
         matchedEpisode = correction.episode;
       } else {
-        log.warn('Local and OMDb episode titles differed; retaining the exact season/episode result', {
-          searchID: context.searchID,
-          localTitle: localTitle,
-          omdbTitle: episodeData.Title,
-          season: season,
-          episode: episode,
-          nearbyProbeError: summarizeError(correction.requestFailure && correction.requestFailure.data)
-        });
+        let seasonCorrection = await findAdjacentSeasonEpisodeByTitle(
+          seriesID, season, episode, localTitle, context
+        );
+        if (seasonCorrection.success) {
+          episodeData = seasonCorrection.data;
+          matchedSeason = seasonCorrection.season;
+          matchedEpisode = seasonCorrection.episode;
+          rememberSeasonOffsetHint(
+            seasonOffsetHints,
+            seriesID,
+            seasonCorrection.offset,
+            context
+          );
+        } else {
+          log.warn('Local and OMDb episode titles differed; retaining the exact season/episode result', {
+            searchID: context.searchID,
+            localTitle: localTitle,
+            omdbTitle: episodeData.Title,
+            season: season,
+            episode: episode,
+            nearbyProbeError: summarizeError(correction.requestFailure && correction.requestFailure.data),
+            adjacentSeasonProbeError: summarizeError(
+              seasonCorrection.requestFailure && seasonCorrection.requestFailure.data
+            )
+          });
+        }
       }
     }
 

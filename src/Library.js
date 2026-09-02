@@ -109,6 +109,7 @@ class Library {
       this.settings.preferences = _.cloneDeep(defaultLibrary.settings.preferences);
     }
     for (const preferenceName of [
+      'remove_edited_from_new',
       'exclude_samples_from_library',
       'exclude_trailers_from_library'
     ]) {
@@ -902,6 +903,7 @@ const defaultLibrary = {
       },
       "include_user_rating_in_avg": false,
       "include_new_vids_in_playlists": true,
+      "remove_edited_from_new": false,
       "remove_autotagged_from_new": true,
       "exclude_samples_from_library": true,
       "exclude_trailers_from_library": true

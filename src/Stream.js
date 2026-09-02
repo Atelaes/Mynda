@@ -3,10 +3,12 @@ const electron = require('electron');
 const path = require('path');
 const fs = require('fs');
 const _ = require('lodash');
+const Logger = require('./Logger.js');
 // const { ipcRenderer } = require('electron');
 const ffmpeg = require('fluent-ffmpeg');
 const HLSServer = require('hls-server');
 const http = require('http');
+const streamLog = Logger.child('Stream');
 let server;
 
 
@@ -53,29 +55,45 @@ class Stream {
         // 'headers "Content-Range: bytes */92000000"'
       ]);
     this.command.on('codecData', (data) => {
-        console.log(data);
+        streamLog.debug('FFmpeg stream codec data received', {
+          source: source,
+          videoID: video_id,
+          codecData: data
+        });
         if (callbacks && _.isFunction(callbacks.codecData)) {
-          console.log('codecData callback');
+          streamLog.debug('Calling stream codec-data callback', {
+            videoID: video_id
+          });
           callbacks.codecData(outputPath,data);
         }
       }).on('progress', () => {
         if (callbacks && _.isFunction(callbacks.progress)) {
-          console.log('progress callback');
+          streamLog.debug('Calling stream progress callback', {
+            videoID: video_id
+          });
           callbacks.progress(outputPath);
         }
       }).on('error', (err) => {
         if (err) {
-          console.log("ffmpeg had an error! Oh no!");
-          console.error(err);
-          console.log({err});
+          streamLog.error('FFmpeg stream failed', {
+            source: source,
+            videoID: video_id,
+            error: err
+          });
         }
         if (callbacks && _.isFunction(callbacks.error)) {
-          console.log('error callback');
+          streamLog.debug('Calling stream error callback', {
+            videoID: video_id
+          });
           callbacks.error(err);
         }
       }).on('end', () => {
         // callback
-        console.log("ENDED");
+        streamLog.info('FFmpeg stream ended', {
+          source: source,
+          videoID: video_id,
+          outputPath: outputPath
+        });
       });
 
     this.command.run();
@@ -96,7 +114,7 @@ class Stream {
   // }
 
   kill() {
-    console.log('Killing ffmpeg process');
+    streamLog.debug('Stopping FFmpeg stream process');
     this.command.kill();
   }
 

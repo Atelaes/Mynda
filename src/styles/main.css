@@ -774,7 +774,7 @@ table.compact .movie-row {
 #detail-title {
   --padding: 100px;
   text-align:center;
-  text-wrap: nowrap;
+  white-space: nowrap;
   text-overflow: ellipsis;
   overflow-x: hidden;
   font-family: var(--big-title-font);
@@ -2044,6 +2044,55 @@ table.compact .movie-row {
   background: none;
 }
 
+/* During a batch edit, these fields will overwrite or deliberately modify the
+   selected videos when Save is pressed. The color is intentionally subtle so
+   it reads as state, not as a validation warning. */
+#editor-pane .edit-field.batch-changed:not(.rating):not(.seen):not(.watchlater):not(.new):not(.tags):not(.cast):not(.subtitles):not(.languages) > .edit-field-editor,
+#editor-pane .edit-field.batch-changed:not(.title):not(.tags):not(.cast):not(.subtitles):not(.languages) input[type=text],
+#editor-pane .edit-field.batch-changed:not(.tags):not(.cast):not(.subtitles):not(.languages) select,
+#editor-pane .edit-field.batch-changed:not(.tags):not(.cast):not(.subtitles):not(.languages) textarea,
+#editor-pane .edit-field.ratings .ratings-input input[type=text].batch-changed {
+  background-color: var(--editor-batch-changed-bg-color);
+  background: var(--editor-batch-changed-bg);
+  box-shadow: var(--editor-batch-changed-boxshadow);
+}
+
+#editor-pane .edit-field.batch-changed:not(.rating):not(.seen):not(.watchlater):not(.new):not(.tags):not(.cast):not(.subtitles):not(.languages) > .edit-field-editor {
+  border-radius: var(--editor-textinput-borderradius-radius);
+}
+
+#editor-pane .edit-field.batch-changed.rating .edit-widget,
+#editor-pane .edit-field.batch-changed.seen .edit-widget,
+#editor-pane .edit-field.batch-changed.watchlater .edit-widget {
+  color: var(--editor-batch-changed-control-text);
+}
+
+#editor-pane .edit-field.batch-changed.new input[type=checkbox]::after {
+  --color: var(--editor-batch-changed-control-text);
+  --bg-color: var(--editor-batch-changed-bg-color);
+}
+
+#editor-pane .edit-field.batch-changed.new input[type=checkbox]:checked::after {
+  box-shadow: inset 0px 0px 0px 3px black,
+    inset 0px 0px 0px 500px var(--editor-batch-changed-control-text);
+}
+
+/* List editors are already visually busy, so use their label as the field-level
+   marker and reserve the background tint for newly added pills. */
+#editor-pane .edit-field.batch-changed.tags > .edit-field-name,
+#editor-pane .edit-field.batch-changed.cast > .edit-field-name,
+#editor-pane .edit-field.batch-changed.subtitles > .edit-field-name,
+#editor-pane .edit-field.batch-changed.languages > .edit-field-name {
+  color: var(--editor-batch-changed-label-text);
+  font-weight: bold;
+}
+
+#editor-pane .list-widget-item.batch-added {
+  --listwidget-item-bg-color: var(--editor-batch-added-item-bg-color);
+  --listwidget-item-ellipsis-grad: var(--editor-batch-added-item-ellipsis-grad);
+  box-shadow: var(--editor-batch-changed-boxshadow);
+}
+
 #editor-pane .edit-field.ratings .tip {
   position: absolute;
   bottom: 0em; /*calc(-1 * var(--tip-fontsize));*/
@@ -2204,6 +2253,7 @@ table.compact .movie-row {
 
 #edit-search-results td.artwork {
   padding-left:0em;
+  border-radius: 1em 0 0 1em;
 }
 
 #edit-search-results td.artwork img {

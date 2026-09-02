@@ -28,12 +28,19 @@ const pathToFFmpeg = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(pathToFFmpeg);
 const ffprobe = require('ffprobe');
+const frontendLog = Logger.child('FrontEnd');
+const libraryViewLog = Logger.child('LibraryView');
+const playerLog = Logger.child('Player');
+const settingsLog = Logger.child('Settings');
+const editorLog = Logger.child('Editor');
+const artworkLog = Logger.child('Artwork');
 let ffprobeStatic = {};
 try {
   ffprobeStatic = require('ffprobe-static');
-} catch(err) {console.warn('Warning: ffprobe-static not installed')}
+} catch(err) {
+  frontendLog.warn('ffprobe-static is unavailable in the renderer', {error: err});
+}
 const placeholderImage = "../images/qmark.png";
-const editorLog = Logger.child('Editor');
 let nextEditorArtworkDownloadNumber = 0;
 let nextFilenameResetNumber = 0;
 
@@ -75,6 +82,97 @@ function batchNewState(videos) {
   if (numberNew === videos.length) return true;
   if (numberNew === 0) return false;
   return null;
+}
+
+// Mynda permits manually interlaced episode positions such as 3.5 while
+// keeping the field predictable for display, sorting, and batch editing.
+// Require a nonnegative ordinary decimal with at most one digit after the
+// point; scientific notation, signs, and higher precision are deliberately
+// excluded. The returned number also gives validateVideo() one canonical form
+// without ever truncating a fractional episode.
+function parseEditableEpisodeNumber(value) {
+  let text = String(value === null || typeof value === 'undefined' ? '' : value).trim();
+  if (!/^\d+(?:\.\d)?$/.test(text)) return null;
+
+  let episode = Number(text);
+  return Number.isFinite(episode) && episode >= 0 ? episode : null;
+}
+
+const EDITOR_RATING_SOURCES = ['imdb', 'rt', 'mc', 'user'];
+
+// Ratings arrive from several generations of library data as numbers,
+// numeric strings, empty strings, or missing properties. Treat values that
+// render identically in the editor as equal so returning an input to what the
+// user originally saw also returns the batch field to its untouched state.
+function normalizeEditorRatingValue(value) {
+  if (value === undefined || value === null || value === '') return '';
+  return String(value);
+}
+
+function editorRatingValuesEqual(first, second) {
+  return normalizeEditorRatingValue(first) === normalizeEditorRatingValue(second);
+}
+
+function editorRatingsEqual(first, second) {
+  const firstRatings = first && typeof first === 'object' ? first : {};
+  const secondRatings = second && typeof second === 'object' ? second : {};
+  const sources = new Set([
+    ...EDITOR_RATING_SOURCES,
+    ...Object.keys(firstRatings),
+    ...Object.keys(secondRatings)
+  ]);
+
+  return Array.from(sources).every(source =>
+    editorRatingValuesEqual(firstRatings[source], secondRatings[source])
+  );
+}
+
+// Build a complete, detached ratings summary for a batch. In particular, a
+// source missing from the first selected video must not hide a value present
+// on a later video, and finding a mixed value must never mutate either source.
+function batchRatingsState(videos) {
+  const safeVideos = Array.isArray(videos) ? videos.filter(Boolean) : [];
+  const sources = new Set(EDITOR_RATING_SOURCES);
+  safeVideos.forEach(video => {
+    if (video.ratings && typeof video.ratings === 'object') {
+      Object.keys(video.ratings).forEach(source => sources.add(source));
+    }
+  });
+
+  const ratings = {};
+  const firstRatings = safeVideos[0] && safeVideos[0].ratings &&
+    typeof safeVideos[0].ratings === 'object' ? safeVideos[0].ratings : {};
+  sources.forEach(source => {
+    const firstValue = firstRatings[source];
+    const common = safeVideos.length > 0 && safeVideos.every(video => {
+      const videoRatings = video.ratings && typeof video.ratings === 'object' ? video.ratings : {};
+      return editorRatingValuesEqual(videoRatings[source], firstValue);
+    });
+    ratings[source] = common && firstValue !== undefined && firstValue !== null ?
+      _.cloneDeep(firstValue) : '';
+  });
+  return ratings;
+}
+
+// The empty value in a batch field has two distinct meanings. If every video
+// originally shared a non-empty value, clearing it is an intentional edit. If
+// the videos originally differed, the batch summary was already empty, and
+// returning to empty means "leave each video's value alone." Compare against
+// the untouched batch summary instead of treating every empty value alike.
+function updateEditorChangedField(changedFields, video, batchBaseline, field, value) {
+  const hasBatchBaseline = video && video.id === 'batch' && batchBaseline &&
+    Object.prototype.hasOwnProperty.call(batchBaseline, field);
+  const isChanged = hasBatchBaseline ?
+    (field === 'ratings' ?
+      !editorRatingsEqual(value, batchBaseline[field]) :
+      !_.isEqual(value, batchBaseline[field])) : value !== '';
+
+  if (isChanged) {
+    changedFields.add(field);
+  } else {
+    changedFields.delete(field);
+  }
+  return isChanged;
 }
 
 
@@ -249,7 +347,11 @@ class Mynda extends React.Component {
 
     // get object containing all selected videos
     let allSelected = this.getAllSelected();
-    console.log(`ALL SELECTED: ${JSON.stringify(allSelected)}`);
+    libraryViewLog.debug('Library row selection changed', {
+      selectedVideoCount: allSelected.rows.length,
+      selectedTableCount: Object.keys(this.state.selectedRows).length,
+      highestRow: allSelected.highestRow
+    });
 
     if (allSelected.rows.length === 0) {
       // if no rows are selected, empty the state object so that
@@ -359,7 +461,9 @@ class Mynda extends React.Component {
     // this object will be used to perform the batch edit
     if (Array.isArray(id)) {
       const vidIDs = id;
-      console.log('SHOWING BATCH DETAILS PANE')
+      libraryViewLog.debug('Building batch details', {
+        requestedVideoCount: vidIDs.length
+      });
       // console.log(vidIDs);
 
       // store a list of videos to display to the user
@@ -384,8 +488,12 @@ class Mynda extends React.Component {
       delete batchObject.metadata; // and delete metadata, since that is derived from the files themselves and is uneditable
       Object.keys(batchObject).map(key => {
         if (key === 'id' || key === 'metadata') return;
+        if (key === 'ratings') {
+          batchObject.ratings = batchRatingsState(videos);
+          return;
+        }
         // test each video's value for this key against that of the first video
-        let testValue = videos[0][key];
+        let testValue = _.cloneDeep(videos[0][key]);
         // loop through and test all the videos against that value
         // console.log('Testing ' + key);
         for (let i=1; i<videos.length; i++) {
@@ -418,7 +526,11 @@ class Mynda extends React.Component {
       // its three-state batch summary explicitly so the checkbox reflects what
       // an untouched batch save will actually preserve.
       batchObject.new = batchNewState(videos);
-      console.log(JSON.stringify(batchObject));
+      libraryViewLog.debug('Batch details ready', {
+        videoCount: videos.length,
+        sharedFieldCount: Object.keys(batchObject).length,
+        newState: batchObject.new
+      });
 
       this.setState({detailRowID: rowID, detailVideo: batchObject, batchVids: batchVids}, callback);
       return;
@@ -431,7 +543,10 @@ class Mynda extends React.Component {
       try {
         detailVideo = this.state.filteredVideos.filter(v => v.id === id)[0]
       } catch (error) {
-        console.log("Error: could not find video " + id)
+        libraryViewLog.warn('Could not resolve details video from the filtered library', {
+          videoID: id,
+          error: error
+        });
       }
     }
 
@@ -462,11 +577,11 @@ class Mynda extends React.Component {
   // highlighting that row and showing it in the details pane,
   // and if the video editor is open, changing the video there too
   incrementDetailVid(amount) {
-    console.log(`Going to ${amount == 1 ? 'NEXT' :( amount == -1 ? 'PREVIOUS' : 'SOME OTHER')} video`);
-
-    console.log('******** playlistRowManifest: ');
-    console.log(this.state.playlistRowManifest);
-    console.log(`Current detail vid rowID: ${this.state.detailRowID}`);
+    libraryViewLog.debug('Moving details selection', {
+      offset: amount,
+      currentRowID: this.state.detailRowID,
+      manifestRowCount: this.state.playlistRowManifest.length
+    });
 
     // first find index of the current detail vid in the playlistRowManifest;
     // even though we've already saved this in this.state.detailVideoRowIndex,
@@ -491,7 +606,11 @@ class Mynda extends React.Component {
           index -= amount;
         }
       } else {
-        return console.error('Could not find current detail vid in manifest');
+        libraryViewLog.warn('Could not find the current details video in the row manifest', {
+          currentRowID: this.state.detailRowID,
+          manifestRowCount: this.state.playlistRowManifest.length
+        });
+        return;
       }
     }
 
@@ -503,7 +622,10 @@ class Mynda extends React.Component {
   }
 
   goToRow(row) {
-    if (!row) return console.error('Could not find row to move to');
+    if (!row) {
+      libraryViewLog.warn('Could not find the requested row to move to');
+      return;
+    }
 
     // select the row that we are going to (instead of just hovering it)
     this.handleSelectedRows(row.vidID, row.rowID, row.tableID, true);
@@ -517,7 +639,9 @@ class Mynda extends React.Component {
     if (els && els.length > 0) {
       els[0].scrollIntoView();
     } else {
-      console.log('Could not find table row to scroll to for ' + rowID);
+      libraryViewLog.warn('Could not find the requested table row to scroll to', {
+        rowID: rowID
+      });
     }
   }
 
@@ -530,7 +654,9 @@ class Mynda extends React.Component {
         || (rect.x > window.innerWidth || rect.y > window.innerHeight)
       );
     } catch(err) {
-      console.error(err);
+      libraryViewLog.warn('Could not determine whether an element is off-screen', {
+        error: err
+      });
       return true;
     }
   }
@@ -546,7 +672,10 @@ class Mynda extends React.Component {
     try {
       row = document.getElementsByClassName('movie-row ' + rowID)[0];
     } catch(err) {
-      console.log('Cannot tell if row is visible. Unable to find row for movie ' + rowID);
+      libraryViewLog.warn('Could not find a row while checking its visibility', {
+        rowID: rowID,
+        error: err
+      });
       return false;
     }
 
@@ -559,7 +688,10 @@ class Mynda extends React.Component {
         inViewport = true;
       }
     } catch(err) {
-      console.error(err);
+      libraryViewLog.warn('Could not measure a row while checking its visibility', {
+        rowID: rowID,
+        error: err
+      });
       inViewport = true; // if there was an error, set this to true, so the link doesn't appear
     }
 
@@ -577,12 +709,15 @@ class Mynda extends React.Component {
     try {
       playlist = this.state.playlists.filter(playlist => playlist.id == id)[0]
     } catch(error) {
-      console.error("Error: could not find playlist " + id + ", displaying first playlist")
+      libraryViewLog.warn('Could not find the requested playlist; displaying the first playlist', {
+        playlistID: id,
+        error: error
+      });
       try {
         playlist = this.state.playlists[0] // display the first one
         id = playlist.id
       } catch(error) {
-        console.error("Error: no playlists found, displaying nothing")
+        libraryViewLog.error('No playlists were available to display', {error: error});
         playlist = { "filter_function" : "false", "id":-1 } // just display nothing
         id = playlist.id
       }
@@ -602,7 +737,11 @@ class Mynda extends React.Component {
       filteredVids = this.state.videos.filter(video => video && eval(playlist.filter_function) && (video.new ? showNew : true));
     } catch(err) {
       let name = playlist ? playlist.name : 'nonexistent';
-      console.error(`Unable to execute filter for ${name} playlist: ${err}`);
+      libraryViewLog.error('Could not execute a playlist filter', {
+        playlistID: playlist && playlist.id,
+        playlistName: name,
+        error: err
+      });
     }
 
     if (playlist.id) {
@@ -635,12 +774,17 @@ class Mynda extends React.Component {
     try {
       playlist = this.state.playlists.filter(playlist => playlist && playlist.id == id)[0];
     } catch(e) {
-      console.error("Error: could not find playlist " + id + ", setting to first playlist")
+      libraryViewLog.warn('Could not set the requested playlist; using the first playlist', {
+        playlistID: id,
+        error: e
+      });
       try {
         playlist = this.state.playlists[0] // display the first one
         id = playlist.id
       } catch(e) {
-        console.error("Error: no playlists found, displaying nothing")
+        libraryViewLog.error('No playlists were available while setting the current playlist', {
+          error: e
+        });
         playlist = { "filter_function": "false", "id":-1 } // just display nothing
         id = playlist.id
       }
@@ -796,13 +940,19 @@ class Mynda extends React.Component {
         // we didn't find a row of this video in the current playlist,
         // so unselect all the rows in this playlist, and just
         // force the detail vid to be this video
-        console.log(`Playing video from '${id}', but could not find row in current playlist, so just forcing the detail vid`);
+        libraryViewLog.warn('Playback video was not in the current playlist; using its library record', {
+          videoID: id,
+          playlistID: this.state.currentPlaylistID
+        });
 
         let video = this.state.videos.filter(v => v.id === vidID)[0];
         if (video) {
           await this.setState({detailVideo: video});
         } else {
-          return console.error(`Could not play video; could not find video from '${id}' in library`);
+          playerLog.error('Could not play video because its library record was not found', {
+            videoID: id
+          });
+          return;
         }
       }
     }
@@ -868,7 +1018,7 @@ class Mynda extends React.Component {
     try {
       document.getElementById('nav-playlists').getElementsByTagName('li')[0].click();
     } catch(e) {
-      console.log("Error displaying first playlist: no playlists found? " + e.toString());
+      libraryViewLog.error('Could not display the initial playlist', {error: e});
     }
 
     // set the lengths of all the playlists
@@ -883,7 +1033,9 @@ class Mynda extends React.Component {
     // something is saved. So here we must take any actions necessary to update
     // the view in real time whenever that happens
     savedPing.saved = (address) => {
-      console.log('MYNDA KNOWS WE SAVED!!!, address is ' + address);
+      frontendLog.debug('Renderer received a library save notification', {
+        address: address
+      });
 
       // if the whole media array was replaced at one time
       // (this happens when a watchfolder is removed or a batch is saved),
@@ -892,7 +1044,7 @@ class Mynda extends React.Component {
       // make playlistFilter() read the old this.state.videos array and leave
       // the table showing stale data even though library.json was saved.
       if (address === 'media') {
-        console.log('library.media was replaced. Refreshing videos');
+        frontendLog.debug('Refreshing renderer state after media replacement');
 
         this.setState({videos:library.media}, () => {
           // Now playlistFilter(), the table, and the details/editor refresh all
@@ -904,7 +1056,9 @@ class Mynda extends React.Component {
       } else if (address.includes('media')) {
         // A one-video save replaces an entry inside the existing media array,
         // so no parent-state handoff is needed before refreshing its consumers.
-        console.log('a video was edited');
+        frontendLog.debug('Refreshing renderer state after a video edit', {
+          address: address
+        });
         this.setPlaylist(this.state.currentPlaylistID);
         this.setPlaylistLengths(true);
         this.refreshDetails(timeout);
@@ -916,7 +1070,9 @@ class Mynda extends React.Component {
         // // (if they don't care which one or what the change was)
         // this.setState({playlistEditFlag:uuidv4()});
 
-        console.log('a playlist was edited');
+        frontendLog.debug('Refreshing renderer state after a playlist edit', {
+          address: address
+        });
         // reload the playlists, and then re-render the current playlist
         this.setState({playlists:this.props.library.playlists}, () => {
 
@@ -929,7 +1085,9 @@ class Mynda extends React.Component {
 
       // if the settings were changed
       if (address.includes('settings')) {
-        console.log('settings was edited');
+        frontendLog.debug('Refreshing renderer state after a settings edit', {
+          address: address
+        });
         this.setState({settings : this.props.library.settings}, () => {
           // if (address === 'settings.preferences.defaultcolumns') {
           //
@@ -959,7 +1117,9 @@ class Mynda extends React.Component {
 
   // REFRESH DETAILS PANE
   refreshDetails(timeout) {
-    console.log('Refreshing Details');
+    libraryViewLog.debug('Refreshing details pane', {
+      videoID: this.state.detailVideo && this.state.detailVideo.id
+    });
     if (this.state.detailVideo) {
       if (this.state.detailVideo.id !== 'batch') {
         this.setState({detailVideo : this.state.videos.filter(video => video && video.id === this.state.detailVideo.id)[0]});
@@ -968,7 +1128,10 @@ class Mynda extends React.Component {
         // calling handleSelectedRows with no parameters will reset the details pane and the editor
         // to correspond appropriately to the selected rows (without adding any new rows)
         clearTimeout(timeout);
-        timeout = setTimeout(() => {console.log('TIMEOUT FIRED, UPDATING BATCH VID');this.handleSelectedRows()},500);
+        timeout = setTimeout(() => {
+          libraryViewLog.debug('Refreshing batch details after save');
+          this.handleSelectedRows();
+        },500);
       }
     }
   }
@@ -1284,7 +1447,11 @@ class MynLibrary extends React.Component {
         />
       );
     } else {
-      console.log('Playlist has bad "view" parameter ("' + this.props.view + '"). Should be "flat" or "series"');
+      libraryViewLog.error('Playlist has an invalid view', {
+        playlistID: this.props.playlistID,
+        view: this.props.view,
+        allowedViews: ['flat', 'series']
+      });
       return null;
     }
 
@@ -1682,7 +1849,10 @@ class MynLibTable extends React.Component {
     } else if (e.detail === 2 && !this.state.shiftDown && !this.state.ctrlDown) {
       this.rowSelect(id, rowID, index, target, true); // 'true' forces the row to be selected; otherwise, if it was already (the only row) selected, clicking on it would unselect it
 
-      console.log('PLAYING VIDEO!');
+      playerLog.debug('Playback requested by double-clicking a library row', {
+        videoID: id,
+        rowID: rowID
+      });
       this.props.playVideo();
     }
   }
@@ -1835,7 +2005,12 @@ class MynLibTable extends React.Component {
   }
 
   requestSort(key, ascending) {
-    console.log(`SORTING TABLE ${this.tableID} by ${key}`);
+    libraryViewLog.debug('Sorting library table', {
+      tableID: this.tableID,
+      sortKey: key,
+      requestedAscending: ascending,
+      videoCount: this.props.movies.length
+    });
 
     if (key === undefined) {
       throw "Error: key was undefined; must supply a key to sort by";
@@ -1898,8 +2073,6 @@ class MynLibTable extends React.Component {
      resolution: (a, b) => [parseInt(a.metadata.width),parseInt(b.metadata.width)],
      episode: (a,b) => [parseFloat(a.episode),parseFloat(b.episode)],
     }
-
-    console.log('this.props.movies.length === ' + this.props.movies.length);
 
     let rows = this.props.movies.sort((vid_a, vid_b) => {
 
@@ -1975,12 +2148,21 @@ class MynLibTable extends React.Component {
     this.state.sortAscending = ascending;
     this.state.sortedRows = rows;
 
-    console.log("...finished sorting");
+    libraryViewLog.debug('Library table sorting finished', {
+      tableID: this.tableID,
+      sortKey: key,
+      ascending: ascending,
+      rowCount: rows.length
+    });
   }
 
   // Sort the rows and rebuild the table content.
   reset(sortValue) {
-    console.log("======== MynLibTable RESET WAS CALLED ========");
+    libraryViewLog.debug('Resetting library table', {
+      tableID: this.tableID,
+      requestedSort: sortValue,
+      currentSortKey: this.state.sortKey
+    });
 
     if (sortValue === "initial-sort" || this.state.sortKey === null) {
       this.state.sortKey = null;
@@ -2036,14 +2218,19 @@ class MynLibTable extends React.Component {
 
     // if another table unselected this table's rows, update the state variable
     if (!this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID]) {
-      console.log('Rows unselected from outside')
+      libraryViewLog.debug('Library table rows were unselected externally', {
+        tableID: this.tableID
+      });
       this.setState({batchSelected:[]},this.handleBatch);
     }
     // if the selection of rows in this table was otherwise changed from the outside
     // (though I don't know when that would happen besides a simple unselection)
     // update the state variable
     if (this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID] && !_.isEqual(this.props.selectedRows[this.tableID],oldProps.selectedRows[this.tableID]) && this.props.selectedRows[this.tableID].rows) {
-      console.log('Selected rows otherwise changed from outside');
+      libraryViewLog.debug('Library table selection changed externally', {
+        tableID: this.tableID,
+        selectedVideoCount: this.props.selectedRows[this.tableID].rows.length
+      });
       this.setState({batchSelected:this.props.selectedRows[this.tableID].rows},this.handleBatch);
     }
 
@@ -2056,7 +2243,11 @@ class MynLibTable extends React.Component {
 
     // If the playlist changed, reset it using the playlist's default sort.
     if (oldProps.playlistID !== this.props.playlistID) {
-      console.log("MynLibTable ============= PLAYLIST WAS CHANGED to " + this.props.playlistID);
+      libraryViewLog.debug('Library table playlist changed', {
+        tableID: this.tableID,
+        previousPlaylistID: oldProps.playlistID,
+        playlistID: this.props.playlistID
+      });
       // setTimeout(() => this.reset(true,true), 1000);
       this.reset('initial-sort');
     } else { //if (this.props.view === 'flat' || this.props.isExpanded) {
@@ -2081,7 +2272,11 @@ class MynLibTable extends React.Component {
 
       let includeUserRatingChanged = this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg;
       if (moviesChanged || includeUserRatingChanged) {
-        console.log("MynLibTable ============= a video updated (or user avg rating setting changed)");
+        libraryViewLog.debug('Library table data changed', {
+          tableID: this.tableID,
+          moviesChanged: moviesChanged,
+          includeUserRatingChanged: includeUserRatingChanged
+        });
         // let diff = getArrayDiff(tempOld,tempNew);
         // console.log(diff);
         // diff.map(key => {
@@ -2224,7 +2419,9 @@ class MynLibTableRow extends React.Component {
         let index = library.media.findIndex((video) => video.id === updated.id);
         library.replace("media." + index, updated);
       } else {
-        console.log('Edit canceled by user')
+        libraryViewLog.debug('Inline video edit canceled by user', {
+          videoID: originalVid && originalVid.id
+        });
       }
 
       // if the user checked the checkbox to override the confirmation dialog,
@@ -2327,7 +2524,10 @@ class MynDetails extends React.Component {
       date = new Date(parseInt(value) * 1000);
       displaydate = date.toDateString().replace(/(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/,"");
     } catch(e) {
-      console.log("MynDetails: could not resolve date: " + e.toString());
+      libraryViewLog.warn('Could not format a date in the details pane', {
+        value: value,
+        error: e
+      });
       displaydate = "";
     }
     return displaydate;
@@ -2338,7 +2538,7 @@ class MynDetails extends React.Component {
       try {
         document.getElementById('detail-description').classList.toggle('hide');
       } catch(err) {
-        console.log(err);
+        libraryViewLog.warn('Could not toggle the details description', {error: err});
       }
     // }
   }
@@ -2381,7 +2581,10 @@ class MynDetails extends React.Component {
     } else if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
       changes = {...args[0]};
     } else {
-      console.error('Bad arguments supplied to saveVideo in MynDetails: ' + JSON.stringify(args));
+      libraryViewLog.error('Bad arguments were supplied to the details-pane video save', {
+        argumentCount: args.length,
+        argumentTypes: args.map(value => typeof value)
+      });
       return;
     }
 
@@ -2401,7 +2604,9 @@ class MynDetails extends React.Component {
         try {
           document.getElementById('detail-description').classList.add('hide');
         } catch(err) {
-          console.log('Error: could not find detail description: ' + err);
+          libraryViewLog.warn('Could not find the details description while applying visibility preferences', {
+            error: err
+          });
         }
       }
     }
@@ -2409,8 +2614,11 @@ class MynDetails extends React.Component {
     // if the user has scrolled, we want to show or not show the scroll button
     // depending on whether the row of the details video is still in view
     if (oldProps.libraryScroll !== this.props.libraryScroll) {
-      if (this.scrollBtn.current && !this.props.isRowVisible(rowID)) {
-        console.log(video.title + ' is NOT visible!');
+      if (this.scrollBtn.current && !this.props.isRowVisible(this.props.rowID)) {
+        libraryViewLog.debug('Details video row is outside the visible library area', {
+          videoID: this.props.video && this.props.video.id,
+          title: this.props.video && this.props.video.title
+        });
         this.scrollBtn.current.style.display = 'block';
       } else {
         this.scrollBtn.current.style.display = 'none';
@@ -2514,7 +2722,8 @@ class MynNotify extends React.Component {
   on(status) {
     if (!status.action) {
       this.off();
-      return console.error('Error: invalid status');
+      frontendLog.warn('Ignored renderer status without an action', {status: status});
+      return;
     }
 
     // if it's not already on, turn on ellipsis animation and set the state to on
@@ -2818,7 +3027,7 @@ class MynOverflowTextMarquee extends React.Component {
 
       // console.log('new width: ' + this.theDiv.current.style.width);
     } catch(err) {
-      console.error(`Could not apply overflow styles: ${err}`);
+      frontendLog.warn('Could not apply text overflow styles', {error: err});
     }
   }
 
@@ -2962,7 +3171,9 @@ class MynOpenablePane extends React.Component {
         // if the user checked the checkbox to override the confirmation dialog,
         // set that preference in the settings
         if (checked) {
-          console.log('option to override dialog was checked!');
+          frontendLog.debug('User disabled a pane-exit confirmation dialog', {
+            paneID: id
+          });
           let prefs = _.cloneDeep(this.props.settings.preferences);
           if (!prefs.override_dialogs) {
             prefs.override_dialogs = {};
@@ -2978,7 +3189,7 @@ class MynOpenablePane extends React.Component {
           } catch(err) {}
           this.props.hideFunction(id);
         } else {
-          console.log('Exit pane canceled by user')
+          frontendLog.debug('Pane exit canceled by user', {paneID: id});
         }
       });
 
@@ -3151,7 +3362,9 @@ function stopMpvSafely(player) {
       socket.removeAllListeners('close');
       socket.removeAllListeners('data');
       socket.removeAllListeners('error');
-      socket.on('error', (error) => console.warn('MPV socket closed during cleanup:', describePlaybackError(error)));
+      socket.on('error', (error) => playerLog.debug('MPV socket closed during cleanup', {
+        error: describePlaybackError(error)
+      }));
       socket.destroy();
     } catch(err) {}
   }
@@ -3251,7 +3464,10 @@ class MynPlayer extends MynOpenablePane {
 
   updatePosition(time) {
     this.state.video.position = Math.round(time * 10) / 10;
-    console.log('UPDATING POSITION TO ' + this.state.video.position);
+    playerLog.debug('Updating saved playback position', {
+      videoID: this.state.video.id,
+      position: this.state.video.position
+    });
     library.replace(`media.id=${this.state.video.id}`,this.state.video);
   }
 
@@ -3266,14 +3482,21 @@ class MynPlayer extends MynOpenablePane {
 
   // called when quitting mpv player or video stopping
   onExitVideo() {
-    console.log('MPV PLAYER CLOSED');
+    playerLog.info('MPV playback ended', {
+      videoID: this.state.video && this.state.video.id,
+      title: this.state.video && this.state.video.title
+    });
     this.setState({showPlayingMessage: false});
 
     clearTimeout(this.logPlayTimeout);
 
     let position = this.state.video.position;
     let duration = this.state.video.metadata.duration;
-    console.log(`position: ${position}, duration: ${duration}`);
+    playerLog.debug('Evaluating playback position at exit', {
+      videoID: this.state.video.id,
+      position: position,
+      duration: duration
+    });
 
     // if the position is close to the beginning or close enough to the end
     // that we estimate the user is done watching it, we reset to 0
@@ -3281,12 +3504,16 @@ class MynPlayer extends MynOpenablePane {
       // if < 30 seconds or 0.5%, whichever is smaller, reset to 0
       // (0.5% of 45 minutes is 13.5 seconds; 0.5% of 2 hours is 36 seconds)
       position = 0;
-      console.log('POSITION close to beginning, resetting to 0');
+      playerLog.debug('Resetting playback position near the beginning', {
+        videoID: this.state.video.id
+      });
     } else if (position > Math.max(duration*.97, duration - 300)) {
       // if 5 minutes or less from the end, or 3% or less from the end, which ever is later, reset to 0 ()
       // (3% of 45 min is 1:21; 3% of 2 hours is 3:36)
       position = 0;
-      console.log('POSITION close to END, resetting to 0');
+      playerLog.debug('Resetting playback position near the end', {
+        videoID: this.state.video.id
+      });
     }
 
     // save the position
@@ -3429,7 +3656,13 @@ class MynPlayer extends MynOpenablePane {
       // turn off loading indicator
       this.setState({ showLoadingIndicator: false, showPlayingMessage: true});
       // log that we played the video, but only after 10 seconds
-      this.logPlayTimeout = setTimeout(() => { console.log('Logging that we played ' + this.state.video.title); this.props.logPlayed(this.state.video.id) }, 10000);
+      this.logPlayTimeout = setTimeout(() => {
+        playerLog.info('Video counted as recently played', {
+          videoID: this.state.video.id,
+          title: this.state.video.title
+        });
+        this.props.logPlayed(this.state.video.id);
+      }, 10000);
 
 
       player.on('timeposition', (pos) => {
@@ -3457,12 +3690,23 @@ class MynPlayer extends MynOpenablePane {
       });
     }
     catch (error) {
-      console.error(error);
       const isCurrentAttempt = attempt === this.playbackAttempt && this.mpv === player;
       stopMpvSafely(player);
       if (this.mpv === player) this.mpv = null;
-      if (!isCurrentAttempt || (error && error.code === 'MYNDA_PLAYBACK_CANCELED')) return;
+      if (!isCurrentAttempt || (error && error.code === 'MYNDA_PLAYBACK_CANCELED')) {
+        playerLog.debug('Playback attempt canceled', {
+          videoID: video && video.id,
+          error: error
+        });
+        return;
+      }
       const mediaType = video && video.dvd ? 'DVD' : 'video';
+      playerLog.error('Playback failed', {
+        videoID: video && video.id,
+        title: video && video.title,
+        mediaType: mediaType,
+        error: error
+      });
       this.setState({
         errorMessage: `Problem playing ${mediaType}: ${describePlaybackError(error)}`,
         showLoadingIndicator: false,
@@ -3481,7 +3725,10 @@ class MynPlayer extends MynOpenablePane {
     // as it's playing, and we don't want the component to re-render
     // every time we do that)
     if (!oldProps.show && this.props.show) {
-      console.log('NOW SHOWING');
+      playerLog.debug('Opening player pane', {
+        videoID: this.props.video && this.props.video.id,
+        title: this.props.video && this.props.video.title
+      });
       this.state.video = this.props.video;
       this.setState({showLoadingIndicator:true});
       this.setUpVideo();
@@ -3545,18 +3792,21 @@ class MynSettings extends MynOpenablePane {
     }
 
     ipcRenderer.on('settings-watchfolder-added', (event, folderObj) => {
-      console.log('server told us it has added ' + folderObj.path)
+      settingsLog.info('Watchfolder added', {
+        path: folderObj && folderObj.path,
+        kind: folderObj && folderObj.kind
+      });
       // update everything
       this.setStateViewsFromProps(() => this.setView(this.state.settingViewName));
     });
 
     ipcRenderer.on('settings-watchfolder-remove', (event, path, removed) => {
       if (removed) {
-        console.log('REMOVED FOLDER: ' + path);
+        settingsLog.info('Watchfolder removed', {path: path});
         // update everything
         this.setStateViewsFromProps(() => this.setView(this.state.settingViewName));
       } else {
-        console.log('DID NOT REMOVE FOLDER: ' + path);
+        settingsLog.warn('Watchfolder removal was not completed', {path: path});
       }
     });
   }
@@ -3694,7 +3944,9 @@ class MynSettings extends MynOpenablePane {
     if (!nonFunctionPropsChanged) return;
 
     if (!isEqualIgnoreFuncs(oldProps,this.props)) {
-      console.log('MynSettings: PROPS HAVE CHANGED:\n' + getObjectDiff(oldProps,this.props));
+      settingsLog.debug('Settings pane properties changed', {
+        changedProperties: getObjectDiff(oldProps,this.props)
+      });
 
       // if the view was changed from outside, call up that view;
       // OR, whenever the pane is closed, also set to props.view
@@ -3740,21 +3992,29 @@ class MynSettingsFolders extends React.Component {
       });
       options.unshift(<option key="none" value="none">(none)</option>);
     } catch(e) {
-      console.error("Unable to find list of media kinds in library: " + e.toString());
+      settingsLog.error('Could not build the media-kind options from the library', {
+        error: e
+      });
       // should display error message to user
     }
     return options;
   }
 
   editRemove(path, index) {
-    console.log("user wants to remove " + path + " which is at index " + index);
+    settingsLog.debug('Watchfolder removal requested', {
+      path: path,
+      index: index
+    });
 
     ipcRenderer.send('settings-watchfolder-remove', path);
   }
 
   // edit the default kind of an existing watchfolder
   editKind(event, index) {
-    console.log("user wants to change 'kind' to " + event.target.value + " for folder at index " + index);
+    settingsLog.debug('Watchfolder default kind change requested', {
+      index: index,
+      kind: event.target.value
+    });
 
     try {
       let temp = _.cloneDeep(this.state.existingFolders[index]);
@@ -3763,13 +4023,17 @@ class MynSettingsFolders extends React.Component {
       library.replace(`settings.watchfolders.${index}`,temp);
 
     } catch(err) {
-      console.error(`Could not edit the kind for folder at index ${index}: ${err}`);
+      settingsLog.error('Could not edit a watchfolder default kind', {
+        index: index,
+        kind: event.target.value,
+        error: err
+      });
     }
   }
 
   changeTargetFolder(folder) {
     this.setState({folderToAdd: folder});
-    console.log('Changed target folder to ' + folder);
+    settingsLog.debug('Watchfolder path input changed', {path: folder});
 
     const inputField = document.getElementById('settings-folders-choose-path');
     if (folder == "") {
@@ -3807,7 +4071,9 @@ class MynSettingsFolders extends React.Component {
         )
       });
     } catch(e) {
-      console.error("Error finding watchfolders from library: " + e.toString());
+      settingsLog.error('Could not display watchfolders from the library', {
+        error: e
+      });
     }
     return folders;
   }
@@ -3825,10 +4091,14 @@ class MynSettingsFolders extends React.Component {
 
   componentDidUpdate(oldProps) {
     if (!_.isEqual(this.props.kinds,oldProps.kinds)) {
-      console.log('MynSettingsFolders : kinds has changed!!!!!!');
+      settingsLog.debug('Available media kinds changed', {
+        kindCount: Array.isArray(this.props.kinds) ? this.props.kinds.length : 0
+      });
     }
     if (!_.isEqual(this.props.folders,oldProps.folders)) {
-      console.log('MynSettingsFolders : folders has changed!!!!!!');
+      settingsLog.debug('Watchfolder settings changed', {
+        watchfolderCount: Array.isArray(this.props.folders) ? this.props.folders.length : 0
+      });
       this.setState({existingFolders: this.props.folders})
     }
   }
@@ -3899,7 +4169,7 @@ class MynSettingsPlaylists extends React.Component {
           this.updateValue(); // force a save to the library
         });
       } else {
-        console.log('Deletion canceled by user')
+        settingsLog.debug('Playlist deletion canceled by user', {playlistID: id});
       }
     });
 
@@ -3932,12 +4202,17 @@ class MynSettingsPlaylists extends React.Component {
     if (invalidFields.length == 0) {
       this.props.save({'playlists':playlists});
     } else {
-      console.log('Not saving, the following fields are invalid: ' + invalidFields);
+      settingsLog.debug('Playlist settings not saved because fields are invalid', {
+        invalidFields: invalidFields
+      });
     }
   }
 
   reportValid(property,valid) {
-    console.log(property + ' is ' + (!valid ? 'not ':'') + 'valid');
+    settingsLog.debug('Playlist setting validation changed', {
+      property: property,
+      valid: valid
+    });
     if (typeof valid === 'boolean') {
       this.state.valid[property] = valid;
     }
@@ -4083,6 +4358,8 @@ class MynSettingsPrefs extends React.Component {
       },
       hide_description : props.settings.preferences.hide_description,
       include_new_vids_in_playlists : props.settings.preferences.include_new_vids_in_playlists,
+      remove_edited_from_new:
+        props.settings.preferences.remove_edited_from_new === true,
       remove_autotagged_from_new: props.settings.preferences.remove_autotagged_from_new,
       exclude_samples_from_library :
         props.settings.preferences.exclude_samples_from_library !== false,
@@ -4115,6 +4392,10 @@ class MynSettingsPrefs extends React.Component {
         address = "settings.preferences.include_new_vids_in_playlists";
         this.setState({include_new_vids_in_playlists:value});
         break;
+      case "remove-edited-new":
+        address = "settings.preferences.remove_edited_from_new";
+        this.setState({remove_edited_from_new: value});
+        break;
       case "remove-autotagged-new":
         address = "settings.preferences.remove_autotagged_from_new";
         this.setState({ remove_autotagged_from_new: value });
@@ -4145,7 +4426,9 @@ class MynSettingsPrefs extends React.Component {
       saveObj[address] = value;
       this.props.save(saveObj);
     } else {
-      console.error('No address was provided to save.');
+      settingsLog.error('Could not save a preference because no library address was resolved', {
+        property: property
+      });
     }
   }
 
@@ -4221,17 +4504,28 @@ class MynSettingsPrefs extends React.Component {
               onChange={(e) => this.update('include-new',e.target.checked)}
             />
             Include new videos in playlists
-            <MynTooltip tip="If unchecked, newly added videos will appear only in the 'New' playlist until edited (or auto-tagged)" />
+            <MynTooltip tip="If unchecked, videos marked as New will appear only in the 'New' playlist" />
           </li>
           <li id='settings-prefs-removeautotaggednew' className='subsection'>
-            <h2>Removed Autotagged from New:</h2>
-            <input
-              type='checkbox'
-              checked={this.state.remove_autotagged_from_new}
-              onChange={(e) => this.update('remove-autotagged-new', e.target.checked)}
-            />
-            Remove all videos from 'New' playlist after auto-tagging 
-            <MynTooltip tip="If unchecked, videos will only be removed from the 'New' playlist when manually edited/tagged" />
+            <h2>Remove from New:</h2>
+            <div>
+              <input
+                type='checkbox'
+                checked={this.state.remove_edited_from_new}
+                onChange={(e) => this.update('remove-edited-new', e.target.checked)}
+              />
+              Remove individually edited videos from 'New' when saved
+              <MynTooltip tip="If unchecked, saving an individual edit preserves the video's current New status. Batch edits always preserve each video's status unless the batch New checkbox is changed." />
+            </div>
+            <div>
+              <input
+                type='checkbox'
+                checked={this.state.remove_autotagged_from_new}
+                onChange={(e) => this.update('remove-autotagged-new', e.target.checked)}
+              />
+              Remove successfully auto-tagged videos from 'New'
+              <MynTooltip tip="If unchecked, auto-tagging preserves each video's current New status" />
+            </div>
           </li>
           <li id='settings-prefs-hidedescrip' className='subsection'>
             <h2>Hide Descriptions:</h2>
@@ -4380,7 +4674,7 @@ class MynSettingsPlaylistsTableRow extends React.Component {
     );
 
     let uneditable = playlist.id === 'new';
-    let newToolTip = "The 'New' playlist is a special built-in playlist that only appears when there are 'new' videos. A video is new when it is first added to the library. This gives you a convenient place to edit/tag new videos. Once edited, a video is no longer new, and disappears from the New playlist (but this can be edited in the video editor). The 'New' playlist cannot be deleted, but you can hide it by unchecking the 'tab' property."
+    let newToolTip = "The 'New' playlist is a special built-in playlist that only appears when there are new videos. A video is marked New when it is first added to the library, and remains there until its New checkbox is cleared. By default, saving edits preserves that status; this can be changed in Preferences. The 'New' playlist cannot be deleted, but you can hide it by unchecking the 'tab' property."
     let name = (
       <div className='cell name name-and-edit'>
         <MynEditText
@@ -4634,14 +4928,13 @@ class MynEditor extends MynOpenablePane {
       update = this.state.video;
       update[args[0]] = args[1];
 
-      // keep track of which fields have been changed
-      if (args[1] === '')/* || (Array.isArray(args[1]) && args[1].length === 0))*/ {
-        // if the updated value is empty, do NOT save this property
-        this.state.changed.delete(args[0]);
-      } else {
-        // otherwise, mark it as changed
-        this.state.changed.add(args[0]);
-      }
+      updateEditorChangedField(
+        this.state.changed,
+        this.state.video,
+        this.state.batchObjectUnedited,
+        args[0],
+        args[1]
+      );
     }
     // if we were passed one argument, it should be an object, where
     // the keys are video props, and the values are those props' values
@@ -4651,15 +4944,14 @@ class MynEditor extends MynOpenablePane {
       update = { ...this.state.video, ...args[0] };
       //console.log(JSON.stringify(update));
 
-      // keep track of which fields have been changed
       Object.keys(args[0]).map(field => {
-        if (args[0][field] === '')/* || (Array.isArray(args[0][field]) && args[0][field].length === 0))*/ {
-          // if the updated value is empty, do NOT save this property
-          this.state.changed.delete(field);
-        } else {
-          // otherwise, mark it as changed
-          this.state.changed.add(field);
-        }
+        updateEditorChangedField(
+          this.state.changed,
+          this.state.video,
+          this.state.batchObjectUnedited,
+          field,
+          args[0][field]
+        );
       });
     } else {
       throw 'Incorrect parameters passed to handleChange in MynEditor';
@@ -4691,7 +4983,10 @@ class MynEditor extends MynOpenablePane {
     // just for debugging:
     let changedFields = []
     this.state.changed.forEach(field => {changedFields.push(field)});
-    console.log('Changed Fields: ' + changedFields.join(', '));
+    editorLog.debug('Editor changed fields updated', {
+      videoID: this.state.video && this.state.video.id,
+      changedFields: changedFields.sort()
+    });
   }
 
   revertChanges() {
@@ -4719,7 +5014,13 @@ class MynEditor extends MynOpenablePane {
         // Ratings are one object in the editor, but only the external catalog
         // ratings are reset. Carry a pending batch user-rating edit into every
         // source object so the backend can preserve that unsaved value too.
-        if (this.state.changed.has('ratings') && this.state.video.ratings) {
+        const batchUserRatingChanged = this.state.video.ratings &&
+          this.state.batchObjectUnedited && this.state.batchObjectUnedited.ratings &&
+          !editorRatingValuesEqual(
+            this.state.video.ratings.user,
+            this.state.batchObjectUnedited.ratings.user
+          );
+        if (batchUserRatingChanged) {
           source.ratings = source.ratings || {};
           source.ratings.user = this.state.video.ratings.user;
         }
@@ -4919,16 +5220,28 @@ class MynEditor extends MynOpenablePane {
         const newArtworkPath = path.join(artworkFolder, uuidv4() + fileExt);
         fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
           if (err) {
-            console.error(err);
+            artworkLog.error('Could not copy editor artwork into the library artwork folder', {
+              source: oldArtworkPath,
+              destination: newArtworkPath,
+              error: err
+            });
           } else {
-            console.log('artwork was copied successfully: ' + newArtworkPath);
+            artworkLog.info('Editor artwork copied into the library artwork folder', {
+              destination: newArtworkPath
+            });
           }
         });
         // this.handleChange({'artwork':newArtworkPath}); // <-- I think this was happening too slowly (part of the function is async), so the new path was not being saved
         this.state.video.artwork = newArtworkPath;
-        console.log("updated state var: " + this.state.video.artwork);
+        artworkLog.debug('Editor artwork path updated', {
+          videoID: this.state.video.id,
+          artwork: this.state.video.artwork
+        });
       } else {
-        console.log('Not copying image, as it is already in the artwork folder');
+        artworkLog.debug('Editor artwork already uses the library artwork folder', {
+          videoID: this.state.video.id,
+          artwork: oldArtworkPath
+        });
       }
     }
 
@@ -4951,8 +5264,10 @@ class MynEditor extends MynOpenablePane {
       // and now also containing any changes the user made in the editor,
       // which we will now apply to the videos and then save them
 
-      console.log('SAVING BATCH')
-      console.log('Changed Fields: ' + JSON.stringify(this.state.changed))
+      editorLog.debug('Batch save requested', {
+        videoCount: this.props.batch ? this.props.batch.length : 0,
+        changedFields: Array.from(this.state.changed).sort()
+      });
       if (this.props.batch) { // <-- this should always be true if this.state.video.id === 'batch', this is just for safety
         const changedFields = Array.from(this.state.changed).sort();
         const filenameResetPatches = this.state.pendingFilenameResetPatches || {};
@@ -5030,14 +5345,19 @@ class MynEditor extends MynOpenablePane {
                 // any props that were in the original batch object (common to all videos)
                 // and were changed, add the change to this video
                 Object.keys(original).map(subProp => {
-                  if (altered[subProp] !== original[subProp]) {
+                  const subPropChanged = prop === 'ratings' ?
+                    !editorRatingValuesEqual(altered[subProp], original[subProp]) :
+                    altered[subProp] !== original[subProp];
+                  if (subPropChanged) {
                     video[prop][subProp] = altered[subProp];
                   }
                 });
                 // any props that were not in the original batch object but were added,
                 // add the change to this video
                 Object.keys(altered).map(subProp => {
-                  if (typeof original[subProp] === "undefined") {
+                  const newlyAddedRatingIsEmpty = prop === 'ratings' &&
+                    editorRatingValuesEqual(altered[subProp], original[subProp]);
+                  if (typeof original[subProp] === "undefined" && !newlyAddedRatingIsEmpty) {
                     video[prop][subProp] = altered[subProp];
                   }
                 });
@@ -5049,7 +5369,11 @@ class MynEditor extends MynOpenablePane {
               }
             }
           });
-          console.log('EDITED: ' + JSON.stringify(video));
+          editorLog.debug('Prepared edited video for batch save', {
+            videoID: video.id,
+            title: video.title,
+            changedFields: changedFields
+          });
 
           // Prepare this video's final replacement. Do not submit it yet:
           // replaceMediaBatch() will merge every prepared video into the
@@ -5066,7 +5390,6 @@ class MynEditor extends MynOpenablePane {
         if (batchVideosToSave.length > 0) {
           library.replaceMediaBatch(batchVideosToSave, (err) => {
             if (err) {
-              console.error(`Could not save video batch: ${err}`);
               editorLog.error('Editor video batch save failed', {
                 videoCount: batchVideosToSave.length,
                 filenameResetPatchCount: filenameResetPatchCount,
@@ -5092,7 +5415,7 @@ class MynEditor extends MynOpenablePane {
         }
 
       } else {
-        console.error('The video objects were not supplied to MynEditor when editing multiple videos');
+        editorLog.error('The editor batch did not include its source video objects');
       }
     } else {
       // SINGLE VIDEO
@@ -5124,7 +5447,6 @@ class MynEditor extends MynOpenablePane {
       // the completed "N of N" message visible until the final settings
       // operation finishes, then release the banner for the next task.
       if (err) {
-        console.error(`Could not finish batch save: ${err}`);
         editorLog.error('Could not finish editor batch settings save', {
           videoCount: batchSaveProgress.numTotal,
           error: err && err.stack ? err.stack : String(err)
@@ -5188,16 +5510,24 @@ class MynEditor extends MynOpenablePane {
       let videoEditPrepped = _.cloneDeep(this.props.video);
 
       if (videoEditPrepped) {
-        if (videoEditPrepped.id === 'batch') {
-          this.state.batchObjectUnedited = _.cloneDeep(videoEditPrepped);
-        } else {
-          // A single-video save replaces the complete editable object, so its
-          // established behavior remains: saving removes it from New unless
-          // the user explicitly checks the box to keep/re-add it.
+        if (videoEditPrepped.id !== 'batch' &&
+            this.props.settings.preferences.remove_edited_from_new === true) {
+          // Preserve the legacy opt-in behavior: the editable checkbox shows
+          // that Save will remove an individual video from New unless the user
+          // explicitly checks it again. The default preference leaves the
+          // video's existing value untouched, just as batch editing does.
           videoEditPrepped.new = false;
         }
 
         validateVideo(videoEditPrepped);
+
+        // validateVideo fills missing ratings sources (and any other legacy
+        // fields) for the controlled form. Capture the batch baseline after
+        // that normalization so a type-then-delete round trip can truly match
+        // the untouched value again.
+        if (videoEditPrepped.id === 'batch') {
+          this.state.batchObjectUnedited = _.cloneDeep(videoEditPrepped);
+        }
 
         this.setState({
           video: videoEditPrepped,
@@ -5293,6 +5623,7 @@ class MynEditor extends MynOpenablePane {
           resetPatches={this.state.pendingFilenameResetPatches}
           resetPending={this.state.resetFromFilenamePending}
           changedFields={this.state.changed}
+          batchBaseline={this.state.batchObjectUnedited}
           saveChanges={this.saveChanges}
           placeholderImage={this.state.placeholderImage}
           reportValid={this.reportValid}
@@ -5338,12 +5669,16 @@ class MynEditorSearch extends React.Component {
     this.render = this.render.bind(this);
 
     this.handleConfirmSelect = (event, response, video, checked) => {
-      console.log('CONFIRMATION OF SEARCH RESULTS HAS FIRED')
-      console.log(event);
+      editorLog.debug('Search-result confirmation received', {
+        response: response,
+        videoID: video && video.imdbID,
+        title: video && video.Title,
+        overrideRequested: Boolean(checked)
+      });
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
       if (checked) {
-        console.log('option to override dialog was checked!');
+        editorLog.debug('User disabled search-result confirmation dialogs');
         let prefs = _.cloneDeep(this.props.settings.preferences);
         if (!prefs.override_dialogs) {
           prefs.override_dialogs = {};
@@ -5356,7 +5691,10 @@ class MynEditorSearch extends React.Component {
         // choose search result and fill in the fields with it
         this.retrieveResult(video);
       } else {
-        console.log('Selection canceled by user')
+        editorLog.debug('Search-result selection canceled by user', {
+          videoID: video && video.imdbID,
+          title: video && video.Title
+        });
       }
     };
   }
@@ -5486,7 +5824,12 @@ class MynEditorSearch extends React.Component {
         alert(movie.myndaChoiceType === 'series' ?
           'OMDb could not find this episode in the selected series.' :
           'OMDb could not retrieve the selected result.');
-        return console.log('Error: no result found: ' + responseObject.data);
+        editorLog.warn('Could not retrieve the selected OMDb result', {
+          choiceType: movie.myndaChoiceType || 'result',
+          imdbID: movie.imdbID,
+          error: responseObject.data
+        });
+        return;
       } else {
         this.props.handleChange(responseObject.data);
       }
@@ -5601,9 +5944,9 @@ class MynEditorEdit extends React.Component {
           exp: { test: value => Number.isInteger(Number(value)) && Number(value)>0 },
           tip: "Positive integer"
         },
-        nonnegativeInteger: {
-          exp: { test: value => String(value).trim() !== '' && Number.isInteger(Number(value)) && Number(value)>=0 },
-          tip: "Integer 0 or greater"
+        episodeNumber: {
+          exp: { test: value => parseEditableEpisodeNumber(value) !== null },
+          tip: "0 or greater; up to one decimal place"
         },
         season: {
           exp: { test: value => String(value).toLowerCase() === 'extras' || (String(value).trim() !== '' && Number.isInteger(Number(value)) && Number(value)>=0) },
@@ -5638,7 +5981,7 @@ class MynEditorEdit extends React.Component {
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
       if (checked) {
-        console.log('option to override dialog was checked!');
+        editorLog.debug('User disabled editor-revert confirmation dialogs');
         let prefs = _.cloneDeep(this.props.settings.preferences);
         if (!prefs.override_dialogs) {
           prefs.override_dialogs = {};
@@ -5651,7 +5994,7 @@ class MynEditorEdit extends React.Component {
         // choose search result and fill in the fields with it
         this.props.revertChanges();
       } else {
-        console.log('Reversion canceled by user');
+        editorLog.debug('Editor reversion canceled by user');
       }
     };
   }
@@ -5708,7 +6051,7 @@ class MynEditorEdit extends React.Component {
     }
 
     if (!this.props.video) {
-      console.error('Error: no video object provided to MynEditorEdit');
+      editorLog.error('No video object was provided to the editor form');
       return null;
     }
 
@@ -5730,6 +6073,39 @@ class MynEditorEdit extends React.Component {
     };
     const resetPlaceholder = (property, ordinaryPlaceholder = '') => {
       return isPendingResetField(property) ? 'Reset' : ordinaryPlaceholder;
+    };
+    const isBatchFieldChanged = (property) => {
+      return video.id === 'batch' && (
+        (this.props.changedFields && this.props.changedFields.has(property)) ||
+        isPendingResetField(property, true)
+      );
+    };
+    const markBatchChangeWhen = (element, changed) => {
+      if (!element || !changed) return element;
+      return React.cloneElement(element, {
+        className: `${element.props.className || ''} batch-changed`.trim()
+      });
+    };
+    const markBatchChange = (element, property) => {
+      return markBatchChangeWhen(element, isBatchFieldChanged(property));
+    };
+    const isBatchRatingChanged = (sources) => {
+      const baseline = this.props.batchBaseline;
+      if (video.id !== 'batch' || !baseline) return false;
+      const currentRatings = video.ratings && typeof video.ratings === 'object' ? video.ratings : {};
+      const baselineRatings = baseline.ratings && typeof baseline.ratings === 'object' ? baseline.ratings : {};
+      return sources.some(source =>
+        !editorRatingValuesEqual(currentRatings[source], baselineRatings[source])
+      );
+    };
+    const batchChangedCatalogRatingSources = video.id === 'batch' ?
+      ['imdb', 'rt', 'mc'].filter(source =>
+        isBatchRatingChanged([source]) || isPendingResetField('ratings', true)
+      ) : [];
+    const batchBaselineItems = (property) => {
+      const baseline = this.props.batchBaseline;
+      return video.id === 'batch' && baseline && Array.isArray(baseline[property]) ?
+        baseline[property] : null;
     };
     // validateVideo(video);
 
@@ -5877,6 +6253,7 @@ class MynEditorEdit extends React.Component {
             <MynEditInlineAddListWidget
               object={this.props.video}
               property="tags"
+              batchBaseline={batchBaselineItems('tags')}
               update={this.props.handleChange}
               options={this.props.settings.used.tags}
               storeTransform={value => value.toLowerCase()}
@@ -5911,6 +6288,7 @@ class MynEditorEdit extends React.Component {
           <MynEditSubtitles
             object={this.props.video}
             property={'subtitles'}
+            batchBaseline={batchBaselineItems('subtitles')}
             update={this.props.handleChange}
             validator={this.state.validators.everything.exp}
             validatorTip={this.state.validators.everything.tip}
@@ -5930,6 +6308,7 @@ class MynEditorEdit extends React.Component {
           <MynEditInlineAddListWidget
             object={this.props.video}
             property="cast"
+            batchBaseline={batchBaselineItems('cast')}
             placeholder={resetPlaceholder('cast', 'Add...')}
             update={this.props.handleChange}
             options={null}
@@ -6014,8 +6393,8 @@ class MynEditorEdit extends React.Component {
             className="edit-field-episode"
             update={this.props.handleChange}
             options={null}
-            validator={this.state.validators.nonnegativeInteger.exp}
-            validatorTip={this.state.validators.nonnegativeInteger.tip}
+            validator={this.state.validators.episodeNumber.exp}
+            validatorTip={this.state.validators.episodeNumber.tip}
             reportValid={this.props.reportValid}
           />
         </div>
@@ -6123,6 +6502,7 @@ class MynEditorEdit extends React.Component {
             property="ratings"
             video={this.props.video}
             update={this.props.handleChange}
+            batchChangedSources={batchChangedCatalogRatingSources}
             placeholder={isPendingResetField('ratings', true) ? 'Reset' : '#'}
             validator={this.state.validators.numrange.exp}
             validatorTip={this.state.validators.numrange.tip}
@@ -6197,6 +6577,7 @@ class MynEditorEdit extends React.Component {
           <MynEditInlineAddListWidget
             object={this.props.video}
             property="languages"
+            batchBaseline={batchBaselineItems('languages')}
             placeholder={resetPlaceholder('languages', 'Add...')}
             update={this.props.handleChange}
             options={null}
@@ -6231,7 +6612,7 @@ class MynEditorEdit extends React.Component {
     const batchNewMixed = this.props.video.id === 'batch' && this.props.video.new === null;
     const newDescription = this.props.video.id === 'batch' ?
       "Keep selected videos in the 'New' playlist. A dash means the selection is mixed; leave it untouched to preserve each video's current status." :
-      "Check to re-add this video to the 'New' playlist";
+      "Checked videos remain in the 'New' playlist after saving";
     let new_ = (
       <div className='edit-field new'>
         <label className="edit-field-name" htmlFor="new">New: </label>
@@ -6336,33 +6717,33 @@ class MynEditorEdit extends React.Component {
         {batchNotification}
         <form onSubmit={this.props.saveChanges}>
           {filename}
-          {title}
-          {series}
-          {season}
-          {episode}
-          {imdbID}
-          {description}
-          {year}
-          {director}
-          {directorsort}
-          {cast}
-          {genre}
-          {tags}
-          {kind}
-          {rating}
-          {seen}
-          {watchlater}
-          {lastseen}
-          {position}
-          {dateadded}
-          {artwork}
-          {subtitles}
+          {markBatchChange(title, 'title')}
+          {markBatchChange(series, 'series')}
+          {markBatchChange(season, 'season')}
+          {markBatchChange(episode, 'episode')}
+          {markBatchChange(imdbID, 'imdbID')}
+          {markBatchChange(description, 'description')}
+          {markBatchChange(year, 'year')}
+          {markBatchChange(director, 'director')}
+          {markBatchChange(directorsort, 'directorsort')}
+          {markBatchChange(cast, 'cast')}
+          {markBatchChange(genre, 'genre')}
+          {markBatchChange(tags, 'tags')}
+          {markBatchChange(kind, 'kind')}
+          {markBatchChangeWhen(rating, isBatchRatingChanged(['user']))}
+          {markBatchChange(seen, 'seen')}
+          {markBatchChange(watchlater, 'watchlater')}
+          {markBatchChange(lastseen, 'lastseen')}
+          {markBatchChange(position, 'position')}
+          {markBatchChange(dateadded, 'dateadded')}
+          {markBatchChange(artwork, 'artwork')}
+          {markBatchChange(subtitles, 'subtitles')}
           {ratings}
-          {boxoffice}
-          {rated}
-          {country}
-          {languages}
-          {new_}
+          {markBatchChange(boxoffice, 'boxoffice')}
+          {markBatchChange(rated, 'rated')}
+          {markBatchChange(country, 'country')}
+          {markBatchChange(languages, 'languages')}
+          {markBatchChange(new_, 'new')}
           {metadata}
           <button
             type="button"
@@ -6526,6 +6907,8 @@ class MynEditRatings extends MynEdit {
     return (
       <table ref={this.table}><tbody>
         {Object.keys(this.state.source).map((source) => {
+          const batchChanged = Array.isArray(this.props.batchChangedSources) &&
+            this.props.batchChangedSources.includes(source);
           return (
             <tr key={source}>
               <td className="ratings-icon">
@@ -6533,11 +6916,13 @@ class MynEditRatings extends MynEdit {
               </td>
               <td className="ratings-input">
                 <input
-                 className={"ratings-input-input " + source}
+                 className={"ratings-input-input " + source + (batchChanged ? " batch-changed" : "")}
                  id={`edit-field-${this.props.property}-${source}`}
                  type="text"
                  name={source}
-                 value={this.props.video[this.props.property][source] || ''}
+                 value={this.props.video[this.props.property][source] === undefined ||
+                   this.props.video[this.props.property][source] === null ? '' :
+                   this.props.video[this.props.property][source]}
                  placeholder={this.props.placeholder || '#'}
                  onChange={(e) => this.handleInput(e.target, e.target.value, source)}
                 />
@@ -6786,7 +7171,7 @@ class MynEditArtwork extends MynEdit {
       if (image) {
         this.update(image);
       } else {
-        console.log("Unable to select file");
+        artworkLog.debug('Artwork file selection canceled or returned no file');
       }
     };
     ipcRenderer.on('editor-artwork-selected', this.handleArtworkSelected);
@@ -6804,19 +7189,25 @@ class MynEditArtwork extends MynEdit {
 
     let extReg = /\.(jpg|jpeg|png|gif)$/i;
     if (isValidURL(value) && extReg.test(value)) {
-      console.log("Valid URL: " + value);
+      artworkLog.debug('Artwork input recognized as a remote image URL', {
+        value: value
+      });
       // then this is a valid url with an image extension at the end
       // try to download it
       this.download(value);
 
     } else if (extReg.test(value)) {
-      console.log("Possible local path: " + value);
+      artworkLog.debug('Artwork input recognized as a possible local path', {
+        value: value
+      });
       // then this MIGHT be a valid local path,
       // we'll see if we can find it
       this.handleLocalFile(value);
     } else {
       // do nothing?
-      console.log("Neither URL nor local path (doing nothing): " + value);
+      artworkLog.debug('Artwork input was not recognized as a supported URL or local path', {
+        value: value
+      });
     }
 
   }
@@ -6869,7 +7260,10 @@ class MynEditArtwork extends MynEdit {
     let restorePreviousArtwork = typeof fallbackArtwork !== 'undefined';
     let handleFailure = response => {
       let status = response && response.status;
-      console.error('Unable to download artwork', response && response.message ? response.message : response);
+      artworkLog.error('Could not download editor artwork', {
+        status: status,
+        error: response && response.message ? response.message : response
+      });
       this.showDownloadStatus(
         status ? `Download failed (${status})` : 'Download failed',
         false,
@@ -6894,7 +7288,9 @@ class MynEditArtwork extends MynEdit {
       if (response && response.success) {
         this.showDownloadStatus('', false);
         this.update(response.message);
-        console.log('Successfully downloaded artwork');
+        artworkLog.info('Editor artwork downloaded', {
+          destination: response.message
+        });
       } else {
         handleFailure(response);
       }
@@ -6915,10 +7311,14 @@ class MynEditArtwork extends MynEdit {
     this._isMounted && fs.readFile(path, (err, data) => {
       if (err) {
         this.update(this.state.placeholderImage);
-        return console.error(err);
+        artworkLog.error('Could not read local editor artwork', {
+          path: path,
+          error: err
+        });
+        return;
       }
       this.update(path);
-      console.log("read local file successfully, updated path");
+      artworkLog.debug('Local editor artwork accepted', {path: path});
     });
   }
 
@@ -6934,7 +7334,9 @@ class MynEditArtwork extends MynEdit {
   }
 
   handleRevert() {
-    console.log("reverting! " + this.state.original);
+    artworkLog.debug('Reverting editor artwork', {
+      originalArtwork: this.state.original
+    });
     this.removeDownloadListener();
     this.showDownloadStatus('', false);
     this.update(this.state.original);
@@ -6960,7 +7362,9 @@ class MynEditArtwork extends MynEdit {
     // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
     // then we want to download it, and point the movie metadata to the downloaded local file instead
     if (oldProps.movie.artwork !== this.props.movie.artwork && isValidURL(this.props.movie.artwork)) {
-      console.log("artwork changed from outside (i.e. from search results)");
+      artworkLog.debug('Editor artwork changed to a remote URL from an external update', {
+        videoID: this.props.movie && this.props.movie.id
+      });
       this.download(this.props.movie.artwork, oldProps.movie.artwork || '');
     }
   }
@@ -6974,12 +7378,15 @@ class MynEditArtwork extends MynEdit {
         event.preventDefault();
         // event.stopPropagation();
 
-        console.log(JSON.stringify(event.dataTransfer));
-
-        for (const f of event.dataTransfer.files) {
-          // Using the path attribute to get absolute file path
-          console.log('Oh you touched me! ', f.path)
-        }
+        const droppedFiles = Array.from((event.dataTransfer && event.dataTransfer.files) || []);
+        artworkLog.debug('Files dropped onto the artwork editor', {
+          fileCount: droppedFiles.length,
+          files: droppedFiles.map(file => ({
+            name: file.name,
+            path: file.path,
+            type: file.type
+          }))
+        });
 
         try {
           const files = event.dataTransfer.files;
@@ -6987,15 +7394,20 @@ class MynEditArtwork extends MynEdit {
             if (/image/.test(files[0].type)) {
               this.handleLocalFile(files[0].path);
             } else {
-              console.log("Wrong file type: images only");
+              artworkLog.debug('Rejected dropped artwork with a non-image file type', {
+                path: files[0].path,
+                type: files[0].type
+              });
             }
           } else if (files.length === 0) {
-            console.log("No files found");
+            artworkLog.debug('Artwork drop did not contain any files');
           } else {
-            console.log("Only 1 file at a time");
+            artworkLog.debug('Rejected artwork drop containing multiple files', {
+              fileCount: files.length
+            });
           }
         } catch(err) {
-          console.error(err);
+          artworkLog.error('Could not process dropped artwork', {error: err});
         }
     });
 
@@ -7058,7 +7470,12 @@ class MynEditGraphicalWidget extends MynEditWidget {
   }
 
   updateValue(value, event) {
-    console.log("Changed " + this.props.movie.title + "'s " + this.state.property + " value to " + value);
+    editorLog.debug('Inline graphical editor value changed', {
+      videoID: this.props.movie && this.props.movie.id,
+      title: this.props.movie && this.props.movie.title,
+      property: this.state.property,
+      value: value
+    });
     event.stopPropagation(); // clicking on the widget should not trigger a click on the whole row
     // this.props.movie[this.state.property] = value;
 
@@ -7244,7 +7661,10 @@ class MynEditPositionWidget extends MynEditGraphicalWidget {
 
       position = (mouseX - widgetX) / widgetWidth * duration;
     } catch(err) {
-      console.error('Error in MynEditPositionWidget: ' + err);
+      editorLog.error('Could not calculate a playback position from the editor widget', {
+        videoID: this.props.movie && this.props.movie.id,
+        error: err
+      });
     }
 
     // console.log(
@@ -7378,7 +7798,10 @@ class MynEditListWidget extends MynEditWidget {
           // delete item (pass 'true' so as not to prompt another dialog)
           this.deleteItem(index, true);
         } else {
-          console.log('Deletion canceled by user')
+          editorLog.debug('Editor list-item deletion canceled by user', {
+            property: this.props.property,
+            index: index
+          });
         }
       });
 
@@ -7394,6 +7817,8 @@ class MynEditListWidget extends MynEditWidget {
   displayList() {
     return this.state.list.map((item, index) => {
       let displayItem
+      const addedInBatch = Array.isArray(this.props.batchBaseline) &&
+        !this.props.batchBaseline.includes(item);
       try {
         displayItem = this.props.displayTransform(item);
       } catch(err) {
@@ -7405,7 +7830,7 @@ class MynEditListWidget extends MynEditWidget {
       }
 
       return (
-        <li key={index} className="list-widget-item" title={item}>
+        <li key={index} className={`list-widget-item${addedInBatch ? ' batch-added' : ''}`} title={item}>
           <pre>{displayItem}</pre>
           <div className="list-widget-delete-item inline-delete-button" onClick={() => this.deleteItem(index)}>
             {"\u2715"}
@@ -7571,7 +7996,7 @@ class MynEditSubtitles extends MynEditListWidget {
         let update = [...this.props.object[this.props.property], ...subs];
         this.updateList(update);
       } else {
-        console.log("Unable to select subtitle file(s): nothing returned from server");
+        editorLog.debug('Subtitle file selection canceled or returned no files');
       }
     };
 
@@ -7649,10 +8074,10 @@ class MynEditSubtitles extends MynEditListWidget {
         {this.displayList()}
         <li className='list-widget-add-with-browse'>
           <MynEditAddToList object={this.props.object} property={this.props.property} update={this.addToListUpdate} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.validator} validatorTip={this.validatorTip} />
-          <button className='list-widget-browse editor-inline-button' onClick={() => ipcRenderer.send('editor-subtitle-select')}><div className='icon-container'></div></button>
+          <button type="button" className='list-widget-browse editor-inline-button' onClick={() => ipcRenderer.send('editor-subtitle-select')}><div className='icon-container'></div></button>
         </li>
         <li>
-          <button className='' onClick={() => this.emptyList()}>Clear All Subtitles</button>
+          <button type="button" className='' onClick={() => this.emptyList()}>Clear All Subtitles</button>
         </li>
       </ul>
     );
@@ -7736,7 +8161,11 @@ class MynEditDateWidget extends MynEditWidget {
         this.props.update(this.props.property,null);
       }
     } catch(error) {
-      console.error(error);
+      editorLog.warn('Could not parse an editor date value', {
+        property: this.props.property,
+        value: value,
+        error: error
+      });
     }
   }
 
@@ -7871,7 +8300,7 @@ class MynRecentlyWatched extends MynDropdown {
     if (id) {
       this.props.playVideo(id);
     } else {
-      console.error('Cannot play next video; none was found');
+      playerLog.debug('No next video was found in the series');
     }
   }
 
@@ -8100,7 +8529,7 @@ function validateVideo(video) {
     'year':'integer',
     'series':'string',
     'season':'integer',
-    'episode':'integer',
+    'episode':'episodeNumber',
     'director':'string',
     'directorsort':'string',
     'cast':'array',
@@ -8160,7 +8589,14 @@ function validateVideo(video) {
             repaired[property] = [];
           }
           break;
-        // year, season, episode, position, dateadded, lastseen
+        // episode permits a manually assigned interlaced position such as 3.5
+        case 'episodeNumber' :
+          repaired[property] = parseEditableEpisodeNumber(video[property]);
+          if (repaired[property] === null) {
+            repaired[property] = '';
+          }
+          break;
+        // year, season, position, dateadded, lastseen
         // season also permits the special "extras" category
         case 'integer' :
           if (property === 'season' && String(video[property]).toLowerCase() === 'extras') {
@@ -8207,7 +8643,10 @@ function validateVideo(video) {
   // if no id, create one
   if (!video.id || video.id === '') {
     video.id = uuidv4();
-    console.log('validateVideo had to create an ID for this video: ' + video.filename);
+    frontendLog.warn('Renderer repaired a video that did not have an ID', {
+      filename: video.filename,
+      generatedVideoID: video.id
+    });
   }
 
   // if the ratings object doesn't have all the sources, fill it with empty values;
@@ -8337,8 +8776,10 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {    // You can also log the error to an error reporting service
-    console.log(error);
-    console.log(errorInfo);
+    frontendLog.error('React error boundary caught a renderer error', {
+      error: error,
+      componentStack: errorInfo && errorInfo.componentStack
+    });
   }
 
   render() {
