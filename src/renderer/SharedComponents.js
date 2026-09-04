@@ -572,14 +572,14 @@ class MynParagraphFolder extends React.Component {
 
         <div className='text-container'>
 
-          <span className='lede' style={{cursor: 'pointer', display: this.props.hideLede ? (!this.state.expanded ? '' : 'none') : ''}}>
+          <div className='lede' style={{cursor: 'pointer', display: this.props.hideLede ? (!this.state.expanded ? '' : 'none') : ''}}>
             {' ' + (this.state.expanded ? this.props.lede : this.props.lede.replace(/[.,;]\s*$/,''))}
             {this.props.keepEllipsis ? '\u2026' : (this.state.expanded ? ' ' : '\u2026')}
-          </span>
+          </div>
 
-          <span className='paragraph' style={{display: this.state.expanded ? '' : 'none'}}>
+          <div className='paragraph' style={{display: this.state.expanded ? '' : 'none'}}>
             {this.props.paragraph}
-          </span>
+          </div>
 
         </div>
 

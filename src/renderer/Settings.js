@@ -9,7 +9,8 @@ const {library, settingsLog} = require('./RendererRuntime.js');
 const {
   MynOpenablePane,
   MynOverflowTextMarquee,
-  MynTooltip
+  MynTooltip,
+  MynParagraphFolder
 } = require('./SharedComponents.js');
 const {
   MynEditText,
@@ -939,17 +940,90 @@ class MynSettingsPlaylistsTableRow extends React.Component {
       </div>
     );
 
+    let filterHelp = (
+      <MynParagraphFolder
+        className='filter-help'
+        lede={"Filter Help"}
+        paragraph={
+          <div className='filter-help-paragraph'>
+            <div className='filter-help-text'>
+              The filter is a boolean expression that will be executed on each video object in the library. If the expression evaluates to true, the video will be included in the playlist. If it evaluates to false, the video will not be included. The expression can use any property of the video object, and can use standard JavaScript operators and functions. For example, to include only videos with a genre of 'Action', you could use: <pre>video.genre === 'Action'</pre>. To include videos with a user rating greater than 3, you could use: <pre>Number(video.ratings.user) &gt; 3</pre>.
+              <br /><br />
+              Note: unset values are generally represented by an empty string, and some numeric values may be stored as numeric strings. Use <pre>Number()</pre> when making numeric comparisons.
+            </div>
+            <div className='filter-help-list'>
+              <h3>Video Properties</h3>
+              <ul>
+                <li><strong>title:</strong> <i>[string]</i> The title of the video</li>
+                <li><strong>year:</strong> <i>[integer]</i> The year the video was released</li>
+                <li><strong>series:</strong> <i>[string]</i> The series the video belongs to</li>
+                <li><strong>season:</strong> <i>[integer]/"Extras"</i> The season the video belongs to ("Extras" is a special allowed season name)</li>
+                <li><strong>episode:</strong> <i>[number] (one decimal place)</i> The episode number of the video</li>
+                <li><strong>director:</strong> <i>[string]</i> The director of the video</li>
+                <li><strong>directorsort:</strong> <i>[string]</i> The sort name of the director (e.g. "Smithee, Alan")</li>
+                <li><strong>cast:</strong> <i>[array[string]]</i> The cast of the video</li>
+                <li><strong>description:</strong> <i>[string]</i> The plot summary of the video</li>
+                <li><strong>genre:</strong> <i>[string]</i> The genre of the video</li>
+                <li><strong>tags:</strong> <i>[array[string]]</i> The video's tags</li>
+                <li><strong>seen:</strong> <i>[boolean]</i> Whether the video has been seen</li>
+                <li><strong>position:</strong> <i>[number]</i> The watch position of the video in seconds</li>
+                <li><strong>ratings:</strong> <i>[object]</i> The ratings of the video
+                  <ul>
+                    <li><strong>user:</strong> <i>[integer] (1-5)</i> The user rating of the video</li>
+                    <li><strong>imdb:</strong> <i>[number] (0-10)</i> The IMDb rating of the video</li>
+                    <li><strong>rt:</strong> <i>[integer] (0-100)</i> The Rotten Tomatoes rating of the video</li>
+                    <li><strong>mc:</strong> <i>[integer] (0-100)</i> The Metacritic rating of the video</li>
+                  </ul>
+                </li>
+                <li><strong>dateadded:</strong> <i>[integer]</i> The date the video was added (file birthtime), seconds since Unix epoch</li>
+                <li><strong>lastseen:</strong> <i>[integer]</i> The date the video was last seen, seconds since Unix epoch</li>
+                <li><strong>kind:</strong> <i>[string]</i> The kind of the video (e.g. "movie", "show")</li>
+                <li><strong>filename:</strong> <i>[string]</i> The absolute file path of the video</li>
+                <li><strong>artwork:</strong> <i>[string]</i> The absolute file path of the video's artwork</li>
+                <li><strong>subtitles:</strong> <i>[array[string]]</i> The absolute file paths of the video's subtitles</li>
+                <li><strong>boxoffice:</strong> <i>[number]</i> The box office earnings of the video, American dollars</li>
+                <li><strong>rated:</strong> <i>[string]</i> The MPAA/TVPG rating of the video</li>
+                <li><strong>languages:</strong> <i>[array[string]]</i> The languages of the video</li>
+                <li><strong>country:</strong> <i>[string]</i> The country of the video</li>
+                <li><strong>metadata:</strong> <i>[object]</i> The metadata of the video
+                  <ul>
+                    <li><strong>codec:</strong> <i>[string]</i> The codec of the video</li>
+                    <li><strong>duration:</strong> <i>[number]</i> The duration of the video in seconds</li>
+                    <li><strong>width:</strong> <i>[integer]</i> The width of the video, pixels</li>
+                    <li><strong>height:</strong> <i>[integer]</i> The height of the video, pixels</li>
+                    <li><strong>aspect_ratio:</strong> <i>[string]</i> The aspect ratio of the video</li>
+                    <li><strong>framerate:</strong> <i>[number]</i> The framerate of the video</li>
+                    <li><strong>audio_codec:</strong> <i>[string]</i> The audio codec of the video</li>
+                    <li><strong>audio_layout:</strong> <i>[string]</i> The audio layout of the video</li>
+                    <li><strong>audio_channels:</strong> <i>[integer]</i> The number of audio channels of the video</li>
+                  </ul>
+                </li>
+                <li><strong>imdbID:</strong> <i>[string]</i> The IMDb ID of the video</li>
+                <li><strong>seriesImdbID:</strong> <i>[string]</i> The IMDb ID of the series the video belongs to</li>
+                <li><strong>autotag_tried:</strong> <i>[boolean]</i> Whether auto-tagging has been tried on this video</li>
+                <li><strong>new:</strong> <i>[boolean]</i> Whether the video is new</li>
+                <li><strong>dvd:</strong> <i>[boolean]</i> Whether the video is a DVD folder</li>
+                <li><strong>watchlater:</strong> <i>[boolean]</i> Whether the video is marked to watch later (♥)</li>
+              </ul>
+            </div>
+          </div>
+        }
+      />
+    );
+
     let filterEditor = (
-      <div className="cell filter" id={'edit-filter-field-' + playlist.id} style={{display: 'none'}}>
+      <div className="cell filter" id={'edit-filter-field-' + playlist.id} style={{ display: 'none' }}>
         <textarea
           className='edit-filter-field'
           name="playlist filter"
           value={playlist.filter_function}
           placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
-          onChange={(e) => this.props.updateValue(this.props.index,'filter_function',e.target.value)}
+          onChange={(e) => this.props.updateValue(this.props.index, 'filter_function', e.target.value)}
         />
+        {filterHelp}
       </div>
     );
+
 
     let columnsHeader = (
       <div className='header columns' id={'edit-columns-header-' + playlist.id} style={{display: 'none'}}>

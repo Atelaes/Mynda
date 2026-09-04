@@ -120,6 +120,7 @@
   --main-font-size: 20pt;
   --main-font-size-compact: 16pt;
   --main-font-weight: normal;
+  --mono-font: SourceCodePro, monospace;
   --textinput-font: var(--main-font);
   --big-title-font: Dorsa, Helvetica, sans-serif;
   --playlist-tab-font: var(--main-font);
@@ -842,6 +843,29 @@ in lieu of that, we will use a negative margin on the selected element instead (
   animation-fill-mode: both;
 }
 
+#settings-playlists .paragraph-fold.filter-help {
+  font-size: .7rem;
+}
+
+#settings-playlists .paragraph-fold.filter-help pre {
+  background-color: var(--light-bg);
+  font-family: var(--mono-font);
+}
+
+#settings-playlists .paragraph-fold.filter-help .twirl-icon {
+  font-size: .5rem;
+  margin-right: .5em;
+  margin-top: .2em;
+}
+
+#settings-playlists .paragraph-fold.filter-help .filter-help-paragraph {
+  margin-top: 1em;
+}
+
+#settings-playlists .paragraph-fold.filter-help .filter-help-paragraph strong{
+  color: var(--colorful-text);
+  font-size: .8rem;
+}
 
 @keyframes list-scroll-left {
   0% {

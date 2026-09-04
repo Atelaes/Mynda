@@ -950,11 +950,13 @@ class MynLibTable extends React.Component {
       }
 
       let includeUserRatingChanged = this.state.include_user_rating_in_avg !== this.props.settings.preferences.include_user_rating_in_avg;
-      if (moviesChanged || includeUserRatingChanged) {
+      let columnsChanged = !_.isEqual(oldProps.columns, this.props.columns);
+      if (moviesChanged || includeUserRatingChanged || columnsChanged) {
         libraryViewLog.debug('Library table data changed', {
           tableID: this.tableID,
           moviesChanged: moviesChanged,
-          includeUserRatingChanged: includeUserRatingChanged
+          includeUserRatingChanged: includeUserRatingChanged,
+          columnsChanged: columnsChanged
         });
         // let diff = getArrayDiff(tempOld,tempNew);
         // console.log(diff);
@@ -965,8 +967,12 @@ class MynLibTable extends React.Component {
         // for some reason, comparing oldProps did not work for this, because oldProps and this.props were always the same; I have no idea why; so we just use a state variable to compare
         this.state.include_user_rating_in_avg = this.props.settings.preferences.include_user_rating_in_avg;
 
-        // re-render the table (sorting by the current values)
-        this.reset();
+        // Rebuild the cached header and row JSX when the visible columns
+        // change. Preserve the current sort when its column is still present;
+        // otherwise return to the playlist's normal initial-sort behavior.
+        let activeSortColumnWasRemoved = columnsChanged &&
+          !this.props.columns.includes(this.state.sortKey);
+        this.reset(activeSortColumnWasRemoved ? 'initial-sort' : undefined);
       }
     }
 
