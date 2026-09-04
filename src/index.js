@@ -62,6 +62,8 @@ let newIDs = [];
 let ffMpegQueue = [];
 let videoAddTimers = [];
 let appStartTime = new Date();
+let watchfolderScanRunning = false;
+let watchfolderScanQueued = false;
 let autoTagRunning = false;
 let autoTagRequestPending = false;
 let autoTagCancelRequested = false;
@@ -150,7 +152,7 @@ async function start() {
   await createWindow();  //createWindow needs to come first else we get a big delay.
   eraseTempImages();
   await cleanLibrary();
-  checkWatchFolders();
+  checkWatchFolders('startup');
 
   // testNotify(0);
 }
@@ -566,45 +568,95 @@ let videoTemplate =   {
     }
   }
 
-function checkWatchFolders() {
-  // These values describe one scan only. Leaving them populated causes files
-  // from earlier scans to be treated as members of the current batch.
-  parsing = {};
-  libMulch = [];
-  newIDs = [];
-  unavailableWatchFolders = new Set();
-  subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
-  videoExclusion.reset();
+function finishWatchfolderScan() {
+  watchfolderScanRunning = false;
 
-  win.webContents.send('status-update', {action: 'check'});
-  // reset libFileTree
-  libFileTree = {name:'root', folders:[]};
+  // A watchfolder added during an existing scan must get one fresh pass. A
+  // single queued scan is enough even if several folders were added, because
+  // it reads the current settings when it starts.
+  if (watchfolderScanQueued) {
+    watchfolderScanQueued = false;
+    checkWatchFolders('watchfolder-added-queued');
+  }
+}
 
-  // Search watchfolders for new files and add any new videos to the library
-  numNewVids = 0; // reset the number of new videos found
-  let folders = library.settings.watchfolders;
-  scanLog.info('Watchfolder scan started', {
-    watchfolderCount: folders.filter(Boolean).length
-  });
-  for (let i=0; i<folders.length; i++) {
-    let thisFolder = folders[i];
-    if (thisFolder) {
-      let thisNode;
-      let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
-      if (filtered.length === 0) {
-        let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
-        libFileTree.folders.push(child);
-        thisNode = libFileTree.folders[libFileTree.folders.length-1];
-      } else {
-        thisNode = filtered[0];
-      }
-      findVideosFromFolder(thisNode);
+async function checkWatchFolders(trigger = 'automatic') {
+  // The scanner uses shared tree/reconciliation state, so overlapping passes
+  // would corrupt one another. An added watchfolder needs a later pass; a
+  // repeated manual/startup request does not, because the active pass already
+  // represents a scan in progress for the user.
+  if (watchfolderScanRunning) {
+    if (trigger === 'watchfolder-added' || trigger === 'watchfolder-added-queued') {
+      watchfolderScanQueued = true;
+      scanLog.info('Queued watchfolder scan until the current scan finishes', {
+        trigger: trigger
+      });
+    } else {
+      scanLog.info('Ignored watchfolder scan request because a scan is already running', {
+        trigger: trigger
+      });
     }
+    return false;
   }
-  if (folders.length === 0) {
-    scanLog.info('Watchfolder scan finished; no watchfolders are configured');
+
+  watchfolderScanRunning = true;
+
+  try {
+    // Let an editor/settings save already in the Library queue settle before
+    // taking snapshots that will later be written back during reconciliation.
+    await library.whenIdle();
+
+    // These values describe one scan only. Leaving them populated causes files
+    // from earlier scans to be treated as members of the current batch.
+    parsing = {};
+    libMulch = [];
+    newIDs = [];
+    unavailableWatchFolders = new Set();
+    subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
+    videoExclusion.reset();
+
+    win.webContents.send('status-update', {action: 'check'});
+    // reset libFileTree
+    libFileTree = {name:'root', folders:[]};
+
+    // Search watchfolders for new files and add any new videos to the library
+    numNewVids = 0; // reset the number of new videos found
+    let folders = Array.isArray(library.settings.watchfolders) ?
+      library.settings.watchfolders.filter(Boolean) : [];
+    scanLog.info('Watchfolder scan started', {
+      trigger: trigger,
+      watchfolderCount: folders.length
+    });
+    for (let i=0; i<folders.length; i++) {
+      let thisFolder = folders[i];
+      if (thisFolder) {
+        let thisNode;
+        let filtered = libFileTree.folders.filter(folder => folder.path === thisFolder.path);
+        if (filtered.length === 0) {
+          let child = {path: thisFolder.path, kind: thisFolder.kind, folders: [], videos: [], subtitles: []};
+          libFileTree.folders.push(child);
+          thisNode = libFileTree.folders[libFileTree.folders.length-1];
+        } else {
+          thisNode = filtered[0];
+        }
+        findVideosFromFolder(thisNode);
+      }
+    }
+    if (folders.length === 0) {
+      scanLog.info('Watchfolder scan finished; no watchfolders are configured');
+      win.webContents.send('status-update', {action: ''});
+      finishWatchfolderScan();
+    }
+  } catch(err) {
+    scanLog.error('Could not start watchfolder scan', {
+      trigger: trigger,
+      error: err && err.stack ? err.stack : String(err)
+    });
     win.webContents.send('status-update', {action: ''});
+    finishWatchfolderScan();
   }
+
+  return true;
 }
 
 // recursively maps out the folder structure and files (only videos/DVDs and subtitle files)
@@ -697,6 +749,7 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
       confirmCurrentVideos().catch(err => {
         scanLog.error('Watchfolder reconciliation failed', {error: err});
         win.webContents.send('status-update', {action: ''});
+        finishWatchfolderScan();
       });
     }
   });
@@ -981,6 +1034,7 @@ async function addVideoController() {
 
   setTimeout(() => {
     win.webContents.send('status-update', {action: ''});
+    finishWatchfolderScan();
   },3000);
 }
 
@@ -2046,6 +2100,18 @@ function prepareSuccessfulAutoTagResult(video) {
 }
 
 async function requestAutoTag() {
+  if (watchfolderScanRunning) {
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Auto-Tag',
+      message: 'Auto-Tag cannot start while a watchfolder scan is running.',
+      detail: 'Wait for the scan to finish, then try again.'
+    });
+    return;
+  }
+
   if (autoTagRunning || autoTagRequestPending) {
     await dialog.showMessageBox({
       type: 'info',
@@ -2155,6 +2221,18 @@ async function showSelectedAutoTagSummary(result) {
 }
 
 async function requestSelectedAutoTag(videoIDs) {
+  if (watchfolderScanRunning) {
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Auto-Tag Selected',
+      message: 'Auto-Tag cannot start while a watchfolder scan is running.',
+      detail: 'Wait for the scan to finish, then try again.'
+    });
+    return;
+  }
+
   if (autoTagRunning || autoTagRequestPending) {
     await dialog.showMessageBox({
       type: 'info',
@@ -2729,7 +2807,7 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
         // add to library
         let folderObject = {"path" : folder, "kind" : kind, "videos" : []};
         library.add('settings.watchfolders.push', folderObject, () => {
-          checkWatchFolders();
+          checkWatchFolders('watchfolder-added');
 
           // tell the client side what happened
           event.sender.send('settings-watchfolder-added', _.cloneDeep(folderObject));
@@ -2830,6 +2908,27 @@ ipcMain.on('download', (event, url, destination, requestedResponseChannel) => {
     downloadFile(url, destination)
       .then(response => event.sender.send(responseChannel, response))
       .catch(response => event.sender.send(responseChannel, response))
+})
+
+ipcMain.on('scan-watchfolders', () => {
+  if (autoTagRunning || autoTagRequestPending) {
+    scanLog.info('Manual watchfolder scan request rejected while Auto-Tag is active');
+    dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Scan Watchfolders',
+      message: 'A watchfolder scan cannot start while Auto-Tag is running.',
+      detail: 'Wait for Auto-Tag to finish or cancel it, then try again.'
+    }).catch(err => {
+      backendLog.error('Could not display the watchfolder-scan conflict dialog', {
+        error: err && err.stack ? err.stack : String(err)
+      });
+    });
+    return;
+  }
+
+  checkWatchFolders('manual');
 })
 
 ipcMain.on('autotag', () => {

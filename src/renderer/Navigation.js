@@ -102,6 +102,7 @@ class MynNav extends React.Component {
           <li key="add" id="add-playlist" onClick={(e) => this.props.showSettings('playlists')}>{'\uFF0B'}</li>
         </ul>
         <div id="nav-controls">
+          <div id="scan-button" className="controls" onClick={() => this.props.scanWatchfolders()} title="Scan Watchfolders for New Videos"></div>
           <div id="search-field" className="input-container controls"><span id="search-label">Search: </span><input id="search-input" className="empty" type="text" placeholder="Search..." onInput={(e) => this.props.search(e)} /><div id="search-clear-button" className="input-clear-button always" onClick={(e) => this.clearSearch(e)}></div></div>
           <div id="settings-button" className="controls" onClick={() => this.props.showSettings()}></div>
           <div id="show-hide-details-btn" className="controls" onClick={() => this.props.toggleDetailsPane(!this.props.detailsPaneShowing)} title="Hide/Show Details Pane">{this.props.detailsPaneShowing ? "\u21E5" : "\u21E4"}</div>

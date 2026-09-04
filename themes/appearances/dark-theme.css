@@ -296,6 +296,17 @@
   --searchicon-empty: url('../../images/mag-icon_white.png');
   --searchicon-background-empty: rgba(0,0,0,0) var(--searchicon-empty) no-repeat 0% 50%;
 
+  --scanicon-image: url('../../images/scan-icon_white.png');
+  --scanicon-opacity: .3;
+  --scanicon-opacity-hover: calc(var(--scanicon-opacity) + .4);
+  --scanicon-height: var(--inputicon-height);
+  --scanicon-width: var(--inputicon-width);
+  --scanicon-background: rgba(0, 0, 0, 0) var(--scanicon-image) no-repeat 0% 50%;
+  --scanicon-bg-size: var(--textinput-height) var(--textinput-height);
+  --scanicon-padding: initial;
+  --scanicon-margin: inherit;
+  --scanicon-border: initial;
+
   --settingsicon-image: url('../../images/settings-icon_white.png');
   --settingsicon-opacity: .3;
   --settingsicon-opacity-hover: calc(var(--settingsicon-opacity) + .4);

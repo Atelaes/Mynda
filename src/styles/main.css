@@ -446,6 +446,24 @@ img.ratings-icon {
   padding: var(--searchinput-padding);
 }
 
+#scan-button {
+  cursor: pointer;
+  user-select: none;
+  opacity: var(--scanicon-opacity);
+  height: var(--scanicon-height);
+  width: var(--scanicon-width);
+  background: var(--scanicon-background);
+  background-size: var(--scanicon-bg-size);
+
+  padding: var(--scanicon-padding);
+  margin: var(--scanicon-margin);
+  border: var(--scanicon-border);
+}
+
+#scan-button:hover {
+  opacity: var(--scanicon-opacity-hover);
+}
+
 #settings-button {
   cursor:pointer;
   user-select:none;

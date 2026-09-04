@@ -1,5 +1,6 @@
 // Root renderer component and application-level state coordination.
 const React = require('react');
+const {ipcRenderer} = require('electron');
 const _ = require('lodash');
 const {
   library,
@@ -65,6 +66,7 @@ class Mynda extends React.Component {
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
     this.logPlayed = this.logPlayed.bind(this);
+    this.scanWatchfolders = this.scanWatchfolders.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     // this.showSettings = this.showSettings.bind(this);
     // this.hideSettings = this.hideSettings.bind(this);
@@ -809,6 +811,16 @@ class Mynda extends React.Component {
     });
   }
 
+  scanWatchfolders() {
+    try {
+      ipcRenderer.send('scan-watchfolders');
+    } catch(err) {
+      frontendLog.error('Could not request a watchfolder scan', {
+        error: err && err.stack ? err.stack : String(err)
+      });
+    }
+  }
+
   showOpenablePane(name,view) {
     // the view parameter may be passed to us to tell us which tab to display in panes with tabs (only 'settings' for now)
     if (view && name === 'settingsPane') {
@@ -992,6 +1004,7 @@ class Mynda extends React.Component {
             currentPlaylistID={this.state.currentPlaylistID}
             setPlaylist={this.setPlaylist}
             search={this.search}
+            scanWatchfolders={this.scanWatchfolders}
             showSettings={(view) => {this.showOpenablePane("settingsPane",view)}}
             playlistLength={this.state.playlistLength}
             toggleDetailsPane={this.toggleDetailsPane}
