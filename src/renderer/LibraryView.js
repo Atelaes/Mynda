@@ -9,7 +9,8 @@ const {
   library,
   libraryViewLog,
   playerLog,
-  placeholderImage
+  placeholderImage,
+  disableConfirmationDialog
 } = require('./RendererRuntime.js');
 const {
   validateVideo,
@@ -1111,14 +1112,9 @@ class MynLibTableRow extends React.Component {
 
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
-      if (skipDialog) {
+      if (skipDialog && response === 0) {
         // console.log('option to override dialog was checked!');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs[`MynLibTable-confirm-inlineEdit`] = true;
-        library.replace("settings.preferences",prefs);
+        disableConfirmationDialog('MynLibTable-confirm-inlineEdit', libraryViewLog);
       }
     });
 

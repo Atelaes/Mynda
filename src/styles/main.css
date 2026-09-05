@@ -1483,6 +1483,163 @@ table.compact .movie-row {
   font-weight: bold;
 }
 
+/* Share is a three-stage removable-drive workflow. Keep its controls in the
+   Settings pane, but give the request, fulfillment, and import preflights
+   enough structure to remain readable with custom kinds and long paths. */
+#settings-share {
+  font-size: .8em;
+  max-width: 58rem;
+}
+
+#settings-share p {
+  margin: 0 0 .6em 0;
+  font-weight: 300;
+}
+
+#settings-share .share-directory-controls,
+#settings-share .share-actions,
+#settings-share .share-kind-actions,
+#settings-share .share-progress {
+  display: flex;
+  align-items: center;
+  gap: .4em;
+}
+
+#settings-share .share-directory-controls .input-container {
+  flex: 1 1 auto;
+}
+
+#settings-share-choose-path {
+  width: 100%;
+}
+
+#settings-share .share-kind-heading {
+  font-weight: 600;
+  margin-bottom: .25em;
+}
+
+#settings-share .share-kind-actions {
+  margin-bottom: .35em;
+}
+
+#settings-share .share-kind-list,
+#settings-share .share-mapping-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25em .8em;
+}
+
+#settings-share .share-kind-list label,
+#settings-share .share-mapping-options label,
+#settings-share .share-dvd-option {
+  white-space: nowrap;
+}
+
+#settings-share .share-dvd-option {
+  display: block;
+  margin-top: .6em;
+}
+
+#settings-share .share-actions {
+  margin-top: .6em;
+}
+
+#settings-share .share-message,
+#settings-share .share-plan,
+#settings-share .share-progress,
+#settings-share .share-existing-summary {
+  padding: .5em .65em;
+  margin: .6em 0;
+  border-left: .18em solid var(--lighter-bg);
+  /* background-color: var(--transparent-black-bg); */
+}
+
+#settings-share .share-message {
+  color: var(--colorful-text);
+}
+
+#settings-share .share-message.success {
+  border-left-color: var(--lighter-colorful-bg);
+}
+
+#settings-share .share-plan.insufficient,
+#settings-share .share-unfulfilled {
+  color: var(--bright-text);
+}
+
+#settings-share .share-message.error,
+#settings-share .share-plan.insufficient {
+  /* box-shadow: var(--input-invalid-boxshadow); */
+  color: var(--error-text);
+}
+
+#settings-share .share-summary-value {
+  color: var(--colorful-text);
+}
+
+#settings-share .share-action-description {
+  color: var(--dim-text);
+  font-size: .85em;
+  font-style: italic;
+}
+
+#settings-share .share-progress {
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+#settings-share .share-mapping-table {
+  display: grid;
+  grid-template-columns: minmax(7em, .7fr) minmax(18em, 2fr);
+  gap: .35em .75em;
+  align-items: start;
+}
+
+#settings-share .share-import-table {
+  display: grid;
+  grid-template-columns: minmax(6em, .6fr) minmax(8em, .8fr) minmax(18em, 2fr);
+  gap: .35em .75em;
+  align-items: start;
+}
+
+#settings-share .share-mapping-header {
+  color: var(--th-text);
+  font-family: var(--th-font);
+  font-size: calc(var(--th-font-size) * .65);
+  font-weight: bold;
+}
+
+#settings-share .share-mapping-label {
+  font-weight: 600;
+  padding-top: .15em;
+}
+
+#settings-share .share-import-table select {
+  width: 100%;
+}
+
+#settings-share .share-unfulfilled,
+#settings-share .share-muted {
+  font-size: .85em;
+  font-style: italic;
+  opacity: .8;
+}
+
+#settings-share .share-unfulfilled {
+  flex-basis: 100%;
+}
+
+#settings-share .share-reason-counts {
+  margin: .35em 0 .5em 1.2em;
+  padding: 0;
+}
+
+#settings-share .share-plan h3 {
+  margin: 0 0 .35em 0;
+}
+
 
 
 /*************************************/

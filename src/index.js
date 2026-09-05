@@ -30,6 +30,8 @@ const OmdbHelper = require('./OmdbHelper.js');
 const MovieSearch = require('./MovieSearch.js');
 const VideoExclusion = require('./VideoExclusion.js');
 const VideoRuntimeVerifier = require('./VideoRuntimeVerifier.js');
+const ShareService = require('./ShareService.js');
+const ShareManifest = require('./ShareManifest.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
 //const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
@@ -50,7 +52,7 @@ const backendLog = Logger.child('Backend');
 const scanLog = Logger.child('WatchfolderScan');
 const metadataLog = Logger.child('Metadata');
 const autoTagLog = Logger.child('AutoTag');
-const exportLog = Logger.child('Export');
+const shareLog = Logger.child('Share');
 const videoExclusionLog = Logger.child('VideoExclusion');
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let libMulch = [];  //After libFileTree has been created and chewed up, this is the flattened version
@@ -69,6 +71,37 @@ let autoTagRequestPending = false;
 let autoTagCancelRequested = false;
 let autoTagCancellationDecision = null;
 let autoTagScope = 'library';
+
+function confirmationDialogIsDisabled(dialogName) {
+  return Boolean(
+    library.settings &&
+    library.settings.preferences &&
+    library.settings.preferences.override_dialogs &&
+    library.settings.preferences.override_dialogs[dialogName] === true
+  );
+}
+
+function disableConfirmationDialog(dialogName, log = backendLog) {
+  if (!dialogName || confirmationDialogIsDisabled(dialogName)) return;
+
+  log.debug('User disabled a confirmation dialog', {dialog: dialogName});
+  const overrideDialogs = library.settings &&
+    library.settings.preferences &&
+    library.settings.preferences.override_dialogs;
+  const address = overrideDialogs ?
+    `settings.preferences.override_dialogs.${dialogName}` :
+    'settings.preferences.override_dialogs';
+  const value = overrideDialogs ? true : {[dialogName]: true};
+  library.replace(address, value, err => {
+    if (err) {
+      log.error('Could not save confirmation-dialog preference', {
+        dialog: dialogName,
+        error: err
+      });
+    }
+  });
+}
+
 const videoRuntimeVerifier = new VideoRuntimeVerifier({
   ffmpegPath: pathToFFmpeg
 });
@@ -86,6 +119,45 @@ const videoExclusion = new VideoExclusion({
     return preferences.exclude_samples_from_library !== false;
   },
   log: videoExclusionLog
+});
+
+function sendShareProgress(progress) {
+  if (!win || win.isDestroyed() || !win.webContents) return;
+  win.webContents.send('share-progress', progress);
+
+  if (!progress || progress.busy === false || !progress.phase) {
+    win.webContents.send('status-update', {action: ''});
+    // A watchfolder added from another Settings tab during Share gets one
+    // fresh scan after the filesystem operation releases its lock.
+    if (watchfolderScanQueued && !watchfolderScanRunning) {
+      watchfolderScanQueued = false;
+      setImmediate(() => checkWatchFolders('watchfolder-added-queued'));
+    }
+    return;
+  }
+
+  const actionForPhase = {
+    request: 'share_request',
+    'fulfillment-plan': 'share_plan',
+    fulfill: 'share_fulfill',
+    'import-plan': 'share_plan',
+    import: 'share_import'
+  };
+  win.webContents.send('status-update', {
+    action: actionForPhase[progress.phase] || 'share_plan',
+    numCurrent: progress.numCurrent,
+    numTotal: progress.numTotal,
+    cancelRequested: progress.cancelRequested
+  });
+}
+
+const shareService = new ShareService({
+  library: library,
+  log: shareLog,
+  checkDiskSpace: checkDiskSpace,
+  sendProgress: sendShareProgress,
+  conflictingOperationActive: () =>
+    watchfolderScanRunning || autoTagRunning || autoTagRequestPending
 });
 
 app.whenReady().then(start);
@@ -581,6 +653,22 @@ function finishWatchfolderScan() {
 }
 
 async function checkWatchFolders(trigger = 'automatic') {
+  if (shareService.isBusy()) {
+    if (trigger === 'watchfolder-added' || trigger === 'watchfolder-added-queued') {
+      watchfolderScanQueued = true;
+      scanLog.info('Queued watchfolder scan until the Share operation finishes', {
+        trigger: trigger,
+        sharePhase: shareService.getState().phase
+      });
+    } else {
+      scanLog.info('Ignored watchfolder scan request because Share is active', {
+        trigger: trigger,
+        sharePhase: shareService.getState().phase
+      });
+    }
+    return false;
+  }
+
   // The scanner uses shared tree/reconciliation state, so overlapping passes
   // would corrupt one another. An added watchfolder needs a later pass; a
   // repeated manual/startup request does not, because the active pass already
@@ -690,6 +778,13 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
       let component = components[i];
       let compAddress = path.join(folder, component.name);
 
+      // Never scan Mynda's atomic Share-import staging directory: an
+      // interrupted DVD copy may already contain VIDEO_TS while incomplete.
+      // Other hidden directories retain the scanner's existing behavior.
+      if (component.name === ShareManifest.IMPORT_STAGING_DIRECTORY) {
+        continue;
+      }
+
       // if we found a directory, find out if it's a DVD rip or not
       if (component.isDirectory()) {
         if (isDVDRip(compAddress)) {
@@ -708,8 +803,7 @@ function findVideosFromFolder(folderNode, rootWatchFolder = folderNode.path) {
           findVideosFromFolder(folderNode.folders[folderNode.folders.length-1], rootWatchFolder);
         }
       } else if (!/^\./.test(component.name)) {
-        //If it's a hidden file, as evidenced by a filename starting with a dot
-        //Then skip it
+        // Hidden files have always been ignored by the watchfolder scanner.
         //console.log(`We came across ${component.name}.`);
         // otherwise, it must be a file
         let fileExt = path.extname(component.name).replace('.', '').toLowerCase();
@@ -2100,6 +2194,18 @@ function prepareSuccessfulAutoTagResult(video) {
 }
 
 async function requestAutoTag() {
+  if (shareService.isBusy()) {
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Auto-Tag',
+      message: 'Auto-Tag cannot start while Share is working.',
+      detail: 'Wait for Share to finish or cancel it, then try again.'
+    });
+    return;
+  }
+
   if (watchfolderScanRunning) {
     await dialog.showMessageBox({
       type: 'info',
@@ -2221,6 +2327,18 @@ async function showSelectedAutoTagSummary(result) {
 }
 
 async function requestSelectedAutoTag(videoIDs) {
+  if (shareService.isBusy()) {
+    await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Auto-Tag Selected',
+      message: 'Auto-Tag cannot start while Share is working.',
+      detail: 'Wait for Share to finish or cancel it, then try again.'
+    });
+    return;
+  }
+
   if (watchfolderScanRunning) {
     await dialog.showMessageBox({
       type: 'info',
@@ -2318,6 +2436,23 @@ function requestAutoTagCancellation() {
     return autoTagCancellationDecision;
   }
 
+  const confirmationPreference = 'MynAutoTag-confirm-cancel';
+  const cancelAutoTag = () => {
+    if (!autoTagRunning) {
+      autoTagLog.info('Automatic tagging finished before cancellation was requested');
+      return false;
+    }
+
+    autoTagCancelRequested = true;
+    autoTagLog.info('Automatic tagging cancellation requested by user');
+    win.webContents.send('status-update', {action: 'autotag', cancelRequested: true});
+    return true;
+  };
+
+  if (confirmationDialogIsDisabled(confirmationPreference)) {
+    return Promise.resolve(cancelAutoTag());
+  }
+
   autoTagCancellationDecision = dialog.showMessageBox({
     type: 'warning',
     buttons: ['Continue', 'Cancel'],
@@ -2325,6 +2460,7 @@ function requestAutoTagCancellation() {
     cancelId: 0,
     title: 'Cancel Auto-Tag',
     message: 'Cancel auto-tagging?',
+    checkboxLabel: `Don't show this message again`,
     detail: autoTagScope === 'selected' ?
       'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Unprocessed selected videos will be left unchanged; select them and use Auto-Tag Selected again if you want to continue.' :
       'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Videos that have not been processed will remain eligible for the next Auto-Tag run, which will pick up where it left off.'
@@ -2333,15 +2469,11 @@ function requestAutoTagCancellation() {
       autoTagLog.info('Automatic tagging cancellation declined by user');
       return false;
     }
-    if (!autoTagRunning) {
-      autoTagLog.info('Automatic tagging finished before cancellation was confirmed');
-      return false;
-    }
 
-    autoTagCancelRequested = true;
-    autoTagLog.info('Automatic tagging cancellation confirmed by user');
-    win.webContents.send('status-update', {action: 'autotag', cancelRequested: true});
-    return true;
+    if (result.checkboxChecked) {
+      disableConfirmationDialog(confirmationPreference, autoTagLog);
+    }
+    return cancelAutoTag();
   }).catch(err => {
     autoTagLog.error('Could not confirm automatic tagging cancellation', {
       error: err && err.stack ? err.stack : String(err)
@@ -2670,121 +2802,6 @@ function saveBatch(batch) {
   });
 }
 
-async function exportFiles(drive) {
-  win.webContents.send('status-update', {action: 'export'});
-  exportLog.info('Media export started', {destination: drive});
-  let fileLocation = path.join(drive, "Mynda Manifest.json");
-  let manifest;
-  if (fs.existsSync(fileLocation)) {
-    manifest = JSON.parse(fs.readFileSync(fileLocation));
-    //console.log('Loaded manifest.')
-  } else {
-    manifest = {media: []};
-    exportLog.info('No export manifest found; treating all media as new', {
-      manifestPath: fileLocation
-    });
-  }
-  let matchedMedia = [];
-  let unmatchedMedia = [];
-  for (let i=0; i<library.media.length; i++) {
-    let homeVideo = library.media[i];
-    let match = null;
-    for (let j=0; j<manifest.media.length; j++) {
-      let awayVideo = manifest.media[j];
-      if (homeVideo.id === awayVideo.id) {
-        match = {id : homeVideo.id, file : homeVideo.filename}
-        matchedMedia.push(match);
-        break;
-      }
-    }
-    if (match === null) {
-      unmatchedMedia.push(homeVideo);
-    }
-  }
-  exportLog.info('Export manifest comparison finished', {
-    alreadyExportedVideos: matchedMedia.length,
-    videosToExport: unmatchedMedia.length
-  });
-  unmatchedMedia.sort((a,b) => {return b.dateadded - a.dateadded});
-  for (let k=0; k<unmatchedMedia.length; k++) {
-    let video = unmatchedMedia[k];
-    //console.log(`Starting export process on ${video.title}`);
-    if (video.dvd) {
-      continue;
-    }
-    let filename = video.filename;
-    let conWatchFolder = '';
-    for (let l=0; l<library.settings.watchfolders.length; l++) {
-      let watchfolder = library.settings.watchfolders[l];
-      //console.log(`Checking watchfolder ${watchfolder.path}`)
-      if (filename.includes(watchfolder.path)) {
-        conWatchFolder = watchfolder.path;
-        break;
-      }
-    }
-    //console.log(`Found watchfolder ${conWatchFolder}.`);
-    if (conWatchFolder === '') {
-      continue;
-    }
-    let filePathTrim = conWatchFolder.replace(path.basename(conWatchFolder), '');
-    let subtitles = video.subtitles;
-    let totalSize = fs.lstatSync(filename).size;
-    for (let m=0; m<subtitles.length; m++) {
-      let subtitle = subtitles[m];
-      totalSize += fs.lstatSync(subtitle).size;
-    }
-    let diskSpace = await checkDiskSpace(drive);
-    let availableSpace = diskSpace.free;
-    exportLog.debug('Checked export destination capacity', {
-      destination: drive,
-      availableBytes: availableSpace,
-      requiredBytes: totalSize,
-      videoID: video.id
-    });
-    //console.log(`Found ${availableDrives.length} drives.`)
-
-    if (availableSpace > totalSize) {
-      //console.log(`There's ${availableSpace} bytes, and we need ${totalSize} bytes.`);
-
-      try {
-        let destFile = path.join(drive, filename.replace(filePathTrim, ''));
-        //console.log(`Going to try copying video to ${destFile}.`);
-        let destDir = destFile.replace(path.basename(destFile), '');
-        fs.mkdirSync(destDir, { recursive: true });
-        fs.copyFileSync(filename, destFile, fs.constants.COPYFILE_EXCL);
-        for (let m=0; m<subtitles.length; m++) {
-          let subtitle = subtitles[m];
-          let subDestFile = path.join(drive, subtitle.replace(filePathTrim, ''));
-          let subDestDir = subDestFile.replace(path.basename(subDestFile), '');
-          fs.mkdirSync(subDestDir, { recursive: true });
-          fs.copyFileSync(subtitle, subDestFile, fs.constants.COPYFILE_EXCL);
-        }
-        exportLog.info('Video exported successfully', {
-          id: video.id,
-          title: video.title,
-          destination: drive
-        });
-      } catch (e) {
-        exportLog.error('Could not export video', {
-          id: video.id,
-          title: video.title,
-          destination: drive,
-          error: e
-        });
-      }
-    } else {
-      exportLog.warn('Export stopped because the destination has insufficient space', {
-        destination: drive,
-        availableBytes: availableSpace,
-        requiredBytes: totalSize,
-        nextVideoID: video.id
-      });
-      break;
-    }
-  }
-  win.webContents.send('status-update', {action: ''});
-}
-
 ipcMain.on('settings-folder-select', (event) => {
   let options = {properties: ['openDirectory']};
   dialog.showOpenDialog(null, options).then(result => {
@@ -2835,10 +2852,34 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
 
 ipcMain.on('settings-watchfolder-remove', (event, path) => {
 
+  const confirmationPreference = 'MynSettingsFolders-confirm-remove';
+  const removeConfirmedWatchfolder = () => {
+    // The callback returns only after the operation has completed, so the
+    // renderer can refresh from the authoritative library state.
+    removeWatchfolder(path,(err) => {
+      event.sender.send('settings-watchfolder-remove', path, !err);
+
+      if (err) {
+        backendLog.error('Could not remove watchfolder', {
+          watchfolder: path,
+          error: err
+        });
+      }
+    });
+  };
+
+  if (confirmationDialogIsDisabled(confirmationPreference)) {
+    removeConfirmedWatchfolder();
+    return;
+  }
+
   // first, show the user a confirmation dialog
   const options = {
     type : 'warning',
     buttons : ['Cancel','Remove Folder'],
+    defaultId : 0,
+    cancelId : 0,
+    checkboxLabel : `Don't show this message again`,
     message : 'Are you sure you want to remove following folder from the library?\n\n' +
               path + '\n\n' +
               'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
@@ -2846,21 +2887,10 @@ ipcMain.on('settings-watchfolder-remove', (event, path) => {
   dialog.showMessageBox(options).then(result => {
     // if the user said okay
     if (result.response === 1) {
-      // remove watchfolder, and pass callback function.
-      // the callback function will return only after the watchfolder
-      // has actually been removed from the library, so we can tell the front end
-      // whether we succeeded or not, and it can use the info to update itself
-      removeWatchfolder(path,(err) => {
-        // tell the client side what happened
-        event.sender.send('settings-watchfolder-remove', path, !err); // <-- pass !err to the front end, which expects a boolean for success or failure
-
-        if (err) {
-          backendLog.error('Could not remove watchfolder', {
-            watchfolder: path,
-            error: err
-          });
-        }
-      });
+      if (result.checkboxChecked) {
+        disableConfirmationDialog(confirmationPreference, scanLog);
+      }
+      removeConfirmedWatchfolder();
     } else {
       // if the user canceled
       backendLog.debug('User canceled watchfolder removal', {watchfolder: path});
@@ -2911,6 +2941,25 @@ ipcMain.on('download', (event, url, destination, requestedResponseChannel) => {
 })
 
 ipcMain.on('scan-watchfolders', () => {
+  if (shareService.isBusy()) {
+    scanLog.info('Manual watchfolder scan request rejected while Share is active', {
+      sharePhase: shareService.getState().phase
+    });
+    dialog.showMessageBox({
+      type: 'info',
+      buttons: ['OK'],
+      defaultId: 0,
+      title: 'Scan Watchfolders',
+      message: 'A watchfolder scan cannot start while Share is working.',
+      detail: 'Wait for Share to finish or cancel it, then try again.'
+    }).catch(err => {
+      backendLog.error('Could not display the Share/watchfolder-scan conflict dialog', {
+        error: err && err.stack ? err.stack : String(err)
+      });
+    });
+    return;
+  }
+
   if (autoTagRunning || autoTagRequestPending) {
     scanLog.info('Manual watchfolder scan request rejected while Auto-Tag is active');
     dialog.showMessageBox({
@@ -3027,27 +3076,42 @@ ipcMain.on('reset-from-filename', (event, requestedResponseChannel, videos) => {
       `video${missingWatchfolders === 1 ? '' : 's'}; for those, it will use the filename alone and keep the current kind.`;
   }
 
+  const confirmationPreference = 'MynEditor-confirm-reset-from-filename';
+  const returnResetResult = confirmed => {
+    backendLog.info(confirmed ?
+      'Filename-derived editor reset confirmed' :
+      'Filename-derived editor reset canceled', {
+        videoCount: count,
+        returnedPatchCount: confirmed ? patches.length : 0
+      });
+    event.sender.send(requestedResponseChannel, {
+      confirmed: confirmed,
+      patches: confirmed ? patches.map(({id, changes}) => ({id, changes})) : []
+    });
+  };
+
+  if (confirmationDialogIsDisabled(confirmationPreference)) {
+    returnResetResult(true);
+    return;
+  }
+
   dialog.showMessageBox({
     type: 'warning',
     buttons: ['Cancel', 'Reset from Filename'],
     defaultId: 0,
     cancelId: 0,
     noLink: true,
+    checkboxLabel: `Don't show this message again`,
     message: count === 1 ?
       'Reset this video from its filename?' :
       `Reset ${count} videos from their filenames?`,
     detail: detail
   }).then(result => {
-    backendLog.info(result.response === 1 ?
-      'Filename-derived editor reset confirmed' :
-      'Filename-derived editor reset canceled', {
-        videoCount: count,
-        returnedPatchCount: result.response === 1 ? patches.length : 0
-      });
-    event.sender.send(requestedResponseChannel, {
-      confirmed: result.response === 1,
-      patches: result.response === 1 ? patches.map(({id, changes}) => ({id, changes})) : []
-    });
+    const confirmed = result.response === 1;
+    if (confirmed && result.checkboxChecked) {
+      disableConfirmationDialog(confirmationPreference, backendLog);
+    }
+    returnResetResult(confirmed);
   }).catch(err => {
     backendLog.error('Could not display filename reset confirmation', {
       error: err && err.stack ? err.stack : String(err)
@@ -3125,12 +3189,93 @@ ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
   });
 })})
 
-ipcMain.on('exportFiles', (event, drive) => {
-  exportFiles(drive).catch(err => {
-    exportLog.error('Media export failed', {
-      destination: drive,
-      error: err
+async function shareIPCResponse(operation, context) {
+  try {
+    return {ok: true, value: await operation()};
+  } catch(err) {
+    const serialized = ShareService.serializeError(err);
+    const expectedCodes = new Set([
+      'SHARE_REQUEST_NOT_FOUND',
+      'SHARE_REQUEST_EXISTS',
+      'SHARE_CANCELED',
+      'SHARE_BUSY',
+      'SHARE_OPERATION_CONFLICT',
+      'SHARE_PLAN_EXPIRED',
+      'SHARE_PLAN_STALE',
+      'SHARE_INSUFFICIENT_SPACE'
+    ]);
+    const logData = Object.assign({}, context || {}, {error: serialized});
+    if (expectedCodes.has(serialized.code)) {
+      shareLog.warn('Share request was not completed', logData);
+    } else {
+      shareLog.error('Share request failed', logData);
+    }
+    return {ok: false, error: serialized};
+  }
+}
+
+ipcMain.handle('share:choose-directory', async () => {
+  return shareIPCResponse(async () => {
+    const result = await dialog.showOpenDialog(win || null, {
+      title: 'Choose Mynda Share Directory',
+      properties: ['openDirectory', 'createDirectory']
     });
-    win.webContents.send('status-update', {action: ''});
-  });
+    return {directory: result.canceled ? null : result.filePaths[0] || null};
+  }, {action: 'choose-directory'});
+});
+
+ipcMain.handle('share:get-state', async () => {
+  return {ok: true, value: shareService.getState()};
+});
+
+ipcMain.handle('share:inspect', async (event, options) => {
+  return shareIPCResponse(
+    () => shareService.inspect(options && options.directory),
+    {action: 'inspect'}
+  );
+});
+
+ipcMain.handle('share:create-request', async (event, options) => {
+  return shareIPCResponse(
+    () => shareService.createRequest(options || {}),
+    {action: 'create-request'}
+  );
+});
+
+ipcMain.handle('share:plan-fulfillment', async (event, options) => {
+  return shareIPCResponse(
+    () => shareService.planFulfillment(options || {}),
+    {action: 'plan-fulfillment'}
+  );
+});
+
+ipcMain.handle('share:fulfill-request', async (event, options) => {
+  return shareIPCResponse(
+    () => shareService.fulfillRequest(options || {}),
+    {action: 'fulfill-request'}
+  );
+});
+
+ipcMain.handle('share:plan-import', async (event, options) => {
+  return shareIPCResponse(
+    () => shareService.planImport(options || {}),
+    {action: 'plan-import'}
+  );
+});
+
+ipcMain.handle('share:import', async (event, options) => {
+  const response = await shareIPCResponse(
+    () => shareService.importShare(options || {}),
+    {action: 'import'}
+  );
+  if (response.ok && response.value && response.value.shouldScan) {
+    // Let the IPC response and Share completion state reach the renderer
+    // before the ordinary scanner takes over the shared status banner.
+    setImmediate(() => checkWatchFolders('share-import'));
+  }
+  return response;
+});
+
+ipcMain.handle('share:cancel', async () => {
+  return {ok: true, value: {cancelRequested: shareService.cancel()}};
 });

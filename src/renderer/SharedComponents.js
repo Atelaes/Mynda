@@ -1,12 +1,11 @@
 // Reusable renderer UI shared by the major feature component groups.
 const React = require('react');
 const {ipcRenderer} = require('electron');
-const _ = require('lodash');
 const {v4: uuidv4} = require('uuid');
 const {
-  library,
   frontendLog,
-  LOCAL_STATUS_UPDATE_EVENT
+  LOCAL_STATUS_UPDATE_EVENT,
+  disableConfirmationDialog
 } = require('./RendererRuntime.js');
 
 class MynNotify extends React.Component {
@@ -108,7 +107,12 @@ class MynNotify extends React.Component {
     if (status.numTotal) _t = ` ${status.numTotal}`;
 
     let textFor = {
-      'export'        : `Exporting${_c}${_of}${_t} videos`,
+      'share_request' : status.numTotal ?
+        `Cataloging${_c}${_of}${_t} videos for Share request` :
+        'Creating Share request',
+      'share_plan'    : `Preparing Share${_c}${_of}${_t}`,
+      'share_fulfill' : `Sharing${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
+      'share_import'  : `Importing${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
       'metadata'      : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
       'metadata_save' : `Saving metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
       'batch_save'    : `Saving${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
@@ -481,16 +485,14 @@ class MynOpenablePane extends React.Component {
         let cb = data.cb;
         // if the user checked the checkbox to override the confirmation dialog,
         // set that preference in the settings
-        if (checked) {
+        if (checked && response === 0) {
           frontendLog.debug('User disabled a pane-exit confirmation dialog', {
             paneID: id
           });
-          let prefs = _.cloneDeep(this.props.settings.preferences);
-          if (!prefs.override_dialogs) {
-            prefs.override_dialogs = {};
-          }
-          prefs.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`] = true;
-          library.replace("settings.preferences",prefs);
+          disableConfirmationDialog(
+            `Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`,
+            frontendLog
+          );
         }
 
         if (response === 0) { // yes

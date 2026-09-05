@@ -176,6 +176,7 @@
   --dim-text: #8b929e; /*#7e848f;*/
   --dimmer-text: #4f5259;
   --colorful-text: #7d91b3;
+  --error-text: #ff2222;
 
   /* other colors */
   --glow-bright: rgba(220,225,255,.2);

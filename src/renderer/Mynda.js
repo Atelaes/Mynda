@@ -258,6 +258,7 @@ class Mynda extends React.Component {
     if (videoIDs.length === 0) return;
 
     const selectedIDSet = new Set(videoIDs);
+    const manifestedIDSet = new Set();
     const selectedRows = {};
     let firstRowID = null;
 
@@ -271,14 +272,26 @@ class Mynda extends React.Component {
       if (!selectedRows[row.tableID].rows.includes(row.vidID)) {
         selectedRows[row.tableID].rows.push(row.vidID);
       }
+      manifestedIDSet.add(row.vidID);
     });
 
-    // A just-rendered or otherwise incomplete manifest should not prevent the
-    // explicit series action. This synthetic entry is enough for refreshDetails
-    // to reconstruct the same batch after the first save completes.
-    if (Object.keys(selectedRows).length === 0) {
-      selectedRows['series-edit'] = {rows: videoIDs, highestRow: null};
+    // Row manifests are reported incrementally by the individual season
+    // tables. A just-rendered or recently refreshed playlist may therefore
+    // have no rows yet—or only some seasons. Preserve every explicit series
+    // ID that is not represented by a table in a synthetic selection group so
+    // a later details refresh cannot silently reduce the batch to that subset.
+    const unmanifestedIDs = videoIDs.filter(id => !manifestedIDSet.has(id));
+    if (unmanifestedIDs.length > 0) {
+      selectedRows['series-edit'] = {rows: unmanifestedIDs, highestRow: null};
     }
+
+    libraryViewLog.debug('Prepared whole-series editor selection', {
+      requestedVideoCount: videoIDs.length,
+      manifestedVideoCount: manifestedIDSet.size,
+      syntheticVideoCount: unmanifestedIDs.length,
+      manifestedTableCount: Object.keys(selectedRows)
+        .filter(tableID => tableID !== 'series-edit').length
+    });
 
     this.setState({selectedRows: selectedRows}, () => {
       this.showDetails(videoIDs, firstRowID, undefined, undefined, () => {
@@ -321,9 +334,10 @@ class Mynda extends React.Component {
       // console.log(videos);
 
       // create the batch object
-      let batchObject = {}
+      // Identify this as the synthetic batch before validation so validation
+      // does not mistake it for a damaged real video and generate a UUID.
+      let batchObject = {id: 'batch'}
       validateVideo(batchObject); // this populates the object with all the right keys
-      batchObject.id = 'batch'; // but set the id to 'batch' so that the editor knows what we're doing
       delete batchObject.metadata; // and delete metadata, since that is derived from the files themselves and is uneditable
       Object.keys(batchObject).map(key => {
         if (key === 'id' || key === 'metadata') return;
@@ -973,13 +987,27 @@ class Mynda extends React.Component {
       if (this.state.detailVideo.id !== 'batch') {
         this.setState({detailVideo : this.state.videos.filter(video => video && video.id === this.state.detailVideo.id)[0]});
       } else {
-        // if the detailVideo id is 'batch', that means multiple rows are selected;
-        // calling handleSelectedRows with no parameters will reset the details pane and the editor
-        // to correspond appropriately to the selected rows (without adding any new rows)
+        // The open editor's batch is authoritative. selectedRows mirrors the
+        // visible tables and can be temporarily incomplete while season tables
+        // rebuild, or after selected videos leave the current playlist. Reuse
+        // the batch's own IDs so a successful save refreshes the same videos
+        // the user actually edited.
+        const batchVideoIDs = (this.state.batchVids || [])
+          .map(video => video && video.id)
+          .filter(Boolean);
         clearTimeout(timeout);
         timeout = setTimeout(() => {
-          libraryViewLog.debug('Refreshing batch details after save');
-          this.handleSelectedRows();
+          libraryViewLog.debug('Refreshing batch details after save', {
+            videoCount: batchVideoIDs.length,
+            source: batchVideoIDs.length > 0 ? 'open editor batch' : 'selected rows fallback'
+          });
+          if (batchVideoIDs.length > 0) {
+            this.showDetails(batchVideoIDs, this.state.detailRowID);
+          } else {
+            // Retain the older selection-based path only as a defensive
+            // fallback for a legacy or transitional batch without batchVids.
+            this.handleSelectedRows();
+          }
         },500);
       }
     }

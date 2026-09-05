@@ -26,6 +26,36 @@ function sendLocalStatusUpdate(status) {
   window.dispatchEvent(new CustomEvent(LOCAL_STATUS_UPDATE_EVENT, {detail: status}));
 }
 
+function confirmationDialogIsDisabled(dialogName) {
+  return Boolean(
+    library.settings &&
+    library.settings.preferences &&
+    library.settings.preferences.override_dialogs &&
+    library.settings.preferences.override_dialogs[dialogName] === true
+  );
+}
+
+function disableConfirmationDialog(dialogName, log = frontendLog) {
+  if (!dialogName || confirmationDialogIsDisabled(dialogName)) return;
+
+  log.debug('User disabled a confirmation dialog', {dialog: dialogName});
+  const overrideDialogs = library.settings &&
+    library.settings.preferences &&
+    library.settings.preferences.override_dialogs;
+  const address = overrideDialogs ?
+    `settings.preferences.override_dialogs.${dialogName}` :
+    'settings.preferences.override_dialogs';
+  const value = overrideDialogs ? true : {[dialogName]: true};
+  library.replace(address, value, err => {
+    if (err) {
+      log.error('Could not save confirmation-dialog preference', {
+        dialog: dialogName,
+        error: err
+      });
+    }
+  });
+}
+
 module.exports = {
   library,
   frontendLog,
@@ -36,5 +66,7 @@ module.exports = {
   artworkLog,
   placeholderImage,
   LOCAL_STATUS_UPDATE_EVENT,
-  sendLocalStatusUpdate
+  sendLocalStatusUpdate,
+  confirmationDialogIsDisabled,
+  disableConfirmationDialog
 };

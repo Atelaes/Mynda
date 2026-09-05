@@ -4,7 +4,12 @@ const {ipcRenderer} = require('electron');
 const _ = require('lodash');
 const fs = require('fs');
 const {v4: uuidv4} = require('uuid');
-const {editorLog, artworkLog} = require('./RendererRuntime.js');
+const {
+  editorLog,
+  artworkLog,
+  confirmationDialogIsDisabled,
+  disableConfirmationDialog
+} = require('./RendererRuntime.js');
 const {isValidURL, findNearestOfClass} = require('./RendererUtils.js');
 const {MynOverflowTextMarquee} = require('./SharedComponents.js');
 
@@ -1034,9 +1039,21 @@ class MynEditListWidget extends MynEditWidget {
   }
 
   deleteItem(index, skipDialog) {
-    if (this.props.deleteDialog && !skipDialog) {
-      ipcRenderer.once('MynEditListWidget-confirm-delete-item', (event, response, index) => {
+    const confirmationPreference = this.props.deleteConfirmationPreference;
+    const confirmationChannel = confirmationPreference || 'MynEditListWidget-confirm-delete-item';
+    const dialogDisabled = typeof this.props.deleteConfirmationDisabled === 'boolean' ?
+      this.props.deleteConfirmationDisabled :
+      confirmationPreference && confirmationDialogIsDisabled(confirmationPreference);
+
+    if (this.props.deleteDialog && !skipDialog && !dialogDisabled) {
+      ipcRenderer.once(confirmationChannel, (event, response, index, checked) => {
         if (response === 0) { // yes
+          if (checked && confirmationPreference) {
+            disableConfirmationDialog(confirmationPreference, editorLog);
+            if (typeof this.props.onDeleteConfirmationDisabled === 'function') {
+              this.props.onDeleteConfirmationDisabled();
+            }
+          }
           // delete item (pass 'true' so as not to prompt another dialog)
           this.deleteItem(index, true);
         } else {
@@ -1047,7 +1064,13 @@ class MynEditListWidget extends MynEditWidget {
         }
       });
 
-      ipcRenderer.send('generic-confirm', 'MynEditListWidget-confirm-delete-item', `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`, index);
+      const options = {
+        message: `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`
+      };
+      if (confirmationPreference) {
+        options.checkboxLabel = `Don't show this message again`;
+      }
+      ipcRenderer.send('generic-confirm', confirmationChannel, options, index);
       return;
     }
 

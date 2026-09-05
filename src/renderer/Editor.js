@@ -14,7 +14,8 @@ const {
   editorLog,
   artworkLog,
   placeholderImage,
-  sendLocalStatusUpdate
+  sendLocalStatusUpdate,
+  disableConfirmationDialog
 } = require('./RendererRuntime.js');
 const {
   editorSelectionKey,
@@ -858,14 +859,9 @@ class MynEditorSearch extends React.Component {
       });
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
-      if (checked) {
+      if (checked && response === 0) {
         editorLog.debug('User disabled search-result confirmation dialogs');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs['MynEditorSearch-confirm-select'] = true;
-        library.replace("settings.preferences",prefs);
+        disableConfirmationDialog('MynEditorSearch-confirm-select', editorLog);
       }
 
       if (response === 0) { // yes
@@ -1161,14 +1157,9 @@ class MynEditorEdit extends React.Component {
     this.handleConfirmRevert = (event, response, data, checked) => {
       // if the user checked the checkbox to override the confirmation dialog,
       // set that preference in the settings
-      if (checked) {
+      if (checked && response === 0) {
         editorLog.debug('User disabled editor-revert confirmation dialogs');
-        let prefs = _.cloneDeep(this.props.settings.preferences);
-        if (!prefs.override_dialogs) {
-          prefs.override_dialogs = {};
-        }
-        prefs.override_dialogs['MynEditorEdit-confirm-revert'] = true;
-        library.replace("settings.preferences",prefs);
+        disableConfirmationDialog('MynEditorEdit-confirm-revert', editorLog);
       }
 
       if (response === 0) { // yes

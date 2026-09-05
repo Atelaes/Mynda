@@ -2,10 +2,14 @@
 const React = require('react');
 const {ipcRenderer} = require('electron');
 const _ = require('lodash');
-const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const {DragDropContext, Droppable, Draggable} = require('react-beautiful-dnd');
-const {library, settingsLog} = require('./RendererRuntime.js');
+const {
+  library,
+  settingsLog,
+  confirmationDialogIsDisabled,
+  disableConfirmationDialog
+} = require('./RendererRuntime.js');
 const {
   MynOpenablePane,
   MynOverflowTextMarquee,
@@ -59,7 +63,7 @@ class MynSettings extends MynOpenablePane {
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />),
-      sync : (<MynSettingsSync                save={this.save} settings={this.props.settings} />)
+      share : (<MynSettingsShare              settings={this.props.settings} videos={this.props.videos} />)
 
     }
     this.setState({views:views},callback);
@@ -403,13 +407,15 @@ class MynSettingsPlaylists extends React.Component {
       valid : {}
     }
 
-    ipcRenderer.on('MynSettingsPlaylists-confirm-delete-playlist', (event, response, id) => {
+    ipcRenderer.on('MynSettingsPlaylists-confirm-delete-playlist', (event, response, id, checked) => {
       if (response === 0) { // yes
-        // delete playlist
-        let playlists = _.cloneDeep(this.state.playlists).filter(playlist => playlist.id !== id);
-        this.setState({playlists:playlists}, () => {
-          this.updateValue(); // force a save to the library
-        });
+        if (checked) {
+          disableConfirmationDialog(
+            'MynSettingsPlaylists-confirm-delete-playlist',
+            settingsLog
+          );
+        }
+        this.removePlaylist(id);
       } else {
         settingsLog.debug('Playlist deletion canceled by user', {playlistID: id});
       }
@@ -418,6 +424,7 @@ class MynSettingsPlaylists extends React.Component {
     this.updateValue = this.updateValue.bind(this);
     this.reportValid = this.reportValid.bind(this);
     this.showEditPlaylist = this.showEditPlaylist.bind(this);
+    this.removePlaylist = this.removePlaylist.bind(this);
     this.deletePlaylist = this.deletePlaylist.bind(this);
     this.addPlaylist = this.addPlaylist.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
@@ -477,9 +484,30 @@ class MynSettingsPlaylists extends React.Component {
     });
   }
 
+  removePlaylist(id) {
+    let playlists = _.cloneDeep(this.state.playlists).filter(playlist => playlist.id !== id);
+    this.setState({playlists:playlists}, () => {
+      this.updateValue(); // force a save to the library
+    });
+  }
+
   deletePlaylist(playlist) {
+    const confirmationPreference = 'MynSettingsPlaylists-confirm-delete-playlist';
+    if (confirmationDialogIsDisabled(confirmationPreference)) {
+      this.removePlaylist(playlist.id);
+      return;
+    }
+
     let playlistName = playlist.name != '' ? `the '${playlist.name}' playlist` : 'this playlist'
-    ipcRenderer.send('generic-confirm', 'MynSettingsPlaylists-confirm-delete-playlist', `Are you sure you want to delete ${playlistName}?`, playlist.id);
+    ipcRenderer.send(
+      'generic-confirm',
+      confirmationPreference,
+      {
+        message: `Are you sure you want to delete ${playlistName}?`,
+        checkboxLabel: `Don't show this message again`
+      },
+      playlist.id
+    );
   }
 
   addPlaylist() {
@@ -685,7 +713,12 @@ class MynSettingsPrefs extends React.Component {
           <br/>
           {'in a table row (e.g. the rating stars)'}
         </span>
-      )
+      ),
+      'MynAutoTag-confirm-cancel' : 'Confirm before canceling Auto-Tag',
+      'MynEditor-confirm-reset-from-filename' : 'Confirm before resetting video information from filenames',
+      'MynSettingsFolders-confirm-remove' : 'Confirm before removing a watchfolder',
+      'MynSettingsPlaylists-confirm-delete-playlist' : 'Confirm before deleting a playlist',
+      'MynSettingsPrefs-confirm-remove-kind' : 'Confirm before removing a media kind'
     }
 
     return (
@@ -710,6 +743,13 @@ class MynSettingsPrefs extends React.Component {
               update={this.update}
               options={null}
               deleteDialog={'Videos of this kind will not be affected until edited.'}
+              deleteConfirmationPreference='MynSettingsPrefs-confirm-remove-kind'
+              deleteConfirmationDisabled={Boolean(this.state.override_dialogs && this.state.override_dialogs['MynSettingsPrefs-confirm-remove-kind'])}
+              onDeleteConfirmationDisabled={() => {
+                let overrideDialogs = _.cloneDeep(this.state.override_dialogs || {});
+                overrideDialogs['MynSettingsPrefs-confirm-remove-kind'] = true;
+                this.setState({override_dialogs: overrideDialogs});
+              }}
               storeTransform={value => value.toLowerCase()}
               displayTransform={value => value.replace(/\b\w/g,(letter) => letter.toUpperCase())}
               validator={/^[^=;{}]+$/}
@@ -1086,87 +1126,681 @@ class MynSettingsPlaylistsTableRow extends React.Component {
   }
 }
 
-class MynSettingsSync extends React.Component {
+function shareKindValues(settings, videos) {
+  const values = new Set();
+  const configured = settings && settings.used && Array.isArray(settings.used.kinds) ?
+    settings.used.kinds : [];
+  configured.forEach(kind => {
+    if (typeof kind === 'string' && kind.trim()) values.add(kind.trim().toLowerCase());
+  });
+  (Array.isArray(videos) ? videos : []).forEach(video => {
+    if (video && typeof video.kind === 'string' && video.kind.trim()) {
+      values.add(video.kind.trim().toLowerCase());
+    }
+  });
+  return Array.from(values).sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+}
+
+function shareKindLabel(kind) {
+  return String(kind || '').replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function formatShareBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return 'unknown size';
+  if (bytes === 0) return '0 bytes';
+  const units = ['bytes', 'KiB', 'MiB', 'GiB', 'TiB'];
+  const unit = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / Math.pow(1024, unit);
+  const decimals = unit === 0 || value >= 10 ? 0 : 1;
+  return `${value.toFixed(decimals)} ${units[unit]}`;
+}
+
+const shareReasonLabels = {
+  'requested-kind-unmapped': 'requested kinds deliberately not mapped',
+  'dvd-excluded': 'DVDs excluded',
+  'identity-conflict': 'same ID but different content',
+  'source-unavailable': 'source unavailable',
+  'subtitle-unavailable': 'subtitle files unavailable',
+  'SOURCE_OUTSIDE_WATCHFOLDER': 'outside a watchfolder',
+  'destination-path-conflict': 'destination path collisions',
+  'SHARE_SOURCE_MISSING': 'source missing',
+  'SHARE_SYMLINK_UNSUPPORTED': 'symbolic links unsupported',
+  'INVALID_DVD_SOURCE': 'invalid DVD folders',
+  'INVALID_VIDEO_SOURCE': 'invalid video files',
+  'EMPTY_DVD_SOURCE': 'empty DVD folders',
+  'SHARE_PACKAGE_INCOMPLETE': 'incomplete package files',
+  'SHARE_DESTINATION_CONFLICT': 'destination conflicts',
+  'PARTIAL_DVD_DESTINATION': 'partial DVD destinations',
+  'import-conflict': 'import conflicts'
+};
+
+class MynSettingsShare extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {driveList : [],
-      driveInfo : [],
-      selectedDrive : ''}
+    const kinds = shareKindValues(props.settings, props.videos);
+    this.state = {
+      shareDirectory: '',
+      selectedRequestKinds: kinds,
+      includeDvds: true,
+      replaceRequestReady: false,
+      inspection: null,
+      fulfillmentMappings: {},
+      fulfillmentIncludeDvds: true,
+      fulfillmentPlan: null,
+      importMappings: {},
+      importPlan: null,
+      busy: false,
+      busyPhase: null,
+      cancelRequested: false,
+      progress: null,
+      message: null,
+      messageType: 'info'
+    };
 
-    this.render = this.render.bind(this);
-    //this.findDrives = this.findDrives.bind(this);
-    this.selectDrive = this.selectDrive.bind(this);
-    this.plantManifest = this.plantManifest.bind(this);
-    this.exportFiles = this.exportFiles.bind(this);
+    this.handleShareProgress = this.handleShareProgress.bind(this);
+    this.changeShareDirectory = this.changeShareDirectory.bind(this);
+    this.folderSelect = this.folderSelect.bind(this);
+    this.loadShare = this.loadShare.bind(this);
+    this.createShareRequest = this.createShareRequest.bind(this);
+    this.prepareFulfillment = this.prepareFulfillment.bind(this);
+    this.fulfillRequest = this.fulfillRequest.bind(this);
+    this.prepareImport = this.prepareImport.bind(this);
+    this.importShare = this.importShare.bind(this);
+    this.cancelShare = this.cancelShare.bind(this);
   }
 
-  /*findDrives() {
-    lsDevices()
-    .then((drives) => {
-      let currentDriveList = [<option key={-1} disabled selected value> -- select an option -- </option>];
-      for (let i=0; i<drives.length; i++) {
-        let drive = drives[i];
-        currentDriveList.push( <option key={i} value={drive.caption}>{drive.caption} {drive.so.VolumeName}</option>);
+  componentDidMount() {
+    ipcRenderer.on('share-progress', this.handleShareProgress);
+    ipcRenderer.invoke('share:get-state').then(response => {
+      if (response && response.ok && response.value) {
+        this.handleShareProgress(null, response.value);
       }
-      this.setState({driveList : currentDriveList, driveInfo : drives});
-      console.log(currentDriveList);
-    })
-    .catch((err) => {
-        console.log(err);
+    }).catch(err => {
+      settingsLog.warn('Could not retrieve current Share state', {error: err});
     });
-  }*/
-
-  folderSelect() {
-    ipcRenderer.once('settings-folder-selected', (event, args) => {
-      this.changeTargetFolder(args);
-    });
-    ipcRenderer.send('settings-folder-select');
   }
 
-  changeTargetFolder(folder) {
-    this.setState({selectedDrive: folder});
+  componentWillUnmount() {
+    ipcRenderer.removeListener('share-progress', this.handleShareProgress);
   }
 
+  handleShareProgress(event, progress) {
+    progress = progress || {};
+    this.setState({
+      busy: Boolean(progress.busy),
+      busyPhase: progress.phase || null,
+      cancelRequested: Boolean(progress.cancelRequested),
+      progress: progress.busy ? progress : null
+    });
+  }
 
-  exportFiles(e) {
-    if (!this.state.selectedDrive) {
-      alert('You have to select a drive, you silly goose!');
+  async invokeShare(channel, options) {
+    try {
+      const response = await ipcRenderer.invoke(channel, options || {});
+      if (!response || response.ok !== true) {
+        const error = response && response.error || {};
+        const thrown = new Error(error.message || 'Mynda could not complete the Share operation.');
+        thrown.code = error.code || 'SHARE_FAILED';
+        thrown.details = error.details;
+        throw thrown;
+      }
+      return response.value;
+    } catch(err) {
+      const correctableShareError = typeof err.code === 'string' &&
+        /^(?:SHARE_|NO_SHARE_|INVALID_IMPORT_|IMPORT_|MISSING_IMPORT_|SOURCE_KIND_|UNKNOWN_SOURCE_|FULFILLMENT_|PARTIAL_DVD_)/.test(err.code);
+      const logData = {channel: channel, error: err};
+      if (correctableShareError) {
+        settingsLog.warn('Share action was not completed in the renderer', logData);
+      } else {
+        settingsLog.error('Share action failed in the renderer', logData);
+      }
+      throw err;
+    }
+  }
+
+  clearLoadedShare(directory) {
+    this.setState({
+      shareDirectory: directory,
+      replaceRequestReady: false,
+      inspection: null,
+      fulfillmentMappings: {},
+      fulfillmentPlan: null,
+      importMappings: {},
+      importPlan: null,
+      message: null
+    });
+  }
+
+  changeShareDirectory(directory) {
+    this.clearLoadedShare(directory || '');
+  }
+
+  clearShareMessage(changes = {}) {
+    this.setState(Object.assign({
+      message: null,
+      messageType: 'info'
+    }, changes));
+  }
+
+  async folderSelect() {
+    this.clearShareMessage();
+    try {
+      const result = await this.invokeShare('share:choose-directory');
+      if (result && result.directory) {
+        this.clearLoadedShare(result.directory);
+      }
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error'});
+    }
+  }
+
+  mappingsFromInspection(inspection) {
+    const fulfillmentMappings = {};
+    (inspection.defaultFulfillmentMappings || []).forEach(mapping => {
+      fulfillmentMappings[mapping.requestedKindId] = (mapping.sourceKinds || []).slice();
+    });
+    const importMappings = {};
+    (inspection.defaultImportMappings || []).forEach(mapping => {
+      importMappings[mapping.requestedKindId] = {
+        localKind: mapping.localKind || '',
+        watchfolder: mapping.watchfolder || ''
+      };
+    });
+    return {fulfillmentMappings: fulfillmentMappings, importMappings: importMappings};
+  }
+
+  async loadShare(options = {}) {
+    this.clearShareMessage();
+    if (!this.state.shareDirectory) {
+      this.setState({message: 'Choose a Share directory first.', messageType: 'error'});
+      return null;
+    }
+    try {
+      const inspection = await this.invokeShare('share:inspect', {
+        directory: this.state.shareDirectory
+      });
+      const mappings = this.mappingsFromInspection(inspection);
+      this.setState({
+        inspection: inspection,
+        fulfillmentMappings: mappings.fulfillmentMappings,
+        fulfillmentIncludeDvds: inspection.request.includeDvds &&
+          (!inspection.fulfillment || inspection.fulfillment.includeDvds !== false),
+        fulfillmentPlan: null,
+        importMappings: mappings.importMappings,
+        importPlan: null,
+        replaceRequestReady: false,
+        message: options.message || `Loaded Share request created ${new Date(inspection.request.createdAt).toLocaleString()}.`,
+        messageType: options.messageType || 'success'
+      });
+      return inspection;
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error', inspection: null});
+      return null;
+    }
+  }
+
+  toggleRequestKind(kind) {
+    const selected = new Set(this.state.selectedRequestKinds);
+    if (selected.has(kind)) selected.delete(kind); else selected.add(kind);
+    this.setState({selectedRequestKinds: Array.from(selected)});
+  }
+
+  selectAllRequestKinds(select) {
+    this.setState({
+      selectedRequestKinds: select ? shareKindValues(this.props.settings, this.props.videos) : []
+    });
+  }
+
+  async createShareRequest() {
+    this.clearShareMessage();
+    if (!this.state.shareDirectory) {
+      this.setState({message: 'Choose a Share directory first.', messageType: 'error'});
       return;
     }
-    ipcRenderer.send('exportFiles', this.state.selectedDrive);
-  }
-
-  plantManifest(e) {
-    if (!this.state.selectedDrive) {
-      alert('You have to select a drive, you silly goose!');
+    if (this.state.selectedRequestKinds.length === 0) {
+      this.setState({message: 'Select at least one media kind to request.', messageType: 'error'});
       return;
     }
-    let location = path.join(this.state.selectedDrive, "Mynda Manifest.json");
-    library.save(location);
+    try {
+      const result = await this.invokeShare('share:create-request', {
+        directory: this.state.shareDirectory,
+        requestedKinds: this.state.selectedRequestKinds,
+        includeDvds: this.state.includeDvds,
+        overwrite: this.state.replaceRequestReady
+      });
+      const action = result.replacedExistingRequest ? 'Replaced' : 'Created';
+      await this.loadShare({
+        message: `${action} Share request with ${result.inventoriedVideos} present video${result.inventoriedVideos === 1 ? '' : 's'}.` +
+          (result.unavailableVideos ? ` ${result.unavailableVideos} unavailable video${result.unavailableVideos === 1 ? ' was' : 's were'} left out of the inventory.` : ''),
+        messageType: result.unavailableVideos ? 'warning' : 'success'
+      });
+    } catch(err) {
+      if (err.code === 'SHARE_REQUEST_EXISTS') {
+        this.setState({
+          replaceRequestReady: true,
+          message: 'This directory already contains a Share request. Click “Replace Existing Request” to replace it. Any media files copied for the previous request will remain in the directory, but the replacement request will not list or use them.',
+          messageType: 'warning'
+        });
+      } else {
+        this.setState({message: err.message, messageType: 'error'});
+      }
+    }
   }
 
-  importFiles(e) {
+  toggleFulfillmentKind(requestedKindId, sourceKind) {
+    const mappings = _.cloneDeep(this.state.fulfillmentMappings);
+    Object.keys(mappings).forEach(kindId => {
+      mappings[kindId] = (mappings[kindId] || []).filter(kind => kind !== sourceKind);
+    });
+    const wasSelected = (this.state.fulfillmentMappings[requestedKindId] || []).includes(sourceKind);
+    if (!wasSelected) {
+      mappings[requestedKindId] = (mappings[requestedKindId] || []).concat(sourceKind);
+    }
+    this.setState({
+      fulfillmentMappings: mappings,
+      fulfillmentPlan: null,
+      message: null,
+      messageType: 'info'
+    });
   }
 
-  selectDrive(e) {
-    this.setState({selectedDrive : e.target.value});
+  fulfillmentMappingArray() {
+    const requestedKinds = this.state.inspection && this.state.inspection.request.requestedKinds || [];
+    return requestedKinds.map(kind => ({
+      requestedKindId: kind.id,
+      sourceKinds: (this.state.fulfillmentMappings[kind.id] || []).slice()
+    }));
+  }
+
+  async prepareFulfillment() {
+    this.clearShareMessage({fulfillmentPlan: null});
+    try {
+      const plan = await this.invokeShare('share:plan-fulfillment', {
+        directory: this.state.shareDirectory,
+        kindMappings: this.fulfillmentMappingArray(),
+        includeDvds: this.state.fulfillmentIncludeDvds
+      });
+      this.setState({
+        fulfillmentPlan: plan,
+        message: plan.enoughSpace ? 'Fulfillment plan is ready for review.' :
+          'The Share directory does not have enough free space for this plan and its safety reserve.',
+        messageType: plan.enoughSpace ? 'info' : 'error'
+      });
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error', fulfillmentPlan: null});
+    }
+  }
+
+  async fulfillRequest() {
+    const plan = this.state.fulfillmentPlan;
+    if (!plan) return;
+    this.clearShareMessage();
+    try {
+      const result = await this.invokeShare('share:fulfill-request', {token: plan.token});
+      await this.loadShare({
+        message: result.canceled ?
+          `Share fulfillment canceled after packaging ${result.packagedVideos} video${result.packagedVideos === 1 ? '' : 's'}. It can be resumed later.` :
+          `Share fulfillment ${result.status === 'complete' ? 'finished' : 'finished with problems'}: ${result.packagedVideos} video${result.packagedVideos === 1 ? '' : 's'} packaged` +
+            (result.failedVideos ? `; ${result.failedVideos} failed` : '') + '.',
+        messageType: result.status === 'complete' ? 'success' : 'warning'
+      });
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error', fulfillmentPlan: null});
+    }
+  }
+
+  changeImportKind(requestedKindId, localKind) {
+    const mappings = _.cloneDeep(this.state.importMappings);
+    const folders = this.state.inspection.watchfolders.filter(folder => folder.kind === localKind);
+    mappings[requestedKindId] = {
+      localKind: localKind,
+      watchfolder: folders.length > 0 ? folders[0].path : ''
+    };
+    this.setState({
+      importMappings: mappings,
+      importPlan: null,
+      message: null,
+      messageType: 'info'
+    });
+  }
+
+  changeImportWatchfolder(requestedKindId, watchfolder) {
+    const mappings = _.cloneDeep(this.state.importMappings);
+    mappings[requestedKindId] = Object.assign({}, mappings[requestedKindId], {watchfolder: watchfolder});
+    this.setState({
+      importMappings: mappings,
+      importPlan: null,
+      message: null,
+      messageType: 'info'
+    });
+  }
+
+  importMappingArray() {
+    const importKinds = this.state.inspection && this.state.inspection.importKinds || [];
+    return importKinds.map(kind => ({
+      requestedKindId: kind.id,
+      localKind: this.state.importMappings[kind.id] && this.state.importMappings[kind.id].localKind || '',
+      watchfolder: this.state.importMappings[kind.id] && this.state.importMappings[kind.id].watchfolder || ''
+    }));
+  }
+
+  importMappingsComplete() {
+    const mappings = this.importMappingArray();
+    return mappings.length > 0 && mappings.every(mapping => mapping.localKind && mapping.watchfolder);
+  }
+
+  async prepareImport() {
+    this.clearShareMessage({importPlan: null});
+    try {
+      const plan = await this.invokeShare('share:plan-import', {
+        directory: this.state.shareDirectory,
+        kindMappings: this.importMappingArray()
+      });
+      this.setState({
+        importPlan: plan,
+        message: plan.enoughSpace ? 'Import plan is ready for review.' :
+          'One or more destination drives do not have enough free space for this import and its safety reserve.',
+        messageType: plan.enoughSpace ? 'info' : 'error'
+      });
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error', importPlan: null});
+    }
+  }
+
+  async importShare() {
+    const plan = this.state.importPlan;
+    if (!plan) return;
+    this.clearShareMessage();
+    try {
+      const result = await this.invokeShare('share:import', {token: plan.token});
+      this.setState({
+        importPlan: null,
+        message: result.canceled ?
+          `Share import canceled after preparing ${result.readyForScan} video${result.readyForScan === 1 ? '' : 's'}.` :
+          `Share import ${result.status === 'complete' ? 'finished' : 'finished with problems'}: ${result.readyForScan} video${result.readyForScan === 1 ? '' : 's'} ready` +
+            (result.failedVideos ? `; ${result.failedVideos} failed` : '') +
+            (result.shouldScan ? '. Mynda is scanning the destination watchfolders now.' : '.'),
+        messageType: result.status === 'complete' ? 'success' : 'warning'
+      });
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error', importPlan: null});
+    }
+  }
+
+  async cancelShare() {
+    this.clearShareMessage();
+    try {
+      const result = await this.invokeShare('share:cancel');
+      if (result.cancelRequested) {
+        this.setState({cancelRequested: true, message: 'Canceling after the current filesystem operation stops safely…', messageType: 'warning'});
+      }
+    } catch(err) {
+      this.setState({message: err.message, messageType: 'error'});
+    }
+  }
+
+  renderReasonCounts(counts) {
+    const entries = Object.keys(counts || {});
+    if (entries.length === 0) return null;
+    return (
+      <ul className='share-reason-counts'>
+        {entries.sort().map(reason => (
+          <li key={reason}><span className='share-summary-value'>{counts[reason]}</span> {shareReasonLabels[reason] || reason}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  renderProgress() {
+    if (!this.state.busy || !this.state.progress) return null;
+    const progress = this.state.progress;
+    const labels = {
+      request: 'Creating request',
+      'fulfillment-plan': 'Preparing fulfillment plan',
+      fulfill: 'Fulfilling request',
+      'import-plan': 'Preparing import plan',
+      import: 'Importing media'
+    };
+    let detail = '';
+    if (progress.numTotal) detail += ` ${progress.numCurrent || 0} of ${progress.numTotal}`;
+    if (progress.bytesTotal) {
+      detail += ` — ${formatShareBytes(progress.bytesCurrent || 0)} of ${formatShareBytes(progress.bytesTotal)}`;
+    }
+    return (
+      <div className='share-progress'>
+        <span>{labels[this.state.busyPhase] || 'Working'}{detail}</span>
+        <button onClick={this.cancelShare} disabled={this.state.cancelRequested}>
+          {this.state.cancelRequested ? 'Canceling…' : 'Cancel'}
+        </button>
+      </div>
+    );
+  }
+
+  renderRequestSection() {
+    const kinds = shareKindValues(this.props.settings, this.props.videos);
+    return (
+      <div className='subsection share-request-section'>
+        <h2>Create a Request</h2>
+        <p>Create a small inventory describing what this library already has and which kinds it wants another Mynda library to share.</p>
+        <div className='share-kind-heading'>Requested kinds:</div>
+        <div className='share-kind-actions'>
+          <button onClick={() => this.selectAllRequestKinds(true)} disabled={this.state.busy}>All</button>
+          <button onClick={() => this.selectAllRequestKinds(false)} disabled={this.state.busy}>None</button>
+        </div>
+        <div className='share-kind-list'>
+          {kinds.map(kind => (
+            <label key={kind}>
+              <input type='checkbox' checked={this.state.selectedRequestKinds.includes(kind)}
+                onChange={() => this.toggleRequestKind(kind)} disabled={this.state.busy} />
+              {shareKindLabel(kind)}
+            </label>
+          ))}
+        </div>
+        <label className='share-dvd-option'>
+          <input type='checkbox' checked={this.state.includeDvds}
+            onChange={event => this.setState({includeDvds: event.target.checked})}
+            disabled={this.state.busy} />
+          Include DVD folders
+        </label>
+        <div className='share-actions'>
+          <button onClick={this.createShareRequest}
+            disabled={this.state.busy || !this.state.shareDirectory || this.state.selectedRequestKinds.length === 0}>
+            {this.state.replaceRequestReady ? 'Replace Existing Request' : 'Create Request'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  renderFulfillmentSection() {
+    const inspection = this.state.inspection;
+    if (!inspection) return null;
+    const sourceKinds = inspection.localKinds || [];
+    const plan = this.state.fulfillmentPlan;
+    return (
+      <div className='subsection share-fulfillment-section'>
+        <h2>Fulfill This Request</h2>
+        <p>Choose which kinds in this library correspond to each kind requested by the receiving library. One requested kind may use several local kinds.</p>
+        <div className='share-mapping-table'>
+          <div className='share-mapping-header'>Requested kind</div>
+          <div className='share-mapping-header'>Use these local kinds</div>
+          {inspection.request.requestedKinds.map(requestedKind => (
+            <React.Fragment key={requestedKind.id}>
+              <div className='share-mapping-label'>{shareKindLabel(requestedKind.label)}</div>
+              <div className='share-mapping-options'>
+                {sourceKinds.length === 0 ? <span className='share-muted'>No local kinds available</span> :
+                  sourceKinds.map(sourceKind => (
+                    <label key={sourceKind.value} title={sourceKind.packagedOnly ?
+                      'This kind is no longer present locally, but already-packaged videos use its saved mapping.' :
+                      (sourceKind.configured ? '' : 'This kind is used by active videos but is no longer configured in Preferences.')}>
+                      <input type='checkbox'
+                        checked={(this.state.fulfillmentMappings[requestedKind.id] || []).includes(sourceKind.value)}
+                        onChange={() => this.toggleFulfillmentKind(requestedKind.id, sourceKind.value)}
+                        disabled={this.state.busy} />
+                      {shareKindLabel(sourceKind.label)} ({sourceKind.packagedOnly ? 'packaged only' : sourceKind.activeVideos})
+                    </label>
+                  ))}
+                {(this.state.fulfillmentMappings[requestedKind.id] || []).length === 0 ?
+                  <span className='share-unfulfilled'>Do not fulfill</span> : null}
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+        <label className='share-dvd-option'>
+          <input type='checkbox'
+            checked={this.state.fulfillmentIncludeDvds}
+            onChange={event => this.setState({
+              fulfillmentIncludeDvds: event.target.checked,
+              fulfillmentPlan: null,
+              message: null,
+              messageType: 'info'
+            })}
+            disabled={this.state.busy || !inspection.request.includeDvds} />
+          Include requested DVD folders
+        </label>
+        {!inspection.request.includeDvds ?
+          <div className='share-muted'>The receiving library did not request DVDs.</div> : null}
+        {inspection.fulfillment ?
+          <div className='share-existing-summary'>
+            <div>Existing fulfillment: {inspection.fulfillment.status}, {inspection.fulfillment.itemCount} video{inspection.fulfillment.itemCount === 1 ? '' : 's'} ({inspection.fulfillment.dvdCount} DVD{inspection.fulfillment.dvdCount === 1 ? '' : 's'}), {formatShareBytes(inspection.fulfillment.totalBytes)}.</div>
+            {this.renderReasonCounts(inspection.fulfillment.omissionCounts)}
+          </div> : null}
+        <div className='share-actions'>
+          <button onClick={this.prepareFulfillment} disabled={this.state.busy}
+            title='Inventory matching media and calculate the transfer plan without copying any files.'>
+            Prepare Fulfillment Plan
+          </button>
+        </div>
+        {plan ? (
+          <div className={`share-plan ${plan.enoughSpace ? '' : 'insufficient'}`}>
+            <h3>Fulfillment plan</h3>
+            <div><span className='share-summary-value'>{plan.videos}</span> video{plan.videos === 1 ? '' : 's'} (<span className='share-summary-value'>{plan.dvds}</span> DVD{plan.dvds === 1 ? '' : 's'}), <span className='share-summary-value'>{plan.subtitles}</span> subtitle{plan.subtitles === 1 ? '' : 's'}</div>
+            <div><span className='share-summary-value'>{formatShareBytes(plan.totalBytes)}</span> to copy; <span className='share-summary-value'>{formatShareBytes(plan.availableBytes)}</span> free; <span className='share-summary-value'>{formatShareBytes(plan.reserveBytes)}</span> safety reserve</div>
+            <div><span className='share-summary-value'>{plan.alreadyPresent}</span> already in the receiving inventory; <span className='share-summary-value'>{plan.alreadyPackaged}</span> already packaged; <span className='share-summary-value'>{plan.omissions}</span> omitted</div>
+            {this.renderReasonCounts(plan.omissionCounts)}
+            <div className='share-actions'>
+              <button onClick={this.fulfillRequest} disabled={this.state.busy || !plan.enoughSpace}
+                title='Copy the planned video and subtitle files into this Share directory.'>
+                Fulfill Request
+              </button>
+              <span className='share-action-description'>Copy the actual video and subtitle files into this Share directory.</span>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  renderImportSection() {
+    const inspection = this.state.inspection;
+    if (!inspection || !inspection.fulfillment) return null;
+    const importKinds = inspection.importKinds || [];
+    const plan = this.state.importPlan;
+    return (
+      <div className='subsection share-import-section'>
+        <h2>Import Shared Media</h2>
+        <p>Choose a local kind and matching destination watchfolder for each kind in the package. Mynda will scan those watchfolders after importing.</p>
+        {inspection.request.belongsToThisLibrary ? null :
+          <div className='share-message warning'>This request was created by a different Mynda library. You may still import it, but verify the destinations carefully.</div>}
+        {importKinds.length === 0 ?
+          <div className='share-muted'>No videos in this package need to be imported.</div> :
+          <div className='share-import-table'>
+            <div className='share-mapping-header'>Share kind</div>
+            <div className='share-mapping-header'>Local kind</div>
+            <div className='share-mapping-header'>Destination watchfolder</div>
+            {importKinds.map(kind => {
+              const mapping = this.state.importMappings[kind.id] || {localKind: '', watchfolder: ''};
+              const matchingFolders = inspection.watchfolders.filter(folder => folder.kind === mapping.localKind);
+              return (
+                <React.Fragment key={kind.id}>
+                  <div className='share-mapping-label'>{shareKindLabel(kind.label)}</div>
+                  <div className='select-container select-alwaysicon'>
+                    <select value={mapping.localKind}
+                      onChange={event => this.changeImportKind(kind.id, event.target.value)}
+                      disabled={this.state.busy}>
+                      <option value=''>Choose kind…</option>
+                      {inspection.localKinds.map(localKind => (
+                        <option key={localKind.value} value={localKind.value}>{shareKindLabel(localKind.label)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <span className='select-container select-alwaysicon'>
+                      <select value={mapping.watchfolder}
+                        onChange={event => this.changeImportWatchfolder(kind.id, event.target.value)}
+                        disabled={this.state.busy || !mapping.localKind || matchingFolders.length === 0}>
+                        <option value=''>{matchingFolders.length ? 'Choose watchfolder…' : 'No matching watchfolder'}</option>
+                        {matchingFolders.map(folder => (
+                          <option key={folder.path} value={folder.path}>{folder.path}</option>
+                        ))}
+                      </select>
+                    </span>
+                    {mapping.localKind && matchingFolders.length === 0 ?
+                      <div className='share-unfulfilled'>Add a {shareKindLabel(mapping.localKind)} watchfolder in the Folders tab first, then return here and reload this Share.</div> : null}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        }
+        <div className='share-actions'>
+          <button onClick={this.prepareImport}
+            disabled={this.state.busy || !this.importMappingsComplete()}
+            title='Inspect the packaged media and destination folders, check available space, and calculate the import plan without copying any files.'>
+            Prepare Import Plan
+          </button>
+        </div>
+        {plan ? (
+          <div className={`share-plan ${plan.enoughSpace ? '' : 'insufficient'}`}>
+            <h3>Import plan</h3>
+            <div>{plan.videos} video{plan.videos === 1 ? '' : 's'} ({plan.dvds} DVD{plan.dvds === 1 ? '' : 's'}), {plan.filesToCopy} file{plan.filesToCopy === 1 ? '' : 's'} to copy</div>
+            <div>{formatShareBytes(plan.totalBytes)} required; {plan.alreadyInLibrary} already in this library; {plan.omissions} omitted</div>
+            {(plan.volumes || []).map(volume => (
+              <div key={volume.diskPath}>{volume.diskPath}: {formatShareBytes(volume.availableBytes)} free, {formatShareBytes(volume.reserveBytes)} safety reserve</div>
+            ))}
+            {this.renderReasonCounts(plan.omissionCounts)}
+            <button onClick={this.importShare} disabled={this.state.busy || !plan.enoughSpace}>
+              Import Shared Media
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   render() {
-    return (<div>
-      <div className="input-container">
-        <input type="text" id="settings-sync-choose-path" className="empty" value={this.state.selectedDrive || ''} placeholder="Select a directory..." onChange={(e) => this.changeTargetFolder(e.target.value)} />
-        <div className="input-clear-button hover" onClick={() => this.changeTargetFolder('')}></div>
+    const inputClass = this.state.shareDirectory ? 'filled' : 'empty';
+    return (
+      <div id='settings-share'>
+        <div className='subsection share-directory-section'>
+          <h2>Share Directory</h2>
+          <p>Use a directory on a removable drive to carry a request and its media between Mynda libraries.</p>
+          <div className='share-directory-controls'>
+            <div className='input-container'>
+              <input type='text' id='settings-share-choose-path' className={inputClass}
+                value={this.state.shareDirectory}
+                placeholder='Select a Share directory…'
+                onChange={event => this.changeShareDirectory(event.target.value)}
+                disabled={this.state.busy} />
+              <div className='input-clear-button hover'
+                onClick={() => { if (!this.state.busy) this.changeShareDirectory(''); }}></div>
+            </div>
+            <button onClick={this.folderSelect} disabled={this.state.busy}>Browse</button>
+            <button onClick={() => this.loadShare()} disabled={this.state.busy || !this.state.shareDirectory}
+              title='Read and validate an existing Share request in this directory. No files will be copied.'>
+              Load Share Request
+            </button>
+          </div>
+        </div>
+        {this.renderProgress()}
+        {this.state.message ?
+          <div className={`share-message ${this.state.messageType}`}>{this.state.message}</div> : null}
+        {this.renderRequestSection()}
+        {this.renderFulfillmentSection()}
+        {this.renderImportSection()}
       </div>
-      <div><button onClick={() => this.folderSelect()}>Browse</button></div>
-      <div>
-        <span style={{width: '33%'}}><button onClick={this.plantManifest}>Request</button></span>
-        <span style={{width: '33%'}}><button onClick={this.exportFiles}>Export</button></span>
-        <span style={{width: '33%'}}><button onClick={this.importFiles}>Import</button></span>
-      </div>
-    </div>)
+    );
   }
-
 }
 
 
@@ -1187,6 +1821,6 @@ module.exports = {
   MynSettingsPrefs,
   MynSettingsColumns,
   MynSettingsPlaylistsTableRow,
-  MynSettingsSync,
+  MynSettingsShare,
   MynSettingsThemes
 };

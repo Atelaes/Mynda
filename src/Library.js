@@ -899,7 +899,12 @@ const defaultLibrary = {
         "MynEditorSearch-confirm-select": false,
         "MynEditor-confirm-exit": false,
         "MynEditorEdit-confirm-revert": false,
-        "MynLibTable-confirm-inlineEdit": false
+        "MynLibTable-confirm-inlineEdit": false,
+        "MynAutoTag-confirm-cancel": false,
+        "MynEditor-confirm-reset-from-filename": false,
+        "MynSettingsFolders-confirm-remove": false,
+        "MynSettingsPlaylists-confirm-delete-playlist": false,
+        "MynSettingsPrefs-confirm-remove-kind": false
       },
       "include_user_rating_in_avg": false,
       "include_new_vids_in_playlists": true,
