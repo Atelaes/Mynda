@@ -167,7 +167,8 @@ input::-webkit-calendar-picker-indicator {
   right: 1.5rem;
 }
 
-input.invalid {
+input.invalid,
+textarea.invalid {
   color: var(--input-invalid-text);
   background-color: var(--input-invalid-bgcolor);
   background: var(--input-invalid-bg);
@@ -1307,6 +1308,44 @@ table.compact .movie-row {
   padding: .3em .5em .3em .5em;
   /* margin-top:.15rem;
   margin-bottom:.3rem; */
+}
+
+#settings-playlists .filter-validation-error {
+  color: var(--error-text);
+  font-size: .7rem;
+  line-height: 1.25;
+  margin: .35rem .25rem .5rem .25rem;
+}
+
+#settings-playlists .paragraph-fold.filter-help .text-container {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#settings-playlists .paragraph-fold.filter-help pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#settings-playlists .filter-help code {
+  color: var(--colorful-text);
+  font-family: var(--mono-font);
+  overflow-wrap: anywhere;
+}
+
+#settings-playlists .filter-help-examples {
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+#settings-playlists .filter-help-examples li {
+  margin-bottom: .3em;
+}
+
+#settings-playlists .filter-help h3 {
+  margin-bottom: .35em;
+  margin-top: 1.2em;
 }
 
 #settings-playlists-rowdivider {

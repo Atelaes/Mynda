@@ -21,6 +21,10 @@ const {
   MynEditInlineAddListWidget
 } = require('./EditorFields.js');
 const {getObjectDiff, isEqualIgnoreFuncs} = require('./RendererUtils.js');
+const {
+  PLAYLIST_FILTER_REFERENCE,
+  validatePlaylistFilter
+} = require('../PlaylistFilter.js');
 
 // ###### Settings Pane: allows user to edit settings. Only appears when user clicks to open it ###### //
 class MynSettings extends MynOpenablePane {
@@ -402,9 +406,16 @@ class MynSettingsPlaylists extends React.Component {
   constructor(props) {
     super(props);
 
+    const filterValidity = (props.playlists || []).reduce((valid, playlist) => {
+      if (playlist && playlist.id !== undefined) {
+        valid[`filter_function-${playlist.id}`] = validatePlaylistFilter(playlist.filter_function).valid;
+      }
+      return valid;
+    }, {});
+
     this.state = {
       playlists : _.cloneDeep(props.playlists),
-      valid : {}
+      valid : filterValidity
     }
 
     ipcRenderer.on('MynSettingsPlaylists-confirm-delete-playlist', (event, response, id, checked) => {
@@ -433,21 +444,27 @@ class MynSettingsPlaylists extends React.Component {
   updateValue(index,prop,value) {
     // console.log(`Updating ${index}: ${prop} = ${value}`);
     let playlists = _.cloneDeep(this.state.playlists);
+    let valid = Object.assign({}, this.state.valid);
 
     // if an index is given, update that playlist
     if (!isNaN(index) && index >= 0) {
       playlists[index][prop] = value;
+
+      if (prop === 'filter_function') {
+        const validationKey = `filter_function-${playlists[index].id}`;
+        valid[validationKey] = validatePlaylistFilter(value).valid;
+      }
 
       if (prop === 'tab') {
         playlists = this.sortByTab(playlists);
       }
 
       // update the playlists object in state (this is what is displayed in the editor)
-      this.setState({playlists: playlists});
+      this.setState({playlists: playlists, valid: valid});
     }
 
     // if there are no invalid fields, save the updated playlists to the library
-    let invalidFields = Object.keys(this.state.valid).filter(key => this.state.valid[key] === false);
+    let invalidFields = Object.keys(valid).filter(key => valid[key] === false);
     if (invalidFields.length == 0) {
       this.props.save({'playlists':playlists});
     } else {
@@ -486,7 +503,9 @@ class MynSettingsPlaylists extends React.Component {
 
   removePlaylist(id) {
     let playlists = _.cloneDeep(this.state.playlists).filter(playlist => playlist.id !== id);
-    this.setState({playlists:playlists}, () => {
+    let valid = Object.assign({}, this.state.valid);
+    delete valid[`filter_function-${id}`];
+    this.setState({playlists:playlists, valid:valid}, () => {
       this.updateValue(); // force a save to the library
     });
   }
@@ -938,6 +957,7 @@ class MynSettingsPlaylistsTableRow extends React.Component {
 
   render() {
     let playlist = this.props.playlist;
+    const filterValidation = validatePlaylistFilter(playlist.filter_function);
 
     let dragButton = (
       <div className='cell drag-button' {...this.props.provided.dragHandleProps}>
@@ -987,12 +1007,54 @@ class MynSettingsPlaylistsTableRow extends React.Component {
         paragraph={
           <div className='filter-help-paragraph'>
             <div className='filter-help-text'>
-              The filter is a boolean expression that will be executed on each video object in the library. If the expression evaluates to true, the video will be included in the playlist. If it evaluates to false, the video will not be included. The expression can use any property of the video object, and can use standard JavaScript operators and functions. For example, to include only videos with a genre of 'Action', you could use: <pre>video.genre === 'Action'</pre>. To include videos with a user rating greater than 3, you could use: <pre>Number(video.ratings.user) &gt; 3</pre>.
-              <br /><br />
-              Note: unset values are generally represented by an empty string, and some numeric values may be stored as numeric strings. Use <pre>Number()</pre> when making numeric comparisons.
+              A filter is a JavaScript-like expression evaluated for each <code>video</code> object. A truthy result includes the video in the playlist; a falsy result excludes it. Mynda parses and interprets the expression in a restricted filter language—not all JavaScript code is valid.
             </div>
             <div className='filter-help-list'>
+              <h3>Examples</h3>
+              <ul className='filter-help-examples'>
+                <li><code>video.genre === 'Action'</code></li>
+                <li><code>Number(video.ratings.user) &gt; 3</code></li>
+                <li><code>video.tags.includes('Horror') &amp;&amp; !video.seen</code></li>
+                <li><code>video.cast.some(name =&gt; name.startsWith('Tilda '))</code></li>
+                <li><code>video.dateadded &gt;= daysAgo(30)</code></li>
+                <li><code>(video.metadata?.duration ?? 0) &gt;= 90 * 60</code></li>
+              </ul>
+
+              <h3>Language</h3>
+              <ul>
+                <li><strong>Values:</strong> strings, template strings, numbers, booleans, null, undefined, NaN, Infinity, arrays, and object literals</li>
+                <li><strong>Numbers:</strong> decimal, hexadecimal, binary, and octal literals are accepted; underscores may separate digits (for example, <code>1_000</code>)</li>
+                <li><strong>Access:</strong> dot notation, bracket notation, array indexes, <code>.length</code>, optional chaining (<code>?.</code>), and bounded spread syntax (<code>...</code>) in arrays, objects, and function arguments</li>
+                <li><strong>Operators:</strong> arithmetic, comparison, strict or loose equality, logical operators, nullish coalescing (<code>??</code>), bitwise operators, <code>typeof</code>, <code>in</code>, and the conditional operator (<code>condition ? yes : no</code>)</li>
+                <li><strong>Comments:</strong> both <code>// line comments</code> and <code>/* block comments */</code> are accepted</li>
+                <li><strong>Global functions:</strong> <code>{PLAYLIST_FILTER_REFERENCE.globalFunctions.join(', ')}</code></li>
+                <li><strong>String methods:</strong> <code>{PLAYLIST_FILTER_REFERENCE.stringMethods.join(', ')}</code></li>
+                <li><strong>Number methods:</strong> <code>{PLAYLIST_FILTER_REFERENCE.numberMethods.join(', ')}</code></li>
+                <li><strong>Array methods:</strong> <code>{PLAYLIST_FILTER_REFERENCE.arrayMethods.join(', ')}</code></li>
+                <li><strong>Array callbacks:</strong> arrow functions may be used with <code>some</code>, <code>every</code>, <code>filter</code>, <code>find</code>, <code>findIndex</code>, <code>map</code>, <code>flatMap</code>, <code>reduce</code>, and <code>reduceRight</code></li>
+                {Object.keys(PLAYLIST_FILTER_REFERENCE.namespaces).map(namespace => (
+                  <li key={namespace}>
+                    <strong>{namespace}:</strong> <code>{PLAYLIST_FILTER_REFERENCE.namespaces[namespace].join(', ')}</code>
+                  </li>
+                ))}
+                <li><strong>Math constants:</strong> <code>{PLAYLIST_FILTER_REFERENCE.mathConstants.map(name => `Math.${name}`).join(', ')}</code></li>
+              </ul>
+
+              <h3>Time Helpers</h3>
+              <ul>
+                <li><code>now():</code> the current time in seconds since the Unix epoch</li>
+                <li><code>Date.now():</code> the current time in milliseconds since the Unix epoch, matching JavaScript</li>
+                <li><code>hoursAgo(n), daysAgo(n), weeksAgo(n), yearsAgo(n):</code> a past Unix timestamp suitable for comparison with dateadded or lastseen</li>
+                <li><code>ageInDays(timestamp):</code> the number of days since a Unix timestamp</li>
+              </ul>
+
+              <h3>Safety Limits</h3>
+              <div>
+                Filters cannot use statements, assignment, loops, constructors, tagged templates, browser or Node globals, arbitrary functions, or methods that modify data. Regular expressions are not yet supported. Long or excessively complex expressions stop with an error rather than delaying the library.
+              </div>
+
               <h3>Video Properties</h3>
+              Note: Unset video fields are generally empty strings, and some numeric values are stored as numeric strings. Use <code>Number()</code> for numeric comparisons. Use optional chaining when an object may be absent, such as <code>video.metadata?.duration</code>.
               <ul>
                 <li><strong>title:</strong> <i>[string]</i> The title of the video</li>
                 <li><strong>year:</strong> <i>[integer]</i> The year the video was released</li>
@@ -1054,12 +1116,16 @@ class MynSettingsPlaylistsTableRow extends React.Component {
     let filterEditor = (
       <div className="cell filter" id={'edit-filter-field-' + playlist.id} style={{ display: 'none' }}>
         <textarea
-          className='edit-filter-field'
+          className={'edit-filter-field' + (filterValidation.valid ? '' : ' invalid')}
           name="playlist filter"
           value={playlist.filter_function}
           placeholder={'Enter a boolean expression to be executed on each video object: e.g. video.genre === \'Action\''}
           onChange={(e) => this.props.updateValue(this.props.index, 'filter_function', e.target.value)}
+          aria-invalid={!filterValidation.valid}
         />
+        {!filterValidation.valid ? (
+          <div className='filter-validation-error'>{filterValidation.error}</div>
+        ) : null}
         {filterHelp}
       </div>
     );

@@ -3,6 +3,10 @@ const React = require('react');
 const {ipcRenderer} = require('electron');
 const _ = require('lodash');
 const {
+  compilePlaylistFilter,
+  createPlaylistFilterContext
+} = require('../PlaylistFilter.js');
+const {
   library,
   frontendLog,
   libraryViewLog,
@@ -587,12 +591,19 @@ class Mynda extends React.Component {
     let filteredVids = [];
     let showNew = playlist.id === 'new' || this.state.settings.preferences.include_new_vids_in_playlists;
     try {
-      filteredVids = this.state.videos.filter(video => video && eval(playlist.filter_function) && (video.new ? showNew : true));
+      const playlistPredicate = compilePlaylistFilter(playlist.filter_function);
+      // Use one clock value for the whole pass so a relative-time expression
+      // cannot change meaning halfway through a large library.
+      const filterContext = createPlaylistFilterContext();
+      filteredVids = this.state.videos.filter(video =>
+        video && playlistPredicate(video, filterContext) && (video.new ? showNew : true)
+      );
     } catch(err) {
       let name = playlist ? playlist.name : 'nonexistent';
       libraryViewLog.error('Could not execute a playlist filter', {
         playlistID: playlist && playlist.id,
         playlistName: name,
+        filterErrorCode: err && err.code,
         error: err
       });
     }
