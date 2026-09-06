@@ -147,6 +147,7 @@ class MynLibrary extends React.Component {
           playlist={playlist}
           view={this.props.view}
           recentlyWatched={this.props.recentlyWatched}
+          mediaRevision={this.props.mediaRevision}
           playVideo={this.props.playVideo}
           toggleCompact={this.toggleCompact}
           changeView={this.props.changeView}
@@ -417,7 +418,12 @@ class MynPlaylistBar extends React.Component {
 
         <div className="pb-element recent">
           <div className="pb-text">Recently Viewed:</div>
-          <MynRecentlyWatched list={this.props.recentlyWatched} selected={0} playVideo={this.props.playVideo} />
+          <MynRecentlyWatched
+            list={this.props.recentlyWatched}
+            mediaRevision={this.props.mediaRevision}
+            selected={0}
+            playVideo={this.props.playVideo}
+          />
         </div>
 
         <button className="pb-element compact" onClick={(e) => this.props.toggleCompact()}>{this.props.compact ? 'Large' : 'Compact'}</button>
@@ -1478,7 +1484,8 @@ class MynRecentlyWatched extends MynDropdown {
   }
 
   componentDidUpdate(oldProps) {
-    if (!_.isEqual(oldProps.list,this.props.list)) {
+    if (!_.isEqual(oldProps.list,this.props.list) ||
+      oldProps.mediaRevision !== this.props.mediaRevision) {
       this.createListItems();
     }
   }

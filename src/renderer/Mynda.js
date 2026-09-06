@@ -44,6 +44,7 @@ class Mynda extends React.Component {
       prevQuery : '',
       selectedRows : {},
       playlistRowManifest : [],
+      mediaRevision : 0,
 
       detailsPaneShowing : true,
 
@@ -944,7 +945,10 @@ class Mynda extends React.Component {
       if (address === 'media') {
         frontendLog.debug('Refreshing renderer state after media replacement');
 
-        this.setState({videos:library.media}, () => {
+        this.setState(previousState => ({
+          videos: library.media,
+          mediaRevision: previousState.mediaRevision + 1
+        }), () => {
           // Now playlistFilter(), the table, and the details/editor refresh all
           // read the newly saved videos rather than the pre-save references.
           this.setPlaylist(this.state.currentPlaylistID);
@@ -957,9 +961,13 @@ class Mynda extends React.Component {
         frontendLog.debug('Refreshing renderer state after a video edit', {
           address: address
         });
-        this.setPlaylist(this.state.currentPlaylistID);
-        this.setPlaylistLengths(true);
-        this.refreshDetails(timeout);
+        this.setState(previousState => ({
+          mediaRevision: previousState.mediaRevision + 1
+        }), () => {
+          this.setPlaylist(this.state.currentPlaylistID);
+          this.setPlaylistLengths(true);
+          this.refreshDetails(timeout);
+        });
       }
 
       // if a playlist was changed
@@ -1104,6 +1112,7 @@ class Mynda extends React.Component {
             selectedRows={this.state.selectedRows}
             reportSortedManifest={this.reportSortedManifest}
             recentlyWatched={this.state.recentlyWatched}
+            mediaRevision={this.state.mediaRevision}
             changeView={this.changePlaylistView}
           />
         </ErrorBoundary>
