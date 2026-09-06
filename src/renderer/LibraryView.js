@@ -5,6 +5,18 @@ const os = require('os');
 const _ = require('lodash');
 const URL = require('url');
 const accounting = require('accounting');
+
+// Electron 12 predates Object.hasOwn(), which current React Virtuoso uses in
+// its prop plumbing. Supply the standards-equivalent operation for that older
+// renderer without changing Mynda's React/Electron stack.
+if (typeof Object.hasOwn !== 'function') {
+  Object.defineProperty(Object, 'hasOwn', {
+    configurable: true,
+    writable: true,
+    value: (object, property) => Object.prototype.hasOwnProperty.call(object, property)
+  });
+}
+const {TableVirtuoso} = require('react-virtuoso');
 const {
   library,
   libraryViewLog,
@@ -14,11 +26,12 @@ const {
 } = require('./RendererRuntime.js');
 const {
   removeLeadingArticle,
-  validateVideo,
-  findNearestOfClass,
-  getObjectDiff,
-  getArrayDiff
+  validateVideo
 } = require('./RendererUtils.js');
+const {
+  selectTableRow,
+  selectedVideoIDsForTable
+} = require('./TableSelection.js');
 const {MynOverflowTextMarquee} = require('./SharedComponents.js');
 const {
   MynEditSeenWidget,
@@ -28,19 +41,91 @@ const {
   MynShowPositionWidget
 } = require('./EditorFields.js');
 
+// TableVirtuoso owns the physical <tr> elements, while Mynda continues to own
+// every semantic row and the complete selection. Custom table components keep
+// the existing markup/classes and make mounted rows reflect data-backed state.
+const MynVirtuosoTable = React.forwardRef((props, ref) => {
+  const {context, className, ...tableProps} = props;
+  const tableClass = [
+    'movie-table',
+    context && context.compact ? 'compact' : '',
+    className || ''
+  ].filter(Boolean).join(' ');
+
+  return (
+    <table
+      {...tableProps}
+      ref={ref}
+      id={context && context.tableID}
+      className={tableClass}
+    />
+  );
+});
+
+// Mynda's headers historically scroll with their table. TableVirtuoso uses a
+// sticky header by default, so discard only that positioning while retaining
+// its measured height and all other library-supplied styles.
+const MynVirtuosoTableHead = React.forwardRef((props, ref) => {
+  const {context, style, ...headProps} = props;
+  return (
+    <thead
+      {...headProps}
+      ref={ref}
+      style={{...style, position: 'static', top: 'auto'}}
+    />
+  );
+});
+
+const MynVirtuosoTableRow = React.forwardRef((props, ref) => {
+  const {item, context, className, children, ...rowProps} = props;
+  if (!item || !context) return <tr {...rowProps} ref={ref}>{children}</tr>;
+
+  const selected = context.selectedVideoIDs.has(item.vidID);
+  const rowClass = [
+    'movie-row',
+    item.index % 2 === 0 ? 'odd' : 'even',
+    item.rowID,
+    selected ? 'selected' : '',
+    className || ''
+  ].filter(Boolean).join(' ');
+
+  return (
+    <tr
+      {...rowProps}
+      ref={ref}
+      id={item.rowID}
+      vid_id={item.vidID}
+      aria-selected={selected}
+      className={rowClass}
+      onMouseEnter={(event) => context.rowHovered(item.video, item.rowID, item.index, event)}
+      onClick={(event) => context.rowClick(item.vidID, item.rowID, item.index, event)}
+    >
+      {children}
+    </tr>
+  );
+});
+
+const MYN_VIRTUOSO_COMPONENTS = {
+  Table: MynVirtuosoTable,
+  TableHead: MynVirtuosoTableHead,
+  TableRow: MynVirtuosoTableRow
+};
+
 // ###### Library Pane: displays either a flat table or tables grouped by series ###### //
 class MynLibrary extends React.Component {
   constructor(props) {
     super(props)
 
     this.state = {
-      compact: false
+      compact: false,
+      scrollParent: null
     }
     this.manifest = {};
     this.manifestPlaylistID = props.playlistID;
     this.manifestVideos = props.videos;
 
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
+    this.setLibraryPane = this.setLibraryPane.bind(this);
     this.toggleCompact = this.toggleCompact.bind(this);
   }
 
@@ -72,6 +157,12 @@ class MynLibrary extends React.Component {
     this.setState({compact: !this.state.compact});
   }
 
+  setLibraryPane(element) {
+    if (element && element !== this.state.scrollParent) {
+      this.setState({scrollParent: element});
+    }
+  }
+
   render() {
     let tables = null;
 
@@ -101,6 +192,8 @@ class MynLibrary extends React.Component {
             editSeries={this.props.editSeries}
             selectedRows={this.props.selectedRows}
             reportSortedManifest={this.reportSortedManifest}
+            registerTableScroller={this.props.registerTableScroller}
+            scrollParent={this.state.scrollParent}
             compact={this.state.compact}
           />
         </div>
@@ -124,6 +217,9 @@ class MynLibrary extends React.Component {
           handleHoveredRow={this.props.handleHoveredRow}
           selectedRows={this.props.selectedRows}
           reportSortedManifest={this.reportSortedManifest}
+          registerTableScroller={this.props.registerTableScroller}
+          scrollParent={this.state.scrollParent}
+          visible={true}
           compact={this.state.compact}
         />
       );
@@ -142,7 +238,7 @@ class MynLibrary extends React.Component {
     } catch(err) {}
 
     return (
-      <div id="library-pane" className="pane">
+      <div id="library-pane" className="pane" ref={this.setLibraryPane}>
         <MynPlaylistBar
           playlist={playlist}
           view={this.props.view}
@@ -222,6 +318,20 @@ class MynLibSeries extends React.Component {
         [series]: !previousState.collapsed[series]
       }
     }));
+  }
+
+  ensureSeriesExpanded(series, callback) {
+    if (!this.state.collapsed[series]) {
+      if (callback) callback();
+      return;
+    }
+
+    this.setState(previousState => ({
+      collapsed: {
+        ...previousState.collapsed,
+        [series]: false
+      }
+    }), callback);
   }
 
   addEpisodeToColumns() {
@@ -306,6 +416,10 @@ class MynLibSeries extends React.Component {
               handleHoveredRow={this.props.handleHoveredRow}
               selectedRows={this.props.selectedRows}
               reportSortedManifest={this.props.reportSortedManifest}
+              registerTableScroller={this.props.registerTableScroller}
+              scrollParent={this.props.scrollParent}
+              visible={!this.state.collapsed[series]}
+              ensureVisible={(callback) => this.ensureSeriesExpanded(series, callback)}
               compact={this.props.compact}
             />
           </div>
@@ -449,57 +563,28 @@ class MynLibTable extends React.Component {
   constructor(props) {
     super(props)
 
-    this._isMounted = false;
-
     this.tableID = this.props.tableID || 'table';
-
     this.clickTimer = null;
+    this.pendingScrollIndex = null;
+    this.virtuosoRef = null;
 
     this.state = {
-      tHeadContent: null,
-      tBodyContent: null,
       sortKey: null,
       sortAscending: true,
       sortedRows: [],
-      batchSelected: [],
       rowID: (vidID) => vidID,
-      shiftDown: false,
-      ctrlDown: false,
       include_user_rating_in_avg: props.settings.preferences.include_user_rating_in_avg
     }
 
-    // this.keyDown = this.keyDown.bind(this);
-    // this.keyUp = this.keyUp.bind(this);
+    this.flushPendingScroll = this.flushPendingScroll.bind(this);
     this.requestSort = this.requestSort.bind(this);
     this.render = this.render.bind(this);
+    this.rowClick = this.rowClick.bind(this);
+    this.rowHovered = this.rowHovered.bind(this);
+    this.scrollToIndex = this.scrollToIndex.bind(this);
+    this.setVirtuosoRef = this.setVirtuosoRef.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     this.componentDidUpdate = this.componentDidUpdate.bind(this);
-  }
-
-  keyDown(e) {
-    if (!this._isMounted) return;
-
-    // SHIFT
-    if (e.keyCode === 16) {
-      this.setState({shiftDown : true});
-    }
-    // CTRL if not MacOS, CMD if MacOS
-    if ((os.platform() !== 'darwin' && e.keyCode === 17) || (os.platform() === 'darwin' && e.metaKey)) {
-      this.setState({ctrlDown : true});
-    }
-  }
-
-  keyUp(e) {
-    if (!this._isMounted) return;
-
-    // SHIFT
-    if (e.keyCode === 16) {
-      this.setState({shiftDown : false});
-    }
-    // CTRL if not MacOS, CMD if MacOS
-    if ((os.platform() !== 'darwin' && e.keyCode === 17) || (os.platform() === 'darwin' && !e.metaKey)) {
-      this.setState({ctrlDown : false});
-    }
   }
 
   rowHovered(video, rowID, index, e) {
@@ -521,21 +606,19 @@ class MynLibTable extends React.Component {
   // if there was a single click on the row, select the row;
   // if there was a double click, play the video
   rowClick(id, rowID, index, e) {
-    let target = e.target;
-    // clear the click timer; we're no longer setting a timer in this function,
-    // but rowSelect() is using it when unselecting the clicked row
-    // (when it's the only one already selected); because in that case
-    // a double click should not unselect the row;
     clearTimeout(this.clickTimer);
+    const shift = e.shiftKey;
+    const toggle = os.platform() === 'darwin' ? e.metaKey : e.ctrlKey;
 
     // single click, or click with mod keys: normal row selection
-    if (e.detail === 1 || this.state.shiftDown || this.state.ctrlDown) {
-      // this.clickTimer = setTimeout(() => this.rowSelect(id, rowID, index, target), 0);
-      this.rowSelect(id, rowID, index, target)
+    if (e.detail === 1 || shift || toggle) {
+      this.rowSelect(id, index, {shift: shift, toggle: toggle});
 
     // double click with no mod keys: play video and select row
-    } else if (e.detail === 2 && !this.state.shiftDown && !this.state.ctrlDown) {
-      this.rowSelect(id, rowID, index, target, true); // 'true' forces the row to be selected; otherwise, if it was already (the only row) selected, clicking on it would unselect it
+    } else if (e.detail === 2 && !shift && !toggle) {
+      // Force selection so a double click on the sole selected row cannot let
+      // the delayed single-click unselection win.
+      this.rowSelect(id, index, {forceSelect: true});
 
       playerLog.debug('Playback requested by double-clicking a library row', {
         videoID: id,
@@ -548,110 +631,25 @@ class MynLibTable extends React.Component {
   // select one or multiple rows (through the use of modifier keys)
   // when selected, the user can batch edit videos;
   // eventually, we'd like to enable batch drag n' drop as well
-  rowSelect(id, rowID, index, target, forceSelect) {
-    // console.log(`TABLE ${this.tableID} REGISTERED A CLICK`);
-    const row = findNearestOfClass(target,'movie-row');
+  rowSelect(id, index, options) {
+    const tableSelection = selectedVideoIDsForTable(
+      this.props.selectedRows,
+      this.state.sortedRows
+    );
+    const result = selectTableRow(
+      this.state.sortedRows,
+      tableSelection,
+      id,
+      index,
+      options
+    );
 
-    // if the user clicks on a row with a modifier key pressed
-    // (either shift or ctrl/cmd), we create/modify the selection of multiple videos
-    if (this.state.shiftDown || this.state.ctrlDown) {
-
-      // if shift is pressed, then we want to select all the videos between
-      // two rows that were clicked (including the clicked ones);
-      // we do this by using the nearest selected row as an anchor
-      // and the new click as the second click, highlighting all the videos in between;
-      // and if there is no other selected row, we just select the row
-      // that was clicked on by itself
-      if (this.state.shiftDown) {
-        // find the index of the clicked row (end) and the nearest already-selected row (start)
-        let end = index;
-        let start;
-        let selectedIndices = [];
-        // get the indices of every selected row
-        for (let i=0; i<this.state.sortedRows.length; i++) {
-          if (this.state.batchSelected.includes(this.state.sortedRows[i].vidID)) {
-            selectedIndices.push(i);
-          }
-        }
-
-        // use the selectedIndices array to pick the closest video
-        // that's already selected and use that as the start point
-        let minDiff = this.state.sortedRows.length;
-        let minDiffIndex;
-        for (let i of selectedIndices) {
-          let diff = Math.abs(end - i);
-          if (diff < minDiff) {
-            minDiff = diff;
-            minDiffIndex = i;
-          }
-        }
-        if (typeof minDiffIndex != "undefined") {
-          start = minDiffIndex;
-        } else {
-          // if we're here, there were no previously selected videos,
-          // so we set 'start' to the same as 'end', which will just
-          // select only the video that was clicked on
-          start = end;
-        }
-
-        // if (this.state.shiftDown) console.log(`SHIFT CLICKED FROM (INDEX) ${start} TO ${end}`);
-        // if (this.state.ctrlDown) console.log(`CTRL CLICKED FROM (INDEX) ${start} TO ${end}`);
-
-        // get a list of the actual videos being selected
-        // and select them
-        let selectedVids = []
-        let low = start < end ? start : end;
-        let high = start < end ? end : start;
-        for (let i = low; i <= high; i++) {
-          selectedVids.push(this.state.sortedRows[i].vidID);
-        }
-        this.setState({batchSelected:selectedVids},this.handleBatch);
-        // console.log(`SELECTED VIDEOS: ${selectedVids}`);
-      }
-
-      // if ctrl/cmd was pressed, but NOT shift,
-      // then we add or subtract the individual row clicked on
-      // from any previously selected videos
-      else if (this.state.ctrlDown) {
-        let selectedVids = _.cloneDeep(this.state.batchSelected);
-        if (this.state.batchSelected.includes(id)) {
-          selectedVids = selectedVids.filter(vID => vID !== id);
-        } else {
-          // console.log("ADDING " + id)
-          selectedVids.push(id);
-        }
-        this.setState({batchSelected:selectedVids},this.handleBatch);
-      }
-
-
-      // no modifier keys were pressed
-    } else {
-      // if there is only one video selected and this is the one we've clicked on,
-      // we actually want to unselect it, UNLESS forceSelect is true
-      if (!forceSelect && this.state.batchSelected.length === 1 && this.state.batchSelected[0] === id) {
-        // erase any previous batch selection
-        // but put it on a timeout, because if the user double clicked,
-        // the row will be reselected (with forceSelect == true);
-        // so that would work just fine without the timeout,
-        // but it's ugly (and maybe confusing) for the row to get unselected and
-        // then reselected on the second click. This way, it just stays selected
-        // if there's a double click
-        this.clickTimer = setTimeout(() => {
-          this.setState({batchSelected:[]},() => this.handleBatch(true));
-        },150);
-
-      } else {
-        // if we're here, either multiple rows, a different row, or no row was already selected,
-        // (or this row was selected but forceSelect was true)
-        // and neither 'shift' nor 'cmd/ctrl' was being pressed,
-        // so we want to erase any previous batch selection,
-        // selecting only the row that was clicked on
-        let selectedVids = [];
-        selectedVids.push(id)
-        this.setState({batchSelected:selectedVids},() => this.handleBatch(true));
-      }
+    if (result.deferClear) {
+      this.clickTimer = setTimeout(() => this.handleBatch([], true), 150);
+      return;
     }
 
+    this.handleBatch(result.selectedVideoIDs, result.overwrite);
   }
 
   // called when the selection is changed;
@@ -659,37 +657,22 @@ class MynLibTable extends React.Component {
   // to overwrite any rows previously selected by other tables;
   // otherwise, we simply want to add this batch to any existing batches
   // (for example, from other season tables in the series view)
-  handleBatch(overwrite) {
-    // first, add the 'selected' class to all the selected rows
-    Array.from(document.getElementById(this.tableID).getElementsByClassName('movie-row')).map(row => {
-      // console.log(row.getAttribute('vid_id'));
-      if (this.state.batchSelected.includes(row.getAttribute('vid_id'))) {
-        row.classList.add('selected');
-      } else {
-        // console.log(`REMOVING SELECTED CLASS FROM ${row.id}`)
-        row.classList.remove('selected');
-      }
-    });
-
+  handleBatch(selectedVideoIDs, overwrite) {
     // find a rowID to pass to the details pane, so that it can
     // populate its "jump to row" link. When multiple rows are selected,
-    // we simply find the highest selected row in the table
-    // (i.e. the row with the lowest index)
-    let firstVid;
-    let lowestIndex = this.state.sortedRows.length;
-    for (let id of this.state.batchSelected) {
-      for (let i=0; i<lowestIndex; i++) {
-        if (this.state.sortedRows[i].vidID === id) {
-          lowestIndex = i;
-          firstVid = id;
-          break;
-        }
-      }
-    }
-    let firstRow = firstVid ? this.state.rowID(firstVid) : null;
+    // we simply find the highest selected row in the complete sorted data.
+    const selectedSet = new Set(selectedVideoIDs);
+    const firstSelectedRow = this.state.sortedRows
+      .find(row => selectedSet.has(row.vidID));
+    const firstRow = firstSelectedRow ? firstSelectedRow.rowID : null;
 
-    // then we pass upwards the list of selected videos
-    this.props.handleSelectedRows(_.cloneDeep(this.state.batchSelected),firstRow,this.tableID,overwrite);
+    this.props.handleSelectedRows(
+      [...selectedVideoIDs],
+      firstRow,
+      this.tableID,
+      overwrite,
+      this.state.sortedRows.map(row => row.vidID)
+    );
   }
 
   requestSort(key, ascending) {
@@ -762,7 +745,7 @@ class MynLibTable extends React.Component {
      episode: (a,b) => [parseFloat(a.episode),parseFloat(b.episode)],
     }
 
-    let rows = this.props.movies.sort((vid_a, vid_b) => {
+    let rows = [...this.props.movies].sort((vid_a, vid_b) => {
 
       // get the video attributes to sort by
       let a,b;
@@ -798,30 +781,9 @@ class MynLibTable extends React.Component {
         rowID:this.state.rowID(movie.id),
         vidID:movie.id,
         vidTitle:movie.title,
-        tableID:this.tableID
+        tableID:this.tableID,
+        video:movie
       };
-
-      // THE BELOW MAY NOT BE NECESSARY
-      // include the 'selected' class if this row is selected
-      // let selected = ''//(this.props.selectedRows[this.tableID] && this.props.selectedRows[this.tableID].rows && this.props.selectedRows[this.tableID].rows.includes(video.id.toString())) ? ' selected' : '';
-      // console.log(`Row for video ${video.id} in table ${this.tableID} class: ${selected}`);
-      let rowID = this.state.rowID(movie.id);
-
-      let rowJSX = (
-        <MynLibTableRow
-          key={movie.id}
-          video={movie}
-          index={index}
-          rowID={rowID}
-          settings={this.props.settings}
-          calcAvgRatings={this.props.calcAvgRatings}
-          columns={this.props.columns}
-          rowHovered={(...args) => this.rowHovered(...args)}
-          rowOut={(...args) => this.rowOut(...args)}
-          rowClick={(...args) => this.rowClick(...args)}
-        />
-      );
-      row.jsx = rowJSX;
 
       return row;
     });
@@ -871,16 +833,68 @@ class MynLibTable extends React.Component {
       this.props.tableOrder || 0
     );
 
-    let tBodyContent = this.state.sortedRows.map(row => row.jsx);
-    let tHeadContent = (
+    // requestSort updates synchronously so the manifest and rendered data are
+    // always the same ordering. Copy the array to notify React/Virtuoso.
+    this.setState({sortedRows: [...this.state.sortedRows]});
+  }
+
+  renderHeader() {
+    return (
       <tr id="main-table-header-row">
         {this.props.columns.map(col => (
           <th key={col} className={col} onClick={() => this.reset(col)}>{this.props.displayColumnName(col)}</th>
         ))}
       </tr>
     );
+  }
 
-    this.setState({tBodyContent:tBodyContent, tHeadContent:tHeadContent});
+  renderCells(index, row) {
+    return (
+      <MynLibTableRow
+        video={row.video}
+        index={index}
+        rowID={row.rowID}
+        settings={this.props.settings}
+        calcAvgRatings={this.props.calcAvgRatings}
+        columns={this.props.columns}
+      />
+    );
+  }
+
+  setVirtuosoRef(ref) {
+    this.virtuosoRef = ref;
+    this.flushPendingScroll();
+  }
+
+  flushPendingScroll() {
+    if (this.pendingScrollIndex === null || !this.virtuosoRef || this.props.visible === false) {
+      return;
+    }
+
+    const index = this.pendingScrollIndex;
+    this.pendingScrollIndex = null;
+    this.virtuosoRef.scrollToIndex({index: index, align: 'center'});
+  }
+
+  // Registered even while this season is collapsed. A request can therefore
+  // expand the owning series first and then scroll the newly mounted virtual
+  // table to a row that did not previously exist in the DOM.
+  scrollToIndex(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= this.state.sortedRows.length) {
+      libraryViewLog.warn('Could not scroll to an invalid virtual table index', {
+        tableID: this.tableID,
+        index: index,
+        rowCount: this.state.sortedRows.length
+      });
+      return;
+    }
+
+    this.pendingScrollIndex = index;
+    if (this.props.visible === false && this.props.ensureVisible) {
+      this.props.ensureVisible(this.flushPendingScroll);
+    } else {
+      this.flushPendingScroll();
+    }
   }
 
   componentDidUpdate(oldProps) {
@@ -898,22 +912,8 @@ class MynLibTable extends React.Component {
     // console.log('UPDATING MynTable at ' + Date.now());
     // console.log(getObjectDiff(oldProps,this.props));
 
-    // if another table unselected this table's rows, update the state variable
-    if (!this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID]) {
-      libraryViewLog.debug('Library table rows were unselected externally', {
-        tableID: this.tableID
-      });
-      this.setState({batchSelected:[]},this.handleBatch);
-    }
-    // if the selection of rows in this table was otherwise changed from the outside
-    // (though I don't know when that would happen besides a simple unselection)
-    // update the state variable
-    if (this.props.selectedRows[this.tableID] && oldProps.selectedRows[this.tableID] && !_.isEqual(this.props.selectedRows[this.tableID],oldProps.selectedRows[this.tableID]) && this.props.selectedRows[this.tableID].rows) {
-      libraryViewLog.debug('Library table selection changed externally', {
-        tableID: this.tableID,
-        selectedVideoCount: this.props.selectedRows[this.tableID].rows.length
-      });
-      this.setState({batchSelected:this.props.selectedRows[this.tableID].rows},this.handleBatch);
+    if (oldProps.visible === false && this.props.visible !== false) {
+      this.flushPendingScroll();
     }
 
     // // in the special case that we now have some videos when before there were none at all
@@ -982,24 +982,17 @@ class MynLibTable extends React.Component {
   }
 
   componentDidMount(props) {
-    this._isMounted = true;
-    // console.log("--MOUNTED--");
-    // this.props.movies.map(movie => console.log(JSON.stringify(movie)));
-    // render the table
+    if (this.props.registerTableScroller) {
+      this.props.registerTableScroller(this.tableID, this.scrollToIndex);
+    }
     this.reset('initial-sort');
-
-  }
-
-  componentWillMount() {
-    // set key listeners to be used for batch highlighting of videos
-    document.addEventListener("keydown", this.keyDown.bind(this));
-    document.addEventListener("keyup", this.keyUp.bind(this));
   }
 
   componentWillUnmount() {
-    this._isMounted = false;
-    document.removeEventListener("keydown", this.keyDown.bind(this));
-    document.removeEventListener("keyup", this.keyUp.bind(this));
+    clearTimeout(this.clickTimer);
+    if (this.props.registerTableScroller) {
+      this.props.registerTableScroller(this.tableID, null);
+    }
   }
 
   render() {
@@ -1009,16 +1002,37 @@ class MynLibTable extends React.Component {
 
     // return this.state.content;
 
+    // Keep collapsed season components mounted so they continue reporting
+    // complete manifests and holding sort state, but do not ask Virtuoso to
+    // measure content inside display:none.
+    if (this.props.visible === false || !this.props.scrollParent) return null;
+
+    const selectedVideoIDs = new Set(selectedVideoIDsForTable(
+      this.props.selectedRows,
+      this.state.sortedRows
+    ));
+    const context = {
+      compact: this.props.compact,
+      rowClick: this.rowClick,
+      rowHovered: this.rowHovered,
+      selectedVideoIDs: selectedVideoIDs,
+      tableID: this.tableID
+    };
+
     return (
       <div className="movie-table-container">
-        <table className={"movie-table " + (this.props.compact ? 'compact' : '')} id={this.tableID}>
-          <thead>
-            {this.state.tHeadContent}
-          </thead>
-          <tbody>
-            {this.state.tBodyContent}
-          </tbody>
-        </table>
+        <TableVirtuoso
+          ref={this.setVirtuosoRef}
+          className="movie-table-virtuoso"
+          customScrollParent={this.props.scrollParent}
+          data={this.state.sortedRows}
+          context={context}
+          components={MYN_VIRTUOSO_COMPONENTS}
+          computeItemKey={(index, row) => row.vidID}
+          fixedHeaderContent={() => this.renderHeader()}
+          increaseViewportBy={{top: 200, bottom: 400}}
+          itemContent={(index, row) => this.renderCells(index, row)}
+        />
       </div>
     );
   }
@@ -1133,10 +1147,7 @@ class MynLibTableRow extends React.Component {
 
 
   render() {
-
-    let rowID = this.props.rowID;
     let video = this.props.video;
-    let index = this.props.index;
 
     let cellJSX = {
       title: (<td key="title" className="title">{video.title}</td>),
@@ -1172,18 +1183,9 @@ class MynLibTableRow extends React.Component {
       return (<td key={column} className={column}>{String(video[column])}</td>)
     });
 
-    return (
-      <tr
-        className={"movie-row " + rowID}
-        id={rowID}
-        vid_id={video.id}
-        onMouseEnter={(e) => this.props.rowHovered(video, rowID, index, e)}
-        onClick={(e) => this.props.rowClick(video.id, rowID, index, e)}
-      >
-        {cells}
-      </tr>
-    );
-    // onMouseOut = {(e) => this.props.rowOut(video.id, rowID, e)}
+    // TableVirtuoso supplies the physical <tr>; this component supplies only
+    // its cells so the existing inline editors remain unchanged.
+    return cells;
   }
 }
 

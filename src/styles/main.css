@@ -499,14 +499,20 @@ img.ratings-icon {
 
 
 .movie-table-container {
-  overflow-x: scroll;
+  overflow-x: auto;
   /* overflow: visible; /* this must be on in order for position: sticky to work on the table header */
+}
+.movie-table-virtuoso {
+  min-width: 100%;
 }
 th, tr, td {
   border-width:0px;
 }
 .movie-table {
-  border-collapse: collapse;
+  /* Collapsed borders can render incorrectly when virtual rows are translated
+     in and out. Zero border spacing preserves the previous appearance. */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
 }
 /* .movie-table thead th {
@@ -552,10 +558,10 @@ table.compact .movie-row {
     font-size: var(--main-font-size-compact);
     height: var(--movie-row-height-compact);
 }
-.movie-row:nth-of-type(odd) {
+.movie-row.odd {
   background-color: var(--movie-row-bg-odd);
 }
-.movie-row:nth-of-type(even) {
+.movie-row.even {
   background-color: var(--movie-row-bg-even);
 }
 .movie-row:hover {

@@ -13,6 +13,10 @@ const {
   playerLog
 } = require('./RendererRuntime.js');
 const {batchNewState, batchRatingsState, validateVideo} = require('./RendererUtils.js');
+const {
+  mergeTableSelection,
+  summarizeSelection
+} = require('./TableSelection.js');
 const {ErrorBoundary, MynNotify} = require('./SharedComponents.js');
 const {MynNav} = require('./Navigation.js');
 const {MynLibrary, MynDetails} = require('./LibraryView.js');
@@ -57,6 +61,7 @@ class Mynda extends React.Component {
       defaultSettingsView : 'folders',
     }
     this.state.settingsView = this.state.defaultSettingsView;
+    this.tableScrollers = {};
 
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
@@ -70,7 +75,9 @@ class Mynda extends React.Component {
     this.playVideo = this.playVideo.bind(this);
     this.handleHoveredRow = this.handleHoveredRow.bind(this);
     this.handleSelectedRows = this.handleSelectedRows.bind(this);
+    this.registerTableScroller = this.registerTableScroller.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
+    this.scrollToVideo = this.scrollToVideo.bind(this);
     this.logPlayed = this.logPlayed.bind(this);
     this.scanWatchfolders = this.scanWatchfolders.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
@@ -166,71 +173,47 @@ class Mynda extends React.Component {
 
   // selectedVids should be an array of video ids
   // or a single video id
-  handleSelectedRows(selectedVids, highestRow, tableID, overwrite) {
-    // console.log("Overwrite ? " + overwrite);
-    // overwrite is a boolean telling us whether to deselect all previously
-    // selected rows in all tables before adding the new selections
-    if (overwrite) this.state.selectedRows = {};
-
+  handleSelectedRows(selectedVids, highestRow, tableID, overwrite, tableVideoIDs) {
     if (typeof selectedVids === 'string') {
       selectedVids = [selectedVids];
     }
 
-    // if any videos were selected in this table, add them to the object;
-    // we don't want to add an empty list of rows to the object, because that may
-    // cause an infinite loop when the table updates its own state variable
-    // based on this object
-    if (selectedVids && selectedVids.length > 0) {
-      this.state.selectedRows[tableID] = {
-        rows: selectedVids,
-        highestRow: highestRow
-      };
-    } else {
-      // if no videos in this table were selected, delete this table from the object
-      delete this.state.selectedRows[tableID]
-    }
+    // A call with no selection arguments is retained for the legacy batch
+    // refresh fallback. Otherwise, build a new object instead of mutating
+    // state so every virtual table receives a dependable props update.
+    const nextSelectedRows = typeof selectedVids === 'undefined' && !tableID ?
+      this.state.selectedRows :
+      mergeTableSelection(
+        this.state.selectedRows,
+        selectedVids || [],
+        highestRow,
+        tableID,
+        overwrite,
+        tableVideoIDs
+      );
 
     // get object containing all selected videos
-    let allSelected = this.getAllSelected();
+    let allSelected = this.getAllSelected(nextSelectedRows);
     libraryViewLog.debug('Library row selection changed', {
       selectedVideoCount: allSelected.rows.length,
-      selectedTableCount: Object.keys(this.state.selectedRows).length,
+      selectedTableCount: Object.keys(nextSelectedRows).length,
       highestRow: allSelected.highestRow
     });
 
-    if (allSelected.rows.length === 0) {
-      // if no rows are selected, empty the state object so that
-      // this.handleHoveredRow can take over and display whatever row the
-      // user is hovering on
-      this.setState({selectedRows:{}} /*, ()=>console.log('SELECTED ROWS OBJECT: ' + JSON.stringify(this.state.selectedRows))*/);
-    } else if (allSelected.rows.length === 1) {
-      // if only one row is selected, show that video in the details pane
-      this.showDetails(allSelected.rows[0],allSelected.highestRow);
-    } else {
-      // if multiple rows are selected, pass the whole array into showDetails
-      this.showDetails(allSelected.rows,allSelected.highestRow);
-    }
-    // console.log('SELECTED ROWS OBJECT: ' + JSON.stringify(this.state.selectedRows));
+    const selectionState = allSelected.rows.length > 0 ? nextSelectedRows : {};
+    this.setState({selectedRows: selectionState}, () => {
+      if (allSelected.rows.length === 1) {
+        this.showDetails(allSelected.rows[0], allSelected.highestRow);
+      } else if (allSelected.rows.length > 1) {
+        this.showDetails(allSelected.rows, allSelected.highestRow);
+      }
+      // With no selection, the details pane intentionally remains as-is until
+      // the next row hover, matching the previous behavior.
+    });
   }
 
-  getAllSelected() {
-    let selected = [];
-    Object.keys(this.state.selectedRows).map(tableID => {
-      selected = [...selected, ...this.state.selectedRows[tableID].rows];
-    });
-
-    selected = [...new Set(selected)];
-    const selectedSet = new Set(selected);
-    const firstSelectedManifestRow = (this.state.playlistRowManifest || [])
-      .find(row => selectedSet.has(row.vidID));
-    const highestRow = firstSelectedManifestRow ? firstSelectedManifestRow.rowID : null;
-
-    let results = {
-      rows: selected,
-      highestRow: highestRow
-    }
-
-    return results;
+  getAllSelected(selectedRows = this.state.selectedRows) {
+    return summarizeSelection(selectedRows, this.state.playlistRowManifest);
   }
 
   // given video id, return a list of its rows in the current playlist, if any
@@ -240,6 +223,15 @@ class Mynda extends React.Component {
 
   reportSortedManifest(manifest) {
     this.state.playlistRowManifest = manifest;
+  }
+
+  registerTableScroller(tableID, scrollToIndex) {
+    if (!tableID) return;
+    if (typeof scrollToIndex === 'function') {
+      this.tableScrollers[tableID] = scrollToIndex;
+    } else {
+      delete this.tableScrollers[tableID];
+    }
   }
 
   toggleDetailsPane(show) {
@@ -494,14 +486,21 @@ class Mynda extends React.Component {
   }
 
   scrollToVideo(rowID) {
-    let els = document.getElementsByClassName('movie-row ' + rowID);
-    if (els && els.length > 0) {
-      els[0].scrollIntoView();
-    } else {
-      libraryViewLog.warn('Could not find the requested table row to scroll to', {
-        rowID: rowID
-      });
+    const row = (this.state.playlistRowManifest || [])
+      .find(manifestRow => manifestRow && manifestRow.rowID === rowID);
+    const tableScroller = row && this.tableScrollers[row.tableID];
+
+    if (row && tableScroller) {
+      tableScroller(row.index);
+      return;
     }
+
+    libraryViewLog.warn('Could not find the requested virtual table row to scroll to', {
+      rowID: rowID,
+      tableID: row && row.tableID,
+      manifestRowFound: Boolean(row),
+      tableScrollerFound: Boolean(tableScroller)
+    });
   }
 
   isElementOffScreen(el) {
@@ -1111,6 +1110,7 @@ class Mynda extends React.Component {
             editSeries={this.editSeries}
             selectedRows={this.state.selectedRows}
             reportSortedManifest={this.reportSortedManifest}
+            registerTableScroller={this.registerTableScroller}
             recentlyWatched={this.state.recentlyWatched}
             mediaRevision={this.state.mediaRevision}
             changeView={this.changePlaylistView}

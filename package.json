@@ -4,7 +4,7 @@
   "description": "A media library and player app",
   "main": "src/index.js",
   "scripts": {
-    "test": "node test/PlaylistFilter.test.js",
+    "test": "node test/PlaylistFilter.test.js && node test/TableSelection.test.js",
     "start": "electron .",
     "dist": "electron-builder"
   },
@@ -38,6 +38,7 @@
     "react": "^16.13.1",
     "react-beautiful-dnd": "^13.0.0",
     "react-dom": "^16.13.1",
+    "react-virtuoso": "4.18.12",
     "request": "^2.88.2",
     "subtitle": "^4.1.0",
     "uuid": "^8.3.0"
