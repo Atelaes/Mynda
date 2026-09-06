@@ -60,6 +60,7 @@ class Mynda extends React.Component {
     this.render = this.render.bind(this);
     this.playlistFilter = this.playlistFilter.bind(this);
     this.setPlaylist = this.setPlaylist.bind(this);
+    this.changePlaylistView = this.changePlaylistView.bind(this);
     this.search = this.search.bind(this);
     this.calcAvgRatings = this.calcAvgRatings.bind(this);
     this.toggleDetailsPane = this.toggleDetailsPane.bind(this);
@@ -618,8 +619,29 @@ class Mynda extends React.Component {
     return filteredVids;
   }
 
-  // called from the nav component to change the current playlist
-  setPlaylist(id,element) {
+  // Change only the current presentation. A playlist's saved default view is
+  // edited exclusively in Settings > Playlists.
+  changePlaylistView(view) {
+    if (view !== 'flat' && view !== 'series') {
+      libraryViewLog.warn('Could not change to an invalid playlist view', {
+        playlistID: this.state.currentPlaylistID,
+        view: view,
+        allowedViews: ['flat', 'series']
+      });
+      return;
+    }
+
+    libraryViewLog.debug('Changing the current playlist view temporarily', {
+      playlistID: this.state.currentPlaylistID,
+      view: view
+    });
+    this.setState({view:view});
+  }
+
+  // called from the nav component to change the current playlist. Refreshing
+  // the playlist already on screen preserves its temporary view selection;
+  // reloadSavedView is reserved for a default-view change made in Settings.
+  setPlaylist(id,element,reloadSavedView = false) {
     // console.log('===== set playlist =====')
     // if (!element) {
     //   element = document.getElementById("playlist-" + id);
@@ -661,7 +683,9 @@ class Mynda extends React.Component {
       id = playlist.id
     }
 
-    let view = playlist && playlist.view === 'series' ? 'series' : 'flat';
+    const savedView = playlist && playlist.view === 'series' ? 'series' : 'flat';
+    const samePlaylist = id === this.state.currentPlaylistID;
+    let view = samePlaylist && !reloadSavedView ? this.state.view : savedView;
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
     let flatDefaultSort = playlist ? playlist.flatDefaultSort : null; // default sort column for this playlist, but only applies when viewed in flat view
     if (id !== this.state.currentPlaylistID) {
@@ -947,10 +971,23 @@ class Mynda extends React.Component {
         frontendLog.debug('Refreshing renderer state after a playlist edit', {
           address: address
         });
-        // reload the playlists, and then re-render the current playlist
-        this.setState({playlists:this.props.library.playlists}, () => {
+        const updatedPlaylists = this.props.library.playlists;
+        const previousCurrentPlaylist = this.state.playlists.find(
+          playlist => playlist && playlist.id === this.state.currentPlaylistID
+        );
+        const updatedCurrentPlaylist = updatedPlaylists.find(
+          playlist => playlist && playlist.id === this.state.currentPlaylistID
+        );
+        const savedViewChanged = Boolean(
+          previousCurrentPlaylist &&
+          updatedCurrentPlaylist &&
+          previousCurrentPlaylist.view !== updatedCurrentPlaylist.view
+        );
 
-          this.setPlaylist(this.state.currentPlaylistID);
+        // reload the playlists, and then re-render the current playlist
+        this.setState({playlists:updatedPlaylists}, () => {
+
+          this.setPlaylist(this.state.currentPlaylistID, undefined, savedViewChanged);
 
           // check all the playlist lengths (pass true to skip the one we just set above)
           this.setPlaylistLengths(true);
@@ -1067,6 +1104,7 @@ class Mynda extends React.Component {
             selectedRows={this.state.selectedRows}
             reportSortedManifest={this.reportSortedManifest}
             recentlyWatched={this.state.recentlyWatched}
+            changeView={this.changePlaylistView}
           />
         </ErrorBoundary>
         <ErrorBoundary>

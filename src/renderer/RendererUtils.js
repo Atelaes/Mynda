@@ -4,6 +4,14 @@ const URL = require('url');
 const {v4: uuidv4} = require('uuid');
 const {frontendLog} = require('./RendererRuntime.js');
 
+// Sort display titles by their meaningful first word while preserving the
+// original title for display. This is shared by flat video tables and the
+// separate series-group view so both ignore leading A, An, and The.
+function removeLeadingArticle(value) {
+  if (typeof value !== 'string') return value;
+  return value.replace(/^(?:a\s|an\s|the\s)/i, '');
+}
+
 // React may give the editor freshly cloned props even though the user is
 // still editing the exact same video selection. Compare stable video IDs
 // rather than object identity so those harmless refreshes cannot discard
@@ -380,6 +388,7 @@ function isEqualIgnoreFuncs(obj1,obj2) {
 }
 
 module.exports = {
+  removeLeadingArticle,
   editorSelectionKey,
   batchNewState,
   parseEditableEpisodeNumber,

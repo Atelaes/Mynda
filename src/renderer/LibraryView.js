@@ -13,6 +13,7 @@ const {
   disableConfirmationDialog
 } = require('./RendererRuntime.js');
 const {
+  removeLeadingArticle,
   validateVideo,
   findNearestOfClass,
   getObjectDiff,
@@ -148,6 +149,7 @@ class MynLibrary extends React.Component {
           recentlyWatched={this.props.recentlyWatched}
           playVideo={this.props.playVideo}
           toggleCompact={this.toggleCompact}
+          changeView={this.props.changeView}
           compact={this.state.compact}
         />
         {tables}
@@ -253,14 +255,14 @@ class MynLibSeries extends React.Component {
   }
 
   render() {
-    // sort the series alphabetically
+    // Match title sorting in the flat library table: leading articles do not
+    // determine where a series appears, but remain visible in its heading.
     let seriesKeys = Object.keys(this.state.manifest);
-    seriesKeys.sort();
-    // (a,b) => { // (not working for some reason)
-    //   a = a.replace(/^(?:a\s|an\s|the\s)/i, "");
-    //   b = b.replace(/^(?:a\s|an\s|the\s)/i, "");
-    //   return a > b ? 1 : (a < b ? -1 : 0);
-    // });
+    seriesKeys.sort((a,b) => {
+      const aSortTitle = removeLeadingArticle(a).toLowerCase();
+      const bSortTitle = removeLeadingArticle(b).toLowerCase();
+      return aSortTitle > bSortTitle ? 1 : (aSortTitle < bSortTitle ? -1 : 0);
+    });
 
     // go through the manifest and create a table for each season
     let tableOrder = 0;
@@ -388,7 +390,7 @@ class MynPlaylistBar extends React.Component {
   }
 
   changeView(view) {
-    library.replace(`playlists.id=${this.props.playlist.id}`,{...this.props.playlist,view:view});
+    this.props.changeView(view);
   }
 
   render() {
@@ -732,7 +734,7 @@ class MynLibTable extends React.Component {
       };
 
     let sortItems = {
-     title: (a, b) => [this.removeArticle(a.title).toLowerCase(),this.removeArticle(b.title).toLowerCase()],
+     title: (a, b) => [removeLeadingArticle(a.title).toLowerCase(),removeLeadingArticle(b.title).toLowerCase()],
      year: (a, b) => [a.year,b.year],
      director: (a, b) => {let a_ds = a.directorsort === '' ? a.director : a.directorsort; let b_ds = b.directorsort === '' ? b.director : b.directorsort; return [a_ds.toLowerCase(), b_ds.toLowerCase()]},
      genre: (a, b) => [a.genre.toLowerCase(), b.genre.toLowerCase()],
@@ -874,12 +876,6 @@ class MynLibTable extends React.Component {
 
     this.setState({tBodyContent:tBodyContent, tHeadContent:tHeadContent});
   }
-
-  removeArticle(string) {
-    if (typeof string !== 'string') return string;
-    return string.replace(/^(?:a\s|an\s|the\s)/i,"")
-  }
-
 
   componentDidUpdate(oldProps) {
     // let propsDiff = getObjectDiff(oldProps,this.props);
