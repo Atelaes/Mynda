@@ -1,10 +1,10 @@
 // MPV playback orchestration and the player pane.
 const React = require('react');
 const {spawn} = require('child_process');
-const os = require('os');
 const fs = require('fs');
-const path = require('path');
 const mpvAPI = require('node-mpv');
+const MediaTools = require('../MediaTools.js');
+const MpvProcess = require('../MpvProcess.js');
 const {library, playerLog} = require('./RendererRuntime.js');
 const {MynOpenablePane} = require('./SharedComponents.js');
 
@@ -86,7 +86,11 @@ function mpvSupportsDvdPlayback() {
     };
 
     try {
-      childProcess = spawn('mpv', ['--no-config', '--list-protocols']);
+      if (!MediaTools.mpvPath) {
+        resolve(null);
+        return;
+      }
+      childProcess = spawn(MediaTools.mpvPath, ['--no-config', '--list-protocols']);
     } catch(err) {
       resolve(null);
       return;
@@ -112,47 +116,20 @@ function mpvSupportsDvdPlayback() {
   return mpvDvdSupportPromise;
 }
 
-function uniqueMpvSocketPath() {
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  if (process.platform === 'win32') return `\\\\.\\pipe\\mynda-mpv-${suffix}`;
-  return path.join(os.tmpdir(), `mynda-mpv-${suffix}.sock`);
-}
+const uniqueMpvSocketPath = MpvProcess.uniqueMpvSocketPath;
 
 // node-mpv's quit() first writes a command to the IPC socket. When MPV has
 // already closed that socket, Node can emit ERR_SOCKET_CLOSED outside the
 // returned promise, which an await/catch cannot intercept. Tear down the
 // renderer-owned process and socket directly instead.
 function stopMpvSafely(player) {
-  if (!player) return;
-
-  // Make any concurrently running node-mpv polling reject as "not running"
-  // before its socket is dismantled.
-  player.running = false;
-  try { clearInterval(player.timepositionListenerId); } catch(err) {}
-  try { player.removeAllListeners(); } catch(err) {}
-
-  const child = player.mpvPlayer;
-  if (child) {
-    // Prevent node-mpv's close handler from attempting an automatic restart.
-    try { child.removeAllListeners('close'); } catch(err) {}
-  }
-
-  const socket = player.socket && player.socket.socket;
-  if (socket) {
-    try {
-      socket.removeAllListeners('close');
-      socket.removeAllListeners('data');
-      socket.removeAllListeners('error');
-      socket.on('error', (error) => playerLog.debug('MPV socket closed during cleanup', {
+  MpvProcess.stopMpvPlayer(player, {
+    onSocketError(error) {
+      playerLog.debug('MPV socket closed during cleanup', {
         error: describePlaybackError(error)
-      }));
-      socket.destroy();
-    } catch(err) {}
-  }
-
-  if (child && child.exitCode === null && child.signalCode === null) {
-    try { child.kill(); } catch(err) {}
-  }
+      });
+    }
+  });
 }
 
 // Watch MPV's actual file lifecycle before sending loadfile. This avoids a
@@ -351,6 +328,14 @@ class MynPlayer extends MynOpenablePane {
       });
       return;
     }
+    if (!MediaTools.mpvPath) {
+      this.setState({
+        errorMessage: 'Problem playing video: Mynda\'s bundled MPV player is missing or could not be started. Reinstall Mynda, then try again.',
+        showLoadingIndicator: false,
+        showPlayingMessage: false
+      });
+      return;
+    }
     if (video.dvd && !fs.existsSync(video.filename)) {
       this.setState({
         errorMessage: 'Problem playing DVD: the DVD folder is no longer available',
@@ -379,7 +364,9 @@ class MynPlayer extends MynOpenablePane {
     const player = new mpvAPI({
       "time_update": 5,
       "auto_restart": false,
-      "socket": uniqueMpvSocketPath()
+      "binary": MediaTools.mpvPath,
+      "socket": uniqueMpvSocketPath(),
+      "ipc_command": "--input-ipc-server"
     }, mpvArguments);
     this.mpv = player;
 
@@ -395,12 +382,13 @@ class MynPlayer extends MynOpenablePane {
 
     // starts MPV
     try {
-      await withPlaybackTimeout(
-        player.start(),
-        MPV_START_TIMEOUT_MS,
-        'MPV did not start within 10 seconds'
-      );
+      await MpvProcess.startMpvPlayer(player, {timeoutMs: MPV_START_TIMEOUT_MS});
       ensureCurrentAttempt();
+      playerLog.debug('MPV process and JSON IPC connection started', {
+        videoID: video && video.id,
+        binary: MediaTools.mpvPath,
+        pid: player.mpvPlayer && player.mpvPlayer.pid
+      });
       // load the video file
       if (video.dvd) {
         await loadDvdInMpv(player);
@@ -465,19 +453,28 @@ class MynPlayer extends MynOpenablePane {
       });
 
       player.on('crashed', () => {
+        playerLog.error('MPV process exited unexpectedly', {
+          videoID: video && video.id,
+          title: video && video.title,
+          error: MpvProcess.withMpvDiagnostics(
+            new Error('MPV process exited unexpectedly'),
+            player
+          )
+        });
         if (this.mpv === player) this.mpv = null;
         this.onExitVideo();
         this.props.hideFunction();
       });
     }
     catch (error) {
+      const playbackError = MpvProcess.withMpvDiagnostics(error, player);
       const isCurrentAttempt = attempt === this.playbackAttempt && this.mpv === player;
       stopMpvSafely(player);
       if (this.mpv === player) this.mpv = null;
       if (!isCurrentAttempt || (error && error.code === 'MYNDA_PLAYBACK_CANCELED')) {
         playerLog.debug('Playback attempt canceled', {
           videoID: video && video.id,
-          error: error
+          error: playbackError
         });
         return;
       }
@@ -486,10 +483,10 @@ class MynPlayer extends MynOpenablePane {
         videoID: video && video.id,
         title: video && video.title,
         mediaType: mediaType,
-        error: error
+        error: playbackError
       });
       this.setState({
-        errorMessage: `Problem playing ${mediaType}: ${describePlaybackError(error)}`,
+        errorMessage: `Problem playing ${mediaType}: ${describePlaybackError(playbackError)}`,
         showLoadingIndicator: false,
         showPlayingMessage: false
       });

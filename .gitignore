@@ -10,3 +10,5 @@ omdb.js
 src/CollectionsOld.js
 src/Collection.js
 .babelrc
+
+/dist/

@@ -1,5 +1,6 @@
 // Pure and near-pure helpers shared by renderer component groups.
 const _ = require('lodash');
+const path = require('path');
 const URL = require('url');
 const {v4: uuidv4} = require('uuid');
 const {frontendLog} = require('./RendererRuntime.js');
@@ -10,6 +11,16 @@ const {frontendLog} = require('./RendererRuntime.js');
 function removeLeadingArticle(value) {
   if (typeof value !== 'string') return value;
   return value.replace(/^(?:a\s|an\s|the\s)/i, '');
+}
+
+// Preserve renderer-relative assets such as ../images/qmark.png so they stay
+// inside app.asar. Only absolute artwork paths from a user's library need
+// conversion to file: URLs.
+function artworkSourceURL(artwork, placeholder = '') {
+  const source = typeof artwork === 'string' && artwork ? artwork : placeholder;
+  if (typeof source !== 'string' || !source) return '';
+  if (!path.isAbsolute(source) || isValidURL(source)) return source;
+  return URL.pathToFileURL(source).href;
 }
 
 // React may give the editor freshly cloned props even though the user is
@@ -390,6 +401,7 @@ function isEqualIgnoreFuncs(obj1,obj2) {
 
 module.exports = {
   removeLeadingArticle,
+  artworkSourceURL,
   editorSelectionKey,
   batchNewState,
   parseEditableEpisodeNumber,

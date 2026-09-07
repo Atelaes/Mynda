@@ -2,13 +2,13 @@ const path = require('path');
 const omdb = require('../omdb');
 const axios = require('axios');
 const _ = require('lodash');
-const accounting = require('accounting');
 const fs = require('fs');
 const electron = require('electron');
 const dl = require('./download');
 const { ipcRenderer } = require('electron');
 const Logger = require('./Logger.js');
 const MovieSearch = require('./MovieSearch.js');
+const {parseOmdbBoxOffice} = require('./BoxOffice.js');
 
 const log = Logger.child('OMDb');
 
@@ -2952,7 +2952,7 @@ function addTagsToVideo(video, data, context = {}) {
   video.country = data.Country;
   video.rated = data.Rated;
   try {
-    video.boxoffice = accounting.parse(data.BoxOffice) || 0; //parseInt(response.data.BoxOffice.replace(/[^0-9.-]/g,'')) || null, // this may fail miserably in other locales, but assuming OMDB always uses $0,000,000.00 format, it'll be fine
+    video.boxoffice = parseOmdbBoxOffice(data.BoxOffice);
   } catch(err) { log.debug('OMDb did not supply a usable box-office value', {searchID: context.searchID, error: summarizeError(err)}); }
   try {
     video.directorsort = /^\w+\s\w+$/.test(data.Director) ? data.Director.replace(/^(\w+)\s(\w+)$/,($match,$1,$2) => `${$2}, ${$1}`) : data.Director; // if the director field consists only of a first and last name separated by a space, set directorsort to 'lastname, firstname', otherwise, leave as-is and let the user edit it manually

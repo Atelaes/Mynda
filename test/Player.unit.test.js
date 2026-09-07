@@ -76,7 +76,8 @@ suite.test('creates distinct per-attempt IPC socket names', () => {
   if (process.platform === 'win32') {
     assert(first.startsWith('\\\\.\\pipe\\mynda-mpv-'));
   } else {
-    assert.strictEqual(path.dirname(first), os.tmpdir());
+    const expectedDirectory = process.platform === 'darwin' ? '/tmp' : os.tmpdir();
+    assert.strictEqual(path.dirname(first), expectedDirectory);
     assert(first.endsWith('.sock'));
   }
 });

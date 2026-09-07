@@ -14,17 +14,11 @@ const {
 } = require('./SubtitleMatcher.js');
 const dl = require('./download');
 const _ = require('lodash');
-const pathToFFmpeg = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
-ffmpeg.setFfmpegPath(pathToFFmpeg);
-const ffprobe = require('ffprobe');
-let ffprobeStatic = {};
-let ffprobeStaticLoadError = null;
-try {
-  ffprobeStatic = require('ffprobe-static');
-} catch(err) {
-  ffprobeStaticLoadError = err;
-}
+const MediaTools = require('./MediaTools.js');
+const MediaMetadata = require('./MediaMetadata.js');
+if (MediaTools.ffmpegPath) ffmpeg.setFfmpegPath(MediaTools.ffmpegPath);
+if (MediaTools.ffprobePath) ffmpeg.setFfprobePath(MediaTools.ffprobePath);
 const Logger = require('./Logger.js');
 const OmdbHelper = require('./OmdbHelper.js');
 const MovieSearch = require('./MovieSearch.js');
@@ -102,7 +96,7 @@ function disableConfirmationDialog(dialogName, log = backendLog) {
 }
 
 const videoRuntimeVerifier = new VideoRuntimeVerifier({
-  ffmpegPath: pathToFFmpeg
+  ffmpegPath: MediaTools.ffmpegPath
 });
 const videoExclusion = new VideoExclusion({
   library: library,
@@ -171,9 +165,18 @@ async function start() {
     platform: process.platform,
     architecture: process.arch
   });
-  if (ffprobeStaticLoadError) {
-    metadataLog.debug('ffprobe-static is unavailable; FFmpeg metadata fallback will be used', {
-      error: ffprobeStaticLoadError
+  const mediaToolStatus = MediaTools.status();
+  metadataLog.info('Media dependency status', mediaToolStatus);
+  if (!mediaToolStatus.ffprobe.available) {
+    metadataLog.warn('Bundled FFprobe is unavailable; FFmpeg metadata fallback will be used', {
+      path: mediaToolStatus.ffprobe.path,
+      error: mediaToolStatus.loadError
+    });
+  }
+  if (!mediaToolStatus.ffmpeg.available) {
+    metadataLog.error('Bundled FFmpeg is unavailable', {
+      path: mediaToolStatus.ffmpeg.path,
+      error: mediaToolStatus.loadError
     });
   }
 
@@ -1293,16 +1296,15 @@ async function getMetadata(video, options = {}) {
   metadataLog.debug('Video metadata retrieval started', logContext);
   try {
     // vidObj.metadata = await getVideoMetadata(file);
-    if (typeof ffprobeStatic.path === "undefined") {
-      // then ffprobeStatic did not install ffprobe
-      throw new Error('ffprobe could not be found (not installed by ffprobe-static)');
+    if (!MediaTools.ffprobePath) {
+      throw new Error('bundled FFprobe executable is unavailable');
     }
 
-    let data = await ffprobe(file, { path: ffprobeStatic.path });
+    let data = await MediaTools.probeFile(file);
 
     //console.log(data);
 
-    for (const stream of data.streams) {
+    for (const stream of (Array.isArray(data.streams) ? data.streams : [])) {
       try {
         if (stream.codec_type === 'video') {
           returnObj.codec = stream.codec_name;
@@ -1333,9 +1335,16 @@ async function getMetadata(video, options = {}) {
         });
       }
     }
+
+    // MKV/Matroska often reports duration only at data.format.duration rather
+    // than on the video stream. Use the complete FFprobe result before falling
+    // back to the more expensive FFmpeg process.
+    if (!returnObj.duration) {
+      returnObj.duration = MediaMetadata.durationFromProbe(data) || undefined;
+    }
   } catch(err) {
-    // ffprobe-static is optional in this build and FFmpeg is the normal
-    // fallback on installations where its bundled binary is unavailable.
+    // Retain FFmpeg as a conservative fallback for malformed containers and
+    // other files that FFprobe cannot describe completely.
     metadataLog.debug('ffprobe metadata retrieval failed; trying FFmpeg fallback', {
       ...logContext,
       error: err
@@ -1522,13 +1531,28 @@ function getMetadataFromFFmpeg(filepath, id, options = {}) {
   return new Promise((resolve, reject) => {
     let purpose = metadataPurpose(options);
     let logContext = {filename: filepath, purpose: purpose};
+    let tempFile;
+    const removeTempFile = () => {
+      if (!tempFile) return;
+      fs.unlink(tempFile, err => {
+        if (err && err.code !== 'ENOENT') {
+          metadataLog.debug('Could not remove FFmpeg metadata scratch file', {
+            ...logContext,
+            tempFile: tempFile,
+            error: err
+          });
+        }
+      });
+    };
     try {
       metadataLog.debug('Starting FFmpeg metadata fallback', {
         ...logContext,
         id: id
       });
 
-      let tempFile = `temp-${uuidv4()}.mkv`;
+      tempFile = MediaMetadata.createFallbackOutputPath(app, {
+        identifier: uuidv4()
+      });
 
       // var outStream = fs.createWriteStream('output.mkv');
 
@@ -1613,21 +1637,20 @@ function getMetadataFromFFmpeg(filepath, id, options = {}) {
           });
         }
 
-
+        removeTempFile();
         resolve(metadata);
 
       }).on('end', (stdout, stderr) => {
         //console.log('==== FFMPEG end ====');
         //console.log(stdout);
+        removeTempFile();
       }).on('error', (err) => {
         metadataLog.debug('FFmpeg metadata fallback process failed', {
           ...logContext,
           error: err
         });
         reject(err.message);
-        fs.unlink(tempFile, () => {
-          //console.log('deleted temp file used by ffmpeg');
-        });
+        removeTempFile();
       }).save(tempFile);
 
       // .save('~/Documents/Coding/Mynda/sandbox/Mynda Example Watchfolders/temp_output.mkv');

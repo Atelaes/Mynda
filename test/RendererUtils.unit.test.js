@@ -33,6 +33,21 @@ suite.test('sorts titles without leading articles', () => {
   assert.strictEqual(RendererUtils.removeLeadingArticle(null), null);
 });
 
+suite.test('keeps packaged renderer assets relative while encoding absolute artwork paths', () => {
+  assert.strictEqual(
+    RendererUtils.artworkSourceURL('', '../images/qmark.png'),
+    '../images/qmark.png'
+  );
+  assert.strictEqual(
+    RendererUtils.artworkSourceURL('https://example.com/poster.jpg', '../images/qmark.png'),
+    'https://example.com/poster.jpg'
+  );
+  const localArtwork = path.resolve('/tmp', 'Poster With Spaces.jpg');
+  const artworkURL = RendererUtils.artworkSourceURL(localArtwork, '../images/qmark.png');
+  assert(artworkURL.startsWith('file:'));
+  assert(artworkURL.includes('Poster%20With%20Spaces.jpg'));
+});
+
 suite.test('builds stable single-video and batch selection identities', () => {
   assert.strictEqual(RendererUtils.editorSelectionKey({id: 'video-1'}), 'single:video-1');
   assert.strictEqual(RendererUtils.editorSelectionKey({id: 'batch'}, [

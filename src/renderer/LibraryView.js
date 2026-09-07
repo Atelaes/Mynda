@@ -4,7 +4,7 @@ const {ipcRenderer, shell} = require('electron');
 const os = require('os');
 const _ = require('lodash');
 const URL = require('url');
-const accounting = require('accounting');
+const {formatBoxOffice, formatCompactBoxOffice} = require('../BoxOffice.js');
 
 // Electron 12 predates Object.hasOwn(), which current React Virtuoso uses in
 // its prop plumbing. Supply the standards-equivalent operation for that older
@@ -26,6 +26,7 @@ const {
 } = require('./RendererRuntime.js');
 const {
   removeLeadingArticle,
+  artworkSourceURL,
   validateVideo
 } = require('./RendererUtils.js');
 const {
@@ -1165,7 +1166,7 @@ class MynLibTableRow extends React.Component {
       ratings_imdb: (<td key="ratings_imdb" className="ratings_imdb ratings centered">{video.ratings.imdb ? Number(video.ratings.imdb).toFixed(1) : ''}</td>),
       ratings_mc: (<td key="ratings_mc" className="ratings_mc ratings centered">{video.ratings.mc ? video.ratings.mc : ''}</td>),
       ratings_avg: (<td key="ratings_avg" className="ratings_avg ratings centered">{this.props.calcAvgRatings(video.ratings)}</td>),
-      boxoffice: (<td key="boxoffice" className="boxoffice">{video.boxoffice === 0 ? '' : accounting.formatMoney(Number(video.boxoffice),'$',0).replace(/,(\d{3})$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}k` : 'k').replace(/,(\d{3})(\.\d{1,2})?k$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}M` : 'M').replace(/,(\d{3})(\.\d{1,2})?M$/,(...grps) => Math.round(grps[1]/100)>0 ? `.${Math.round(grps[1]/100).toString().replace(/0$/,'')}B` : 'B')}</td>),
+      boxoffice: (<td key="boxoffice" className="boxoffice">{Number(video.boxoffice) > 0 ? formatCompactBoxOffice(video.boxoffice) : ''}</td>),
       rated: (<td key="rated" className="rated centered">{video.rated}</td>),
       country: (<td key="country" className="country">{video.country}</td>),
       languages: (<td key="languages" className="languages">{video.languages[0]}</td>),
@@ -1340,7 +1341,7 @@ class MynDetails extends React.Component {
           <li className="detail" id="detail-rated"><span className="label">Rated:</span> {video.rated}</li>
           <li className="detail" id="detail-country"><span className="label">Country:</span> {video.country}</li>
           <li className="detail" id="detail-languages"><span className="label">Languages:</span> {video.languages.join(", ")}</li>
-          {video.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {accounting.formatMoney(video.boxoffice,'$',0) || ''}</li>) : null}
+          {video.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {formatBoxOffice(video.boxoffice)}</li>) : null}
           <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(video.dateadded)}</li>
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(video.lastseen)}</li>
           <li className="detail" id="detail-showFileBtn"><button onClick={() => this.openInFinder()}>Open in {os.platform() === 'darwin' ? "Finder" : "Explorer"}</button></li>
@@ -1503,7 +1504,7 @@ class MynRecentlyWatched extends MynDropdown {
         return (
           <div className='container' key={id}>
             <div className='video' onClick={() => this.props.playVideo(video.id)}>
-              <div className='artwork' style={{backgroundImage:`url('${video.artwork ? URL.pathToFileURL(video.artwork) : URL.pathToFileURL(placeholderImage.replace(/^\.\.\//,''))}')`}} />
+              <div className='artwork' style={{backgroundImage:`url('${artworkSourceURL(video.artwork, placeholderImage)}')`}} />
               <div className='title-position-container'>
                 <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
                 {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}

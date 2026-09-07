@@ -49,10 +49,11 @@ function linkProjectDirectoryIfPresent(name, appDirectory) {
 
 function launchElectron(executable, appDirectory, userData) {
   return new Promise((resolve, reject) => {
-    const args = [appDirectory];
+    const args = [];
     if (process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0) {
       args.push('--no-sandbox');
     }
+    args.push(appDirectory);
     const child = spawn(executable, args, {
       cwd: appDirectory,
       env: Object.assign({}, process.env, {
@@ -80,7 +81,7 @@ function launchElectron(executable, appDirectory, userData) {
       clearTimeout(timeout);
       reject(error);
     });
-    child.once('close', code => {
+    child.once('close', (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
@@ -89,7 +90,7 @@ function launchElectron(executable, appDirectory, userData) {
         .pop();
       if (!markerLine) {
         reject(new Error(
-          `Electron exited with code ${code} without reporting a result.\n` +
+          `Electron exited with ${signal ? `signal ${signal}` : `code ${code}`} without reporting a result.\n` +
           `STDOUT:\n${tail(stdout)}\nSTDERR:\n${tail(stderr)}`
         ));
         return;

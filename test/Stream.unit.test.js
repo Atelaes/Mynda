@@ -23,14 +23,19 @@ class FakeFfmpegCommand extends EventEmitter {
 }
 
 let lastCommand;
+const fakeFfmpeg = () => {
+  lastCommand = new FakeFfmpegCommand();
+  return lastCommand;
+};
+fakeFfmpeg.setFfmpegPath = () => {};
+fakeFfmpeg.setFfprobePath = () => {};
+
 const Stream = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'Stream.js'),
   {
     'electron': {},
-    'fluent-ffmpeg': () => {
-      lastCommand = new FakeFfmpegCommand();
-      return lastCommand;
-    },
+    'fluent-ffmpeg': fakeFfmpeg,
+    './MediaTools.js': {ffmpegPath: '/fake/ffmpeg', ffprobePath: '/fake/ffprobe'},
     'hls-server': class FakeHlsServer {},
     './Logger.js': {child: () => ({debug() {}, info() {}, warn() {}, error() {}})}
   }

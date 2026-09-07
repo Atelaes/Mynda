@@ -6,9 +6,9 @@ const _ = require('lodash');
 const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
-const accounting = require('accounting');
 const hashObject = require('object-hash');
 const OmdbHelper = require('../OmdbHelper.js');
+const {parseBoxOffice, formatBoxOffice} = require('../BoxOffice.js');
 const {
   library,
   editorLog,
@@ -1138,8 +1138,8 @@ class MynEditorEdit extends React.Component {
           tip: (min,max) => `${min}-${max}`
         },
         money: {
-          exp: { test: value => !isNaN(accounting.unformat(value)) && accounting.unformat(value) >= 0 },
-          tip: "Non-negative monetary value"
+          exp: { test: value => value === '' || parseBoxOffice(value) !== null },
+          tip: "Non-negative USD amount"
         },
         imdb: {
           exp: /^tt\d+$/,
@@ -1696,8 +1696,12 @@ class MynEditorEdit extends React.Component {
             className="edit-field-boxoffice"
             update={this.props.handleChange}
             options={null}
-            storeTransform={value => value !== '' ? Math.round(accounting.unformat(value)) : ''}
-            displayTransform={value => value !== '' ? accounting.formatMoney(value,'$',0) : ''}
+            storeTransform={value => {
+              if (value === '') return '';
+              const amount = parseBoxOffice(value);
+              return amount === null ? '' : Math.round(amount);
+            }}
+            displayTransform={value => value !== '' ? formatBoxOffice(value) : ''}
             validator={this.state.validators.money.exp}
             validatorTip={this.state.validators.money.tip}
             reportValid={this.props.reportValid}

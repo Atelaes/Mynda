@@ -22,6 +22,42 @@ module.exports = [
   },
   {
     category: 'unit',
+    file: 'test/BoxOffice.unit.test.js',
+    title: 'Box-office parsing and formatting',
+    protects: 'fixed-USD input, invalid values, locale presentation, and compact thresholds'
+  },
+  {
+    category: 'unit',
+    file: 'test/PackageConfig.unit.test.js',
+    title: 'Production package boundaries',
+    protects: 'file boundaries, staged sidecars, strict package commands, and retired HLS code'
+  },
+  {
+    category: 'unit',
+    file: 'test/MediaTools.unit.test.js',
+    title: 'Media executable resolution',
+    protects: 'packaged/staged sidecar paths, executable validation, and development fallbacks'
+  },
+  {
+    category: 'unit',
+    file: 'test/MediaToolPolicy.unit.test.js',
+    title: 'Bundled media policy',
+    protects: 'LGPL-only FFmpeg flags, nonfree rejection, and required MPV DVD/macOS video support'
+  },
+  {
+    category: 'unit',
+    file: 'test/MediaBundleVerifier.unit.test.js',
+    title: 'Media bundle staging verifier',
+    protects: 'source pins, graphical MPV, libdvdcss exclusion, architecture, and relocatable macOS dylibs'
+  },
+  {
+    category: 'unit',
+    file: 'test/MediaMetadata.unit.test.js',
+    title: 'Media metadata paths',
+    protects: 'container durations and writable packaged-app FFmpeg scratch output'
+  },
+  {
+    category: 'unit',
     file: 'test/MovieSearch.unit.test.js',
     title: 'Movie identification',
     protects: 'filename parsing, search variants, candidate scoring, and confidence'
@@ -58,9 +94,15 @@ module.exports = [
   },
   {
     category: 'unit',
-    file: 'test/Stream.unit.test.js',
-    title: 'HLS stream orchestration',
-    protects: 'FFmpeg HLS arguments, callbacks, and process cleanup'
+    file: 'test/MpvProcess.unit.test.js',
+    title: 'MPV process and IPC startup',
+    protects: 'short sockets, gpu-next/Vulkan/macvk selection, JSON IPC readiness, and retained diagnostics'
+  },
+  {
+    category: 'integration',
+    file: 'test/MediaDependencies.integration.test.js',
+    title: 'Installed media dependencies',
+    protects: 'node-mpv JSON IPC startup, real graphical output, decoding/probing, and MPV DVD capability'
   },
   {
     category: 'integration',
