@@ -32,10 +32,9 @@ const VideoExclusion = require('./VideoExclusion.js');
 const VideoRuntimeVerifier = require('./VideoRuntimeVerifier.js');
 const ShareService = require('./ShareService.js');
 const ShareManifest = require('./ShareManifest.js');
+const loadReactDeveloperTools = require('./ReactDevTools.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
-//const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
-
 const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
 const videoExtensions = [
@@ -190,23 +189,13 @@ async function start() {
   // even if this session never performs another save.
   library.maybeCreateAutomaticBackup();
 
-  //Tutorial at https://www.electronjs.org/docs/tutorial/devtools-extension
-  //You need to install React Dev tools in Chrome before this will work, also, double-check the location.
-  try {
-    let reactToolsLoc;
-    if (process.platform === "win32") {
-      reactToolsLoc = 'C:\\Users\\atela\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Extensions\\fmkadmapgofadopljbjfkapdkoienihi\\4.12.3_0';
-    } else {
-      reactToolsLoc = path.join('~/Library/Application Support/Google/Chrome/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.12.3_0');
-    }
-    backendLog.debug('React developer-tools extension path selected', {
-      platform: process.platform,
-      extensionPath: reactToolsLoc
-    });
-    //await electron.session.defaultSession.loadExtension(reactToolsLoc)
-  } catch (err) {
-    backendLog.warn('Could not load React developer tools', {error: err});
-  }
+  // Load the bundled Manifest V2 build while running from source. The current
+  // Chrome Web Store build requires a much newer Chromium than Electron 12.
+  await loadReactDeveloperTools({
+    app: app,
+    session: electron.session,
+    log: backendLog
+  });
 
   // make the temp folder if it doesn't already exist
   const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
