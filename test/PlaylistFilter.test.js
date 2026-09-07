@@ -12,6 +12,9 @@ const NOW_MILLISECONDS = 1700000000000;
 const NOW_SECONDS = NOW_MILLISECONDS / 1000;
 const context = createPlaylistFilterContext(NOW_MILLISECONDS);
 
+console.log('\n[UNIT] Safe playlist filter expressions');
+console.log('  Exercises the expression compiler, evaluator, cache, and security boundaries.');
+
 const video = {
   title: ' Alien ',
   year: '1979',
@@ -208,4 +211,11 @@ assertRuntimeError('video.values.map(value => value + value + value).length > 0'
 assertCompileError('', 'EMPTY_FILTER');
 assertCompileError('x' + ' '.repeat(8192), 'FILTER_TOO_LONG');
 
-console.log('PlaylistFilter tests passed.');
+console.log('  PASS  9 grouped playlist-expression scenarios');
+console.log('MYNDA_TEST_RESULT:' + JSON.stringify({
+  suite: 'Safe playlist filter expressions',
+  category: 'unit',
+  passed: 9,
+  failed: 0,
+  total: 9
+}));

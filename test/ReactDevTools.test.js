@@ -3,6 +3,8 @@ const path = require('path');
 const loadReactDeveloperTools = require('../src/ReactDevTools.js');
 
 async function run() {
+  console.log('\n[UNIT] React developer-tools loader');
+  console.log('  Exercises development loading, packaged-app skipping, and graceful failure.');
   const calls = [];
   const debugEntries = [];
   const warningEntries = [];
@@ -85,7 +87,14 @@ async function run() {
     }
   }]);
 
-  console.log('React developer tools loader tests passed.');
+  console.log('  PASS  3 React developer-tools loading scenarios');
+  console.log('MYNDA_TEST_RESULT:' + JSON.stringify({
+    suite: 'React developer-tools loader',
+    category: 'unit',
+    passed: 3,
+    failed: 0,
+    total: 3
+  }));
 }
 
 run().catch(err => {

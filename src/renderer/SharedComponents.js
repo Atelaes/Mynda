@@ -113,8 +113,8 @@ class MynNotify extends React.Component {
       'share_plan'    : `Preparing Share${_c}${_of}${_t}`,
       'share_fulfill' : `Sharing${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
       'share_import'  : `Importing${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
-      'metadata'      : `Checking metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
-      'metadata_save' : `Saving metadata${status.numCurrent || status.numTotal ? ' for ' + _c + _of + _t + ' videos' : ''}`,
+      'metadata'      : `Checking metadata${status.numCurrent || status.numTotal ? ' for' + _c + _of + _t + ' videos' : ''}`,
+      'metadata_save' : `Saving metadata${status.numCurrent || status.numTotal ? ' for' + _c + _of + _t + ' videos' : ''}`,
       'batch_save'    : `Saving${_c}${_of}${_t} ${status.numTotal === 1 ? 'video' : 'videos'}`,
       'autotag'       : `Auto-tagging${_c}${_of}${_t} videos`,
       'check'         : status.numTotal ?

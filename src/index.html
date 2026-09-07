@@ -18,7 +18,17 @@
     <div id="root">
     </div>
     <script type="text/javascript">
-      const babelRegister = require("@babel/register");
+      // Configure JSX explicitly instead of relying on a .babelrc somewhere
+      // above the project. The Electron smoke test runs a disposable app copy,
+      // and packaged builds must be equally independent of a developer's
+      // machine-wide Babel configuration.
+      require("@babel/register")({
+        presets: [require.resolve("@babel/preset-react")],
+        extensions: [".js"],
+        ignore: [/node_modules/],
+        babelrc: false,
+        configFile: false
+      });
       require('./Renderer.js');
     </script>
   </body>

@@ -6,6 +6,9 @@ const {
   summarizeSelection
 } = require('../src/renderer/TableSelection.js');
 
+console.log('\n[UNIT] Virtual-table selection');
+console.log('  Exercises selection behavior independently of mounted or offscreen React rows.');
+
 const rows = Array.from({length: 5000}, (unused, index) => ({
   index: index,
   rowID: `row-${index}`,
@@ -103,4 +106,11 @@ const summary = summarizeSelection(
 assert.strictEqual(summary.highestRow, 'row-4');
 assert.deepStrictEqual(new Set(summary.rows), new Set(['video-30', 'video-4']));
 
-console.log('Table selection tests passed.');
+console.log('  PASS  5 grouped table-selection scenarios');
+console.log('MYNDA_TEST_RESULT:' + JSON.stringify({
+  suite: 'Virtual-table selection',
+  category: 'unit',
+  passed: 5,
+  failed: 0,
+  total: 5
+}));

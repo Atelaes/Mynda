@@ -187,7 +187,8 @@ function validateVideo(video) {
       switch(properties[property]) {
         // ratings and metadata
         case 'object' :
-          if (typeof video[property] === 'undefined' || typeof video[property] !== 'object' || typeof video[property] === null) {
+          if (typeof video[property] === 'undefined' || video[property] === null ||
+              typeof video[property] !== 'object' || Array.isArray(video[property])) {
             if (property === 'metadata') {
               repaired[property] = {
                 "codec" : "",

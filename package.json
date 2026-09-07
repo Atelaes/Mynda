@@ -4,7 +4,17 @@
   "description": "A media library and player app",
   "main": "src/index.js",
   "scripts": {
-    "test": "node test/PlaylistFilter.test.js && node test/TableSelection.test.js && node test/ReactDevTools.test.js",
+    "test": "npm run test:fast",
+    "test:fast": "node test/run-tests.js fast",
+    "test:list": "node test/run-tests.js list",
+    "test:unit": "node test/run-tests.js unit",
+    "test:integration": "node test/run-tests.js integration",
+    "test:component": "node test/run-tests.js component",
+    "test:renderer": "npm run test:component",
+    "test:electron": "node test/run-tests.js e2e",
+    "test:e2e": "npm run test:electron",
+    "test:all": "node test/run-tests.js all",
+    "test:package": "npm run test:fast && electron-builder --dir --publish never",
     "start": "electron .",
     "dist": "electron-builder"
   },
@@ -52,7 +62,9 @@
     "appId": "com.torvor.mynda",
     "files": [
       "**/*",
-      "!devtools/**/*"
+      "!devtools/**/*",
+      "!test/**/*",
+      "!TESTING.md"
     ],
     "win": {
       "target": "nsis"

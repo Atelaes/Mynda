@@ -1,0 +1,13 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.torvor.mynda
+files:
+  - filter:
+      - '**/*'
+      - '!devtools/**/*'
+      - '!test/**/*'
+      - '!TESTING.md'
+win:
+  target: nsis
+electronVersion: 12.0.5
