@@ -23,10 +23,11 @@ probing, and runtime-verification operations.
 - SHA-256: `ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209`
 - License: GPL-2.0-or-later for this build
 
-MPV is packaged as a separate `mpv.app` executable. This build enables
-`dvdnav` so Mynda can play unencrypted DVD folders. MPV's private FFmpeg
-libraries and other dynamically linked dependencies are distinct from the
-standalone LGPL-only FFmpeg and FFprobe listed above.
+MPV is packaged as a separate child-process executable (`mpv.app` on macOS,
+`mpv.exe` on Windows, and `mpv` on Linux). These builds enable `dvdnav` so
+Mynda can play unencrypted DVD folders. MPV's private FFmpeg libraries and
+other runtime dependencies are distinct from the standalone LGPL-only FFmpeg
+and FFprobe listed above.
 
 ## DVD navigation libraries
 
@@ -47,7 +48,8 @@ Mynda does not promise playback of encrypted discs.
 ## Release caution
 
 The generated media directory includes the principal license texts and a build
-record. Before public or commercial distribution, obtain legal review and make
-a final corresponding-source and third-party-notice inventory for every library
-copied into `mpv.app`. This development build is not a substitute for that
-release-compliance review.
+record. Windows and Linux stages also record the native packages that supplied
+copied runtime libraries. Before public or commercial distribution, obtain
+legal review and make a final corresponding-source and third-party-notice
+inventory for every library copied into each platform bundle. This development
+build is not a substitute for that release-compliance review.

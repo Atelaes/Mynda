@@ -128,7 +128,7 @@ function mediaToolCandidates(tool, options = {}) {
 
 function findMediaToolPath(tool, options = {}) {
   const isExecutable = options.isExecutable || (candidate =>
-    executableExists(candidate, {platform: options.platform})
+    executableExists(candidate, {fs: options.fs, platform: options.platform})
   );
   return mediaToolCandidates(tool, options).find(isExecutable) || null;
 }
@@ -152,26 +152,52 @@ function isBundledPath(candidate, options = {}) {
     isInside(candidate, stagedMediaRoot(options));
 }
 
+function samePath(first, second, platform = process.platform) {
+  if (!first || !second) return false;
+  const normalize = value => path.resolve(String(value));
+  const left = normalize(first);
+  const right = normalize(second);
+  return platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+function mediaToolSource(tool, candidate, options = {}) {
+  if (!candidate) return 'missing';
+  const env = options.env || process.env;
+  const platform = options.platform || process.platform;
+  if (samePath(candidate, env[overrideName(tool)], platform)) return 'override';
+  if (isInside(candidate, packagedMediaRoot(options))) return 'packaged';
+  if (isInside(candidate, stagedMediaRoot(options))) return 'staged';
+  return 'system';
+}
+
 const ffmpegPath = findMediaToolPath('ffmpeg');
 const ffprobePath = findMediaToolPath('ffprobe');
 const mpvPath = findMpvPath();
 
-function status() {
+function status(options = {}) {
+  const paths = {
+    ffmpeg: findMediaToolPath('ffmpeg', options),
+    ffprobe: findMediaToolPath('ffprobe', options),
+    mpv: findMediaToolPath('mpv', options)
+  };
   return {
     ffmpeg: {
-      path: ffmpegPath,
-      available: executableExists(ffmpegPath),
-      bundled: isBundledPath(ffmpegPath, {tool: 'ffmpeg'})
+      path: paths.ffmpeg,
+      available: executableExists(paths.ffmpeg, {fs: options.fs, platform: options.platform}),
+      bundled: isBundledPath(paths.ffmpeg, options),
+      source: mediaToolSource('ffmpeg', paths.ffmpeg, options)
     },
     ffprobe: {
-      path: ffprobePath,
-      available: executableExists(ffprobePath),
-      bundled: isBundledPath(ffprobePath, {tool: 'ffprobe'})
+      path: paths.ffprobe,
+      available: executableExists(paths.ffprobe, {fs: options.fs, platform: options.platform}),
+      bundled: isBundledPath(paths.ffprobe, options),
+      source: mediaToolSource('ffprobe', paths.ffprobe, options)
     },
     mpv: {
-      path: mpvPath,
-      available: executableExists(mpvPath),
-      bundled: isBundledPath(mpvPath, {tool: 'mpv'})
+      path: paths.mpv,
+      available: executableExists(paths.mpv, {fs: options.fs, platform: options.platform}),
+      bundled: isBundledPath(paths.mpv, options),
+      source: mediaToolSource('mpv', paths.mpv, options)
     }
   };
 }
@@ -237,6 +263,7 @@ module.exports = {
   findMediaToolPath,
   findMpvPath,
   isBundledPath,
+  mediaToolSource,
   mediaToolCandidates,
   mpvCandidates,
   mpvPath,

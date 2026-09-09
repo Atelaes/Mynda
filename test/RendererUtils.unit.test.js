@@ -48,6 +48,12 @@ suite.test('keeps packaged renderer assets relative while encoding absolute artw
   assert(artworkURL.includes('Poster%20With%20Spaces.jpg'));
 });
 
+suite.test('uses each desktop platform\'s familiar file-manager name', () => {
+  assert.strictEqual(RendererUtils.fileManagerName('darwin'), 'Finder');
+  assert.strictEqual(RendererUtils.fileManagerName('win32'), 'Explorer');
+  assert.strictEqual(RendererUtils.fileManagerName('linux'), 'File Manager');
+});
+
 suite.test('builds stable single-video and batch selection identities', () => {
   assert.strictEqual(RendererUtils.editorSelectionKey({id: 'video-1'}), 'single:video-1');
   assert.strictEqual(RendererUtils.editorSelectionKey({id: 'batch'}, [

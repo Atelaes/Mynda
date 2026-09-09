@@ -172,7 +172,11 @@ async function main() {
     });
     console.log('    source: Mynda Resources/media-tools (PATH deliberately empty)');
     console.log('    policy: standalone FFmpeg/FFprobe are LGPL-only; MPV reports dvd:// support');
-    console.log('    node-mpv: connected over JSON IPC and rendered generated video through gpu-next/macvk');
+    const player = result.checks.nodeMpv && result.checks.nodeMpv.value || {};
+    console.log(
+      `    node-mpv: connected over JSON IPC and rendered generated video through ` +
+      `${player.videoOutput}/${player.gpuContext}`
+    );
   } finally {
     removeDirectory(userData);
   }

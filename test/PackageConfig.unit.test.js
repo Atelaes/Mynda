@@ -101,8 +101,18 @@ suite.test('copies only the matching staged platform media directory into Resour
 
 suite.test('verifies media binaries even when electron-builder is invoked directly', () => {
   assert.strictEqual(packageJson.build.beforeBuild, './scripts/verify-media-tools.js');
-  assert(packageJson.scripts['media:prepare'].includes('prepare-media-tools-macos.sh'));
+  assert(packageJson.scripts['media:prepare'].includes('prepare-media-tools.js'));
+  assert(packageJson.scripts['media:prepare:macos'].includes('prepare-media-tools-macos.sh'));
+  assert(packageJson.scripts['media:prepare:windows'].includes('prepare-media-tools-windows.ps1'));
+  assert(packageJson.scripts['media:prepare:linux'].includes('prepare-media-tools-linux.sh'));
+  assert(packageJson.scripts['media:status'].includes('media-tools-status.js'));
   assert(packageJson.scripts['media:verify'].includes('verify-media-tools.js'));
+});
+
+suite.test('declares native Windows and Linux distributable targets', () => {
+  assert.strictEqual(packageJson.build.win.target, 'nsis');
+  assert.strictEqual(packageJson.build.linux.target, 'AppImage');
+  assert.strictEqual(packageJson.build.linux.category, 'AudioVideo');
 });
 
 suite.test('runs the packaged dependency smoke check after building', () => {

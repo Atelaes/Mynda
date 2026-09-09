@@ -72,7 +72,11 @@ async function readMpvProperty(player, name) {
   }
 }
 
-async function waitForGraphicalMpvVideo(player, timeoutMs = 10000) {
+async function waitForGraphicalMpvVideo(player, options = {}) {
+  if (typeof options === 'number') options = {timeoutMs: options};
+  const timeoutMs = options.timeoutMs || 10000;
+  const platform = options.platform || process.platform;
+  const requirements = MediaToolPolicy.mpvVideoRequirements(platform);
   const deadline = Date.now() + timeoutMs;
   let last = {};
   while (Date.now() < deadline) {
@@ -89,7 +93,7 @@ async function waitForGraphicalMpvVideo(player, timeoutMs = 10000) {
       height
     };
     if (last.videoOutput === 'gpu-next' &&
-      last.gpuContext === 'macvk' &&
+      requirements.runtimeContexts.includes(last.gpuContext) &&
       Number(last.width) > 0 &&
       Number(last.height) > 0) {
       return last;
@@ -98,7 +102,7 @@ async function waitForGraphicalMpvVideo(player, timeoutMs = 10000) {
   }
 
   const error = new Error(
-    `MPV decoded the test video but did not create its gpu-next/macvk window ` +
+    `MPV decoded the test video but did not create its ${requirements.description} ` +
     `(current-vo=${last.videoOutput || 'unavailable'}, ` +
     `current-gpu-context=${last.gpuContext || 'unavailable'}, ` +
     `size=${last.width || 0}x${last.height || 0})`
@@ -164,7 +168,7 @@ async function run(options = {}) {
       // the old startup path could hang before connecting to MPV. Exercise the
       // same process/JSON-IPC handoff as the real Player pane, while keeping
       // this automated check headless.
-      const graphicalVideoCheck = requireBundled && process.platform === 'darwin';
+      const graphicalVideoCheck = requireBundled;
       const mpvArguments = graphicalVideoCheck ?
         ['--no-config', '--keep-open=yes', '--ao=null'] :
         ['--no-config', '--vo=null', '--ao=null', '--force-window=no'];
@@ -199,7 +203,9 @@ async function run(options = {}) {
           10000,
           'MPV did not load the generated graphical test video'
         );
-        const video = await waitForGraphicalMpvVideo(player);
+        const video = await waitForGraphicalMpvVideo(player, {
+          platform: process.platform
+        });
         return {
           loaded: true,
           ipcChecked: true,

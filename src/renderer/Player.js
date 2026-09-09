@@ -2,6 +2,7 @@
 const React = require('react');
 const {spawn} = require('child_process');
 const fs = require('fs');
+const path = require('path');
 const mpvAPI = require('node-mpv');
 const MediaTools = require('../MediaTools.js');
 const MpvProcess = require('../MpvProcess.js');
@@ -14,6 +15,9 @@ function describePlaybackError(error) {
   if (typeof error === 'string' && error.trim()) return error.trim();
   if (error && typeof error.message === 'string' && error.message.trim()) {
     return error.message.trim();
+  }
+  if (error && typeof error.verbose === 'string' && error.verbose.trim()) {
+    return error.verbose.trim();
   }
   if (error && typeof error.error === 'string' && error.error.trim()) {
     return error.error.trim();
@@ -32,6 +36,206 @@ function describePlaybackError(error) {
     // message below instead of creating another playback error.
   }
   return 'MPV returned an unknown error';
+}
+
+function playbackMediaType(video) {
+  return video && video.dvd ? 'DVD' : 'video';
+}
+
+function playbackMediaDescription(mediaType) {
+  return mediaType === 'DVD' ? 'DVD folder' : 'video file';
+}
+
+function storageUnavailableMessage(mediaType) {
+  return `Problem playing ${mediaType}: the drive containing this ${
+    mediaType === 'DVD' ? 'DVD' : 'video'
+  } is not connected or mounted. Connect or mount the drive, then try again.`;
+}
+
+function watchfolderUnavailableMessage(mediaType) {
+  return `Problem playing ${mediaType}: this ${
+    mediaType === 'DVD' ? 'DVD\'s' : 'video\'s'
+  } watchfolder is unavailable. Make sure its drive or network location is connected; ` +
+    'if it is, the watchfolder may have been moved or renamed.';
+}
+
+function mediaMissingMessage(mediaType) {
+  return `Problem playing ${mediaType}: the ${playbackMediaDescription(mediaType)} was moved, ` +
+    'renamed, or deleted. Scan its watchfolder to update Mynda.';
+}
+
+function mediaInaccessibleMessage(mediaType) {
+  return `Problem playing ${mediaType}: Mynda cannot access the ${
+    playbackMediaDescription(mediaType)
+  }. Check its permissions, then try again.`;
+}
+
+// macOS external volumes and Windows drive/UNC roots let Mynda distinguish an
+// unavailable device from an individual file that was moved or deleted. Linux
+// mount locations are not standardized, so its configured watchfolder is the
+// stronger portable boundary checked below.
+function playbackStorageRoot(filename, platform = process.platform) {
+  if (typeof filename !== 'string' || !filename) return null;
+
+  if (platform === 'darwin') {
+    const resolved = path.posix.resolve(filename);
+    const parts = resolved.split('/');
+    if (parts[1] === 'Volumes' && parts[2]) {
+      return path.posix.join('/Volumes', parts[2]);
+    }
+    return null;
+  }
+
+  if (platform === 'win32') {
+    return path.win32.parse(filename).root || null;
+  }
+
+  return null;
+}
+
+function containingWatchfolderPath(filename, watchfolders, platform = process.platform) {
+  if (typeof filename !== 'string' || !Array.isArray(watchfolders)) return null;
+  const pathAPI = platform === 'win32' ? path.win32 : path.posix;
+  const caseInsensitive = platform === 'win32' || platform === 'darwin';
+  const resolvedFilename = pathAPI.resolve(filename);
+  const comparableFilename = caseInsensitive ? resolvedFilename.toLowerCase() : resolvedFilename;
+
+  return watchfolders
+    .map(folder => typeof folder === 'string' ? folder : folder && folder.path)
+    .filter(folderPath => typeof folderPath === 'string' && folderPath.trim())
+    .map(folderPath => {
+      const resolved = pathAPI.resolve(folderPath);
+      return {
+        path: folderPath,
+        resolved: resolved,
+        comparable: caseInsensitive ? resolved.toLowerCase() : resolved
+      };
+    })
+    .filter(candidate => {
+      const relative = pathAPI.relative(candidate.comparable, comparableFilename);
+      return relative === '' ||
+        (relative !== '..' && !relative.startsWith(`..${pathAPI.sep}`) && !pathAPI.isAbsolute(relative));
+    })
+    .sort((a, b) => b.resolved.length - a.resolved.length)
+    .map(candidate => candidate.path)[0] || null;
+}
+
+function statPlaybackPath(filesystem, filename) {
+  try {
+    return {available: true, stats: filesystem.statSync(filename), error: null};
+  } catch(error) {
+    return {available: false, stats: null, error: error};
+  }
+}
+
+function isMissingPathError(error) {
+  return Boolean(error && (error.code === 'ENOENT' || error.code === 'ENOTDIR'));
+}
+
+// Inspect the selected target before MPV is constructed. Besides avoiding a
+// pointless player window, the staged checks provide a useful distinction:
+// missing storage, missing watchfolder, missing media, or a permissions issue.
+function inspectPlaybackTarget(video, options = {}) {
+  const filesystem = options.filesystem || fs;
+  const platform = options.platform || process.platform;
+  const watchfolders = Array.isArray(options.watchfolders) ? options.watchfolders : [];
+  const mediaType = playbackMediaType(video);
+  const filename = video && typeof video.filename === 'string' ? video.filename.trim() : '';
+
+  if (!filename) {
+    return {
+      available: false,
+      mediaType: mediaType,
+      filename: filename,
+      reason: 'missing-library-path',
+      message: `Problem playing ${mediaType}: the library record has no media path`
+    };
+  }
+
+  const mediaStatus = statPlaybackPath(filesystem, filename);
+  if (mediaStatus.available) {
+    const correctType = video && video.dvd ?
+      mediaStatus.stats.isDirectory() : mediaStatus.stats.isFile();
+    if (correctType) {
+      return {
+        available: true,
+        mediaType: mediaType,
+        filename: filename,
+        reason: null,
+        message: null
+      };
+    }
+    return {
+      available: false,
+      mediaType: mediaType,
+      filename: filename,
+      reason: 'wrong-media-type',
+      message: mediaMissingMessage(mediaType)
+    };
+  }
+
+  if (!isMissingPathError(mediaStatus.error)) {
+    return {
+      available: false,
+      mediaType: mediaType,
+      filename: filename,
+      reason: 'media-inaccessible',
+      error: mediaStatus.error,
+      message: mediaInaccessibleMessage(mediaType)
+    };
+  }
+
+  const storageRoot = playbackStorageRoot(filename, platform);
+  if (storageRoot) {
+    const storageStatus = statPlaybackPath(filesystem, storageRoot);
+    if (!storageStatus.available && isMissingPathError(storageStatus.error)) {
+      return {
+        available: false,
+        mediaType: mediaType,
+        filename: filename,
+        storageRoot: storageRoot,
+        reason: 'storage-unavailable',
+        error: mediaStatus.error,
+        message: storageUnavailableMessage(mediaType)
+      };
+    }
+  }
+
+  const watchfolder = containingWatchfolderPath(filename, watchfolders, platform);
+  if (watchfolder) {
+    const watchfolderStatus = statPlaybackPath(filesystem, watchfolder);
+    if (!watchfolderStatus.available) {
+      return {
+        available: false,
+        mediaType: mediaType,
+        filename: filename,
+        watchfolder: watchfolder,
+        reason: 'watchfolder-unavailable',
+        error: mediaStatus.error,
+        message: watchfolderUnavailableMessage(mediaType)
+      };
+    }
+  }
+
+  return {
+    available: false,
+    mediaType: mediaType,
+    filename: filename,
+    watchfolder: watchfolder,
+    reason: 'media-missing',
+    error: mediaStatus.error,
+    message: mediaMissingMessage(mediaType)
+  };
+}
+
+function playbackFailureMessage(error, mediaType) {
+  let displayError = error;
+  let depth = 0;
+  while (displayError && displayError.originalError && depth < 4) {
+    displayError = displayError.originalError;
+    depth += 1;
+  }
+  return `Problem playing ${mediaType}: ${describePlaybackError(displayError)}`;
 }
 
 const MPV_START_TIMEOUT_MS = 10000;
@@ -90,7 +294,11 @@ function mpvSupportsDvdPlayback() {
         resolve(null);
         return;
       }
-      childProcess = spawn(MediaTools.mpvPath, ['--no-config', '--list-protocols']);
+      childProcess = spawn(
+        MediaTools.mpvPath,
+        ['--no-config', '--list-protocols'],
+        MpvProcess.mpvSpawnOptions(MediaTools.mpvPath)
+      );
     } catch(err) {
       resolve(null);
       return;
@@ -320,9 +528,21 @@ class MynPlayer extends MynOpenablePane {
     // structure. MPV expects that directory as --dvd-device and the special
     // dvd:// playback URL; passing the directory to load() as a normal file is
     // rejected. With no explicit title, MPV selects the longest DVD title.
-    if (!video || typeof video.filename !== 'string' || !video.filename.trim()) {
+    const watchfolders = library && library.settings && library.settings.watchfolders;
+    const targetStatus = inspectPlaybackTarget(video, {watchfolders: watchfolders});
+    if (!targetStatus.available) {
+      playerLog.warn('Playback skipped because its media target is unavailable', {
+        videoID: video && video.id,
+        title: video && video.title,
+        mediaType: targetStatus.mediaType,
+        filename: targetStatus.filename,
+        storageRoot: targetStatus.storageRoot,
+        watchfolder: targetStatus.watchfolder,
+        reason: targetStatus.reason,
+        errorCode: targetStatus.error && targetStatus.error.code
+      });
       this.setState({
-        errorMessage: 'Problem playing video: the library record has no media path',
+        errorMessage: targetStatus.message,
         showLoadingIndicator: false,
         showPlayingMessage: false
       });
@@ -336,15 +556,6 @@ class MynPlayer extends MynOpenablePane {
       });
       return;
     }
-    if (video.dvd && !fs.existsSync(video.filename)) {
-      this.setState({
-        errorMessage: 'Problem playing DVD: the DVD folder is no longer available',
-        showLoadingIndicator: false,
-        showPlayingMessage: false
-      });
-      return;
-    }
-
     if (video.dvd) {
       const dvdSupported = await mpvSupportsDvdPlayback();
       if (attempt !== this.playbackAttempt) return;
@@ -479,6 +690,7 @@ class MynPlayer extends MynOpenablePane {
         return;
       }
       const mediaType = video && video.dvd ? 'DVD' : 'video';
+      const postFailureTargetStatus = inspectPlaybackTarget(video, {watchfolders: watchfolders});
       playerLog.error('Playback failed', {
         videoID: video && video.id,
         title: video && video.title,
@@ -486,7 +698,8 @@ class MynPlayer extends MynOpenablePane {
         error: playbackError
       });
       this.setState({
-        errorMessage: `Problem playing ${mediaType}: ${describePlaybackError(playbackError)}`,
+        errorMessage: postFailureTargetStatus.available ?
+          playbackFailureMessage(playbackError, mediaType) : postFailureTargetStatus.message,
         showLoadingIndicator: false,
         showPlayingMessage: false
       });
@@ -557,6 +770,10 @@ class MynPlayer extends MynOpenablePane {
 module.exports = {
   MynPlayer,
   describePlaybackError,
+  playbackStorageRoot,
+  containingWatchfolderPath,
+  inspectPlaybackTarget,
+  playbackFailureMessage,
   withPlaybackTimeout,
   mpvSupportsDvdPlayback,
   uniqueMpvSocketPath,

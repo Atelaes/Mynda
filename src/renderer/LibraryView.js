@@ -3,7 +3,6 @@ const React = require('react');
 const {ipcRenderer, shell} = require('electron');
 const os = require('os');
 const _ = require('lodash');
-const URL = require('url');
 const {formatBoxOffice, formatCompactBoxOffice} = require('../BoxOffice.js');
 
 // Electron 12 predates Object.hasOwn(), which current React Virtuoso uses in
@@ -27,6 +26,7 @@ const {
 const {
   removeLeadingArticle,
   artworkSourceURL,
+  fileManagerName,
   validateVideo
 } = require('./RendererUtils.js');
 const {
@@ -1325,10 +1325,11 @@ class MynDetails extends React.Component {
 
     try {
       const video = this.props.video;
-      let imageURL = video.artwork ? URL.pathToFileURL(video.artwork).pathname : '';
+      const imageURL = artworkSourceURL(video.artwork);
+      const imageSource = artworkSourceURL(video.artwork, '../images/qmark-details.png');
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={video.artwork || '../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={imageSource} /></li>
           {/* <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li> */}
           <li className="detail" id="detail-title">{video.title}</li>
           <li className="detail" id="detail-year">{video.year}</li>
@@ -1344,7 +1345,7 @@ class MynDetails extends React.Component {
           {video.boxoffice > 0 ? (<li className="detail" id="detail-boxoffice"><span className="label">Box Office:</span> {formatBoxOffice(video.boxoffice)}</li>) : null}
           <li className="detail" id="detail-dateadded"><span className="label">Date Added:</span> {this.displayDate(video.dateadded)}</li>
           <li className="detail" id="detail-lastseen"><span className="label">Last Seen:</span> {this.displayDate(video.lastseen)}</li>
-          <li className="detail" id="detail-showFileBtn"><button onClick={() => this.openInFinder()}>Open in {os.platform() === 'darwin' ? "Finder" : "Explorer"}</button></li>
+          <li className="detail" id="detail-showFileBtn"><button onClick={() => this.openInFinder()}>Open in {fileManagerName()}</button></li>
         </ul>
       );
 

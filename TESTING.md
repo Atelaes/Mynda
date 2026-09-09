@@ -2,16 +2,15 @@
 
 This test suite is the safety net for modernizing Electron, React, and Mynda's other dependencies. It checks several different boundaries: small calculations, modules working together through real temporary files, React components, and the actual Electron application.
 
-All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library under `~/Library/Application Support/mynda`. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
+All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 26 suites: 25 fast suites with 179 named cases, plus the Electron end-to-end suite.
+The current catalog contains 28 suites: 27 fast suites with 208 named cases, plus the Electron end-to-end suite.
 
 ## The first commands to learn
 
-Open Terminal, move into the Mynda project, and run:
+Open Terminal, PowerShell, or your Linux shell, move into the Mynda project, and run:
 
 ```bash
-cd "/Volumes/2TB-SSD/Coding/Mynda (React)"
 npm test
 ```
 
@@ -29,8 +28,9 @@ The complete command set is:
 | `npm run test:renderer` | Same as `test:component` | A more memorable alias |
 | `npm run test:electron` | Real Electron end-to-end smoke test | After Electron, React, Babel, or startup changes |
 | `npm run test:all` | Fast tests plus Electron | Before committing an upgrade or preparing a release |
-| `npm run media:prepare` | Builds and stages the pinned Apple Silicon media sidecars | Once before the first fix54 package, or after changing their versions |
-| `npm run media:verify` | Checks license flags, versions, architecture, DVD support, macOS graphical output, and dylib paths | Before diagnosing a media build or package failure |
+| `npm run media:prepare` | Builds and stages the current machine's pinned native media sidecars | Once on each packaging platform, or after changing their versions |
+| `npm run media:status` | Shows the resolved path and source of FFmpeg, FFprobe, and MPV | To detect a staged, packaged, override, system, or missing tool |
+| `npm run media:verify` | Checks license flags, versions, architecture, DVD/video support, and native dependency closure | Before diagnosing a media build or package failure |
 | `npm run test:media` | Strict staged FFmpeg/FFprobe checks plus real node-mpv → MPV graphical video over JSON IPC | After preparing or changing media dependencies; briefly opens MPV |
 | `npm run test:package` | Fast tests, strict media verification, unpacked production build, then packaged decode/probe/graphical-MPV checks with an empty `PATH` | Before a release; briefly opens MPV and writes under `dist/` |
 
@@ -66,16 +66,18 @@ A “test double” is simply a small, predictable substitute for something outs
 | `BoxOffice.unit.test.js` | Unit | Fixed-USD parsing, bad input, full and compact formatting, locale conventions, and no currency conversion |
 | `PackageConfig.unit.test.js` | Unit | Production file boundaries, media staging, strict package commands, and retirement of the HLS player |
 | `MediaTools.unit.test.js` | Unit | Packaged/staged executable paths, platform naming, overrides, and development fallbacks |
-| `MediaToolPolicy.unit.test.js` | Unit | LGPL-only standalone FFmpeg flags, nonfree rejection, and required MPV DVD/macOS video capabilities |
-| `MediaBundleVerifier.unit.test.js` | Unit | Pinned source policy, graphical MPV, architecture, exclusion of `libdvdcss`, and relocatable macOS dylibs |
+| `MediaToolPolicy.unit.test.js` | Unit | LGPL-only standalone FFmpeg flags, nonfree rejection, and required MPV DVD/video capabilities on macOS, Windows, and Linux |
+| `MediaBundleVerifier.unit.test.js` | Unit | Pinned source policy, graphical MPV, architecture, exclusion of `libdvdcss`, and platform verification dispatch |
+| `MediaBundleInspection.unit.test.js` | Unit | Windows PE imports, Linux ELF dependencies/RUNPATHs, architecture, closure, and prohibited libraries |
+| `MediaPlatformPreparation.unit.test.js` | Unit | Native preparation dispatch, source pins, Windows UCRT64 policy, and the Ubuntu Linux baseline |
 | `MediaMetadata.unit.test.js` | Unit | MKV container durations and writable FFmpeg scratch output in packaged applications |
 | `MovieSearch.unit.test.js` | Unit | Filename parsing, title variants, result scoring, ambiguity, and confidence |
 | `SubtitleMatcher.unit.test.js` | Unit | Sidecar matching, episode evidence, ambiguity, folder boundaries, and manual provenance |
 | `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
 | `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, early EOF, process errors, timeouts, and cleanup |
-| `RendererUtils.unit.test.js` | Unit | Batch-edit states, ratings, video validation/repair, paths, DOM ancestry, and object diffs |
-| `Player.unit.test.js` | Unit | MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
-| `MpvProcess.unit.test.js` | Unit | Short macOS sockets, explicit gpu-next/Vulkan/macvk selection, JSON IPC readiness, lifecycle events, and retained diagnostics |
+| `RendererUtils.unit.test.js` | Unit | Batch-edit states, ratings, video validation/repair, portable artwork URLs, desktop labels, DOM ancestry, and object diffs |
+| `Player.unit.test.js` | Unit | Missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
+| `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
 | `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
 | `Library.integration.test.js` | Integration | First launch, migrations, add/replace/remove, synchronization waits, subtitle-safe edits, and recovery decisions |
@@ -116,7 +118,7 @@ Before changing Electron or React:
 
 1. Run `npm test` on the current versions and fix any failures.
 2. Run `npm run test:electron` and confirm the disposable startup journey passes.
-3. Run `npm run media:prepare` once on the Apple Silicon packaging Mac, then run `npm run test:package` to establish that the release toolchain builds and its self-contained media stack runs.
+3. Run `npm run media:prepare` once on each native packaging platform, then run `npm run test:package` to establish that its release toolchain and self-contained media stack run.
 4. Save that passing state in Git or a separate archive.
 5. Upgrade one major layer at a time rather than Electron and React simultaneously.
 6. Run `npm run test:all` after each dependency step.
@@ -141,6 +143,6 @@ That is why the small manual acceptance pass remains part of the release checkli
 
 ## If a command cannot start
 
-If Node reports a missing package, run `npm install` in the Mynda folder and retry. If only the Electron test reports that Electron's executable is missing, Electron's installation/download did not finish; run `npm install` again before diagnosing Mynda itself. If `test:media` reports that the staged tools are missing, run `npm run media:prepare`; it will list any one-time Homebrew build prerequisites that are absent. Packaged tests intentionally ignore `MYNDA_MPV_PATH` and the system `PATH` so an installed player cannot mask an incomplete application bundle. MPV startup and load failures now retain the subprocess warning/error output in Mynda's log instead of silently suppressing it. See `MEDIA_TOOLS.md` for the complete preparation guide.
+If Node reports a missing package, run `npm install` in the Mynda folder and retry. If only the Electron test reports that Electron's executable is missing, Electron's installation/download did not finish; run `npm install` again before diagnosing Mynda itself. If `test:media` reports that the staged tools are missing, run `npm run media:prepare`; it will list absent Homebrew, MSYS2 UCRT64, or Ubuntu build prerequisites. Use `npm run media:status` when development may be finding a system copy unexpectedly. Packaged tests intentionally ignore media overrides and the system `PATH` so an installed player cannot mask an incomplete application bundle. MPV startup and load failures retain subprocess warning/error output in Mynda's log. See `MEDIA_TOOLS.md` for the complete preparation guide.
 
 When reporting a failure, copy from the category header (such as `[INTEGRATION]`) through the final summary. That includes the useful context without requiring the entire Terminal history.

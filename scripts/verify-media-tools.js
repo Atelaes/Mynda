@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const {execFile} = require('child_process');
+const MediaBundleInspection = require('../src/MediaBundleInspection.js');
 const MediaToolPolicy = require('../src/MediaToolPolicy.js');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -41,7 +42,8 @@ function runExecutable(filename, args, options = {}) {
       cwd: options.cwd,
       env: options.env || process.env,
       maxBuffer: 20 * 1024 * 1024,
-      timeout: options.timeout || 30000
+      timeout: options.timeout || 30000,
+      windowsHide: true
     }, (error, stdout, stderr) => {
       if (error) {
         error.stdout = String(stdout || '');
@@ -54,7 +56,7 @@ function runExecutable(filename, args, options = {}) {
   });
 }
 
-function assertExecutable(filename, label) {
+function assertExecutable(filename, label, platform = process.platform) {
   let stats;
   try {
     stats = fs.statSync(filename);
@@ -62,7 +64,7 @@ function assertExecutable(filename, label) {
     throw new Error(`${label} is missing: ${filename}`);
   }
   if (!stats.isFile()) throw new Error(`${label} is not a file: ${filename}`);
-  if (process.platform !== 'win32') {
+  if (platform !== 'win32') {
     try {
       fs.accessSync(filename, fs.constants.X_OK);
     } catch(error) {
@@ -92,7 +94,7 @@ function assertNoDvdCss(stage) {
   }
 
   const dvdreadLibraries = walkFiles(stage).filter(filename =>
-    /libdvdread[^/]*\.dylib$/i.test(path.basename(filename))
+    /(?:libdvdread[^/]*\.(?:dylib|dll)|libdvdread\.so(?:\.\d+)*)$/i.test(path.basename(filename))
   );
   for (const filename of dvdreadLibraries) {
     const contents = fs.readFileSync(filename);
@@ -174,8 +176,8 @@ async function verifyFfmpegSidecars(options = {}) {
   const runner = options.runExecutable || runExecutable;
   const paths = toolPaths(stage, platform);
 
-  assertExecutable(paths.ffmpeg, 'FFmpeg');
-  assertExecutable(paths.ffprobe, 'FFprobe');
+  assertExecutable(paths.ffmpeg, 'FFmpeg', platform);
+  assertExecutable(paths.ffprobe, 'FFprobe', platform);
 
   const ffmpegVersion = await runner(paths.ffmpeg, ['-version']);
   const ffmpegOutput = `${ffmpegVersion.stdout}\n${ffmpegVersion.stderr}`;
@@ -213,21 +215,22 @@ async function verifyStage(options = {}) {
   const runner = options.runExecutable || runExecutable;
   const paths = toolPaths(stage, platform);
 
-  if (platform !== 'darwin' || arch !== 'arm64') {
+  const supportedTargets = new Set(['darwin-arm64', 'win32-x64', 'linux-x64']);
+  if (!supportedTargets.has(`${platform}-${arch}`)) {
     throw new Error(
-      `Fix54 currently prepares mac-arm64 media tools, not ${builderPlatform(platform)}-${arch}. ` +
-      'Build Intel/Windows media sidecars separately before packaging that target.'
+      `Mynda does not yet prepare ${builderPlatform(platform)}-${arch} media tools. ` +
+      'The current targets are mac-arm64, win-x64, and linux-x64. Build each target on its native host.'
     );
   }
   if (!fs.existsSync(stage) || !fs.statSync(stage).isDirectory()) {
     throw new Error(
-      `Prepared media tools were not found at ${stage}. Run "npm run media:prepare" on the Apple Silicon Mac first.`
+      `Prepared media tools were not found at ${stage}. Run "npm run media:prepare" on the target platform first.`
     );
   }
 
-  assertExecutable(paths.ffmpeg, 'FFmpeg');
-  assertExecutable(paths.ffprobe, 'FFprobe');
-  assertExecutable(paths.mpv, 'MPV');
+  assertExecutable(paths.ffmpeg, 'FFmpeg', platform);
+  assertExecutable(paths.ffprobe, 'FFprobe', platform);
+  assertExecutable(paths.mpv, 'MPV', platform);
   [
     path.join(stage, 'THIRD_PARTY_NOTICES.md'),
     path.join(stage, 'licenses', 'FFmpeg-COPYING.LGPLv2.1'),
@@ -257,17 +260,26 @@ async function verifyStage(options = {}) {
   const videoOutputHelp = `${videoOutputs.stdout}\n${videoOutputs.stderr}`;
   const gpuContexts = await runner(paths.mpv, ['--no-config', '--gpu-context=help']);
   const gpuContextHelp = `${gpuContexts.stdout}\n${gpuContexts.stderr}`;
-  const macVideo = MediaToolPolicy.assertMpvMacVideoSupport(
+  const videoSupport = MediaToolPolicy.assertMpvVideoSupport(
+    platform,
     videoOutputHelp,
     gpuContextHelp
   );
 
   if (platform === 'darwin' && options.skipMachOChecks !== true) {
     await assertRelocatableMacBinaries(stage, paths, arch, runner);
+  } else if (platform === 'win32' && options.skipWindowsChecks !== true) {
+    MediaBundleInspection.assertWindowsBundle(stage, paths, arch, {
+      readFile: options.readFile
+    });
+  } else if (platform === 'linux' && options.skipLinuxChecks !== true) {
+    await MediaBundleInspection.assertLinuxBundle(stage, paths, arch, runner, {
+      readFile: options.readFile
+    });
   }
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     platform,
     arch,
     ffmpeg: ffmpegSidecars.ffmpeg,
@@ -277,8 +289,10 @@ async function verifyStage(options = {}) {
       license: 'GPL-2.0-or-later',
       dvd: true,
       graphicalVideo: true,
-      videoOutput: macVideo.videoOutputs[0],
-      gpuContext: macVideo.gpuContexts[0],
+      videoOutput: videoSupport.videoOutputs[0],
+      gpuContext: videoSupport.gpuContexts[0],
+      gpuContexts: videoSupport.gpuContexts,
+      videoPolicy: videoSupport.description,
       libdvdcssBundled: false,
       libdvdcssDynamicLoading: false
     }
@@ -329,7 +343,7 @@ async function main() {
   console.log(`  ${report.ffprobe.version} — LGPL-only configuration`);
   console.log(
     `  ${report.mpv.version} — bundled, relocatable, ` +
-    `${report.mpv.videoOutput}/${report.mpv.gpuContext} video, dvd:// enabled, no libdvdcss`
+    `${report.mpv.videoPolicy}, dvd:// enabled, no libdvdcss`
   );
 }
 

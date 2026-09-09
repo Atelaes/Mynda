@@ -14,7 +14,11 @@
     "test:electron": "node test/run-tests.js e2e",
     "test:e2e": "npm run test:electron",
     "test:all": "node test/run-tests.js all",
-    "media:prepare": "bash scripts/prepare-media-tools-macos.sh",
+    "media:prepare": "node scripts/prepare-media-tools.js",
+    "media:prepare:macos": "bash scripts/prepare-media-tools-macos.sh",
+    "media:prepare:windows": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-media-tools-windows.ps1",
+    "media:prepare:linux": "bash scripts/prepare-media-tools-linux.sh",
+    "media:status": "node scripts/media-tools-status.js",
     "media:verify": "node scripts/verify-media-tools.js",
     "test:media": "npm run media:verify && node test/MediaDependencies.integration.test.js --require-bundled",
     "test:package": "npm run test:fast && npm run media:verify && electron-builder --dir --publish never && node test/package/run-packaged-media-smoke.js",
@@ -83,6 +87,10 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo"
     }
   }
 }

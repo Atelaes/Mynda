@@ -1,5 +1,8 @@
 mac-*/
 win-*/
 linux-*/
+.*.candidate/
+.*.new.*/
+.*.old.*/
 !.gitignore
 !THIRD_PARTY_NOTICES.md

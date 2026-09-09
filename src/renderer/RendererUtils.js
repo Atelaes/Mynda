@@ -23,6 +23,15 @@ function artworkSourceURL(artwork, placeholder = '') {
   return URL.pathToFileURL(source).href;
 }
 
+// Electron's shell.showItemInFolder() is portable, but each desktop gives
+// its file browser a different familiar name. Keep that presentation choice
+// out of the component so Linux is not described as Windows.
+function fileManagerName(platform = process.platform) {
+  if (platform === 'darwin') return 'Finder';
+  if (platform === 'win32') return 'Explorer';
+  return 'File Manager';
+}
+
 // React may give the editor freshly cloned props even though the user is
 // still editing the exact same video selection. Compare stable video IDs
 // rather than object identity so those harmless refreshes cannot discard
@@ -402,6 +411,7 @@ function isEqualIgnoreFuncs(obj1,obj2) {
 module.exports = {
   removeLeadingArticle,
   artworkSourceURL,
+  fileManagerName,
   editorSelectionKey,
   batchNewState,
   parseEditableEpisodeNumber,

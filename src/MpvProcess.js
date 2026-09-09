@@ -81,6 +81,18 @@ function mpvLaunchArguments(player, options = {}) {
     if (!optionPresent(args, '--vo')) args.push('--vo=gpu-next');
     if (!optionPresent(args, '--gpu-api')) args.push('--gpu-api=vulkan');
     if (!optionPresent(args, '--gpu-context')) args.push('--gpu-context=macvk');
+  } else if (platform === 'win32' && showWindow) {
+    // Use Windows' native renderer instead of depending on a separately
+    // installed Vulkan runtime or OpenGL implementation.
+    if (!optionPresent(args, '--force-window')) args.push('--force-window=yes');
+    if (!optionPresent(args, '--vo')) args.push('--vo=gpu-next');
+    if (!optionPresent(args, '--gpu-api')) args.push('--gpu-api=d3d11');
+    if (!optionPresent(args, '--gpu-context')) args.push('--gpu-context=d3d11');
+  } else if (platform === 'linux' && showWindow) {
+    // Linux desktops may be Wayland or X11. The verified bundle contains both
+    // context families, so leave context selection to MPV at runtime.
+    if (!optionPresent(args, '--force-window')) args.push('--force-window=yes');
+    if (!optionPresent(args, '--vo')) args.push('--vo=gpu-next');
   }
 
   // Warnings and errors are retained for Mynda's log instead of being hidden
@@ -89,6 +101,13 @@ function mpvLaunchArguments(player, options = {}) {
   args.push('--msg-level=all=warn,ipc=v');
   args.push(`--input-ipc-server=${socketPath}`);
   return args;
+}
+
+function mpvSpawnOptions(binary) {
+  return {
+    cwd: path.dirname(binary),
+    windowsHide: true
+  };
 }
 
 function probeMpvIpc(socketPath, options = {}) {
@@ -329,7 +348,7 @@ async function startMpvPlayer(player, options = {}) {
 
   let child;
   try {
-    child = spawnProcess(player.options.binary, args);
+    child = spawnProcess(player.options.binary, args, mpvSpawnOptions(player.options.binary));
   } catch(error) {
     throw withMpvDiagnostics(error, player);
   }
@@ -380,6 +399,7 @@ module.exports = {
   DEFAULT_START_TIMEOUT_MS,
   diagnosticsText,
   mpvLaunchArguments,
+  mpvSpawnOptions,
   probeMpvIpc,
   promiseWithTimeout,
   removeSocketFile,

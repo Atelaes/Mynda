@@ -23,7 +23,7 @@ if [[ "$PLATFORM" != "Darwin" ]]; then
   fail "media:prepare must be run on macOS."
 fi
 if [[ "$MACHINE_ARCH" != "arm64" ]]; then
-  fail "fix54's first media bundle targets Apple Silicon (arm64). Intel/Mojave needs a separately pinned legacy build."
+  fail "The macOS media bundle targets Apple Silicon (arm64). Intel/Mojave needs a separately pinned legacy build."
 fi
 
 for command_name in brew curl ditto make node patch shasum tar xcode-select xcrun; do

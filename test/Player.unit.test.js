@@ -18,13 +18,25 @@ require('@babel/register')({
 });
 
 class TestPane extends React.Component {}
+let fakeMpvConstructions = 0;
+class FakeMpv {
+  constructor() {
+    fakeMpvConstructions += 1;
+  }
+}
+const playerWarnings = [];
 const Player = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'renderer', 'Player.js'),
   {
-    'node-mpv': class FakeMpv {},
+    'node-mpv': FakeMpv,
     './RendererRuntime.js': {
-      library: {},
-      playerLog: {debug() {}, info() {}, warn() {}, error() {}}
+      library: {settings: {watchfolders: []}},
+      playerLog: {
+        debug() {},
+        info() {},
+        warn(message, detail) { playerWarnings.push({message, detail}); },
+        error() {}
+      }
     },
     './SharedComponents.js': {MynOpenablePane: TestPane}
   }
@@ -41,11 +53,146 @@ suite.test('turns every supported MPV error shape into useful text', () => {
   assert.strictEqual(Player.describePlaybackError(new Error('error message')), 'error message');
   assert.strictEqual(Player.describePlaybackError({error: 'ipc error'}), 'ipc error');
   assert.strictEqual(Player.describePlaybackError({reason: 'file missing'}), 'file missing');
+  assert.strictEqual(Player.describePlaybackError({verbose: 'Unable to load file'}), 'Unable to load file');
   assert.strictEqual(Player.describePlaybackError(404), '404');
   assert.strictEqual(Player.describePlaybackError({code: 'bad'}), '{"code":"bad"}');
   const circular = {};
   circular.self = circular;
   assert.strictEqual(Player.describePlaybackError(circular), 'MPV returned an unknown error');
+});
+
+function missingError(code = 'ENOENT') {
+  const error = new Error(code === 'ENOENT' ? 'No such file or directory' : 'Access denied');
+  error.code = code;
+  return error;
+}
+
+function fakeFilesystem(entries) {
+  return {
+    statSync(filename) {
+      if (!Object.prototype.hasOwnProperty.call(entries, filename)) throw missingError();
+      const entry = entries[filename];
+      if (entry instanceof Error) throw entry;
+      return {
+        isFile: () => entry === 'file',
+        isDirectory: () => entry === 'directory'
+      };
+    }
+  };
+}
+
+suite.test('distinguishes an unmounted macOS drive from missing media on an available drive', () => {
+  const filename = '/Volumes/Movie Drive/Movies/example.mp4';
+  const watchfolder = '/Volumes/Movie Drive/Movies';
+  const unavailableDrive = Player.inspectPlaybackTarget(
+    {filename: filename},
+    {filesystem: fakeFilesystem({}), platform: 'darwin', watchfolders: [{path: watchfolder}]}
+  );
+  assert.strictEqual(unavailableDrive.reason, 'storage-unavailable');
+  assert(unavailableDrive.message.includes('drive containing this video is not connected or mounted'));
+  assert(!unavailableDrive.message.includes(filename));
+
+  const missingFile = Player.inspectPlaybackTarget(
+    {filename: filename},
+    {
+      filesystem: fakeFilesystem({
+        '/Volumes/Movie Drive': 'directory',
+        [watchfolder]: 'directory'
+      }),
+      platform: 'darwin',
+      watchfolders: [{path: watchfolder}]
+    }
+  );
+  assert.strictEqual(missingFile.reason, 'media-missing');
+  assert(missingFile.message.includes('moved, renamed, or deleted'));
+  assert(missingFile.message.includes('Scan its watchfolder'));
+
+  assert.strictEqual(
+    Player.playbackStorageRoot('E:\\Movies\\example.mkv', 'win32'),
+    'E:\\'
+  );
+  assert.strictEqual(
+    Player.playbackStorageRoot('\\\\server\\share\\Movies\\example.mkv', 'win32'),
+    '\\\\server\\share\\'
+  );
+});
+
+suite.test('uses a missing configured watchfolder when a Linux mount cannot be identified', () => {
+  const filename = '/media/torgo/Movie Drive/Movies/example.mkv';
+  const watchfolder = '/media/torgo/Movie Drive/Movies';
+  const status = Player.inspectPlaybackTarget(
+    {filename: filename},
+    {filesystem: fakeFilesystem({}), platform: 'linux', watchfolders: [{path: watchfolder}]}
+  );
+  assert.strictEqual(status.reason, 'watchfolder-unavailable');
+  assert(status.message.includes('watchfolder is unavailable'));
+  assert(status.message.includes('drive or network location'));
+});
+
+suite.test('accepts real targets and reports wrong types or permission failures clearly', () => {
+  const filesystem = fakeFilesystem({
+    '/movies/video.mkv': 'file',
+    '/movies/dvd': 'directory',
+    '/movies/not-a-video': 'directory',
+    '/movies/private.mkv': missingError('EACCES')
+  });
+  assert.strictEqual(Player.inspectPlaybackTarget(
+    {filename: '/movies/video.mkv'}, {filesystem: filesystem, platform: 'linux'}
+  ).available, true);
+  assert.strictEqual(Player.inspectPlaybackTarget(
+    {filename: '/movies/dvd', dvd: true}, {filesystem: filesystem, platform: 'linux'}
+  ).available, true);
+  assert.strictEqual(Player.inspectPlaybackTarget(
+    {filename: '/movies/not-a-video'}, {filesystem: filesystem, platform: 'linux'}
+  ).reason, 'wrong-media-type');
+  const inaccessible = Player.inspectPlaybackTarget(
+    {filename: '/movies/private.mkv'}, {filesystem: filesystem, platform: 'linux'}
+  );
+  assert.strictEqual(inaccessible.reason, 'media-inaccessible');
+  assert(inaccessible.message.includes('Check its permissions'));
+});
+
+suite.test('keeps MPV diagnostics in logs while returning concise playback errors', () => {
+  const structured = {
+    errcode: 0,
+    verbose: 'Unable to load file or stream',
+    method: 'load()',
+    arguments: ['/private/movie.mkv']
+  };
+  const wrapped = new Error(`${JSON.stringify(structured)}\nMPV output:\ndecoder failed`);
+  wrapped.originalError = structured;
+  wrapped.mpvOutput = 'decoder failed';
+  assert.strictEqual(
+    Player.playbackFailureMessage(wrapped, 'video'),
+    'Problem playing video: Unable to load file or stream'
+  );
+
+  const decoderError = new Error('The video decoder failed');
+  decoderError.mpvOutput = "Verbose MPV diagnostics mentioning '/private/movie.mkv'";
+  assert.strictEqual(
+    Player.playbackFailureMessage(decoderError, 'video'),
+    'Problem playing video: The video decoder failed'
+  );
+});
+
+suite.test('does not construct MPV when the selected media path is unavailable', async () => {
+  const before = fakeMpvConstructions;
+  const player = new Player.MynPlayer({
+    video: {
+      id: 'missing-video',
+      title: 'Missing Video',
+      filename: path.join(os.tmpdir(), 'mynda-file-that-does-not-exist-fix63.mkv')
+    },
+    show: true,
+    hideFunction() {},
+    logPlayed() {}
+  });
+  player.setState = update => { player.state = Object.assign({}, player.state, update); };
+  await player.setUpVideo();
+  assert.strictEqual(fakeMpvConstructions, before);
+  assert(player.state.errorMessage.includes('moved, renamed, or deleted'));
+  assert.strictEqual(player.state.showLoadingIndicator, false);
+  assert.strictEqual(playerWarnings[playerWarnings.length - 1].detail.reason, 'media-missing');
 });
 
 suite.test('passes through prompt resolutions and rejections', async () => {

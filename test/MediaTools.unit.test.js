@@ -29,6 +29,14 @@ suite.test('uses one architecture-specific developer staging directory', () => {
     }),
     path.join('/project', 'vendor', 'media-tools', 'mac-arm64')
   );
+  assert.strictEqual(
+    MediaTools.stagedMediaRoot({projectRoot: 'C:\\project', platform: 'win32', arch: 'x64'}),
+    path.join('C:\\project', 'vendor', 'media-tools', 'win-x64')
+  );
+  assert.strictEqual(
+    MediaTools.stagedMediaRoot({projectRoot: '/project', platform: 'linux', arch: 'x64'}),
+    path.join('/project', 'vendor', 'media-tools', 'linux-x64')
+  );
 });
 
 suite.test('accepts files only when they are executable on Unix', async () => {
@@ -121,6 +129,38 @@ suite.test('reports no MPV when every known location is unavailable', () => {
     resourcesPath: '',
     isExecutable: () => false
   }), null);
+});
+
+suite.test('uses .exe names for every Windows media sidecar', () => {
+  const candidates = MediaTools.bundledCandidates('ffprobe', {
+    platform: 'win32',
+    arch: 'x64',
+    projectRoot: 'C:\\project',
+    resourcesPath: 'C:\\Mynda\\resources'
+  });
+  assert(candidates.every(candidate => candidate.toLowerCase().endsWith('ffprobe.exe')));
+  assert(candidates.some(candidate => candidate.includes('win-x64')));
+});
+
+suite.test('reports staged, packaged, overridden, system, and missing sources', () => {
+  const options = {
+    platform: 'linux',
+    arch: 'x64',
+    projectRoot: '/project',
+    resourcesPath: '/application/resources',
+    env: {MYNDA_MPV_PATH: '/custom/mpv', PATH: '/usr/bin'}
+  };
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', '/custom/mpv', options), 'override');
+  assert.strictEqual(
+    MediaTools.mediaToolSource('mpv', '/application/resources/media-tools/mpv', options),
+    'packaged'
+  );
+  assert.strictEqual(
+    MediaTools.mediaToolSource('mpv', '/project/vendor/media-tools/linux-x64/mpv', options),
+    'staged'
+  );
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', '/usr/bin/mpv', options), 'system');
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', null, options), 'missing');
 });
 
 runSuite(suite);

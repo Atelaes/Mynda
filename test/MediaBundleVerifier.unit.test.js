@@ -11,7 +11,7 @@ const {
 const suite = createSuite(
   'Media bundle staging verifier',
   'unit',
-  'Protects platform staging, checksum/build policy, libdvdcss exclusion, and relocatable macOS dylibs.'
+  'Protects platform staging, checksum/build policy, libdvdcss exclusion, and native dependency boundaries.'
 );
 
 suite.test('selects the electron-builder platform and architecture directory', () => {
@@ -22,6 +22,14 @@ suite.test('selects the electron-builder platform and architecture directory', (
       arch: 'arm64'
     }),
     path.join('/project', 'vendor', 'media-tools', 'mac-arm64')
+  );
+  assert.strictEqual(
+    MediaBundleVerifier.stageDirectory({projectRoot: '/project', platform: 'win32', arch: 'x64'}),
+    path.join('/project', 'vendor', 'media-tools', 'win-x64')
+  );
+  assert.strictEqual(
+    MediaBundleVerifier.stageDirectory({projectRoot: '/project', platform: 'linux', arch: 'x64'}),
+    path.join('/project', 'vendor', 'media-tools', 'linux-x64')
   );
 });
 
@@ -182,6 +190,66 @@ suite.test('accepts a complete staged bundle with the real tool output formats',
     assert.strictEqual(report.mpv.gpuContext, 'macvk');
     assert.strictEqual(report.mpv.libdvdcssBundled, false);
     assert.strictEqual(report.mpv.libdvdcssDynamicLoading, false);
+  });
+});
+
+suite.test('applies the Windows and Linux graphical-video policies to complete stages', async () => {
+  async function verifyPlatform(directory, platform, contexts, skipOption) {
+    const toolPaths = MediaBundleVerifier.toolPaths(directory, platform);
+    const requiredFiles = [
+      'THIRD_PARTY_NOTICES.md',
+      'licenses/FFmpeg-COPYING.LGPLv2.1',
+      'licenses/MPV-LICENSE.GPL',
+      'licenses/libdvdread-COPYING',
+      'licenses/libdvdnav-COPYING',
+      'licenses/libdvdread-no-libdvdcss.patch'
+    ].map(filename => path.join(directory, filename));
+    [...Object.values(toolPaths), ...requiredFiles].forEach(filename => {
+      fs.mkdirSync(path.dirname(filename), {recursive: true});
+      fs.writeFileSync(filename, 'fixture');
+    });
+    if (platform !== 'win32') {
+      Object.values(toolPaths).forEach(filename => fs.chmodSync(filename, 0o755));
+    }
+    const runner = async (filename, args) => {
+      if (filename === toolPaths.ffmpeg || filename === toolPaths.ffprobe) {
+        const toolName = filename === toolPaths.ffmpeg ? 'ffmpeg' : 'ffprobe';
+        return {
+          stdout: `${toolName} version 6.1.6\n` +
+            'configuration: --disable-gpl --disable-nonfree --disable-version3\n',
+          stderr: ''
+        };
+      }
+      if (args[0] === '--version') return {stdout: 'mpv v0.41.0\n', stderr: ''};
+      if (args.includes('--list-protocols')) return {stdout: 'dvd://\nfile://\n', stderr: ''};
+      if (args.includes('--vo=help')) return {stdout: 'gpu-next\nnull\n', stderr: ''};
+      if (args.includes('--gpu-context=help')) return {stdout: `${contexts}\n`, stderr: ''};
+      throw new Error(`Unexpected verifier command: ${filename} ${args.join(' ')}`);
+    };
+    const options = {
+      stage: directory,
+      platform,
+      arch: 'x64',
+      runExecutable: runner
+    };
+    options[skipOption] = true;
+    return MediaBundleVerifier.verifyStage(options);
+  }
+
+  await withTemporaryDirectory('media-windows-stage', async directory => {
+    const report = await verifyPlatform(directory, 'win32', 'auto\nd3d11', 'skipWindowsChecks');
+    assert.strictEqual(report.platform, 'win32');
+    assert.deepStrictEqual(report.mpv.gpuContexts, ['d3d11']);
+  });
+  await withTemporaryDirectory('media-linux-stage', async directory => {
+    const report = await verifyPlatform(
+      directory,
+      'linux',
+      'auto\nwaylandvk\nx11egl',
+      'skipLinuxChecks'
+    );
+    assert.strictEqual(report.platform, 'linux');
+    assert.deepStrictEqual(report.mpv.gpuContexts, ['waylandvk', 'x11egl']);
   });
 });
 

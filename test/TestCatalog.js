@@ -42,13 +42,25 @@ module.exports = [
     category: 'unit',
     file: 'test/MediaToolPolicy.unit.test.js',
     title: 'Bundled media policy',
-    protects: 'LGPL-only FFmpeg flags, nonfree rejection, and required MPV DVD/macOS video support'
+    protects: 'LGPL-only FFmpeg flags, nonfree rejection, and required MPV DVD/native video support'
   },
   {
     category: 'unit',
     file: 'test/MediaBundleVerifier.unit.test.js',
     title: 'Media bundle staging verifier',
-    protects: 'source pins, graphical MPV, libdvdcss exclusion, architecture, and relocatable macOS dylibs'
+    protects: 'source pins, graphical MPV, libdvdcss exclusion, architecture, and native dependencies'
+  },
+  {
+    category: 'unit',
+    file: 'test/MediaBundleInspection.unit.test.js',
+    title: 'Windows/Linux media-bundle inspection',
+    protects: 'PE/ELF architecture, dependency closure, app-relative loading, and prohibited libraries'
+  },
+  {
+    category: 'unit',
+    file: 'test/MediaPlatformPreparation.unit.test.js',
+    title: 'Cross-platform media preparation',
+    protects: 'native host dispatch, source pins, build baselines, and platform-specific recipes'
   },
   {
     category: 'unit',
@@ -84,19 +96,19 @@ module.exports = [
     category: 'unit',
     file: 'test/RendererUtils.unit.test.js',
     title: 'Renderer editing helpers',
-    protects: 'batch edits, ratings, validation/repair, URLs, DOM ancestry, and diffs'
+    protects: 'batch edits, ratings, validation/repair, portable URLs/labels, DOM ancestry, and diffs'
   },
   {
     category: 'unit',
     file: 'test/Player.unit.test.js',
     title: 'MPV playback safety',
-    protects: 'timeouts, error details, socket cleanup, DVD load events, and process exits'
+    protects: 'media availability, concise errors, launch avoidance, timeouts, socket cleanup, DVD load events, and process exits'
   },
   {
     category: 'unit',
     file: 'test/MpvProcess.unit.test.js',
     title: 'MPV process and IPC startup',
-    protects: 'short sockets, gpu-next/Vulkan/macvk selection, JSON IPC readiness, and retained diagnostics'
+    protects: 'native IPC paths, platform video selection, sidecar launch isolation, JSON IPC, and diagnostics'
   },
   {
     category: 'integration',

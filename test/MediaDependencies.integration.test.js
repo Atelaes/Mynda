@@ -37,7 +37,9 @@ suite.test('loads node-mpv and connects it to MPV over JSON IPC when available',
     if (requireBundled) {
       assert.strictEqual(report.checks.nodeMpv.value.graphicalVideoChecked, true);
       assert.strictEqual(report.checks.nodeMpv.value.videoOutput, 'gpu-next');
-      assert.strictEqual(report.checks.nodeMpv.value.gpuContext, 'macvk');
+      const requirements = require('../src/MediaToolPolicy.js')
+        .mpvVideoRequirements(process.platform);
+      assert(requirements.runtimeContexts.includes(report.checks.nodeMpv.value.gpuContext));
       assert(report.checks.nodeMpv.value.width > 0);
       assert(report.checks.nodeMpv.value.height > 0);
     }
