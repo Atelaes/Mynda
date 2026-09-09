@@ -328,7 +328,7 @@
 }
 
 #settings-prefs-kinds {
-  grid-row: 2 / span 3;
+  grid-row: 2 / span 100;
   grid-column: 1;
 }
 

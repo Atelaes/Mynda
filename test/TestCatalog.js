@@ -102,7 +102,7 @@ module.exports = [
     category: 'unit',
     file: 'test/Player.unit.test.js',
     title: 'MPV playback safety',
-    protects: 'media availability, concise errors, launch avoidance, timeouts, socket cleanup, DVD load events, and process exits'
+    protects: 'attempt logging, media availability, concise errors, launch avoidance, timeouts, socket cleanup, DVD load events, and process exits'
   },
   {
     category: 'unit',
@@ -132,7 +132,7 @@ module.exports = [
     category: 'integration',
     file: 'test/Logger.integration.test.js',
     title: 'Backend logging',
-    protects: 'file routing, renderer forwarding, secret redaction, rotation, and shutdown'
+    protects: 'file routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and shutdown'
   },
   {
     category: 'integration',

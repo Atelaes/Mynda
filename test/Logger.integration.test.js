@@ -16,8 +16,8 @@ const suite = createSuite(
   'Uses real temporary log files while replacing only Electron and the terminal console.'
 );
 
-function loadLogger() {
-  return loadFreshWithMocks(loggerPath, {'electron': {}});
+function loadLogger(electron = {}) {
+  return loadFreshWithMocks(loggerPath, {'electron': electron});
 }
 
 async function withoutConsoleOutput(operation) {
@@ -49,6 +49,13 @@ suite.test('routes levels to the correct files and redacts secrets', () => withT
       log.error('failed safely', {authorization: 'Bearer visible-authorization'});
       ipcMain.emit('mynda-backend-log', {}, {
         timestamp: '2026-09-07T01:00:00.000Z',
+        level: 'debug',
+        scope: 'RendererTest',
+        pid: 123,
+        message: 'renderer debug remains console only'
+      });
+      ipcMain.emit('mynda-backend-log', {}, {
+        timestamp: '2026-09-07T01:00:00.000Z',
         level: 'info',
         scope: 'RendererTest',
         pid: 123,
@@ -65,6 +72,7 @@ suite.test('routes levels to the correct files and redacts secrets', () => withT
     assert(info.includes('failed safely'));
     assert(info.includes('[RendererTest] [renderer:123] renderer forwarded this'));
     assert(!info.includes('debug stays out of files'));
+    assert(!info.includes('renderer debug remains console only'));
     assert(error.includes('failed safely'));
     assert(!error.includes('ordinary information'));
     assert(info.includes('[REDACTED]'));
@@ -77,6 +85,55 @@ suite.test('routes levels to the correct files and redacts secrets', () => withT
     assert.strictEqual(ipcMain.listenerCount('mynda-backend-log'), 0);
   }
 ));
+
+suite.test('shows renderer DEBUG at the normal DevTools level and still forwards it', async () => {
+  const originalProcessType = Object.getOwnPropertyDescriptor(process, 'type');
+  const originalConsole = {
+    debug: console.debug,
+    log: console.log,
+    warn: console.warn,
+    error: console.error
+  };
+  const calls = {debug: [], log: []};
+  const forwarded = [];
+
+  try {
+    Object.defineProperty(process, 'type', {
+      configurable: true,
+      value: 'renderer'
+    });
+    console.debug = (...args) => calls.debug.push(args);
+    console.log = (...args) => calls.log.push(args);
+    console.warn = () => {};
+    console.error = () => {};
+
+    const Logger = loadLogger({
+      ipcRenderer: {
+        send: (...args) => forwarded.push(args)
+      }
+    });
+    Logger.child('RendererConsole').debug('visible debug detail', {videoID: 'video-1'});
+
+    assert.strictEqual(calls.debug.length, 0);
+    assert.strictEqual(calls.log.length, 1);
+    assert.strictEqual(calls.log[0][5], 'DEBUG');
+    assert(calls.log[0][7].includes('[RendererConsole] [renderer:'));
+    assert(calls.log[0][7].includes('visible debug detail'));
+    assert.strictEqual(forwarded.length, 1);
+    assert.strictEqual(forwarded[0][0], 'mynda-backend-log');
+    assert.strictEqual(forwarded[0][1].level, 'debug');
+  } finally {
+    console.debug = originalConsole.debug;
+    console.log = originalConsole.log;
+    console.warn = originalConsole.warn;
+    console.error = originalConsole.error;
+    if (originalProcessType) {
+      Object.defineProperty(process, 'type', originalProcessType);
+    } else {
+      delete process.type;
+    }
+  }
+});
 
 suite.test('rotates large logs and honors the configured backup limit', () => withTemporaryDirectory(
   'logger-rotation',

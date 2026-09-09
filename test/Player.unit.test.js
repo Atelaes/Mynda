@@ -25,6 +25,7 @@ class FakeMpv {
   }
 }
 const playerWarnings = [];
+const playerInfos = [];
 const Player = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'renderer', 'Player.js'),
   {
@@ -33,7 +34,7 @@ const Player = loadFreshWithMocks(
       library: {settings: {watchfolders: []}},
       playerLog: {
         debug() {},
-        info() {},
+        info(message, detail) { playerInfos.push({message, detail}); },
         warn(message, detail) { playerWarnings.push({message, detail}); },
         error() {}
       }
@@ -190,6 +191,12 @@ suite.test('does not construct MPV when the selected media path is unavailable',
   player.setState = update => { player.state = Object.assign({}, player.state, update); };
   await player.setUpVideo();
   assert.strictEqual(fakeMpvConstructions, before);
+  assert.strictEqual(playerInfos[playerInfos.length - 1].message, 'Playback requested');
+  assert.strictEqual(playerInfos[playerInfos.length - 1].detail.videoID, 'missing-video');
+  assert.strictEqual(
+    playerInfos[playerInfos.length - 1].detail.filename,
+    path.join(os.tmpdir(), 'mynda-file-that-does-not-exist-fix63.mkv')
+  );
   assert(player.state.errorMessage.includes('moved, renamed, or deleted'));
   assert.strictEqual(player.state.showLoadingIndicator, false);
   assert.strictEqual(playerWarnings[playerWarnings.length - 1].detail.reason, 'media-missing');

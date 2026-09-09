@@ -524,6 +524,13 @@ class MynPlayer extends MynOpenablePane {
 
     const attempt = ++this.playbackAttempt;
     const video = this.state.video;
+    playerLog.info('Playback requested', {
+      videoID: video && video.id,
+      title: video && video.title,
+      mediaType: playbackMediaType(video),
+      filename: video && video.filename,
+      savedPosition: video && video.position
+    });
     // Mynda represents a copied DVD as the directory containing its VIDEO_TS
     // structure. MPV expects that directory as --dvd-device and the special
     // dvd:// playback URL; passing the directory to load() as a normal file is

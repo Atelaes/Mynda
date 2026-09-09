@@ -276,22 +276,25 @@ function persistEntry(entry) {
 }
 
 function writeToConsole(entry) {
+  const rendererProcess = isRendererProcess();
   let outputMethod;
   if (entry.level === 'error') {
     outputMethod = console.error;
   } else if (entry.level === 'warn') {
     outputMethod = console.warn;
-  } else if (entry.level === 'debug' && console.debug) {
+  } else if (entry.level === 'debug' && !rendererProcess && console.debug) {
     outputMethod = console.debug;
   } else {
     outputMethod = console.log;
   }
 
   const parts = consoleEntryParts(entry);
-  if (isRendererProcess()) {
+  if (rendererProcess) {
     // Chromium DevTools supports CSS substitutions. Reset the style after both
     // highlighted fields so wrapped message text retains the console's normal
-    // foreground color.
+    // foreground color. Renderer DEBUG deliberately uses console.log because
+    // Chromium classifies console.debug as "Verbose" and hides it by default;
+    // Mynda's own DEBUG label and color still identify the level accurately.
     outputMethod.call(
       console,
       '%c%s%c %c%s%c %s',

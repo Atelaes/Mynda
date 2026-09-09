@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 28 suites: 27 fast suites with 208 named cases, plus the Electron end-to-end suite.
+The current catalog contains 28 suites: 27 fast suites with 209 named cases, plus the Electron end-to-end suite.
 
 ## The first commands to learn
 
@@ -76,12 +76,12 @@ A “test double” is simply a small, predictable substitute for something outs
 | `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
 | `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, early EOF, process errors, timeouts, and cleanup |
 | `RendererUtils.unit.test.js` | Unit | Batch-edit states, ratings, video validation/repair, portable artwork URLs, desktop labels, DOM ancestry, and object diffs |
-| `Player.unit.test.js` | Unit | Missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
+| `Player.unit.test.js` | Unit | Playback-attempt logs, missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
 | `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
 | `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
 | `Library.integration.test.js` | Integration | First launch, migrations, add/replace/remove, synchronization waits, subtitle-safe edits, and recovery decisions |
-| `Logger.integration.test.js` | Integration | Log routing, renderer forwarding, secret redaction, rotation, and listener shutdown |
+| `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
 | `ShareManifest.integration.test.js` | Integration | Manifest schema, checksums, safe paths, inventory, error codes, and atomic files |
 | `ShareService.integration.test.js` | Integration | Complete request → fulfillment → import flow, copies, reuse, conflicts, cancellation, and expiration |
