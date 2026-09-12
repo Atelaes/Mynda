@@ -1450,7 +1450,7 @@ class MynRecentlyWatched extends MynDropdown {
 
   findNextVideoInSeries(id) {
     const current = library.media.find(video => video && video.id === id);
-    if (!current || !current.series) return null;
+    if (!current || typeof current.series !== 'string' || !current.series.trim()) return null;
 
     const sortNumber = value => {
       const parsed = parseFloat(value);
@@ -1504,14 +1504,16 @@ class MynRecentlyWatched extends MynDropdown {
 
         return (
           <div className='container' key={id}>
-            <div className='video' onClick={() => this.props.playVideo(video.id)}>
+            <div className={`video${nextVidID ? '' : ' no-next'}`} onClick={() => this.props.playVideo(video.id)}>
               <div className='artwork' style={{backgroundImage:`url('${artworkSourceURL(video.artwork, placeholderImage)}')`}} />
               <div className='title-position-container'>
                 <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
                 {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}
               </div>
             </div>
-            <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../images/ff-icon_white.png' title='Play next video in series' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
+            {nextVidID ? (
+              <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../images/ff-icon_white.png' title='Play next video in series' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
+            ) : null}
           </div>
         );
       });

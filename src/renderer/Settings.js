@@ -1,6 +1,6 @@
 // Settings pane and its major settings views.
 const React = require('react');
-const {ipcRenderer} = require('electron');
+const {ipcRenderer, shell} = require('electron');
 const _ = require('lodash');
 const {v4: uuidv4} = require('uuid');
 const {DragDropContext, Droppable, Draggable} = require('react-beautiful-dnd');
@@ -20,7 +20,8 @@ const {
   MynEditText,
   MynEditInlineAddListWidget
 } = require('./EditorFields.js');
-const {getObjectDiff, isEqualIgnoreFuncs} = require('./RendererUtils.js');
+const {getObjectDiff, isEqualIgnoreFuncs, fileManagerName} = require('./RendererUtils.js');
+const {buildKindStats} = require('../LibraryDuplicates.js');
 const {
   PLAYLIST_FILTER_REFERENCE,
   validatePlaylistFilter
@@ -67,8 +68,8 @@ class MynSettings extends MynOpenablePane {
       playlists :   (<MynSettingsPlaylists    save={this.save} playlists={this.props.playlists} defaultcolumns={this.props.settings.preferences.defaultcolumns} displayColumnName={this.props.displayColumnName} />),
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />),
-      share : (<MynSettingsShare              settings={this.props.settings} videos={this.props.videos} />)
-
+      share : (<MynSettingsShare              settings={this.props.settings} videos={this.props.videos} />),
+      library : (<MynSettingsLibrary          videos={this.props.videos} />)
     }
     this.setState({views:views},callback);
   }
@@ -1081,6 +1082,7 @@ class MynSettingsPlaylistsTableRow extends React.Component {
                 <li><strong>lastseen:</strong> <i>[integer]</i> The date the video was last seen, seconds since Unix epoch</li>
                 <li><strong>kind:</strong> <i>[string]</i> The kind of the video (e.g. "movie", "show")</li>
                 <li><strong>filename:</strong> <i>[string]</i> The absolute file path of the video</li>
+                <li><strong>duplicates:</strong> <i>[array[string]]</i> The absolute file paths of duplicate copies found during the latest watchfolder scan</li>
                 <li><strong>artwork:</strong> <i>[string]</i> The absolute file path of the video's artwork</li>
                 <li><strong>subtitles:</strong> <i>[array[string]]</i> The absolute file paths of the video's subtitles</li>
                 <li><strong>boxoffice:</strong> <i>[number]</i> The box office earnings of the video, American dollars</li>
@@ -1880,6 +1882,171 @@ class MynSettingsThemes extends React.Component {
   }
 }
 
+class MynSettingsLibrary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      exporting: false,
+      exportMessage: '',
+      exportMessageType: '',
+      exportPath: ''
+    };
+    this.exportLibrary = this.exportLibrary.bind(this);
+    this.showFile = this.showFile.bind(this);
+  }
+
+  showFile(target, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    const filename = typeof target === 'string' ? target : target && target.filename;
+    if (!filename) return;
+    try {
+      shell.showItemInFolder(filename);
+    } catch(err) {
+      settingsLog.error('Could not show a library file in the system file manager', {
+        filename: filename,
+        error: err && err.stack ? err.stack : String(err)
+      });
+    }
+  }
+
+  async exportLibrary() {
+    if (this.state.exporting) return;
+    this.setState({
+      exporting: true,
+      exportMessage: '',
+      exportMessageType: '',
+      exportPath: ''
+    });
+
+    try {
+      const response = await ipcRenderer.invoke('library:export');
+      if (!response || response.ok !== true) {
+        const error = response && response.error ? response.error : {};
+        throw Object.assign(
+          new Error(error.message || 'Mynda could not export the library.'),
+          {code: error.code || 'EXPORT_FAILED'}
+        );
+      }
+
+      if (response.value && response.value.canceled) {
+        this.setState({exporting: false});
+        return;
+      }
+
+      const exportPath = response.value && response.value.filePath;
+      this.setState({
+        exporting: false,
+        exportMessage: 'Library exported successfully.',
+        exportMessageType: 'success',
+        exportPath: exportPath || ''
+      });
+      settingsLog.info('Library export completed', {destination: exportPath});
+    } catch(err) {
+      settingsLog.error('Library export request failed', {
+        code: err && err.code ? err.code : 'EXPORT_FAILED',
+        error: err && err.stack ? err.stack : String(err)
+      });
+      this.setState({
+        exporting: false,
+        exportMessage: err && err.message ? err.message : 'Mynda could not export the library.',
+        exportMessageType: 'error',
+        exportPath: ''
+      });
+    }
+  }
+
+  renderDuplicateVideo(entry, fileManager) {
+    const video = entry.video;
+    return (
+      <div className='duplicate-video' key={video.id || video.filename}>
+        <h4>{video.title || video.filename || 'Untitled video'}</h4>
+        <div className='duplicate-original'>
+          <span className='duplicate-label'>Library&nbsp;copy:</span>
+          <div className='duplicate-original-path'>
+            <span className='library-path'>{video.filename}</span>
+            <button onClick={event => this.showFile(video.filename, event)}>Show in {fileManager}</button>
+          </div>
+        </div>
+        <span className='duplicate-label'>Duplicate&nbsp;{entry.paths.length === 1 ? 'file' : 'files'}:</span>
+        <ul>
+          {entry.paths.map(duplicatePath => (
+            <li key={duplicatePath}>
+              <span className='library-path'>{duplicatePath}</span>
+              <button onClick={event => this.showFile(duplicatePath, event)}>Show in {fileManager}</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  render() {
+    const fileManager = fileManagerName();
+    const kinds = buildKindStats(this.props.videos || []);
+
+    return (
+      <div id='settings-library'>
+        <div className='subsection export-library-section'>
+          <h2>Export Library</h2>
+          <p>Export the library to a file for backup or use in another Mynda instance.</p>
+          <button onClick={this.exportLibrary} disabled={this.state.exporting}>
+            {this.state.exporting ? 'Exporting…' : 'Export…'}
+          </button>
+          {this.state.exportMessage ? (
+            <div className={`library-export-message ${this.state.exportMessageType}`}>
+              <div>{this.state.exportMessage}</div>
+              {this.state.exportPath ? (
+                <div className='library-export-result'>
+                  <span className='library-path'>{this.state.exportPath}</span>
+                  <button onClick={event => this.showFile(this.state.exportPath, event)}>
+                    Show in {fileManager}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        <div className='subsection library-stats-section'>
+          <h2>Library Statistics</h2>
+          <div className='kinds-stats'>
+            <h3>Media Kinds</h3>
+            {kinds.length === 0 ? <p className='library-empty'>The library does not contain any videos.</p> : (
+              <table className='kinds-table'>
+                <thead>
+                  <tr>
+                    <th>Kind</th>
+                    <th>Videos</th>
+                    <th>Duplicates</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kinds.map(kind => (
+                    <tr key={kind.value || '__none__'}>
+                      <td className='kind'>{kind.value || '(none)'}</td>
+                      <td className='count'>{kind.count} {kind.count === 1 ? 'video' : 'videos'}</td>
+                      <td className='duplicates'>
+                        {kind.duplicateCount > 0 ? (
+                          <MynParagraphFolder
+                            className='duplicates-folder'
+                            lede={`${kind.duplicateCount} duplicate ${kind.duplicateCount === 1 ? 'file' : 'files'}`}
+                            paragraph={kind.duplicateVideos.map(entry =>
+                              this.renderDuplicateVideo(entry, fileManager)
+                            )}
+                          />
+                        ) : <span className='no-duplicates'>None</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 module.exports = {
   MynSettings,
   MynSettingsFolders,
@@ -1888,5 +2055,6 @@ module.exports = {
   MynSettingsColumns,
   MynSettingsPlaylistsTableRow,
   MynSettingsShare,
-  MynSettingsThemes
+  MynSettingsThemes,
+  MynSettingsLibrary
 };

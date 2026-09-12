@@ -28,6 +28,12 @@ module.exports = [
   },
   {
     category: 'unit',
+    file: 'test/LibraryDuplicates.unit.test.js',
+    title: 'Library duplicate tracking',
+    protects: 'path normalization, scan reconciliation, offline retention, and statistics'
+  },
+  {
+    category: 'unit',
     file: 'test/PackageConfig.unit.test.js',
     title: 'Production package boundaries',
     protects: 'file boundaries, staged sidecars, strict package commands, and retired HLS code'
@@ -156,7 +162,13 @@ module.exports = [
     category: 'component',
     file: 'test/RendererComponents.component.test.js',
     title: 'Notification and navigation UI',
-    protects: 'progress language, listener cleanup, active navigation, and the New tab'
+    protects: 'progress language, listener cleanup, active navigation, the New tab, and actionable Play Next controls'
+  },
+  {
+    category: 'component',
+    file: 'test/SettingsLibrary.component.test.js',
+    title: 'Settings Library tab',
+    protects: 'export IPC, file-manager actions, media totals, and duplicate-file details'
   },
   {
     category: 'component',
@@ -168,6 +180,6 @@ module.exports = [
     category: 'end-to-end',
     file: 'test/electron/run-electron-smoke.js',
     title: 'Real Electron startup',
-    protects: 'main/renderer boot, first-launch storage, root panes, and Settings interaction'
+    protects: 'main/renderer boot, first-launch storage, root panes, and Settings tabs'
   }
 ];

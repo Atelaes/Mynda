@@ -24,6 +24,8 @@ const OmdbHelper = require('./OmdbHelper.js');
 const MovieSearch = require('./MovieSearch.js');
 const VideoExclusion = require('./VideoExclusion.js');
 const VideoRuntimeVerifier = require('./VideoRuntimeVerifier.js');
+const {ScanDuplicateTracker} = require('./LibraryDuplicates.js');
+const LibraryExport = require('./LibraryExport.js');
 const ShareService = require('./ShareService.js');
 const ShareManifest = require('./ShareManifest.js');
 const loadReactDeveloperTools = require('./ReactDevTools.js');
@@ -618,6 +620,7 @@ let videoTemplate =   {
     "ignored_subtitles" : [],
     "subtitle_tracking_initialized" : true,
     "filename" : '',
+    "duplicates" : [],
     "new" : true,
     "metadata" : {
       "codec" : "",
@@ -985,6 +988,13 @@ function mulchVideoTree(folderNode) {
 async function addVideoController() {
   let checkStart = new Date();
   let newMedia = [];
+  // A complete scan rebuilds duplicate paths from what is actually present.
+  // Paths beneath an unavailable watchfolder are retained because this pass
+  // has no evidence that those files disappeared.
+  const duplicateTracker = new ScanDuplicateTracker(
+    library.media,
+    isInUnavailableWatchFolder
+  );
   let candidateOutcomes = {
     newVideos: 0,
     reactivatedVideos: 0,
@@ -1016,9 +1026,22 @@ async function addVideoController() {
         break;
       case 'duplicate-active':
         candidateOutcomes.activeDuplicates++;
+        duplicateTracker.record(result.duplicateOfID, result.duplicatePath);
         break;
       case 'duplicate-batch':
         candidateOutcomes.batchDuplicates++;
+        duplicateTracker.record(result.duplicateOfID, result.duplicatePath);
+        // Preserve subtitles found next to a same-scan duplicate just as the
+        // active-library duplicate branch already does.
+        const batchPrimary = newMedia.find(video =>
+          video && video.id === result.duplicateOfID
+        );
+        if (batchPrimary) {
+          updateVideoSubs(batchPrimary, [
+            ...(batchPrimary.detected_subtitles || []),
+            ...(result.detectedSubtitles || [])
+          ]);
+        }
         break;
       default:
         candidateOutcomes.failedVideos++;
@@ -1038,7 +1061,7 @@ async function addVideoController() {
     elapsedMs: checkEnd-checkStart
   });
 
-  let combinedMedia = library.media.concat(newMedia);
+  let combinedMedia = duplicateTracker.apply(library.media.concat(newMedia));
   let minimumResultStatus = Promise.resolve();
   if (newMedia.length > 0 || duplicateVideos > 0) {
     // The potentially slow content-ID work is complete, so this total now
@@ -1150,8 +1173,6 @@ async function addVideoFile(video) {
   } else {
     situation = 4;
   }
-  // Now that we've checked whether this video id is in our current batch, put it there.
-  newIDs.push(id);
   let vidObj;
 
   switch(situation) {
@@ -1175,7 +1196,11 @@ async function addVideoFile(video) {
         ...(video.subtitles || [])
       ];
       updateVideoSubs(libraryVideo, duplicateDetectedSubtitles);
-      return {disposition: 'duplicate-active'};
+      return {
+        disposition: 'duplicate-active',
+        duplicateOfID: libraryVideo.id,
+        duplicatePath: file
+      };
 
     case 2:
       // If we have another new video with the same id, just skip it for now.
@@ -1184,7 +1209,12 @@ async function addVideoFile(video) {
         filename: file,
         id: id
       });
-      return {disposition: 'duplicate-batch'};
+      return {
+        disposition: 'duplicate-batch',
+        duplicateOfID: id,
+        duplicatePath: file,
+        detectedSubtitles: video.subtitles || []
+      };
 
     case 3:
     case 4:
@@ -1271,6 +1301,10 @@ async function addVideoFile(video) {
 
       if (typeof vidObj === 'object' && vidObj !== null) {
         updateVideoSubs(vidObj, video.subtitles);
+        // Register only successful additions. A failed first candidate must
+        // not cause a later copy in the same scan to be discarded as though a
+        // usable primary video already existed.
+        newIDs.push(id);
         return {
           disposition: situation === 3 ? 'reactivated' : 'new',
           video: vidObj
@@ -1385,7 +1419,8 @@ async function createVideoID(filepath) {
     try {
       baseStats = fs.lstatSync(filepath)
     } catch (e) {
-      reject(`Error when trying to create id for ${filepath}, could not read path to determine if it was a directory or a file. Not adding video.\n${err}`);
+      reject(`Error when trying to create id for ${filepath}, could not read path to determine if it was a directory or a file. Not adding video.\n${e}`);
+      return;
     }
     let hashPath = filepath;
 
@@ -1432,7 +1467,7 @@ async function createVideoID(filepath) {
     fs.createReadStream(hashPath, { end: 65535, encoding: 'hex'}).
       pipe(crypto.createHash('sha1').setEncoding('hex')).
       on('finish', function () {
-        filehash = this.read();
+        const filehash = this.read();
         // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
         const id = uuidv5(filehash, appID);
 
@@ -2813,6 +2848,45 @@ function saveBatch(batch) {
     });
   });
 }
+
+ipcMain.handle('library:export', async () => {
+  let defaultDirectory = '';
+  try {
+    defaultDirectory = app.getPath('documents');
+  } catch(err) {
+    backendLog.debug('Could not resolve the Documents directory for library export', {
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+
+  try {
+    const result = await LibraryExport.exportLibraryCopy({
+      dialog: dialog,
+      library: library,
+      parentWindow: win || null,
+      defaultDirectory: defaultDirectory
+    });
+    if (result.canceled) {
+      backendLog.debug('Library export canceled by user');
+    } else {
+      backendLog.info('Library exported', {destination: result.filePath});
+    }
+    return {ok: true, value: result};
+  } catch(err) {
+    backendLog.error('Could not export library', {
+      code: err && err.code ? err.code : 'EXPORT_FAILED',
+      error: err && err.stack ? err.stack : String(err),
+      cause: err && err.cause && err.cause.stack ? err.cause.stack : undefined
+    });
+    return {
+      ok: false,
+      error: {
+        code: err && err.code ? err.code : 'EXPORT_FAILED',
+        message: err && err.message ? err.message : 'Mynda could not export the library.'
+      }
+    };
+  }
+});
 
 ipcMain.on('settings-folder-select', (event) => {
   let options = {properties: ['openDirectory']};

@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 28 suites: 27 fast suites with 209 named cases, plus the Electron end-to-end suite.
+The current catalog contains 30 suites: 29 fast suites with 221 named cases, plus the Electron end-to-end suite.
 
 ## The first commands to learn
 
@@ -64,6 +64,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | `TableSelection.test.js` | Unit | Single, toggle, range, cross-table, offscreen, and ordered row selection |
 | `ReactDevTools.test.js` | Unit | Development extension path/loading, packaged-app skip, and graceful failures |
 | `BoxOffice.unit.test.js` | Unit | Fixed-USD parsing, bad input, full and compact formatting, locale conventions, and no currency conversion |
+| `LibraryDuplicates.unit.test.js` | Unit | Duplicate-path normalization, complete-scan reconciliation, unavailable-watchfolder retention, and per-kind totals |
 | `PackageConfig.unit.test.js` | Unit | Production file boundaries, media staging, strict package commands, and retirement of the HLS player |
 | `MediaTools.unit.test.js` | Unit | Packaged/staged executable paths, platform naming, overrides, and development fallbacks |
 | `MediaToolPolicy.unit.test.js` | Unit | LGPL-only standalone FFmpeg flags, nonfree rejection, and required MPV DVD/video capabilities on macOS, Windows, and Linux |
@@ -80,14 +81,15 @@ A “test double” is simply a small, predictable substitute for something outs
 | `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
 | `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
-| `Library.integration.test.js` | Integration | First launch, migrations, add/replace/remove, synchronization waits, subtitle-safe edits, and recovery decisions |
+| `Library.integration.test.js` | Integration | First launch, migrations, add/replace/remove, synchronization waits, scanner-owned fields, manual exports, and recovery decisions |
 | `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
 | `ShareManifest.integration.test.js` | Integration | Manifest schema, checksums, safe paths, inventory, error codes, and atomic files |
 | `ShareService.integration.test.js` | Integration | Complete request → fulfillment → import flow, copies, reuse, conflicts, cancellation, and expiration |
-| `RendererComponents.component.test.js` | Component | Status language, notification cleanup, selected navigation, and New-tab visibility |
+| `RendererComponents.component.test.js` | Component | Status language, notification cleanup, selected navigation, New-tab visibility, and actionable recently-played controls |
+| `SettingsLibrary.component.test.js` | Component | Library export requests, file-manager actions, media-kind totals, and duplicate-file details |
 | `Mynda.component.test.js` | Component | Ratings, playlist filtering, search, recent history, scan IPC, view state, and root pane composition |
-| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, isolated library creation, and Settings interaction |
+| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, isolated library creation, and Settings-tab interaction |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
 

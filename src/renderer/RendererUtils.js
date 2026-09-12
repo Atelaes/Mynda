@@ -4,6 +4,7 @@ const path = require('path');
 const URL = require('url');
 const {v4: uuidv4} = require('uuid');
 const {frontendLog} = require('./RendererRuntime.js');
+const {normalizeDuplicatePaths} = require('../LibraryDuplicates.js');
 
 // Sort display titles by their meaningful first word while preserving the
 // original title for display. This is shared by flat video tables and the
@@ -185,6 +186,7 @@ function validateVideo(video) {
     'lastseen':'integer',
     'kind':'string',
     'filename':'string',
+    'duplicates':'array',
     'artwork':'string',
     'subtitles':'array',
     'boxoffice':'number',
@@ -282,6 +284,7 @@ function validateVideo(video) {
   if (repaired.kind !== 'show') {
     repaired.seriesImdbID = '';
   }
+  repaired.duplicates = normalizeDuplicatePaths(repaired.duplicates, repaired.filename);
 
   // if no id, create one
   if (!video.id || video.id === '') {

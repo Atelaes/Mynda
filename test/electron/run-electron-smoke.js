@@ -157,6 +157,7 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
     assert.strictEqual(result.libraryCreated, true);
     assert.strictEqual(result.settingsClosed, true);
     assert.strictEqual(result.initial.grid, true);
+    assert.strictEqual(result.settings.libraryTab, true);
   } finally {
     removeDirectory(temporaryRoot);
   }

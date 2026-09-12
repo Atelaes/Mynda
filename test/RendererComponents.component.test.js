@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const {EventEmitter} = require('events');
 const React = require('react');
 const ReactDOMServer = require('react-dom/server');
@@ -45,6 +46,45 @@ const {MynNav} = loadFreshWithMocks(
   {
     'electron': {ipcRenderer},
     './RendererRuntime.js': {library: runtimeLibrary}
+  }
+);
+
+const EmptyComponent = () => React.createElement('span');
+const OverflowText = props => React.createElement('span', null, props.text);
+const {MynRecentlyWatched} = loadFreshWithMocks(
+  path.join(__dirname, '..', 'src', 'renderer', 'LibraryView.js'),
+  {
+    'electron': {ipcRenderer, shell: {showItemInFolder() {}}},
+    'react-virtuoso': {TableVirtuoso: EmptyComponent},
+    '../BoxOffice.js': {
+      formatBoxOffice: value => String(value),
+      formatCompactBoxOffice: value => String(value)
+    },
+    './RendererRuntime.js': {
+      library: runtimeLibrary,
+      libraryViewLog: quietLog,
+      playerLog: quietLog,
+      placeholderImage: '../images/qmark.png',
+      disableConfirmationDialog() {}
+    },
+    './RendererUtils.js': {
+      removeLeadingArticle: value => value,
+      artworkSourceURL: (value, fallback = '') => value || fallback,
+      fileManagerName: () => 'File Manager',
+      validateVideo: value => value
+    },
+    './TableSelection.js': {
+      selectTableRow: () => [],
+      selectedVideoIDsForTable: () => []
+    },
+    './SharedComponents.js': {MynOverflowTextMarquee: OverflowText},
+    './EditorFields.js': {
+      MynEditSeenWidget: EmptyComponent,
+      MynEditWatchlaterWidget: EmptyComponent,
+      MynEditRatingWidget: EmptyComponent,
+      MynEditPositionWidget: EmptyComponent,
+      MynShowPositionWidget: EmptyComponent
+    }
   }
 );
 
@@ -143,6 +183,71 @@ suite.test('shows the New tab and count when new media exists', () => {
   assert(html.includes('id="playlist-new"'));
   assert(html.includes('class="nav-message loud"'));
   assert(html.includes('(2)'));
+});
+
+function recentlyPlayedItem(id) {
+  const played = [];
+  const instance = new MynRecentlyWatched({
+    list: [id],
+    mediaRevision: 1,
+    selected: 0,
+    playVideo: videoID => played.push(videoID)
+  });
+  instance.setState = update => {
+    instance.state = Object.assign({}, instance.state, update);
+  };
+  instance.createListItems();
+  return {
+    instance,
+    played,
+    html: ReactDOMServer.renderToStaticMarkup(instance.render())
+  };
+}
+
+suite.test('shows Play Next only when a later video exists in the same series', () => {
+  runtimeLibrary.media = [
+    {id: 'movie', title: 'Standalone Movie', series: '', season: '', episode: '', artwork: '', position: 0},
+    {id: 'singleton', title: 'Only Episode', series: 'One Episode Show', season: 1, episode: 1, artwork: '', position: 0},
+    {id: 'episode-1', title: 'Episode One', series: 'Continuing Show', season: 1, episode: 1, artwork: '', position: 0},
+    {id: 'episode-2', title: 'Episode Two', series: 'Continuing Show', season: 1, episode: 2, artwork: '', position: 0},
+    {id: 'episode-3', title: 'Episode Three', series: 'Continuing Show', season: 1, episode: 3, artwork: '', position: 0}
+  ];
+
+  const movie = recentlyPlayedItem('movie');
+  const singleton = recentlyPlayedItem('singleton');
+  const middle = recentlyPlayedItem('episode-2');
+  const finalEpisode = recentlyPlayedItem('episode-3');
+
+  assert(!movie.html.includes('class="next-btn"'));
+  assert(movie.html.includes('class="video no-next"'));
+  assert(!singleton.html.includes('class="next-btn"'));
+  assert(singleton.html.includes('class="video no-next"'));
+  assert.strictEqual(middle.instance.findNextVideoInSeries('episode-2'), 'episode-3');
+  assert(middle.html.includes('class="next-btn"'));
+  assert(!middle.html.includes('class="video no-next"'));
+  assert.strictEqual(finalEpisode.instance.findNextVideoInSeries('episode-3'), null);
+  assert(!finalEpisode.html.includes('class="next-btn"'));
+  assert(finalEpisode.html.includes('class="video no-next"'));
+});
+
+suite.test('keeps recently played rows the same width when Play Next is hidden', () => {
+  const stylesheet = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'styles', 'main.css'),
+    'utf8'
+  );
+  const noNextRule = stylesheet.match(
+    /\.pb-element\.recent \.dropdown-item \.video\.no-next\s*\{([^}]*)\}/
+  );
+
+  assert(noNextRule, 'Expected a style rule for recently played videos without a next button');
+  assert(
+    /border-radius:\s*var\(--vid-height\)\s*;/.test(noNextRule[1]),
+    'Expected the video row to retain its fully rounded edge'
+  );
+  assert(
+    /padding-right:\s*var\(--vid-height\)\s*;/.test(noNextRule[1]),
+    'Expected the video row to occupy the missing Play Next button width'
+  );
 });
 
 runSuite(suite);

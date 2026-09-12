@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const _ = require('lodash');
 const { ipcRenderer } = require('electron');
 const { trackManualSubtitleEdit } = require('./SubtitleMatcher.js');
+const {normalizeDuplicatePaths} = require('./LibraryDuplicates.js');
 
 // LibraryPersistence owns file validation, atomic writes, automatic snapshots,
 // retention, and preservation of damaged bytes. Keeping those mechanics out of
@@ -119,11 +120,10 @@ class Library {
       }
     }
 
-    // Remove the retired per-video field and add the persistent parent-series
-    // identifier to every active and inactive video. The video schema remains
-    // universal: non-show videos carry an empty string rather than omitting a
-    // show-only property, while existing show IDs survive ordinary startups
-    // and backup recovery.
+    // Remove the retired per-video field and add current universal fields to
+    // every active and inactive video. Non-show videos retain an empty parent
+    // series ID, while duplicate paths are normalized and cannot include the
+    // selected library copy itself.
     for (const listName of ['media', 'inactive_media']) {
       if (Array.isArray(this[listName])) {
         this[listName].forEach(video => {
@@ -131,6 +131,7 @@ class Library {
           delete video.collections;
           video.seriesImdbID = video.kind === 'show' &&
             typeof video.seriesImdbID === 'string' ? video.seriesImdbID : '';
+          video.duplicates = normalizeDuplicatePaths(video.duplicates, video.filename);
         });
       }
     }
@@ -168,9 +169,8 @@ class Library {
     delete replacement.__mynda_subtitles_edited;
 
     if (oldVideo && subtitlesWereEdited) {
-      return trackManualSubtitleEdit(oldVideo, replacement);
-    }
-    if (oldVideo) {
+      replacement = trackManualSubtitleEdit(oldVideo, replacement);
+    } else if (oldVideo) {
       replacement.subtitles = _.cloneDeep(oldVideo.subtitles || []);
       for (const property of [
         'detected_subtitles',
@@ -184,6 +184,16 @@ class Library {
           delete replacement[property];
         }
       }
+    }
+
+    // Duplicate paths belong to the scanner, not the editor. Preserve the
+    // freshest main-process value even if an editor opened before a scan and
+    // later saves an otherwise unrelated metadata change.
+    if (oldVideo) {
+      replacement.duplicates = normalizeDuplicatePaths(
+        oldVideo.duplicates,
+        oldVideo.filename
+      );
     }
     return replacement;
   }

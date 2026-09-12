@@ -131,6 +131,7 @@ suite.test('repairs malformed universal fields and removes series IDs from movie
     cast: 'not an array',
     ratings: null,
     metadata: null,
+    duplicates: 'not-an-array',
     seen: 'yes',
     seriesImdbID: 'tt-wrong-for-a-movie'
   });
@@ -142,6 +143,7 @@ suite.test('repairs malformed universal fields and removes series IDs from movie
   assert.deepStrictEqual(malformed.cast, []);
   assert.deepStrictEqual(Object.keys(malformed.ratings).sort(), ['imdb', 'mc', 'rt', 'user']);
   assert.strictEqual(malformed.metadata.duration, 0);
+  assert.deepStrictEqual(malformed.duplicates, []);
   assert.strictEqual(malformed.seen, false);
   assert.strictEqual(malformed.seriesImdbID, '');
   assert.strictEqual(loggedWarnings.length, 1);

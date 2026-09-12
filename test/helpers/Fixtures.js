@@ -20,6 +20,7 @@ function videoFixture(overrides = {}) {
     lastseen: '',
     kind: 'movie',
     filename: '/media/Movies/Alien (1979)/Alien.mkv',
+    duplicates: [],
     artwork: '',
     subtitles: [],
     boxoffice: '',

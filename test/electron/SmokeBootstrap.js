@@ -71,9 +71,11 @@ async function inspectMainWindow(window) {
       pane: Boolean(document.getElementById('settings-pane')),
       tabs: Boolean(document.getElementById('settings-tabs')),
       foldersTab: Boolean(document.getElementById('settings-tab-folders')),
+      libraryTab: Boolean(document.getElementById('settings-tab-library')),
       closeButton: Boolean(document.querySelector('#settings-pane .openable-close-btn'))
     }))()`);
-    if (!settings.pane || !settings.tabs || !settings.foldersTab || !settings.closeButton) {
+    if (!settings.pane || !settings.tabs || !settings.foldersTab ||
+        !settings.libraryTab || !settings.closeButton) {
       finish(false, {stage: 'open-settings', initial, settings});
       return;
     }

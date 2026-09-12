@@ -10,6 +10,7 @@ const {
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 const {libraryFixture, videoFixture} = require('./helpers/Fixtures.js');
 const Persistence = require('../src/LibraryPersistence.js');
+const LibraryExport = require('../src/LibraryExport.js');
 
 const suite = createSuite(
   'Library model, migration, synchronization, and recovery',
@@ -85,8 +86,24 @@ suite.test('migrates older libraries while preserving explicit preferences and s
       },
       playlists: [{id: 'old', name: 'Old', view: 'retired-view'}],
       media: [
-        videoFixture({id: 'movie', collections: ['Retired'], seriesImdbID: 'tt-wrong'}),
-        videoFixture({id: 'show', kind: 'show', series: 'Party of Five', seriesImdbID: 'tt0108894'})
+        videoFixture({
+          id: 'movie',
+          collections: ['Retired'],
+          seriesImdbID: 'tt-wrong',
+          duplicates: 'not-an-array'
+        }),
+        videoFixture({
+          id: 'show',
+          kind: 'show',
+          series: 'Party of Five',
+          seriesImdbID: 'tt0108894',
+          filename: '/watch/Party of Five.mkv',
+          duplicates: [
+            '/watch/Party of Five.mkv',
+            '/watch/Party of Five Copy.mkv',
+            '/watch/Party of Five Copy.mkv'
+          ]
+        })
       ]
     });
     Persistence.writeLibraryFile(libraryPath, oldLibrary);
@@ -98,7 +115,9 @@ suite.test('migrates older libraries while preserving explicit preferences and s
     assert.strictEqual(instance.settings.preferences.exclude_trailers_from_library, true);
     assert.strictEqual(Object.prototype.hasOwnProperty.call(instance.media[0], 'collections'), false);
     assert.strictEqual(instance.media[0].seriesImdbID, '');
+    assert.deepStrictEqual(instance.media[0].duplicates, []);
     assert.strictEqual(instance.media[1].seriesImdbID, 'tt0108894');
+    assert.deepStrictEqual(instance.media[1].duplicates, ['/watch/Party of Five Copy.mkv']);
     assert.strictEqual(instance.playlists[0].view, 'flat');
     assert.strictEqual(Object.prototype.hasOwnProperty.call(
       instance.settings.preferences.override_dialogs,
@@ -147,12 +166,19 @@ suite.test('preserves current subtitle provenance during unrelated renderer edit
       detected_subtitles: [detected],
       manual_subtitles: [],
       ignored_subtitles: ['/watch/Movie.commentary.srt'],
-      subtitle_tracking_initialized: true
+      subtitle_tracking_initialized: true,
+      duplicates: ['/watch/Movie Copy.mkv']
     });
-    const replacement = videoFixture({id: 'movie', title: 'New title', subtitles: []});
+    const replacement = videoFixture({
+      id: 'movie',
+      title: 'New title',
+      subtitles: [],
+      duplicates: ['/stale/renderer-copy.mkv']
+    });
     const prepared = instance.prepareRendererVideoReplacement(oldVideo, replacement);
     assert.deepStrictEqual(prepared.subtitles, [detected]);
     assert.deepStrictEqual(prepared.ignored_subtitles, ['/watch/Movie.commentary.srt']);
+    assert.deepStrictEqual(prepared.duplicates, ['/watch/Movie Copy.mkv']);
     assert(ipcRenderer.sent.some(entry => entry.channel === 'lib-beacon'));
     delete global.savedPing;
   }
@@ -218,6 +244,65 @@ suite.test('resolves idle waiters only after the real synchronization confirmati
     await waiting;
     assert.strictEqual(resolved, true);
     assert.strictEqual(instance.idleWaiters.length, 0);
+  })
+);
+
+suite.test('exports a validated atomic library copy through the save-dialog workflow', () =>
+  withTemporaryDirectory('library-manual-export', async directory => {
+    const {Library} = loadLibraryClass(directory);
+    const instance = new Library();
+    instance.media = [videoFixture({id: 'exported-video'})];
+    const chosenWithoutExtension = path.join(directory, 'Chosen Library Backup');
+    const calls = [];
+    const parentWindow = {name: 'main-window'};
+    const dialog = {
+      async showSaveDialog(parent, options) {
+        calls.push({parent, options});
+        return {canceled: false, filePath: chosenWithoutExtension};
+      }
+    };
+
+    const result = await LibraryExport.exportLibraryCopy({
+      dialog,
+      library: instance,
+      parentWindow,
+      defaultDirectory: directory,
+      now: new Date('2026-09-11T12:34:56.789Z')
+    });
+
+    assert.strictEqual(result.canceled, false);
+    assert.strictEqual(result.filePath, `${chosenWithoutExtension}.json`);
+    assert.strictEqual(calls[0].parent, parentWindow);
+    assert.strictEqual(
+      calls[0].options.defaultPath,
+      path.join(directory, 'Mynda Library Backup 2026-09-11T12-34-56-789Z.json')
+    );
+    assert.deepStrictEqual(
+      Persistence.readLibraryFile(result.filePath).data.media.map(video => video.id),
+      ['exported-video']
+    );
+  })
+);
+
+suite.test('handles export cancellation and refuses to overwrite the live library', () =>
+  withTemporaryDirectory('library-manual-export-guards', async directory => {
+    const {Library} = loadLibraryClass(directory);
+    const instance = new Library();
+    const canceled = await LibraryExport.exportLibraryCopy({
+      dialog: {showSaveDialog: async () => ({canceled: true})},
+      library: instance,
+      defaultDirectory: directory
+    });
+    assert.deepStrictEqual(canceled, {canceled: true, filePath: null});
+
+    await assert.rejects(
+      LibraryExport.exportLibraryCopy({
+        dialog: {showSaveDialog: async () => ({canceled: false, filePath: instance.path})},
+        library: instance,
+        defaultDirectory: directory
+      }),
+      error => error && error.code === 'EXPORT_PRIMARY_LIBRARY'
+    );
   })
 );
 
