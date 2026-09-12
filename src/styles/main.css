@@ -1731,27 +1731,35 @@ table.compact .movie-row {
   user-select: text;
 }
 
-#settings-library .kinds-table {
+#settings-library .library-stats-section > div + div {
+  margin-top: 1.2em;
+}
+
+#settings-library .library-stats-section h3 {
+  margin-bottom: .35em;
+}
+
+#settings-library .library-stats-table {
   border-spacing: 0;
   border-collapse: collapse;
   max-width: 100%;
 }
 
-#settings-library .kinds-table tr:nth-of-type(even) {
+#settings-library .library-stats-table tr:nth-of-type(even) {
   background-color: var(--movie-row-bg-even);
 }
 
-#settings-library .kinds-table tr td:last-child {
+#settings-library .library-stats-table tr td:last-child {
   border-top-right-radius: .5em;
   border-bottom-right-radius: .5em;
 }
 
-#settings-library .kinds-table tr td:first-child {
+#settings-library .library-stats-table tr td:first-child {
   border-top-left-radius: .5em;
   border-bottom-left-radius: .5em;
 }
 
-#settings-library .kinds-table th {
+#settings-library .library-stats-table th {
   color: var(--th-text);
   font-family: var(--th-font);
   font-size: calc(var(--th-font-size) * .65);
@@ -1759,7 +1767,7 @@ table.compact .movie-row {
   padding: .2em .5em;
 }
 
-#settings-library .kinds-table td {
+#settings-library .library-stats-table td {
   padding: .2em .5em;
   border-width: 0;
   vertical-align: top;
@@ -1767,7 +1775,13 @@ table.compact .movie-row {
 }
 
 #settings-library .kinds-table td.kind,
-#settings-library .kinds-table td.count {
+#settings-library .library-stats-table td.status,
+#settings-library .library-stats-table td.resolution,
+#settings-library .library-stats-table td.count,
+#settings-library .library-stats-table td.series-count,
+#settings-library .library-stats-table td.seen-count,
+#settings-library .library-stats-table td.unseen-count,
+#settings-library .library-stats-table td.percentage {
   white-space: nowrap;
 }
 
@@ -1776,35 +1790,55 @@ table.compact .movie-row {
   font-size: 1.2em;
 }
 
-#settings-library .kinds-table td.count {
+#settings-library .library-stats-table td.count,
+#settings-library .library-stats-table td.series-count,
+#settings-library .library-stats-table td.seen-count,
+#settings-library .library-stats-table td.unseen-count,
+#settings-library .library-stats-table td.percentage {
   text-align: right;
   font-family: var(--mono-font);
 }
 
-#settings-library .kinds-table td.duplicates {
-  min-width: 12em;
+/* Reserve the same space for 0.0% through 100.0% in every kind row. The
+   surrounding count and parentheses then align as well as the decimal point. */
+#settings-library .kinds-table .viewing-percentage {
+  display: inline-block;
+  width: 6ch;
+  text-align: right;
+}
+
+#settings-library .duplicates-explanation,
+#settings-library .duplicates-summary {
   font-size: .9em;
+  margin: .35em 0 .65em;
 }
 
 #settings-library .duplicates-folder .text-container {
   min-width: 0;
 }
 
+#settings-library .duplicates-stats .duplicates-folder {
+  max-width: 100%;
+  font-size: .9em;
+}
+
+#settings-library .duplicates-folder + .duplicates-folder {
+  margin-top: .65em;
+  padding-top: .65em;
+  border-top: 1px solid var(--lighter-bg);
+}
+
+#settings-library .duplicates-folder .lede {
+  color: var(--colorful-text);
+  font-family: var(--settings-subheader-font);
+  font-style: var(--settings-subheader-fontstyle);
+  font-weight: var(--settings-subheader-fontweight);
+  overflow-wrap: anywhere;
+}
+
 #settings-library .duplicate-video {
   margin: .65em 0;
-  padding-bottom: .65em;
-  border-bottom: 1px solid var(--lighter-bg);
   line-height: 1.2em;
-}
-
-#settings-library .duplicate-video:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-#settings-library .duplicate-video h4 {
-  margin-bottom: .25em;
-  color: var(--colorful-text);
 }
 
 #settings-library .duplicate-video ul,

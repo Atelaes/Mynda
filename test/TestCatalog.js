@@ -30,7 +30,19 @@ module.exports = [
     category: 'unit',
     file: 'test/LibraryDuplicates.unit.test.js',
     title: 'Library duplicate tracking',
-    protects: 'path normalization, scan reconciliation, offline retention, and statistics'
+    protects: 'path normalization, scan reconciliation, and offline retention'
+  },
+  {
+    category: 'unit',
+    file: 'test/LibraryStats.unit.test.js',
+    title: 'Library statistics',
+    protects: 'viewing totals, visible-title series grouping, resolution tiers, and global duplicates'
+  },
+  {
+    category: 'unit',
+    file: 'test/VideoResolution.unit.test.js',
+    title: 'Shared resolution buckets',
+    protects: 'all bucket boundaries, crops, anamorphic ratios, portrait video, panoramas, and unknown metadata'
   },
   {
     category: 'unit',
@@ -71,8 +83,8 @@ module.exports = [
   {
     category: 'unit',
     file: 'test/MediaMetadata.unit.test.js',
-    title: 'Media metadata paths',
-    protects: 'container durations and writable packaged-app FFmpeg scratch output'
+    title: 'Media metadata selection and normalization',
+    protects: 'playable video selection, cover-art rejection, aspect ratios, fallback merging, legacy rechecks, and scratch output'
   },
   {
     category: 'unit',
@@ -124,6 +136,12 @@ module.exports = [
   },
   {
     category: 'integration',
+    file: 'test/MediaMetadata.integration.test.js',
+    title: 'Real video metadata and embedded artwork',
+    protects: 'actual FFprobe and FFmpeg fallback selection of videos with cover art, genuine MJPEG, and cleanup on failure'
+  },
+  {
+    category: 'integration',
     file: 'test/LibraryPersistence.integration.test.js',
     title: 'Library persistence',
     protects: 'validation, atomic saves, snapshots, retention, recovery, and damaged bytes'
@@ -161,14 +179,14 @@ module.exports = [
   {
     category: 'component',
     file: 'test/RendererComponents.component.test.js',
-    title: 'Notification and navigation UI',
-    protects: 'progress language, listener cleanup, active navigation, the New tab, and actionable Play Next controls'
+    title: 'Notification, navigation, and playlist UI',
+    protects: 'progress language, listener cleanup, navigation, Play Next, resolution cells, dimension tooltips, and bucket sorting'
   },
   {
     category: 'component',
     file: 'test/SettingsLibrary.component.test.js',
     title: 'Settings Library tab',
-    protects: 'export IPC, file-manager actions, media totals, and duplicate-file details'
+    protects: 'export IPC, aligned statistics, per-video duplicate folders, rescan guidance, and file-manager actions'
   },
   {
     category: 'component',
@@ -180,6 +198,6 @@ module.exports = [
     category: 'end-to-end',
     file: 'test/electron/run-electron-smoke.js',
     title: 'Real Electron startup',
-    protects: 'main/renderer boot, first-launch storage, root panes, and Settings tabs'
+    protects: 'main/renderer boot, first-launch storage, root panes, Settings tabs, and Library statistics'
   }
 ];

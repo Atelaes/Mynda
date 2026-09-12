@@ -6,14 +6,13 @@ const {
 const {
   duplicatePathKey,
   normalizeDuplicatePaths,
-  ScanDuplicateTracker,
-  buildKindStats
+  ScanDuplicateTracker
 } = require('../src/LibraryDuplicates.js');
 
 const suite = createSuite(
   'Library duplicate-path tracking',
   'unit',
-  'Protects duplicate-path normalization, scan reconciliation, offline retention, and Settings statistics.'
+  'Protects duplicate-path normalization, scan reconciliation, and offline retention.'
 );
 
 suite.test('normalizes absolute paths and removes invalid, repeated, and primary entries', () => {
@@ -68,24 +67,6 @@ suite.test('tracks duplicates for a primary video first discovered in the same s
     filename: '/watch/First Copy.mkv'
   }]);
   assert.deepStrictEqual(videos[0].duplicates, ['/watch/Second Copy.mkv']);
-});
-
-suite.test('counts duplicate files rather than only videos that have duplicates', () => {
-  const stats = buildKindStats([
-    {id: 'movie-1', kind: 'movie', filename: '/watch/One.mkv', duplicates: ['/dup/One A.mkv', '/dup/One B.mkv']},
-    {id: 'movie-2', kind: 'movie', filename: '/watch/Two.mkv', duplicates: []},
-    {id: 'show-1', kind: 'show', filename: '/watch/Episode.mkv', duplicates: ['/dup/Episode.mkv']}
-  ], 'linux');
-
-  assert.deepStrictEqual(stats.map(group => ({
-    kind: group.value,
-    videos: group.count,
-    duplicates: group.duplicateCount,
-    sources: group.duplicateVideos.length
-  })), [
-    {kind: 'movie', videos: 2, duplicates: 2, sources: 1},
-    {kind: 'show', videos: 1, duplicates: 1, sources: 1}
-  ]);
 });
 
 runSuite(suite);

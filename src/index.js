@@ -1095,8 +1095,8 @@ async function addVideoController() {
   // so that even if the library call hasn't finished, we're not using an outdated media object here
   let metaStart = new Date();
   let unchecked = combinedMedia.filter(v =>
-    v !== null && !v.metadata.checked && !isInUnavailableWatchFolder(v.filename)
-  ); // all available videos in the library that haven't already been checked for metadata
+    v !== null && MediaMetadata.needsMetadataScan(v.metadata) && !isInUnavailableWatchFolder(v.filename)
+  ); // Include one recheck of legacy MJPEG metadata that may describe cover art.
   let numTotal = unchecked.length;
   let numChecked = 0;
   let numSuccessful = 0;
@@ -1111,13 +1111,15 @@ async function addVideoController() {
   // loop through all the unchecked videos and check them,
   // storing the metadata in the metadataToAdd object with the video's id as the key
   for (let v of unchecked) {
-    if (v !== null && !v.metadata.checked) {
+    if (v !== null && MediaMetadata.needsMetadataScan(v.metadata)) {
       numChecked++;
       win.webContents.send('status-update', {action: 'metadata', numCurrent: numChecked, numTotal: numTotal});
       let metadata = await getMetadata(v, {
-        purpose: 'populate technical metadata for unchecked library video'
+        purpose: v.metadata && v.metadata.checked ?
+          'recheck legacy video metadata that may describe cover art' :
+          'populate technical metadata for unchecked library video'
       });
-      if (metadata.hasOwnProperty('checked') && Object.keys(metadata).length > 1) numSuccessful++; // count how many videos we actually got some data for, just to notify the user
+      if (MediaMetadata.hasTechnicalMetadata(metadata)) numSuccessful++;
       metadataToAdd[v.id] = metadata;
     }
   }
@@ -1325,90 +1327,14 @@ async function getMetadata(video, options = {}) {
   let file = video.filename;
   let purpose = metadataPurpose(options);
   let logContext = {filename: file, purpose: purpose};
-  let returnObj = {};
-  returnObj.checked = true;
   metadataLog.debug('Video metadata retrieval started', logContext);
-  try {
-    // vidObj.metadata = await getVideoMetadata(file);
-    if (!MediaTools.ffprobePath) {
-      throw new Error('bundled FFprobe executable is unavailable');
-    }
-
-    let data = await MediaTools.probeFile(file);
-
-    //console.log(data);
-
-    for (const stream of (Array.isArray(data.streams) ? data.streams : [])) {
-      try {
-        if (stream.codec_type === 'video') {
-          returnObj.codec = stream.codec_name;
-          returnObj.duration = Number(stream.duration);
-          returnObj.width = stream.width;
-          returnObj.height = stream.height;
-          returnObj.aspect_ratio = stream.display_aspect_ratio;
-          let f = stream.avg_frame_rate.split('/');
-          returnObj.framerate = Math.round(Number(f[0]) / Number(f[1]) * 100) / 100;
-        }
-        if (stream.codec_type === 'audio') {
-          returnObj.audio_codec = stream.codec_name;
-          returnObj.audio_layout = stream.channel_layout;
-          returnObj.audio_channels = stream.channels;
-        }
-        // if we didn't get a duration already,
-        // grab one from whatever stream has one
-        // (e.g. mkv files don't seem to store duration
-        // in the video or audio streams, but may have it in a subtitle stream)
-        // if (!vidObj.metadata.duration) {
-        //   console.log(`Taking duration (${stream.duration}) from ${stream.codec_type} stream`);
-        //   vidObj.metadata.duration = Number(stream.duration);
-        // }
-      } catch(err) {
-        metadataLog.debug('Could not store one ffprobe metadata stream', {
-          ...logContext,
-          error: err
-        });
-      }
-    }
-
-    // MKV/Matroska often reports duration only at data.format.duration rather
-    // than on the video stream. Use the complete FFprobe result before falling
-    // back to the more expensive FFmpeg process.
-    if (!returnObj.duration) {
-      returnObj.duration = MediaMetadata.durationFromProbe(data) || undefined;
-    }
-  } catch(err) {
-    // Retain FFmpeg as a conservative fallback for malformed containers and
-    // other files that FFprobe cannot describe completely.
-    metadataLog.debug('ffprobe metadata retrieval failed; trying FFmpeg fallback', {
-      ...logContext,
-      error: err
-    });
-  }
-
-  // some files (.mkv) will give us metadata, but do not store the duration for some reason;
-  // in this case, we analyze the file with ffmpeg to obtain the duration
-  if (!returnObj.duration) { // value could be either 0 (in case of error) or undefined, if we didn't get a duration
-    try {
-      let ffmpegData = await getMetadataFromFFmpeg(file, video.id, {purpose: purpose});
-      metadataLog.debug('FFmpeg metadata retrieved', {
-        ...logContext,
-        metadata: ffmpegData
-      });
-      returnObj = {...ffmpegData, ...returnObj};
-    } catch(err) {
-      metadataLog.warn('Could not retrieve video metadata with FFmpeg', {
-        ...logContext,
-        error: err
-      });
-    }
-  }
-
-
-  //Replace the library entry with our new version.
-  //Even if everything failed, we've set metadata.checked to true, so we don't
-  //waste time trying again.
-  //library.replace(`media.id=${video.id}`, video);
-  return returnObj;
+  return MediaMetadata.retrieveMetadata({
+    probe: () => MediaTools.probeFile(file),
+    fallback: () => getMetadataFromFFmpeg(file, video.id, {purpose}),
+    previous: video.metadata,
+    log: metadataLog,
+    context: logContext
+  });
 }
 
 
@@ -1563,145 +1489,9 @@ function getFileBirthtime(file) {
 }
 
 function getMetadataFromFFmpeg(filepath, id, options = {}) {
-  return new Promise((resolve, reject) => {
-    let purpose = metadataPurpose(options);
-    let logContext = {filename: filepath, purpose: purpose};
-    let tempFile;
-    const removeTempFile = () => {
-      if (!tempFile) return;
-      fs.unlink(tempFile, err => {
-        if (err && err.code !== 'ENOENT') {
-          metadataLog.debug('Could not remove FFmpeg metadata scratch file', {
-            ...logContext,
-            tempFile: tempFile,
-            error: err
-          });
-        }
-      });
-    };
-    try {
-      metadataLog.debug('Starting FFmpeg metadata fallback', {
-        ...logContext,
-        id: id
-      });
-
-      tempFile = MediaMetadata.createFallbackOutputPath(app, {
-        identifier: uuidv4()
-      });
-
-      // var outStream = fs.createWriteStream('output.mkv');
-
-      let cmd = ffmpeg(filepath, {
-        // timeout:600
-      }).on('codecData', (data) => {
-        cmd.kill();
-
-        metadataLog.debug('FFmpeg codec data received', {
-          ...logContext,
-          codecData: data
-        });
-        let metadata = {};
-
-        // get duration
-        if (data.duration) {
-          let timeArr = data.duration.split(':');
-          let seconds = 0;
-          if (timeArr.length >= 3) {
-            seconds += timeArr[0] * 60 * 60;
-            seconds += timeArr[1] * 60;
-            seconds += timeArr[2] * 1;
-          } else if (!isNaN(Number(data.duration))) {
-            seconds = Number(data.duration);
-          }
-          metadata.duration = seconds;
-        }
-
-        // get video codec
-        if (data.video) {
-          metadata.codec = data.video;
-        }
-
-        // get other video details
-        if (data.video_details && Array.isArray(data.video_details)) {
-          data.video_details.map(detail => {
-            // width and height
-            let match = detail.match(/\b(\d{2,5})x(\d{2,5})\b/);
-            if (match && match.length >= 3) {
-              metadata.width = match[1];
-              metadata.height = match[2];
-              return;
-            }
-            // framerate
-            match = detail.match(/^(\d+\.?\d*)\sfps$/);
-            if (match && match.length >= 2) {
-              metadata.framerate = Number(match[1]);
-              return;
-            }
-            // aspect ratio
-            match = detail.match(/DAR\s+(\d+:\d+)/);
-            if (match && match.length >= 2) {
-              metadata.aspect_ratio = match[1];
-              return;
-            }
-
-          });
-        }
-
-        // get audio codec
-        if (data.audio) {
-          metadata.audio_codec = data.audio;
-        }
-
-        // get other audio details
-        if (data.audio_details && Array.isArray(data.audio_details)) {
-          // audio layout and audio channels
-          data.audio_details.map(detail => {
-            let poss_values = {
-              'mono' : 1,
-              'stereo' : 2,
-              '2.0' : 2,
-              '2.1' : 3,
-              '5.1' : 6,
-              '6.1' : 7,
-              '7.1' : 8
-            }
-            if (Object.keys(poss_values).includes(detail)) {
-              metadata.audio_layout = detail;
-              metadata.audio_channels = poss_values[detail];
-            }
-          });
-        }
-
-        removeTempFile();
-        resolve(metadata);
-
-      }).on('end', (stdout, stderr) => {
-        //console.log('==== FFMPEG end ====');
-        //console.log(stdout);
-        removeTempFile();
-      }).on('error', (err) => {
-        metadataLog.debug('FFmpeg metadata fallback process failed', {
-          ...logContext,
-          error: err
-        });
-        reject(err.message);
-        removeTempFile();
-      }).save(tempFile);
-
-      // .save('~/Documents/Coding/Mynda/sandbox/Mynda Example Watchfolders/temp_output.mkv');
-
-      // let stream = cmd.pipe();
-      // stream.on('data', (chunk) => {
-      //   console.log('ffmpeg just wrote ' + chunk.length + ' bytes');
-      // });
-
-    } catch(err) {
-      metadataLog.debug('Could not start FFmpeg metadata fallback', {
-        ...logContext,
-        error: err
-      });
-      reject(err);
-    }
+  return MediaMetadata.readFfmpegMetadata(filepath, {
+    ffmpeg, app, identifier: uuidv4(), log: metadataLog,
+    context: {filename: filepath, id, purpose: metadataPurpose(options)}
   });
 }
 

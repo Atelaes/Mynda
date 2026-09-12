@@ -21,7 +21,7 @@ const {
   MynEditInlineAddListWidget
 } = require('./EditorFields.js');
 const {getObjectDiff, isEqualIgnoreFuncs, fileManagerName} = require('./RendererUtils.js');
-const {buildKindStats} = require('../LibraryDuplicates.js');
+const {buildLibraryStats, formatPercentage, percentage} = require('../LibraryStats.js');
 const {
   PLAYLIST_FILTER_REFERENCE,
   validatePlaylistFilter
@@ -1955,11 +1955,19 @@ class MynSettingsLibrary extends React.Component {
     }
   }
 
+  renderViewingCount(count, total) {
+    return (
+      <React.Fragment>
+        <span className='viewing-number'>{count}</span>{' ('}
+        <span className='viewing-percentage'>{percentage(count, total).toFixed(1)}%</span>{')'}
+      </React.Fragment>
+    );
+  }
+
   renderDuplicateVideo(entry, fileManager) {
     const video = entry.video;
     return (
-      <div className='duplicate-video' key={video.id || video.filename}>
-        <h4>{video.title || video.filename || 'Untitled video'}</h4>
+      <div className='duplicate-video' onClick={event => event.stopPropagation()}>
         <div className='duplicate-original'>
           <span className='duplicate-label'>Library&nbsp;copy:</span>
           <div className='duplicate-original-path'>
@@ -1982,7 +1990,7 @@ class MynSettingsLibrary extends React.Component {
 
   render() {
     const fileManager = fileManagerName();
-    const kinds = buildKindStats(this.props.videos || []);
+    const stats = buildLibraryStats(this.props.videos || []);
 
     return (
       <div id='settings-library'>
@@ -2008,38 +2016,99 @@ class MynSettingsLibrary extends React.Component {
         </div>
         <div className='subsection library-stats-section'>
           <h2>Library Statistics</h2>
+          <div className='viewing-stats'>
+            <h3>Viewing Status</h3>
+            <table className='library-stats-table viewing-table'>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Videos</th>
+                  <th>Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className='status'>Seen</td>
+                  <td className='count'>{stats.seenCount} {stats.seenCount === 1 ? 'video' : 'videos'}</td>
+                  <td className='percentage'>{formatPercentage(stats.seenCount, stats.videoCount)}</td>
+                </tr>
+                <tr>
+                  <td className='status'>Unseen</td>
+                  <td className='count'>{stats.unseenCount} {stats.unseenCount === 1 ? 'video' : 'videos'}</td>
+                  <td className='percentage'>{formatPercentage(stats.unseenCount, stats.videoCount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div className='kinds-stats'>
             <h3>Media Kinds</h3>
-            {kinds.length === 0 ? <p className='library-empty'>The library does not contain any videos.</p> : (
-              <table className='kinds-table'>
+            {stats.kinds.length === 0 ? <p className='library-empty'>The library does not contain any videos.</p> : (
+              <table className='library-stats-table kinds-table'>
                 <thead>
                   <tr>
                     <th>Kind</th>
                     <th>Videos</th>
-                    <th>Duplicates</th>
+                    <th>Series</th>
+                    <th>Seen</th>
+                    <th>Unseen</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {kinds.map(kind => (
+                  {stats.kinds.map(kind => (
                     <tr key={kind.value || '__none__'}>
                       <td className='kind'>{kind.value || '(none)'}</td>
                       <td className='count'>{kind.count} {kind.count === 1 ? 'video' : 'videos'}</td>
-                      <td className='duplicates'>
-                        {kind.duplicateCount > 0 ? (
-                          <MynParagraphFolder
-                            className='duplicates-folder'
-                            lede={`${kind.duplicateCount} duplicate ${kind.duplicateCount === 1 ? 'file' : 'files'}`}
-                            paragraph={kind.duplicateVideos.map(entry =>
-                              this.renderDuplicateVideo(entry, fileManager)
-                            )}
-                          />
-                        ) : <span className='no-duplicates'>None</span>}
-                      </td>
+                      <td className='series-count'>{kind.seriesCount} series</td>
+                      <td className='seen-count'>{this.renderViewingCount(kind.seenCount, kind.count)}</td>
+                      <td className='unseen-count'>{this.renderViewingCount(kind.unseenCount, kind.count)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+          </div>
+          <div className='resolution-stats'>
+            <h3>Resolution</h3>
+            <table className='library-stats-table resolution-table'>
+              <thead>
+                <tr>
+                  <th>Resolution</th>
+                  <th>Videos</th>
+                  <th>Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.resolutions.map(resolution => (
+                  <tr key={resolution.value}>
+                    <td className='resolution'>{resolution.value}</td>
+                    <td className='count'>{resolution.count} {resolution.count === 1 ? 'video' : 'videos'}</td>
+                    <td className='percentage'>{formatPercentage(resolution.count, stats.videoCount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className='duplicates-stats'>
+            <h3>Duplicates</h3>
+            <p className='duplicates-explanation'>
+              The library copy is the file included in your Mynda library. Duplicate files are extra copies on disk and are <em>not</em> included in the library.
+              {' '}After moving, renaming, or deleting files, run another library scan to update this list.
+            </p>
+            {stats.duplicateCount > 0 ? (
+              <React.Fragment>
+                <p className='duplicates-summary'>
+                  {stats.duplicateCount} duplicate {stats.duplicateCount === 1 ? 'file' : 'files'} across {stats.duplicateVideos.length} {stats.duplicateVideos.length === 1 ? 'video' : 'videos'}
+                </p>
+                {stats.duplicateVideos.map(entry => (
+                  <MynParagraphFolder
+                    key={entry.video.id || entry.video.filename}
+                    className='duplicates-folder'
+                    lede={`${entry.video.title || entry.video.filename || 'Untitled video'} — ${entry.paths.length} duplicate ${entry.paths.length === 1 ? 'file' : 'files'}`}
+                    paragraph={this.renderDuplicateVideo(entry, fileManager)}
+                  />
+                ))}
+              </React.Fragment>
+            ) : <span className='no-duplicates'>None</span>}
           </div>
         </div>
       </div>

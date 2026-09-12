@@ -4,6 +4,7 @@ const {ipcRenderer, shell} = require('electron');
 const os = require('os');
 const _ = require('lodash');
 const {formatBoxOffice, formatCompactBoxOffice} = require('../BoxOffice.js');
+const {getResolutionInfo} = require('../VideoResolution.js');
 
 // Electron 12 predates Object.hasOwn(), which current React Virtuoso uses in
 // its prop plumbing. Supply the standards-equivalent operation for that older
@@ -723,6 +724,11 @@ class MynLibTable extends React.Component {
         'N/A':      13
       };
 
+    // Calculate once per video for this sort, rather than on every comparator
+    // call. Unknown uses the table's existing -1 sentinel and stays last.
+    const resolutionRanks = key === 'resolution' ? new Map(
+      this.props.movies.map(video => [video, getResolutionInfo(video.metadata).rank])
+    ) : null;
     let sortItems = {
      title: (a, b) => [removeLeadingArticle(a.title).toLowerCase(),removeLeadingArticle(b.title).toLowerCase()],
      year: (a, b) => [a.year,b.year],
@@ -742,7 +748,7 @@ class MynLibTable extends React.Component {
      country: (a, b) => [a.country.toLowerCase(), b.country.toLowerCase()],
      languages: (a, b) => [(a.languages[0] || '').toLowerCase(), (b.languages[0] || '').toLowerCase()],
      duration: (a, b) => [a.metadata ? parseInt(a.metadata.duration)-1 : null, b.metadata ? parseInt(b.metadata.duration)-1 : null], // - 1 because we use 0 when we don't have a duration, but the sort function doesn't treat 0 as empty (it does treat -1 as empty);
-     resolution: (a, b) => [parseInt(a.metadata.width),parseInt(b.metadata.width)],
+     resolution: (a, b) => [resolutionRanks.get(a),resolutionRanks.get(b)],
      episode: (a,b) => [parseFloat(a.episode),parseFloat(b.episode)],
     }
 
@@ -1064,44 +1070,6 @@ class MynLibTableRow extends React.Component {
     return result;
   }
 
-  displayResolution(metadata) {
-    let width = metadata.width;
-    if (!width) {
-      return '';
-    }
-
-    // this correlates with erroneous width and height metadata, causing the wrong resolution to be displayed,
-    // so we'd rather leave it blank
-    if (metadata.codec.includes("mjpeg")) {
-      return '';
-    }
-
-    let resolution = '';
-    width = parseInt(width);
-
-    if (width > 6000) { // 8K, nominal 7680
-      resolution = '4320p';
-    } else if (width > 3000) { // 4K, nominal 4096
-      resolution = '2160p';
-    } else if (width > 2240) { // 1440p, nominal 2560
-      resolution = '1440p';
-    } else if (width > 1600) { // 1080p, nominal 1920
-      resolution = '1080p';
-    } else if (width > 900) { // 720p, nominal 1280
-      resolution = '720p';
-    } else if (width > 670) { // 480p, nominal 720 (NTSC DVD resolution), or 854 (16:9 ratio)
-      resolution = '480p';
-    } else if (width > 400) { // 360p, nominal 640
-      resolution = '360p';
-    } else if (width > 340) { // 240p, nominal 427
-      resolution = '240p';
-    } else { // 144p, nominal 256
-      resolution = '144p';
-    }
-
-    return resolution
-  }
-
   saveEdited(originalVid, ...args) {
     // console.log('save-edited!!!');
     let changes = {};
@@ -1149,6 +1117,8 @@ class MynLibTableRow extends React.Component {
 
   render() {
     let video = this.props.video;
+    const metadata = video.metadata || {};
+    const resolution = getResolutionInfo(metadata);
 
     let cellJSX = {
       title: (<td key="title" className="title">{video.title}</td>),
@@ -1170,8 +1140,8 @@ class MynLibTableRow extends React.Component {
       rated: (<td key="rated" className="rated centered">{video.rated}</td>),
       country: (<td key="country" className="country">{video.country}</td>),
       languages: (<td key="languages" className="languages">{video.languages[0]}</td>),
-      duration: (<td key="duration" className="duration">{video.metadata.duration !== 0 && video.metadata.duration !== null ? `${Math.round(Number(video.metadata.duration)/60)} min` : ''}</td>),
-      resolution: (<td key="resolution" className="resolution">{this.displayResolution(video.metadata)}</td>)
+      duration: (<td key="duration" className="duration">{Number(metadata.duration) > 0 ? `${Math.round(Number(metadata.duration)/60)} min` : ''}</td>),
+      resolution: (<td key="resolution" className="resolution" title={resolution.title}>{resolution.label}</td>)
     };
 
     let cells = this.props.columns.map(column => {

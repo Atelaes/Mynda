@@ -81,6 +81,29 @@ async function inspectMainWindow(window) {
     }
 
     await window.webContents.executeJavaScript(
+      `document.getElementById('settings-tab-library').click(); true`
+    );
+    await delay(250);
+    const libraryStats = await window.webContents.executeJavaScript(`(() => ({
+      pane: Boolean(document.getElementById('settings-library')),
+      viewing: Boolean(document.querySelector('#settings-library .viewing-table')),
+      kinds: Boolean(document.querySelector('#settings-library .kinds-stats')),
+      resolution: Boolean(document.querySelector('#settings-library .resolution-table')),
+      duplicates: Boolean(document.querySelector('#settings-library .duplicates-stats'))
+    }))()`);
+    if (!libraryStats.pane || !libraryStats.viewing || !libraryStats.kinds ||
+        !libraryStats.resolution || !libraryStats.duplicates) {
+      finish(false, {
+        stage: 'library-statistics',
+        initial,
+        settings,
+        libraryStats,
+        rendererConsole: rendererDiagnostics()
+      });
+      return;
+    }
+
+    await window.webContents.executeJavaScript(
       `document.querySelector('#settings-pane .openable-close-btn').click(); true`
     );
     await delay(150);
@@ -93,6 +116,7 @@ async function inspectMainWindow(window) {
         stage: 'close-settings-or-library-create',
         initial,
         settings,
+        libraryStats,
         settingsClosed,
         libraryCreated
       });
@@ -103,6 +127,7 @@ async function inspectMainWindow(window) {
       stage: 'complete',
       initial,
       settings,
+      libraryStats,
       settingsClosed,
       libraryCreated
     });

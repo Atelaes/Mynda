@@ -88,40 +88,8 @@ class ScanDuplicateTracker {
   }
 }
 
-function buildKindStats(videos, platform = process.platform) {
-  const groups = new Map();
-
-  (Array.isArray(videos) ? videos : []).forEach(video => {
-    if (!video || typeof video !== 'object') return;
-    const kind = typeof video.kind === 'string' ? video.kind.trim() : '';
-    if (!groups.has(kind)) {
-      groups.set(kind, {
-        value: kind,
-        count: 0,
-        duplicateCount: 0,
-        duplicateVideos: []
-      });
-    }
-
-    const group = groups.get(kind);
-    const duplicatePaths = normalizeDuplicatePaths(
-      video.duplicates,
-      video.filename,
-      platform
-    );
-    group.count++;
-    group.duplicateCount += duplicatePaths.length;
-    if (duplicatePaths.length > 0) {
-      group.duplicateVideos.push({video: video, paths: duplicatePaths});
-    }
-  });
-
-  return Array.from(groups.values());
-}
-
 module.exports = {
   duplicatePathKey,
   normalizeDuplicatePaths,
-  ScanDuplicateTracker,
-  buildKindStats
+  ScanDuplicateTracker
 };

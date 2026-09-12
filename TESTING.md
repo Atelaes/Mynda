@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 30 suites: 29 fast suites with 221 named cases, plus the Electron end-to-end suite.
+The current catalog contains 33 suites: 32 fast suites with 255 named cases, plus the Electron end-to-end suite.
 
 ## The first commands to learn
 
@@ -34,7 +34,7 @@ The complete command set is:
 | `npm run test:media` | Strict staged FFmpeg/FFprobe checks plus real node-mpv → MPV graphical video over JSON IPC | After preparing or changing media dependencies; briefly opens MPV |
 | `npm run test:package` | Fast tests, strict media verification, unpacked production build, then packaged decode/probe/graphical-MPV checks with an empty `PATH` | Before a release; briefly opens MPV and writes under `dist/` |
 
-The Electron test briefly opens Mynda and its DevTools. That is expected. It verifies startup, the first render, creation of an isolated first-launch library, opening Settings, and closing Settings. It exits automatically.
+The Electron test briefly opens Mynda and its DevTools. That is expected. It verifies startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. It exits automatically.
 
 To run one test file while working on a failure:
 
@@ -64,14 +64,16 @@ A “test double” is simply a small, predictable substitute for something outs
 | `TableSelection.test.js` | Unit | Single, toggle, range, cross-table, offscreen, and ordered row selection |
 | `ReactDevTools.test.js` | Unit | Development extension path/loading, packaged-app skip, and graceful failures |
 | `BoxOffice.unit.test.js` | Unit | Fixed-USD parsing, bad input, full and compact formatting, locale conventions, and no currency conversion |
-| `LibraryDuplicates.unit.test.js` | Unit | Duplicate-path normalization, complete-scan reconciliation, unavailable-watchfolder retention, and per-kind totals |
+| `LibraryDuplicates.unit.test.js` | Unit | Duplicate-path normalization, complete-scan reconciliation, and unavailable-watchfolder retention |
+| `LibraryStats.unit.test.js` | Unit | Seen/unseen totals, exact visible-title series grouping, resolution tiers, percentages, and global duplicate totals |
+| `VideoResolution.unit.test.js` | Unit | Shared labels/ranks, exact bucket cutoffs, crops, anamorphic ratios, portrait video, extreme panoramas, and unknown metadata |
 | `PackageConfig.unit.test.js` | Unit | Production file boundaries, media staging, strict package commands, and retirement of the HLS player |
 | `MediaTools.unit.test.js` | Unit | Packaged/staged executable paths, platform naming, overrides, and development fallbacks |
 | `MediaToolPolicy.unit.test.js` | Unit | LGPL-only standalone FFmpeg flags, nonfree rejection, and required MPV DVD/video capabilities on macOS, Windows, and Linux |
 | `MediaBundleVerifier.unit.test.js` | Unit | Pinned source policy, graphical MPV, architecture, exclusion of `libdvdcss`, and platform verification dispatch |
 | `MediaBundleInspection.unit.test.js` | Unit | Windows PE imports, Linux ELF dependencies/RUNPATHs, architecture, closure, and prohibited libraries |
 | `MediaPlatformPreparation.unit.test.js` | Unit | Native preparation dispatch, source pins, Windows UCRT64 policy, and the Ubuntu Linux baseline |
-| `MediaMetadata.unit.test.js` | Unit | MKV container durations and writable FFmpeg scratch output in packaged applications |
+| `MediaMetadata.unit.test.js` | Unit | Video-stream selection, cover-art rejection, aspect ratios, safe fallback merging, one-time legacy rechecks, durations, and writable scratch output |
 | `MovieSearch.unit.test.js` | Unit | Filename parsing, title variants, result scoring, ambiguity, and confidence |
 | `SubtitleMatcher.unit.test.js` | Unit | Sidecar matching, episode evidence, ambiguity, folder boundaries, and manual provenance |
 | `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
@@ -80,18 +82,29 @@ A “test double” is simply a small, predictable substitute for something outs
 | `Player.unit.test.js` | Unit | Playback-attempt logs, missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
 | `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
+| `MediaMetadata.integration.test.js` | Integration | Real FFprobe and FFmpeg fallback on generated videos with embedded covers, genuine MJPEG video, unavailable files, and scratch cleanup |
 | `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
 | `Library.integration.test.js` | Integration | First launch, migrations, add/replace/remove, synchronization waits, scanner-owned fields, manual exports, and recovery decisions |
 | `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
 | `ShareManifest.integration.test.js` | Integration | Manifest schema, checksums, safe paths, inventory, error codes, and atomic files |
 | `ShareService.integration.test.js` | Integration | Complete request → fulfillment → import flow, copies, reuse, conflicts, cancellation, and expiration |
-| `RendererComponents.component.test.js` | Component | Status language, notification cleanup, selected navigation, New-tab visibility, and actionable recently-played controls |
-| `SettingsLibrary.component.test.js` | Component | Library export requests, file-manager actions, media-kind totals, and duplicate-file details |
+| `RendererComponents.component.test.js` | Component | Status language, notification cleanup, navigation, recently-played controls, resolution cells/tooltips, shared statistics, and bucket sorting |
+| `SettingsLibrary.component.test.js` | Component | Library export requests, aligned viewing/kind/series/resolution totals, independent per-video duplicate folders, rescan guidance, and file-manager actions |
 | `Mynda.component.test.js` | Component | Ratings, playlist filtering, search, recent history, scan IPC, view state, and root pane composition |
-| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, isolated library creation, and Settings-tab interaction |
+| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, isolated library creation, and Library-statistics interaction |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
+
+## Resolution checks
+
+Playlist cells, resolution sorting, and Library statistics all use `src/VideoResolution.js`. Labels are calculated from technical metadata; no derived resolution string is saved in a video. Unknown values sort last in either direction. Hovering over a playlist resolution shows stored pixel dimensions and, for anamorphic video, the adjusted display dimensions.
+
+The buckets are 8K, 4K, 1440p, 1080p, 720p, 576p, 480p, 360p, 240p, Below 240p, and Unknown. The helper corrects for pixel/display aspect ratio and uses the shorter/longer display edges, with a 5% allowance for small crops. Width can preserve the class of an ordinary widescreen crop (1920×800 is 1080p), but cannot promote a panorama wider than 3:1 (3840×1080 is 1080p). These are size categories; the `p` labels do not certify progressive scanning or picture quality.
+
+FFprobe and the FFmpeg fallback exclude attached pictures and thumbnail streams, while accepting genuine MJPEG video. Older checked MJPEG metadata has not established that distinction, so it displays Unknown until one recheck during the next normal library scan. Unavailable watchfolders remain skipped. Other valid existing dimensions use the new buckets immediately; a media-tool rebuild is unnecessary.
+
+To verify this change manually, compare a few playlist labels with their Library statistics, hover over cropped/anamorphic videos, and sort the Resolution column both ways. Automated coverage also creates tiny temporary video files with larger embedded cover images and checks both real metadata paths.
 
 ## How to read a test run
 

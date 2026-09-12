@@ -9,6 +9,8 @@ const {
   runSuite
 } = require('./helpers/TestHarness.js');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
+const {videoFixture} = require('./helpers/Fixtures.js');
+const {buildLibraryStats} = require('../src/LibraryStats.js');
 
 require('@babel/register')({
   presets: [require.resolve('@babel/preset-react')],
@@ -51,7 +53,7 @@ const {MynNav} = loadFreshWithMocks(
 
 const EmptyComponent = () => React.createElement('span');
 const OverflowText = props => React.createElement('span', null, props.text);
-const {MynRecentlyWatched} = loadFreshWithMocks(
+const {MynRecentlyWatched, MynLibTable, MynLibTableRow} = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'renderer', 'LibraryView.js'),
   {
     'electron': {ipcRenderer, shell: {showItemInFolder() {}}},
@@ -89,7 +91,7 @@ const {MynRecentlyWatched} = loadFreshWithMocks(
 );
 
 const suite = createSuite(
-  'Renderer notification and navigation components',
+  'Renderer notification, navigation, and playlist components',
   'component',
   'Renders real React components to HTML with Electron IPC and browser globals replaced by small test doubles.'
 );
@@ -248,6 +250,67 @@ suite.test('keeps recently played rows the same width when Play Next is hidden',
     /padding-right:\s*var\(--vid-height\)\s*;/.test(noNextRule[1]),
     'Expected the video row to occupy the missing Play Next button width'
   );
+});
+
+function resolutionHtml(video) {
+  return ReactDOMServer.renderToStaticMarkup(React.createElement('table', null,
+    React.createElement('tbody', null, React.createElement('tr', null,
+      React.createElement(MynLibTableRow, {
+        video, columns: ['resolution'], calcAvgRatings: () => '',
+        settings: {preferences: {}}
+      })
+    ))
+  ));
+}
+
+suite.test('renders shared resolution labels and exact dimensions in real playlist cells', () => {
+  const examples = [
+    [{width:640,height:480}, '480p', '640 × 480 pixels'],
+    [{width:720,height:432,sample_aspect_ratio:'64:45'}, '576p', '720 × 432 pixels (display 1024 × 432)'],
+    [{width:1920,height:800}, '1080p', '1920 × 800 pixels'],
+    [{width:2560,height:1440}, '1440p', '2560 × 1440 pixels'],
+    [{width:3840,height:1080}, '1080p', '3840 × 1080 pixels'],
+    [null, 'Unknown', 'Resolution unavailable']
+  ];
+  for (const [metadata, label, title] of examples) {
+    const html = resolutionHtml(videoFixture({metadata}));
+    assert(html.includes(`class="resolution" title="${title}">${label}</td>`), html);
+  }
+});
+
+suite.test('sorts by displayed resolution and keeps unknowns last in both directions', () => {
+  const movies = [
+    videoFixture({id:'unknown',metadata:null}),
+    videoFixture({id:'hd-4by3',metadata:{width:960,height:720}}),
+    videoFixture({id:'sd-wide',metadata:{width:1024,height:576}}),
+    videoFixture({id:'cropped-fhd',metadata:{width:1920,height:800}}),
+    videoFixture({id:'qhd',metadata:{width:2560,height:1440}})
+  ];
+  const table = new MynLibTable({movies,settings:{preferences:{}}});
+  table.requestSort('resolution', true);
+  assert.deepStrictEqual(table.state.sortedRows.map(row => row.vidID),
+    ['sd-wide','hd-4by3','cropped-fhd','qhd','unknown']);
+  table.requestSort('resolution');
+  assert.deepStrictEqual(table.state.sortedRows.map(row => row.vidID),
+    ['qhd','cropped-fhd','hd-4by3','sd-wide','unknown']);
+  assert.deepStrictEqual(movies.map(video => video.id),
+    ['unknown','hd-4by3','sd-wide','cropped-fhd','qhd']);
+});
+
+suite.test('keeps playlist labels and Library statistics in agreement for the same videos', () => {
+  const media = [
+    videoFixture({id:'sd',metadata:{width:640,height:480}}),
+    videoFixture({id:'mjpeg',metadata:{width:640,height:480,codec:'mjpeg',video_stream_selected:true}}),
+    videoFixture({id:'unknown',metadata:{width:2000,height:3000,codec:'mjpeg'}}),
+    videoFixture({id:'qhd',metadata:{width:2560,height:1440}})
+  ];
+  const rows = buildLibraryStats(media).resolutions.filter(row => row.count);
+  assert.deepStrictEqual(rows.map(row => [row.value,row.count]),
+    [['1440p',1],['480p',2],['Unknown',1]]);
+  for (const row of rows) {
+    const matching = media.filter(video => resolutionHtml(video).includes(`>${row.value}</td>`));
+    assert.strictEqual(matching.length, row.count);
+  }
 });
 
 runSuite(suite);

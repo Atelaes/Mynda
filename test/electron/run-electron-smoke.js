@@ -158,6 +158,10 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
     assert.strictEqual(result.settingsClosed, true);
     assert.strictEqual(result.initial.grid, true);
     assert.strictEqual(result.settings.libraryTab, true);
+    assert.strictEqual(result.libraryStats.viewing, true);
+    assert.strictEqual(result.libraryStats.kinds, true);
+    assert.strictEqual(result.libraryStats.resolution, true);
+    assert.strictEqual(result.libraryStats.duplicates, true);
   } finally {
     removeDirectory(temporaryRoot);
   }
