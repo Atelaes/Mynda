@@ -14,6 +14,7 @@
     "test:electron": "node test/run-tests.js e2e",
     "test:e2e": "npm run test:electron",
     "test:all": "node test/run-tests.js all",
+    "library:migrate": "node scripts/migrate-video-ids.js",
     "media:prepare": "node scripts/prepare-media-tools.js",
     "media:prepare:macos": "bash scripts/prepare-media-tools-macos.sh",
     "media:prepare:windows": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-media-tools-windows.ps1",
@@ -83,7 +84,8 @@
       "!test/**/*",
       "!vendor/**/*",
       "!TESTING.md",
-      "!MEDIA_TOOLS.md"
+      "!MEDIA_TOOLS.md",
+      "!MIGRATING_VIDEO_IDS.md"
     ],
     "win": {
       "target": "nsis"

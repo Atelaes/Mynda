@@ -4,21 +4,8 @@ const {
   createSuite,
   runSuite
 } = require('./helpers/TestHarness.js');
-const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 const {videoFixture} = require('./helpers/Fixtures.js');
-
-const loggedWarnings = [];
-const RendererUtils = loadFreshWithMocks(
-  path.join(__dirname, '..', 'src', 'renderer', 'RendererUtils.js'),
-  {
-    './RendererRuntime.js': {
-      frontendLog: {
-        warn: (message, data) => loggedWarnings.push({message, data}),
-        debug() {}, info() {}, error() {}
-      }
-    }
-  }
-);
+const RendererUtils = require('../src/renderer/RendererUtils.js');
 
 const suite = createSuite(
   'Renderer editing and validation helpers',
@@ -116,16 +103,15 @@ suite.test('distinguishes clearing a common batch value from leaving a mixed fie
 });
 
 suite.test('recognizes a complete valid video without changing it', () => {
-  const item = videoFixture();
+  const item = videoFixture({id: 'a'.repeat(64)});
   const before = JSON.parse(JSON.stringify(item));
   assert.strictEqual(RendererUtils.validateVideo(item), true);
   assert.deepStrictEqual(item, before);
 });
 
 suite.test('repairs malformed universal fields and removes series IDs from movies', () => {
-  loggedWarnings.length = 0;
   const malformed = videoFixture({
-    id: '',
+    id: 'b'.repeat(64),
     year: 'not a year',
     episode: '3.50',
     cast: 'not an array',
@@ -136,8 +122,7 @@ suite.test('repairs malformed universal fields and removes series IDs from movie
     seriesImdbID: 'tt-wrong-for-a-movie'
   });
   assert.strictEqual(RendererUtils.validateVideo(malformed), false);
-  assert.strictEqual(typeof malformed.id, 'string');
-  assert.notStrictEqual(malformed.id, '');
+  assert.strictEqual(malformed.id, 'b'.repeat(64));
   assert.strictEqual(malformed.year, '');
   assert.strictEqual(malformed.episode, '');
   assert.deepStrictEqual(malformed.cast, []);
@@ -146,7 +131,19 @@ suite.test('repairs malformed universal fields and removes series IDs from movie
   assert.deepStrictEqual(malformed.duplicates, []);
   assert.strictEqual(malformed.seen, false);
   assert.strictEqual(malformed.seriesImdbID, '');
-  assert.strictEqual(loggedWarnings.length, 1);
+});
+
+suite.test('never invents or replaces content IDs while repairing renderer metadata', () => {
+  for (const id of ['', 'old-uuid', undefined]) {
+    const video = {id, title: 'Keep this title'};
+    const before = {...video};
+    assert.throws(() => RendererUtils.validateVideo(video), error => error.code === 'INVALID_VIDEO_ID');
+    assert.deepStrictEqual(video, before);
+  }
+  const batch = {id: 'batch'};
+  RendererUtils.validateVideo(batch);
+  assert.strictEqual(batch.id, 'batch');
+  assert.strictEqual(RendererUtils.validateVideo(undefined), false);
 });
 
 suite.test('validates URLs and locates the nearest matching DOM ancestor', () => {

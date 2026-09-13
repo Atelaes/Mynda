@@ -6,6 +6,7 @@ const _ = require('lodash');
 const { ipcRenderer } = require('electron');
 const { trackManualSubtitleEdit } = require('./SubtitleMatcher.js');
 const {normalizeDuplicatePaths} = require('./LibraryDuplicates.js');
+const VideoIdentity = require('./VideoIdentity.js');
 
 // LibraryPersistence owns file validation, atomic writes, automatic snapshots,
 // retention, and preservation of damaged bytes. Keeping those mechanics out of
@@ -97,6 +98,9 @@ class Library {
     Object.keys(defaultLibrary).map((key) => {
       this[key] = typeof data[key] === 'undefined' ? _.cloneDeep(defaultLibrary[key]) : data[key];
     });
+    // Missing scheme means a legacy library, never a freshly fingerprinted
+    // library. Conversion is an explicit offline operation, not a default.
+    this.videoIdScheme = data.videoIdScheme === undefined ? 1 : data.videoIdScheme;
 
     // Existing libraries predate some preference fields. Add new preferences
     // individually so a user's explicit false value is preserved, while a
@@ -610,6 +614,10 @@ class Library {
     return _.cloneDeep(this.loadIssue);
   }
 
+  getIdentityIssue() {
+    return VideoIdentity.libraryIdentityIssue(this);
+  }
+
   // Called at startup and before ordinary primary saves. Most invocations exit
   // immediately because the last automatic snapshot is less than an hour old.
   // When due, this captures the currently committed primary—the restore point
@@ -617,7 +625,7 @@ class Library {
   maybeCreateAutomaticBackup(now = new Date()) {
     // A malformed primary must never become a restore point. While loadIssue is
     // unresolved, the only legal writes are the explicit recovery methods.
-    if (this.loadIssue) return null;
+    if (this.loadIssue || this.getIdentityIssue()) return null;
     if (!LibraryPersistence.automaticBackupIsDue(
       this.backupDirectory,
       now,
@@ -664,6 +672,7 @@ class Library {
     if (isPrimarySave && this.loadIssue && !options.recoveryWrite) {
       throw new Error('Refusing to overwrite an unreadable library before recovery is resolved.');
     }
+    VideoIdentity.assertLibraryIdentity(this);
 
     // Automatic snapshots belong only to the live primary. Exports, future
     // manual backups, and recovery commits use the same atomic writer without
@@ -710,6 +719,7 @@ class Library {
     if (!this.loadIssue || !this.loadIssue.latestBackupPath) {
       throw new Error('No validated automatic library backup is available to restore.');
     }
+    VideoIdentity.assertLibraryIdentity(this);
 
     // Preserve first. If preservation itself fails, the unreadable primary is
     // left untouched and the caller reports that recovery could not proceed.
@@ -830,6 +840,7 @@ class Library {
 
 const defaultLibrary = {
   "id": uuidv4(),
+  "videoIdScheme": VideoIdentity.VIDEO_ID_SCHEME,
   "settings": {
     "watchfolders": [],
     "themes": {

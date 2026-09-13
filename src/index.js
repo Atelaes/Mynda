@@ -3,8 +3,8 @@ const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const {v4: uuidv4, v5: uuidv5} = require('uuid');
-const crypto = require('crypto');
+const {v4: uuidv4} = require('uuid');
+const ContentFingerprint = require('./ContentFingerprint.js');
 const Library = require("./Library.js");
 const {
   subtitleExtensions,
@@ -31,7 +31,6 @@ const ShareManifest = require('./ShareManifest.js');
 const loadReactDeveloperTools = require('./ReactDevTools.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
-const appID = '7f1eec5b-a20d-400a-8876-cad667efe08f';
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
 const videoExtensions = [
   '3g2', '3gp',  'amv',  'asf', 'avchd', 'avi', 'divx', 'drc',  'f4a',  'f4b', 'f4p',
@@ -186,6 +185,18 @@ async function start() {
   // early to display a native dialog. Once ready, resolve any recorded load
   // problem before opening the renderer or starting a watchfolder scan; either
   // could otherwise save provisional data over the unreadable primary.
+  const identityIssue = library.getIdentityIssue();
+  if (identityIssue) {
+    const loadIssue = library.getLoadIssue();
+    const source = loadIssue && loadIssue.latestBackupPath || library.path;
+    backendLog.error('Library video ID format prevents startup', {...identityIssue, path: source});
+    await dialog.showMessageBox({
+      type: 'info', buttons: ['Quit Mynda'], defaultId: 0, cancelId: 0,
+      title: 'Library Update Required', message: identityIssue.message,
+      detail: `Your saved library has not been changed. Follow the one-time conversion instructions in MIGRATING_VIDEO_IDS.md in the Mynda project folder.\n\nLibrary to convert:\n${source}`
+    });
+    return quitAfterLibraryLoadIssue();
+  }
   if (!await resolveLibraryLoadIssue()) {
     return;
   }
@@ -648,6 +659,10 @@ function finishWatchfolderScan() {
 }
 
 async function checkWatchFolders(trigger = 'automatic') {
+  if (library.getIdentityIssue()) {
+    scanLog.error('Refused a scan of an incompatible library', library.getIdentityIssue());
+    return false;
+  }
   if (shareService.isBusy()) {
     if (trigger === 'watchfolder-added' || trigger === 'watchfolder-added-queued') {
       watchfolderScanQueued = true;
@@ -1338,102 +1353,9 @@ async function getMetadata(video, options = {}) {
 }
 
 
-// create a uuid based on a hash of the video file; this will be the video's id in the library
+// The scanner and one-time migration share this exact scheme-2 recipe.
 async function createVideoID(filepath) {
-  return new Promise((resolve,reject) => {
-    let baseStats;
-    try {
-      baseStats = fs.lstatSync(filepath)
-    } catch (e) {
-      reject(`Error when trying to create id for ${filepath}, could not read path to determine if it was a directory or a file. Not adding video.\n${e}`);
-      return;
-    }
-    let hashPath = filepath;
-
-    // If the path points to a directory, we're dealing with a DVD rip
-    // Find the appropriate file and hash it
-    if(baseStats.isDirectory()) {
-      try {
-        if (fs.existsSync(path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO'))) {
-          hashPath = path.join(filepath, 'VIDEO_TS', 'VIDEO_TS.IFO');
-        } else if (fs.existsSync(path.join(filepath, 'VIDEO_TS', 'VTS_01_1.VOB'))) {
-          hashPath = path.join(filepath, 'VIDEO_TS', 'VTS_01_1.VOB');
-        } else if (fs.existsSync(path.join(filepath, 'VTS_01_1.VOB'))) {
-          hashPath = path.join(filepath, 'VTS_01_1.VOB');
-        } else {
-          let files = getFilesRecursive(filepath);
-          let biggestSize = 0;
-          let biggestFile;
-          for (let file of files) {
-            let size = 0;
-            try {
-              size = fs.statSync(file).size;
-            } catch(err) {
-              scanLog.warn('Could not read a DVD file while selecting content for hashing', {
-                filename: file,
-                error: err
-              });
-            }
-            if (size > biggestSize) {
-              biggestSize = size;
-              biggestFile = file;
-            }
-          }
-          if (biggestFile) {
-            hashPath = biggestFile;
-          } else {
-            reject(`DVD folder ${filepath} does not have the correct file to hash.`)
-          }
-        }
-      } catch (e) {
-        reject(`Error when trying to create id for DVD rip ${filepath}.\n${e}`);
-      }
-    }
-
-    fs.createReadStream(hashPath, { end: 65535, encoding: 'hex'}).
-      pipe(crypto.createHash('sha1').setEncoding('hex')).
-      on('finish', function () {
-        const filehash = this.read();
-        // console.log(`Hash for ${filepath.split('/').pop()} is ${filehash}`) // the hash
-        const id = uuidv5(filehash, appID);
-
-        resolve(id);
-        // callback(id);
-      }).
-      on('error', (err) => {
-        reject(`Error (from fs module) when creating/finding id for ${filepath}\nNot adding video\n${err}`);
-      })
-  });
-}
-
-function getFilesRecursive(folder) {
-  scanLog.debug('Scanning DVD directory for hashable content', {directory: folder});
-  let files = [];
-  let contents = [];
-  try {
-    contents = fs.readdirSync(folder);
-  } catch(err) {
-    scanLog.warn('Could not read DVD directory', {
-      directory: folder,
-      error: err
-    });
-  }
-  for (let content of contents) {
-    let fullPath = path.join(folder, content);
-    try {
-      if (fs.lstatSync(fullPath).isDirectory()) {
-        files = [...files,...getFilesRecursive(fullPath)];
-      } else {
-        files.push(fullPath);
-      }
-    } catch(err) {
-      scanLog.warn('Could not inspect DVD directory entry', {
-        filename: fullPath,
-        error: err
-      });
-    }
-  }
-  return files;
+  return (await ContentFingerprint.fingerprintPath(filepath)).id;
 }
 
 

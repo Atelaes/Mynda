@@ -332,8 +332,8 @@ class Mynda extends React.Component {
       // console.log(videos);
 
       // create the batch object
-      // Identify this as the synthetic batch before validation so validation
-      // does not mistake it for a damaged real video and generate a UUID.
+      // Identify this as the synthetic batch before validation; only real
+      // videos are required to carry a content fingerprint.
       let batchObject = {id: 'batch'}
       validateVideo(batchObject); // this populates the object with all the right keys
       delete batchObject.metadata; // and delete metadata, since that is derived from the files themselves and is uneditable

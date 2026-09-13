@@ -155,6 +155,8 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
 
     const result = await launchElectron(electronExecutable, appDirectory, userData);
     assert.strictEqual(result.libraryCreated, true);
+    const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
+    assert.strictEqual(savedLibrary.videoIdScheme, 2, 'First launch must persist the new video ID scheme');
     assert.strictEqual(result.settingsClosed, true);
     assert.strictEqual(result.initial.grid, true);
     assert.strictEqual(result.settings.libraryTab, true);

@@ -5,6 +5,7 @@ const {pipeline} = require('stream');
 const {promisify} = require('util');
 const {v4: uuidv4} = require('uuid');
 const ShareManifest = require('./ShareManifest.js');
+const {VIDEO_ID_SCHEME, assertLibraryIdentity} = require('./VideoIdentity.js');
 
 const pipelineAsync = promisify(pipeline);
 const MIN_FREE_SPACE_RESERVE = 128 * 1024 * 1024;
@@ -406,6 +407,7 @@ class ShareService {
       if (this.library && typeof this.library.whenIdle === 'function') {
         await this.library.whenIdle();
       }
+      assertLibraryIdentity(this.library);
       return await operation();
     } finally {
       this.busy = null;
@@ -528,6 +530,7 @@ class ShareService {
       const manifest = {
         format: ShareManifest.SHARE_FORMAT,
         version: ShareManifest.SHARE_VERSION,
+        videoIdScheme: VIDEO_ID_SCHEME,
         revision: 1,
         request: {
           id: requestId,

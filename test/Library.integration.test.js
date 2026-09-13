@@ -60,6 +60,8 @@ suite.test('creates an isolated default library on first launch', () => withTemp
     const {Library} = loadLibraryClass(directory);
     const instance = new Library();
     assert.strictEqual(instance.env, 'server');
+    assert.strictEqual(instance.videoIdScheme, 2);
+    assert.strictEqual(instance.getIdentityIssue(), null);
     assert.deepStrictEqual(instance.media, []);
     assert.strictEqual(instance.settings.preferences.exclude_samples_from_library, true);
     assert.strictEqual(instance.settings.preferences.exclude_trailers_from_library, true);
@@ -131,13 +133,13 @@ suite.test('adds, replaces, removes, and batch-replaces media through the normal
   async directory => {
     const {Library} = loadLibraryClass(directory);
     const instance = new Library();
-    const first = videoFixture({id: 'first', title: 'First'});
-    const second = videoFixture({id: 'second', title: 'Second'});
+    const first = videoFixture({id: '1'.repeat(64), title: 'First'});
+    const second = videoFixture({id: '2'.repeat(64), title: 'Second'});
     await operate(instance, 'add', 'media.push', first);
     await operate(instance, 'add', 'media.push', second);
-    assert.deepStrictEqual(instance.media.map(item => item.id), ['first', 'second']);
+    assert.deepStrictEqual(instance.media.map(item => item.id), [first.id, second.id]);
 
-    await operate(instance, 'replace', 'media.id=first', Object.assign({}, first, {title: 'Changed'}));
+    await operate(instance, 'replace', `media.id=${first.id}`, Object.assign({}, first, {title: 'Changed'}));
     assert.strictEqual(instance.media[0].title, 'Changed');
 
     await operate(instance, 'replaceMediaBatch', [
@@ -148,8 +150,8 @@ suite.test('adds, replaces, removes, and batch-replaces media through the normal
     assert.strictEqual(instance.media[1].watchlater, true);
 
     await operate(instance, 'remove', 'media.0');
-    assert.deepStrictEqual(instance.media.map(item => item.id), ['second']);
-    assert.deepStrictEqual(Persistence.readLibraryFile(instance.path).data.media.map(item => item.id), ['second']);
+    assert.deepStrictEqual(instance.media.map(item => item.id), [second.id]);
+    assert.deepStrictEqual(Persistence.readLibraryFile(instance.path).data.media.map(item => item.id), [second.id]);
   }
 ));
 
@@ -194,19 +196,19 @@ suite.test('blocks normal saves after corruption and restores the newest valid b
     const damagedBytes = '{broken primary';
     fs.writeFileSync(libraryPath, damagedBytes);
     const backupName = 'library-2026-09-07T01-00-00-000Z-p1-1.json';
-    const recovered = libraryFixture({media: [videoFixture({id: 'from-backup'})]});
+    const recovered = libraryFixture({videoIdScheme: 2, media: [videoFixture({id: '3'.repeat(64)})]});
     Persistence.writeLibraryFile(path.join(backupDirectory, backupName), recovered);
 
     const {Library} = loadLibraryClass(directory);
     const instance = new Library();
-    assert.strictEqual(instance.media[0].id, 'from-backup');
+    assert.strictEqual(instance.media[0].id, '3'.repeat(64));
     assert.strictEqual(instance.getLoadIssue().type, 'malformed');
     assert.throws(() => instance.save(), /Refusing to overwrite/);
 
     const result = instance.restoreLatestAutomaticBackup();
     assert.strictEqual(instance.getLoadIssue(), null);
     assert.deepStrictEqual(Persistence.readLibraryFile(libraryPath).data.media.map(item => item.id),
-      ['from-backup']);
+      ['3'.repeat(64)]);
     assert.strictEqual(fs.readFileSync(result.preservedLibraryPath, 'utf8'), damagedBytes);
   }
 ));
@@ -251,7 +253,7 @@ suite.test('exports a validated atomic library copy through the save-dialog work
   withTemporaryDirectory('library-manual-export', async directory => {
     const {Library} = loadLibraryClass(directory);
     const instance = new Library();
-    instance.media = [videoFixture({id: 'exported-video'})];
+    instance.media = [videoFixture({id: '4'.repeat(64)})];
     const chosenWithoutExtension = path.join(directory, 'Chosen Library Backup');
     const calls = [];
     const parentWindow = {name: 'main-window'};
@@ -279,7 +281,7 @@ suite.test('exports a validated atomic library copy through the save-dialog work
     );
     assert.deepStrictEqual(
       Persistence.readLibraryFile(result.filePath).data.media.map(video => video.id),
-      ['exported-video']
+      ['4'.repeat(64)]
     );
   })
 );
@@ -305,5 +307,51 @@ suite.test('handles export cancellation and refuses to overwrite the live librar
     );
   })
 );
+
+suite.test('keeps legacy libraries intact and blocks saves until explicit ID conversion', () =>
+  withTemporaryDirectory('library-id-conversion-guard', directory => {
+    const libraryPath = path.join(directory, 'Library', 'library.json');
+    Persistence.writeLibraryFile(libraryPath, libraryFixture({media:[videoFixture()]}));
+    const before = fs.readFileSync(libraryPath);
+    const {Library} = loadLibraryClass(directory);
+    const instance = new Library();
+    assert.strictEqual(instance.getLoadIssue(), null);
+    assert.strictEqual(instance.videoIdScheme, 1);
+    assert.strictEqual(instance.getIdentityIssue().code, 'LIBRARY_ID_MIGRATION_REQUIRED');
+    assert.throws(() => instance.save(), error => error.code === 'LIBRARY_ID_MIGRATION_REQUIRED');
+    assert.strictEqual(instance.maybeCreateAutomaticBackup(), null);
+    assert.deepStrictEqual(fs.readFileSync(libraryPath), before);
+  }));
+
+suite.test('rejects unsupported schemes and mixed-format IDs instead of silently promoting them', async () => {
+  for (const [scheme, expected] of [[99,'UNSUPPORTED_VIDEO_ID_SCHEME'],[2,'INVALID_VIDEO_ID']]) {
+    await withTemporaryDirectory('library-id-format-guard', directory => {
+      const libraryPath = path.join(directory,'Library','library.json');
+      Persistence.writeLibraryFile(libraryPath,libraryFixture({videoIdScheme:scheme,media:[videoFixture()]}));
+      const before = fs.readFileSync(libraryPath);
+      const {Library} = loadLibraryClass(directory);
+      const instance = new Library();
+      assert.strictEqual(instance.getIdentityIssue().code,expected);
+      assert.throws(() => instance.save(),error => error.code === expected);
+      assert.deepStrictEqual(fs.readFileSync(libraryPath),before);
+    });
+  }
+});
+
+suite.test('requires conversion of an old recovery backup before replacing a damaged primary', () =>
+  withTemporaryDirectory('library-legacy-backup-guard',directory => {
+    const libraryPath = path.join(directory,'Library','library.json');
+    const backups = path.join(directory,'Library','Backups');
+    fs.mkdirSync(backups,{recursive:true});
+    fs.writeFileSync(libraryPath,'{damaged primary');
+    Persistence.writeLibraryFile(path.join(backups,'library-2026-09-07T01-00-00-000Z-p1-1.json'),
+      libraryFixture({media:[videoFixture()]}));
+    const {Library} = loadLibraryClass(directory);
+    const instance = new Library();
+    assert(instance.getLoadIssue().latestBackupPath);
+    assert.strictEqual(instance.getIdentityIssue().code,'LIBRARY_ID_MIGRATION_REQUIRED');
+    assert.throws(() => instance.restoreLatestAutomaticBackup(),error => error.code === 'LIBRARY_ID_MIGRATION_REQUIRED');
+    assert.strictEqual(fs.readFileSync(libraryPath,'utf8'),'{damaged primary');
+  }));
 
 runSuite(suite);

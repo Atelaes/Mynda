@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 33 suites: 32 fast suites with 255 named cases, plus the Electron end-to-end suite.
+The current catalog contains 35 suites: 34 fast suites with 282 named cases, plus the Electron end-to-end suite.
 
 ## The first commands to learn
 
@@ -78,23 +78,38 @@ A “test double” is simply a small, predictable substitute for something outs
 | `SubtitleMatcher.unit.test.js` | Unit | Sidecar matching, episode evidence, ambiguity, folder boundaries, and manual provenance |
 | `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
 | `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, early EOF, process errors, timeouts, and cleanup |
-| `RendererUtils.unit.test.js` | Unit | Batch-edit states, ratings, video validation/repair, portable artwork URLs, desktop labels, DOM ancestry, and object diffs |
+| `RendererUtils.unit.test.js` | Unit | Batch-edit states, metadata repair without inventing IDs, portable artwork URLs, desktop labels, DOM ancestry, and object diffs |
 | `Player.unit.test.js` | Unit | Playback-attempt logs, missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
 | `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
+| `ContentFingerprint.integration.test.js` | Integration | Fixed SHA-256 protocol vectors, sample boundaries, copied files/DVDs, complete control files, cache checks, cancellation, and sampled-hash limitations |
+| `VideoIdMigration.integration.test.js` | Integration | Separate conversion, exact original preservation, metadata/history and filter remapping, unavailable media, conflicts, resume, and real CLI installation safeguards |
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
 | `MediaMetadata.integration.test.js` | Integration | Real FFprobe and FFmpeg fallback on generated videos with embedded covers, genuine MJPEG video, unavailable files, and scratch cleanup |
 | `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
-| `Library.integration.test.js` | Integration | First launch, migrations, add/replace/remove, synchronization waits, scanner-owned fields, manual exports, and recovery decisions |
+| `Library.integration.test.js` | Integration | First launch, schema/version guards, add/replace/remove, synchronization waits, scanner-owned fields, exports, and recovery decisions |
 | `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
-| `ShareManifest.integration.test.js` | Integration | Manifest schema, checksums, safe paths, inventory, error codes, and atomic files |
-| `ShareService.integration.test.js` | Integration | Complete request → fulfillment → import flow, copies, reuse, conflicts, cancellation, and expiration |
+| `ShareManifest.integration.test.js` | Integration | Manifest/ID version compatibility, checksums, safe paths, inventory, error codes, and atomic files |
+| `ShareService.integration.test.js` | Integration | Complete request → fulfillment → import flow, preserved content identity, old-library rejection, copies, conflicts, cancellation, and expiration |
 | `RendererComponents.component.test.js` | Component | Status language, notification cleanup, navigation, recently-played controls, resolution cells/tooltips, shared statistics, and bucket sorting |
 | `SettingsLibrary.component.test.js` | Component | Library export requests, aligned viewing/kind/series/resolution totals, independent per-video duplicate folders, rescan guidance, and file-manager actions |
 | `Mynda.component.test.js` | Component | Ratings, playlist filtering, search, recent history, scan IPC, view state, and root pane composition |
-| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, isolated library creation, and Library-statistics interaction |
+| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, and Library-statistics interaction |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
+
+## Content ID and migration checks
+
+The two new suites are **integration tests**: they use actual temporary media files, DVD directory structures, library JSON, and the migration CLI. They verify both intended behavior and refusal to install incomplete or changed results. They run under `npm test`, or individually:
+
+```bash
+node test/ContentFingerprint.integration.test.js
+node test/VideoIdMigration.integration.test.js
+```
+
+`npm run library:migrate` is a separate operational command, **not a test**. It reads the selected real library and media to prepare conversion. Only its explicit `--install` stage replaces that library. Follow `MIGRATING_VIDEO_IDS.md`; keep Mynda closed during conversion and use only the updated app afterward.
+
+After conversion, the manual acceptance pass should include edited metadata, Recently Played, resume positions, scanning a copied file as a duplicate, a representative DVD, and a fresh Share request between two converted libraries. The automated fingerprint fixtures prove byte-level rules, but cannot substitute for reading the actual media on your computers.
 
 ## Resolution checks
 

@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const {VIDEO_ID_SCHEME, isVideoID} = require('./VideoIdentity.js');
 
 const SHARE_FORMAT = 'mynda-share';
-const SHARE_VERSION = 1;
+const SHARE_VERSION = 2;
 const MANIFEST_FILENAME = 'Mynda Share.json';
 const FILES_DIRECTORY = 'Mynda Share Files';
 const IMPORT_STAGING_DIRECTORY = '.mynda-share-staging';
@@ -111,7 +112,7 @@ function validateInventory(inventory) {
     'The Share request has an invalid media inventory.');
   const ids = new Set();
   inventory.forEach((entry, index) => {
-    assert(isPlainObject(entry) && typeof entry.id === 'string' && entry.id.trim() !== '',
+    assert(isPlainObject(entry) && isVideoID(entry.id),
       'INVALID_SHARE_REQUEST', 'The Share inventory contains an invalid video.', {index: index});
     assert(!ids.has(entry.id), 'INVALID_SHARE_REQUEST',
       'The Share inventory contains the same video more than once.', {id: entry.id});
@@ -206,7 +207,7 @@ function validateFulfillment(fulfillment, requestedKindIDs) {
   const videoIDs = new Set();
   const packageDirectories = new Set();
   fulfillment.items.forEach((item, itemIndex) => {
-    assert(isPlainObject(item) && typeof item.videoId === 'string' && item.videoId !== '',
+    assert(isPlainObject(item) && isVideoID(item.videoId),
       'INVALID_SHARE_FULFILLMENT', 'The Share fulfillment contains an invalid video.', {
         itemIndex: itemIndex
       });
@@ -344,10 +345,12 @@ function validateManifest(rawManifest) {
   assert(manifest.format === SHARE_FORMAT, 'INVALID_SHARE_MANIFEST',
     'This file is not a Mynda Share request.', {format: manifest.format});
   assert(manifest.version === SHARE_VERSION, 'UNSUPPORTED_SHARE_VERSION',
-    `This Share request uses unsupported format version ${manifest.version}.`, {
+    `This Share request uses unsupported format version ${manifest.version}. Create a new Share request after both libraries have completed the video ID conversion.`, {
       supportedVersion: SHARE_VERSION,
       foundVersion: manifest.version
     });
+  assert(manifest.videoIdScheme === VIDEO_ID_SCHEME, 'UNSUPPORTED_SHARE_ID_SCHEME',
+    'This Share request uses a different video ID format. Create a new request using the updated Mynda on both computers.');
   assert(Number.isSafeInteger(manifest.revision) && manifest.revision >= 1,
     'INVALID_SHARE_MANIFEST', 'The Share manifest has an invalid revision number.');
   assert(isPlainObject(manifest.request), 'INVALID_SHARE_REQUEST',

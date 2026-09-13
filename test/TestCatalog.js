@@ -130,6 +130,18 @@ module.exports = [
   },
   {
     category: 'integration',
+    file: 'test/ContentFingerprint.integration.test.js',
+    title: 'Content-based video IDs',
+    protects: 'fixed hash vectors, distributed samples, file sizes, DVD normalization, cache validation, and read failures'
+  },
+  {
+    category: 'integration',
+    file: 'test/VideoIdMigration.integration.test.js',
+    title: 'One-time video ID migration',
+    protects: 'metadata/history preservation, cross-library IDs, resumable conversion, explicit archiving, collisions, and guarded installation'
+  },
+  {
+    category: 'integration',
     file: 'test/MediaDependencies.integration.test.js',
     title: 'Installed media dependencies',
     protects: 'node-mpv JSON IPC startup, real graphical output, decoding/probing, and MPV DVD capability'

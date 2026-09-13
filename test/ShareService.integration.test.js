@@ -10,6 +10,7 @@ const {
 } = require('./helpers/TestHarness.js');
 const ShareService = require('../src/ShareService.js');
 const ShareManifest = require('../src/ShareManifest.js');
+const {fingerprintPath} = require('../src/ContentFingerprint.js');
 
 const suite = createSuite(
   'Share service filesystem workflow',
@@ -26,6 +27,7 @@ const roomyDisk = directory => Promise.resolve({
 function library(id, watchfolders, media = []) {
   return {
     id,
+    videoIdScheme: 2,
     media,
     settings: {
       watchfolders,
@@ -163,7 +165,7 @@ suite.test('completes a request-to-fulfillment-to-import round trip', () => with
     const fulfillingLibrary = library('fulfiller', [
       {path: sourceWatchfolder, kind: 'movie'}
     ], [{
-      id: 'alien-video',
+      id: (await fingerprintPath(sourceMovie)).id,
       title: 'Alien',
       kind: 'movie',
       filename: sourceMovie,
@@ -214,6 +216,7 @@ suite.test('completes a request-to-fulfillment-to-import round trip', () => with
     const importedMovie = path.join(destinationWatchfolder, 'Alien (1979)', 'Alien.mkv');
     const importedSubtitle = path.join(destinationWatchfolder, 'Alien (1979)', 'Alien.en.srt');
     assert.strictEqual(fs.readFileSync(importedMovie, 'utf8'), 'movie data');
+    assert.strictEqual((await fingerprintPath(importedMovie)).id, fulfillingLibrary.media[0].id);
     assert.strictEqual(fs.readFileSync(importedSubtitle, 'utf8'), 'subtitle data');
 
     const finalManifest = await ShareManifest.readManifest(shareDirectory);
@@ -226,6 +229,15 @@ suite.test('rejects an expired plan token without copying anything', async () =>
   const instance = serviceFor(library('test-library', [], []));
   await rejectsWithCode(() => instance.fulfillRequest({token: 'missing'}), 'SHARE_PLAN_EXPIRED');
   await rejectsWithCode(() => instance.importShare({token: 'missing'}), 'SHARE_PLAN_EXPIRED');
+});
+
+suite.test('blocks Share writes from a library whose IDs have not been converted', async () => {
+  const old = library('legacy-library', [], []); delete old.videoIdScheme;
+  const instance = serviceFor(old);
+  let ran = false;
+  await rejectsWithCode(() => instance._run('request', {}, async () => {ran = true;}), 'LIBRARY_ID_MIGRATION_REQUIRED');
+  assert.strictEqual(ran, false);
+  assert.strictEqual(instance.isBusy(), false);
 });
 
 runSuite(suite);

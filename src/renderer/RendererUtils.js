@@ -2,9 +2,8 @@
 const _ = require('lodash');
 const path = require('path');
 const URL = require('url');
-const {v4: uuidv4} = require('uuid');
-const {frontendLog} = require('./RendererRuntime.js');
 const {normalizeDuplicatePaths} = require('../LibraryDuplicates.js');
+const {isVideoID} = require('../VideoIdentity.js');
 
 // Sort display titles by their meaningful first word while preserving the
 // original title for display. This is shared by flat video tables and the
@@ -159,8 +158,16 @@ function updateEditorChangedField(changedFields, video, batchBaseline, field, va
 // all it does right now is check for top-level properties
 // eventually it should do more than that
 function validateVideo(video) {
-  if (typeof video === undefined || video === null) {
+  if (!video || typeof video !== 'object') {
     return false;
+  }
+  // A real video's identity must come from its bytes in the backend. The
+  // renderer may repair metadata, but cannot invent a replacement identity.
+  // 'batch' is an editor-only object and is never a stored video.
+  if (video.id !== 'batch' && !isVideoID(video.id)) {
+    const error = new Error('This video has no valid content ID. Complete the library ID conversion before editing it.');
+    error.code = 'INVALID_VIDEO_ID';
+    throw error;
   }
   // let repaired = _.cloneDeep(video);
   let repaired = video; // don't clone, because we want to alter the video in place
@@ -285,15 +292,6 @@ function validateVideo(video) {
     repaired.seriesImdbID = '';
   }
   repaired.duplicates = normalizeDuplicatePaths(repaired.duplicates, repaired.filename);
-
-  // if no id, create one
-  if (!video.id || video.id === '') {
-    video.id = uuidv4();
-    frontendLog.warn('Renderer repaired a video that did not have an ID', {
-      filename: video.filename,
-      generatedVideoID: video.id
-    });
-  }
 
   // if the ratings object doesn't have all the sources, fill it with empty values;
   // most things will work fine if we don't do this, but the bit of logic

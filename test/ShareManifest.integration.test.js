@@ -19,6 +19,7 @@ function validManifest() {
   return {
     format: ShareManifest.SHARE_FORMAT,
     version: ShareManifest.SHARE_VERSION,
+    videoIdScheme: 2,
     revision: 1,
     request: {
       id: 'request-1',
@@ -26,7 +27,7 @@ function validManifest() {
       createdAt: '2026-09-07T01:00:00.000Z',
       requestedKinds: [{id: 'kind-movie', label: ' Movie '}],
       includeDvds: true,
-      inventory: [{id: 'already-owned', mediaType: 'file', size: 100}]
+      inventory: [{id: '1'.repeat(64), mediaType: 'file', size: 100}]
     },
     fulfillment: {
       status: 'complete',
@@ -36,7 +37,7 @@ function validManifest() {
       includeDvds: true,
       kindMappings: [{requestedKindId: 'kind-movie', sourceKinds: ['Movie']}],
       items: [{
-        videoId: 'shared-video',
+        videoId: '2'.repeat(64),
         title: 'Alien',
         sourceKind: 'Movie',
         requestedKindId: 'kind-movie',
@@ -104,7 +105,7 @@ suite.test('rejects duplicate requested kinds and duplicate inventory IDs', () =
     error => error.code === 'INVALID_SHARE_REQUEST');
 
   const duplicateInventory = validManifest();
-  duplicateInventory.request.inventory.push({id: 'already-owned', mediaType: 'file', size: 100});
+  duplicateInventory.request.inventory.push({id: '1'.repeat(64), mediaType: 'file', size: 100});
   assert.throws(() => ShareManifest.validateManifest(duplicateInventory),
     error => error.code === 'INVALID_SHARE_REQUEST');
 });
@@ -160,5 +161,16 @@ suite.test('reports missing and malformed Share request files with stable codes'
     await rejectsWithCode(() => ShareManifest.readManifest(directory), 'INVALID_SHARE_MANIFEST');
   }
 ));
+
+suite.test('rejects old Share versions, incompatible ID schemes, and legacy IDs in new manifests', () => {
+  const old = validManifest(); old.version = 1;
+  assert.throws(() => ShareManifest.validateManifest(old), error => error.code === 'UNSUPPORTED_SHARE_VERSION');
+  const missing = validManifest(); delete missing.videoIdScheme;
+  assert.throws(() => ShareManifest.validateManifest(missing), error => error.code === 'UNSUPPORTED_SHARE_ID_SCHEME');
+  const badInventory = validManifest(); badInventory.request.inventory[0].id = 'legacy-id';
+  assert.throws(() => ShareManifest.validateManifest(badInventory), error => error.code === 'INVALID_SHARE_REQUEST');
+  const badFulfillment = validManifest(); badFulfillment.fulfillment.items[0].videoId = 'legacy-id';
+  assert.throws(() => ShareManifest.validateManifest(badFulfillment), error => error.code === 'INVALID_SHARE_FULFILLMENT');
+});
 
 runSuite(suite);
