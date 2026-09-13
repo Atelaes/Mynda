@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 35 suites: 34 fast suites with 282 named cases, plus the Electron end-to-end suite.
+The current catalog contains 35 suites: 34 fast suites with 285 named cases, plus the Electron end-to-end suite. Before media-tool setup, `npm run test:core` selects 32 suites with 278 cases.
 
 ## The first commands to learn
 
@@ -16,11 +16,14 @@ npm test
 
 `npm test` is the everyday command. It runs every unit, integration, and React component test, but does not launch Electron. It should take only a few seconds.
 
+On a new development machine, start with `npm run test:core`. This runs all fast suites except the two that execute real FFmpeg/FFprobe/MPV binaries. Once `npm run media:prepare` has completed for that machine, use `npm test` for the complete fast suite. `npm test` continues to fail if required media tools are missing; building an Electron package is not a prerequisite for tests.
+
 The complete command set is:
 
 | Command | What it runs | When to use it |
 |---|---|---|
 | `npm test` | All fast tests | Before and after ordinary code changes |
+| `npm run test:core` | Fast suites that do not require media executables | Before native media preparation on a new machine, or while diagnosing its toolchain |
 | `npm run test:list` | Test catalog only | To see what exists without running anything |
 | `npm run test:unit` | Unit tests | While changing calculations or one helper module |
 | `npm run test:integration` | Integration tests | While changing storage, IPC-facing models, logs, or Share |
@@ -68,7 +71,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | `LibraryStats.unit.test.js` | Unit | Seen/unseen totals, exact visible-title series grouping, resolution tiers, percentages, and global duplicate totals |
 | `VideoResolution.unit.test.js` | Unit | Shared labels/ranks, exact bucket cutoffs, crops, anamorphic ratios, portrait video, extreme panoramas, and unknown metadata |
 | `PackageConfig.unit.test.js` | Unit | Production file boundaries, media staging, strict package commands, and retirement of the HLS player |
-| `MediaTools.unit.test.js` | Unit | Packaged/staged executable paths, platform naming, overrides, and development fallbacks |
+| `MediaTools.unit.test.js` | Unit | Target-platform paths on either host, Windows environment-key casing, overrides, bundled-path classification, and development fallbacks |
 | `MediaToolPolicy.unit.test.js` | Unit | LGPL-only standalone FFmpeg flags, nonfree rejection, and required MPV DVD/video capabilities on macOS, Windows, and Linux |
 | `MediaBundleVerifier.unit.test.js` | Unit | Pinned source policy, graphical MPV, architecture, exclusion of `libdvdcss`, and platform verification dispatch |
 | `MediaBundleInspection.unit.test.js` | Unit | Windows PE imports, Linux ELF dependencies/RUNPATHs, architecture, closure, and prohibited libraries |
@@ -89,14 +92,28 @@ A “test double” is simply a small, predictable substitute for something outs
 | `Library.integration.test.js` | Integration | First launch, schema/version guards, add/replace/remove, synchronization waits, scanner-owned fields, exports, and recovery decisions |
 | `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
-| `ShareManifest.integration.test.js` | Integration | Manifest/ID version compatibility, checksums, safe paths, inventory, error codes, and atomic files |
-| `ShareService.integration.test.js` | Integration | Complete request → fulfillment → import flow, preserved content identity, old-library rejection, copies, conflicts, cancellation, and expiration |
+| `ShareManifest.integration.test.js` | Integration | Manifest/ID compatibility, safe paths, atomic files, Windows flush permissions, and preservation after a failed flush |
+| `ShareService.integration.test.js` | Integration | Request → fulfillment → import, content identity, conflicts, Windows flush permissions, cleanup after disk failure, cancellation, and expiration |
 | `RendererComponents.component.test.js` | Component | Status language, notification cleanup, navigation, recently-played controls, resolution cells/tooltips, shared statistics, and bucket sorting |
 | `SettingsLibrary.component.test.js` | Component | Library export requests, aligned viewing/kind/series/resolution totals, independent per-video duplicate folders, rescan guidance, and file-manager actions |
 | `Mynda.component.test.js` | Component | Ratings, playlist filtering, search, recent history, scan IPC, view state, and root pane composition |
 | `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, and Library-statistics interaction |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
+
+## Windows first-run failures and fix72
+
+The first Windows run reported 16 failed cases in eight suites. They had three causes:
+
+| Failed cases | Cause | Resolution |
+|---|---|---|
+| 9 | Cross-platform tests mixed Unix path literals with the host's Windows path operations, or expected unnormalized Unix fixture paths in the UI | Target-specific path helpers and native absolute fixtures; no media build required |
+| 4 | No usable FFmpeg/FFprobe executables were found | Complete `media:prepare` on Windows, then rerun `npm test` |
+| 3 | Share tried to flush files through read-only handles | Fix72 opens the existing temporary files with `r+`, retaining their bytes and propagating real flush errors |
+
+Windows requires a writable handle for its file-buffer flush operation. See [Microsoft's FlushFileBuffers documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers). Regression tests enforce that constraint while using real temporary files on any host, and verify that a simulated disk failure preserves the previous manifest or removes the incomplete media copy.
+
+`test:core` still covers library persistence, Share, fingerprinting, migration fixtures, settings, player orchestration, and the media path/policy helpers. Its success does not certify executable availability, playback, or packaging. The two real-media suites remain mandatory in `npm test`, `test:all`, and `test:package`. Use `MEDIA_TOOLS.md` for Windows setup and command order. A new library does not need ID migration; the migration tests only operate on disposable fixtures.
 
 ## Content ID and migration checks
 

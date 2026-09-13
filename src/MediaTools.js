@@ -5,6 +5,21 @@ const {execFile} = require('child_process');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
+function pathsFor(platform = process.platform) {
+  return platform === 'win32' ? path.win32 : path.posix;
+}
+
+function environmentValue(env, name, platform) {
+  if (env[name] !== undefined) return env[name];
+  // process.env is case-insensitive on Windows, but copied/injected env
+  // objects are ordinary JavaScript objects and often contain "Path".
+  if (platform === 'win32') {
+    const key = Object.keys(env).find(key => key.toUpperCase() === name.toUpperCase());
+    if (key) return env[key];
+  }
+  return undefined;
+}
+
 function executableExists(filename, options = {}) {
   if (typeof filename !== 'string' || !filename) return false;
   const filesystem = options.fs || fs;
@@ -40,13 +55,13 @@ function stagedMediaRoot(options = {}) {
   const platform = options.platform || process.platform;
   const arch = options.arch || process.arch;
   const projectRoot = options.projectRoot || PROJECT_ROOT;
-  return path.join(projectRoot, 'vendor', 'media-tools', `${builderPlatform(platform)}-${arch}`);
+  return pathsFor(platform).join(projectRoot, 'vendor', 'media-tools', `${builderPlatform(platform)}-${arch}`);
 }
 
 function packagedMediaRoot(options = {}) {
   const resourcesPath = typeof options.resourcesPath === 'string' ?
     options.resourcesPath : process.resourcesPath;
-  return resourcesPath ? path.join(resourcesPath, 'media-tools') : null;
+  return resourcesPath ? pathsFor(options.platform).join(resourcesPath, 'media-tools') : null;
 }
 
 function executableName(tool, platform) {
@@ -55,21 +70,22 @@ function executableName(tool, platform) {
 
 function bundledCandidates(tool, options = {}) {
   const platform = options.platform || process.platform;
+  const paths = pathsFor(platform);
   const filename = executableName(tool, platform);
   const packagedRoot = packagedMediaRoot(options);
   const stagedRoot = stagedMediaRoot(options);
   const candidates = [];
 
   if (packagedRoot) {
-    candidates.push(path.join(packagedRoot, filename));
+    candidates.push(paths.join(packagedRoot, filename));
     if (tool === 'mpv' && platform === 'darwin') {
-      candidates.push(path.join(packagedRoot, 'mpv.app', 'Contents', 'MacOS', 'mpv'));
+      candidates.push(paths.join(packagedRoot, 'mpv.app', 'Contents', 'MacOS', 'mpv'));
     }
   }
 
-  candidates.push(path.join(stagedRoot, filename));
+  candidates.push(paths.join(stagedRoot, filename));
   if (tool === 'mpv' && platform === 'darwin') {
-    candidates.push(path.join(stagedRoot, 'mpv.app', 'Contents', 'MacOS', 'mpv'));
+    candidates.push(paths.join(stagedRoot, 'mpv.app', 'Contents', 'MacOS', 'mpv'));
   }
   return unique(candidates);
 }
@@ -78,10 +94,11 @@ function pathCandidates(tool, options = {}) {
   const env = options.env || process.env;
   const platform = options.platform || process.platform;
   const filename = executableName(tool, platform);
-  const pathValue = typeof env.PATH === 'string' ? env.PATH : '';
+  const suppliedPath = environmentValue(env, 'PATH', platform);
+  const pathValue = typeof suppliedPath === 'string' ? suppliedPath : '';
   const pathDelimiter = options.pathDelimiter || (platform === 'win32' ? ';' : ':');
   return pathValue.split(pathDelimiter).filter(Boolean)
-    .map(directory => path.join(directory, filename));
+    .map(directory => pathsFor(platform).join(directory, filename));
 }
 
 function overrideName(tool) {
@@ -91,10 +108,11 @@ function overrideName(tool) {
 function mediaToolCandidates(tool, options = {}) {
   const env = options.env || process.env;
   const platform = options.platform || process.platform;
+  const paths = pathsFor(platform);
   const homeDirectory = typeof options.homeDirectory === 'string' ?
     options.homeDirectory : os.homedir();
   const filename = executableName(tool, platform);
-  const candidates = [env[overrideName(tool)]];
+  const candidates = [environmentValue(env, overrideName(tool), platform)];
 
   candidates.push(...bundledCandidates(tool, options));
   candidates.push(...pathCandidates(tool, options));
@@ -107,19 +125,19 @@ function mediaToolCandidates(tool, options = {}) {
         '/usr/local/bin/mpv',
         '/usr/bin/mpv',
         '/Applications/mpv.app/Contents/MacOS/mpv',
-        homeDirectory && path.join(homeDirectory, 'Applications', 'mpv.app', 'Contents', 'MacOS', 'mpv')
+        homeDirectory && paths.join(homeDirectory, 'Applications', 'mpv.app', 'Contents', 'MacOS', 'mpv')
       );
     } else if (platform === 'linux') {
       candidates.push('/usr/bin/mpv', '/usr/local/bin/mpv', '/snap/bin/mpv');
     } else if (platform === 'win32') {
-      const programFiles = env.ProgramFiles || env.PROGRAMFILES;
-      const localAppData = env.LOCALAPPDATA;
-      const userProfile = env.USERPROFILE;
-      const chocolatey = env.ChocolateyInstall;
-      if (programFiles) candidates.push(path.join(programFiles, 'mpv', filename));
-      if (localAppData) candidates.push(path.join(localAppData, 'Programs', 'mpv', filename));
-      if (userProfile) candidates.push(path.join(userProfile, 'scoop', 'apps', 'mpv', 'current', filename));
-      if (chocolatey) candidates.push(path.join(chocolatey, 'bin', filename));
+      const programFiles = environmentValue(env, 'ProgramFiles', platform);
+      const localAppData = environmentValue(env, 'LOCALAPPDATA', platform);
+      const userProfile = environmentValue(env, 'USERPROFILE', platform);
+      const chocolatey = environmentValue(env, 'ChocolateyInstall', platform);
+      if (programFiles) candidates.push(paths.join(programFiles, 'mpv', filename));
+      if (localAppData) candidates.push(paths.join(localAppData, 'Programs', 'mpv', filename));
+      if (userProfile) candidates.push(paths.join(userProfile, 'scoop', 'apps', 'mpv', 'current', filename));
+      if (chocolatey) candidates.push(paths.join(chocolatey, 'bin', filename));
     }
   }
 
@@ -141,20 +159,21 @@ function findMpvPath(options = {}) {
   return findMediaToolPath('mpv', options);
 }
 
-function isInside(candidate, directory) {
+function isInside(candidate, directory, platform = process.platform) {
   if (!candidate || !directory) return false;
-  const relative = path.relative(directory, candidate);
-  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+  const paths = pathsFor(platform);
+  const relative = paths.relative(directory, candidate);
+  return relative === '' || (!relative.startsWith(`..${paths.sep}`) && relative !== '..' && !paths.isAbsolute(relative));
 }
 
 function isBundledPath(candidate, options = {}) {
-  return isInside(candidate, packagedMediaRoot(options)) ||
-    isInside(candidate, stagedMediaRoot(options));
+  return isInside(candidate, packagedMediaRoot(options), options.platform) ||
+    isInside(candidate, stagedMediaRoot(options), options.platform);
 }
 
 function samePath(first, second, platform = process.platform) {
   if (!first || !second) return false;
-  const normalize = value => path.resolve(String(value));
+  const normalize = value => pathsFor(platform).resolve(String(value));
   const left = normalize(first);
   const right = normalize(second);
   return platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
@@ -164,9 +183,9 @@ function mediaToolSource(tool, candidate, options = {}) {
   if (!candidate) return 'missing';
   const env = options.env || process.env;
   const platform = options.platform || process.platform;
-  if (samePath(candidate, env[overrideName(tool)], platform)) return 'override';
-  if (isInside(candidate, packagedMediaRoot(options))) return 'packaged';
-  if (isInside(candidate, stagedMediaRoot(options))) return 'staged';
+  if (samePath(candidate, environmentValue(env, overrideName(tool), platform), platform)) return 'override';
+  if (isInside(candidate, packagedMediaRoot(options), platform)) return 'packaged';
+  if (isInside(candidate, stagedMediaRoot(options), platform)) return 'staged';
   return 'system';
 }
 

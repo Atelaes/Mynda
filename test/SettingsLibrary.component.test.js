@@ -102,6 +102,12 @@ function component(videos = []) {
   return synchronousState(new MynSettingsLibrary({videos}));
 }
 
+// These are render-only inputs; no files are created. Use a native absolute
+// path so the expected text includes Windows' drive and backslashes there.
+function fixturePath(directory, filename) {
+  return path.join(path.parse(process.cwd()).root, directory, filename);
+}
+
 function matchingElements(element, predicate) {
   const matches = [];
   React.Children.forEach(element, child => {
@@ -123,7 +129,7 @@ suite.test('renders viewing, kind, series, resolution, and global duplicate stat
       title: 'Alien',
       seen: true,
       metadata: {width: 3840, height: 1600},
-      duplicates: ['/duplicates/Alien Copy A.mkv', '/duplicates/Alien Copy B.mkv']
+      duplicates: [fixturePath('duplicates', 'Alien Copy A.mkv'), fixturePath('duplicates', 'Alien Copy B.mkv')]
     }),
     videoFixture({
       id: 'movie-2',
@@ -139,7 +145,7 @@ suite.test('renders viewing, kind, series, resolution, and global duplicate stat
       seriesImdbID: 'tt0056751',
       seen: true,
       metadata: {width: 1280, height: 720},
-      duplicates: ['/duplicates/Pilot.mkv']
+      duplicates: [fixturePath('duplicates', 'Pilot.mkv')]
     }),
     videoFixture({
       id: 'show-2',
@@ -178,7 +184,7 @@ suite.test('renders viewing, kind, series, resolution, and global duplicate stat
   assert(/<td class="resolution">Unknown<\/td><td class="count">1 video<\/td><td class="percentage">20%<\/td>/.test(html));
   assert(html.includes('3 duplicate files across 2 videos'));
   assert.strictEqual((html.match(/duplicates-folder/g) || []).length, 2);
-  assert(html.includes('/duplicates/Alien Copy A.mkv'));
+  assert(html.includes(fixturePath('duplicates', 'Alien Copy A.mkv')));
   assert(html.includes('Show in Finder'));
 });
 
@@ -210,12 +216,12 @@ suite.test('explains library membership and the need to rescan after filesystem 
 
 suite.test('gives each video an independent titled folder and keeps detail clicks from closing it', () => {
   const first = videoFixture({
-    id: 'movie-a', title: 'Alien', filename: '/library/Alien.mkv',
-    duplicates: ['/duplicates/Alien A.mkv', '/duplicates/Alien B.mkv']
+    id: 'movie-a', title: 'Alien', filename: fixturePath('library', 'Alien.mkv'),
+    duplicates: [fixturePath('duplicates', 'Alien A.mkv'), fixturePath('duplicates', 'Alien B.mkv')]
   });
   const second = videoFixture({
-    id: 'movie-b', title: 'Arrival', filename: '/library/Arrival.mkv',
-    duplicates: ['/duplicates/Arrival.mkv']
+    id: 'movie-b', title: 'Arrival', filename: fixturePath('library', 'Arrival.mkv'),
+    duplicates: [fixturePath('duplicates', 'Arrival.mkv')]
   });
   const instance = component([first, second, videoFixture({id: 'no-copies', duplicates: []})]);
   const folders = matchingElements(instance.render(), element => element.type === MynParagraphFolder);
@@ -228,10 +234,10 @@ suite.test('gives each video an independent titled folder and keeps detail click
   const secondDetails = ReactDOMServer.renderToStaticMarkup(folders[1].props.paragraph);
   assert(firstDetails.includes('Library\u00a0copy:'));
   assert(firstDetails.includes('Duplicate\u00a0files:'));
-  assert(firstDetails.includes('/library/Alien.mkv') && firstDetails.includes('/duplicates/Alien B.mkv'));
+  assert(firstDetails.includes(first.filename) && firstDetails.includes(first.duplicates[1]));
   assert(!firstDetails.includes('Arrival'));
   assert(secondDetails.includes('Duplicate\u00a0file:'));
-  assert(secondDetails.includes('/library/Arrival.mkv') && !secondDetails.includes('Alien'));
+  assert(secondDetails.includes(second.filename) && !secondDetails.includes('Alien'));
 
   const renderedFolders = folders.map(folder => synchronousState(new MynParagraphFolder(folder.props)));
   const paragraphOf = folder => matchingElements(folder.render(), element => element.props.className === 'paragraph')[0];

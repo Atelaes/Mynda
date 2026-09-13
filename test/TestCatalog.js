@@ -143,12 +143,14 @@ module.exports = [
   {
     category: 'integration',
     file: 'test/MediaDependencies.integration.test.js',
+    requiresMediaTools: true,
     title: 'Installed media dependencies',
     protects: 'node-mpv JSON IPC startup, real graphical output, decoding/probing, and MPV DVD capability'
   },
   {
     category: 'integration',
     file: 'test/MediaMetadata.integration.test.js',
+    requiresMediaTools: true,
     title: 'Real video metadata and embedded artwork',
     protects: 'actual FFprobe and FFmpeg fallback selection of videos with cover art, genuine MJPEG, and cleanup on failure'
   },

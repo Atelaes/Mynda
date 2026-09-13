@@ -73,6 +73,8 @@ suite.test('creates an isolated default library on first launch', () => withTemp
 suite.test('migrates older libraries while preserving explicit preferences and show IDs', () => withTemporaryDirectory(
   'library-migration',
   directory => {
+    const originalShow = path.join(directory, 'watch', 'Party of Five.mkv');
+    const duplicateShow = path.join(directory, 'watch', 'Party of Five Copy.mkv');
     const libraryDirectory = path.join(directory, 'Library');
     const libraryPath = path.join(libraryDirectory, 'library.json');
     const oldLibrary = libraryFixture({
@@ -99,12 +101,8 @@ suite.test('migrates older libraries while preserving explicit preferences and s
           kind: 'show',
           series: 'Party of Five',
           seriesImdbID: 'tt0108894',
-          filename: '/watch/Party of Five.mkv',
-          duplicates: [
-            '/watch/Party of Five.mkv',
-            '/watch/Party of Five Copy.mkv',
-            '/watch/Party of Five Copy.mkv'
-          ]
+          filename: originalShow,
+          duplicates: [originalShow, duplicateShow, duplicateShow]
         })
       ]
     });
@@ -119,7 +117,7 @@ suite.test('migrates older libraries while preserving explicit preferences and s
     assert.strictEqual(instance.media[0].seriesImdbID, '');
     assert.deepStrictEqual(instance.media[0].duplicates, []);
     assert.strictEqual(instance.media[1].seriesImdbID, 'tt0108894');
-    assert.deepStrictEqual(instance.media[1].duplicates, ['/watch/Party of Five Copy.mkv']);
+    assert.deepStrictEqual(instance.media[1].duplicates, [duplicateShow]);
     assert.strictEqual(instance.playlists[0].view, 'flat');
     assert.strictEqual(Object.prototype.hasOwnProperty.call(
       instance.settings.preferences.override_dialogs,
@@ -161,26 +159,28 @@ suite.test('preserves current subtitle provenance during unrelated renderer edit
     global.savedPing = {saved() {}};
     const {Library, ipcRenderer} = loadLibraryClass(directory, true);
     const instance = new Library();
-    const detected = '/watch/Movie.en.srt';
+    const detected = path.join(directory, 'watch', 'Movie.en.srt');
+    const ignored = path.join(directory, 'watch', 'Movie.commentary.srt');
+    const duplicate = path.join(directory, 'watch', 'Movie Copy.mkv');
     const oldVideo = videoFixture({
       id: 'movie',
       subtitles: [detected],
       detected_subtitles: [detected],
       manual_subtitles: [],
-      ignored_subtitles: ['/watch/Movie.commentary.srt'],
+      ignored_subtitles: [ignored],
       subtitle_tracking_initialized: true,
-      duplicates: ['/watch/Movie Copy.mkv']
+      duplicates: [duplicate]
     });
     const replacement = videoFixture({
       id: 'movie',
       title: 'New title',
       subtitles: [],
-      duplicates: ['/stale/renderer-copy.mkv']
+      duplicates: [path.join(directory, 'stale', 'renderer-copy.mkv')]
     });
     const prepared = instance.prepareRendererVideoReplacement(oldVideo, replacement);
     assert.deepStrictEqual(prepared.subtitles, [detected]);
-    assert.deepStrictEqual(prepared.ignored_subtitles, ['/watch/Movie.commentary.srt']);
-    assert.deepStrictEqual(prepared.duplicates, ['/watch/Movie Copy.mkv']);
+    assert.deepStrictEqual(prepared.ignored_subtitles, [ignored]);
+    assert.deepStrictEqual(prepared.duplicates, [duplicate]);
     assert(ipcRenderer.sent.some(entry => entry.channel === 'lib-beacon'));
     delete global.savedPing;
   }

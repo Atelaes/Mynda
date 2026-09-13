@@ -46,8 +46,11 @@ From the Mynda project directory on each target machine:
 
 ```bash
 npm install
+npm run test:core
 npm run media:prepare
 npm run media:status
+npm test
+npm run test:electron
 npm run test:media
 npm run test:package
 ```
@@ -56,6 +59,8 @@ npm run test:package
 while, but downloads are cached and a completed candidate is preserved if only
 a verifier rule needs correction. Generated stages are ignored by Git; do not
 commit native binaries or `dist/`.
+
+`test:core` checks the application without requiring media executables. `npm test` includes two suites that really execute FFmpeg/FFprobe against generated fixtures, so those tools must be available first. `test:package` consumes a prepared stage; it does not build the media tools for you.
 
 ## macOS preparation
 
@@ -70,7 +75,7 @@ application-bundle target, and rewrites private dylibs to app-relative paths.
 
 ## Windows preparation
 
-Install 64-bit MSYS2, then open its **UCRT64** terminal. Update MSYS2 and
+Install x64 [MSYS2 from its official site](https://www.msys2.org/), then open its **UCRT64** terminal. The current Mynda Windows recipe targets x64. Update MSYS2 and
 install the build inputs:
 
 ```bash
@@ -79,7 +84,7 @@ pacman -S --needed base-devel mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-me
 ```
 
 If `pacman -Syu` asks to close the terminal after updating core components,
-close it, reopen UCRT64, and run the update again before installing packages.
+close it, reopen UCRT64, and run the update again before installing packages. See the [MSYS2 update instructions](https://www.msys2.org/docs/updating/).
 
 Return to PowerShell or Windows Terminal in the Mynda directory and run the
 common workflow. The PowerShell wrapper locates `C:\msys64` (or the directory
@@ -87,6 +92,23 @@ named by `MYNDA_MSYS2_ROOT`) and enters UCRT64 automatically. The inner recipe
 builds the pinned standalone FFmpeg/FFprobe, patched DVD libraries, and MPV
 source. It recursively copies non-Windows DLLs beside `mpv.exe` and records
 which MSYS2 packages supplied them.
+
+For the current Windows checkout, after applying fix72, run in PowerShell:
+
+```powershell
+Set-Location 'H:\Dropbox\Coding\Mynda'
+npm run test:core
+npm run media:prepare
+npm run media:status
+npm test
+npm run test:electron
+npm run test:media
+npm run test:package
+```
+
+Run each command after the preceding one succeeds. `test:core` should report 32 suites and 278 cases. After preparation, `media:status` should show all three tools as available with `source: staged`, under `vendor/media-tools/win-x64/`. `npm test` should then report 34 suites and 285 cases. `test:media` and the package smoke check briefly open MPV to verify actual graphical playback. If preparation cannot start, it prints the missing prerequisite packages or commands; install the requested build inputs in UCRT64 and retry from PowerShell.
+
+You do not need to migrate a freshly created library. Applying this overlay requires no new npm packages. The fixes also apply to the macOS/Linux source; the existing media source pins, licensing policy, and Electron version are unchanged.
 
 ## Linux preparation
 
@@ -133,14 +155,15 @@ mask a missing packaged dependency.
 The scripts and platform-independent inspectors can be tested anywhere, but a
 target is not release-validated until these steps pass on that target:
 
-1. `npm test`
-2. `npm run test:electron`
-3. `npm run media:prepare`
-4. `npm run test:media`
-5. `npm run test:package`
-6. Manually scan a fixture watchfolder and play a normal video, subtitles, and
+1. `npm run test:core`
+2. `npm run media:prepare`
+3. `npm test`
+4. `npm run test:electron`
+5. `npm run test:media`
+6. `npm run test:package`
+7. Manually scan a fixture watchfolder and play a normal video, subtitles, and
    one representative unencrypted DVD folder.
-7. Run `npm run dist` and test the installer or AppImage on a clean machine
+8. Run `npm run dist` and test the installer or AppImage on a clean machine
    without development tools.
 
 The Windows and Linux recipes in this change are ready for those native passes;

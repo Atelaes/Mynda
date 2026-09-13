@@ -5,6 +5,7 @@ const catalog = require('./TestCatalog.js');
 const projectRoot = path.resolve(__dirname, '..');
 const aliases = {
   fast: 'fast',
+  core: 'core',
   unit: 'unit',
   integration: 'integration',
   component: 'component',
@@ -16,7 +17,7 @@ const aliases = {
 };
 
 function usage() {
-  console.log('Usage: node test/run-tests.js [fast|unit|integration|component|e2e|all|list]');
+  console.log('Usage: node test/run-tests.js [fast|core|unit|integration|component|e2e|all|list]');
 }
 
 function printCatalog() {
@@ -27,9 +28,10 @@ function printCatalog() {
     console.log(
       `${entry.category.padEnd(categoryWidth)}  ${entry.title.padEnd(titleWidth)}  ${entry.file}`
     );
-    console.log(`${' '.repeat(categoryWidth + titleWidth + 4)}${entry.protects}`);
+    console.log(`${' '.repeat(categoryWidth + titleWidth + 4)}${entry.protects}${entry.requiresMediaTools ? ' (requires installed media tools)' : ''}`);
   });
   console.log('\n`fast` runs unit + integration + component tests. `all` adds real Electron.');
+  console.log('`core` runs the fast suites that do not require media executables.');
 }
 
 function parseResult(output, entry, exitCode) {
@@ -99,10 +101,14 @@ async function main() {
 
   const selected = catalog.filter(entry => {
     if (mode === 'all') return true;
+    if (mode === 'core') return entry.category !== 'end-to-end' && !entry.requiresMediaTools;
     if (mode === 'fast') return entry.category !== 'end-to-end';
     return entry.category === mode;
   });
   console.log(`Running ${selected.length} Mynda test suite${selected.length === 1 ? '' : 's'} (${requested})...`);
+  if (mode === 'core') {
+    console.log('The two real-media suites are not selected. Run npm test after npm run media:prepare for full fast coverage.');
+  }
 
   const runs = [];
   for (const entry of selected) {

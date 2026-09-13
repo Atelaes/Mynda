@@ -11,6 +11,7 @@ const {
 const ShareService = require('../src/ShareService.js');
 const ShareManifest = require('../src/ShareManifest.js');
 const {fingerprintPath} = require('../src/ContentFingerprint.js');
+const {withWindowsFileSync} = require('./helpers/WindowsFileSync.js');
 
 const suite = createSuite(
   'Share service filesystem workflow',
@@ -239,5 +240,22 @@ suite.test('blocks Share writes from a library whose IDs have not been converted
   assert.strictEqual(ran, false);
   assert.strictEqual(instance.isBusy(), false);
 });
+
+suite.test('flushes copied media on Windows and removes incomplete output after a disk failure', () =>
+  withTemporaryDirectory('share-copy-windows-flush', directory => withWindowsFileSync(async policy => {
+    const source = path.join(directory, 'source.bin');
+    const destination = path.join(directory, 'copied.bin');
+    const failedDestination = path.join(directory, 'failed.bin');
+    const bytes = Buffer.from('preserve every source byte');
+    fs.writeFileSync(source, bytes);
+    await ShareService.copyFileVerified(source, destination);
+    assert.strictEqual(policy.syncs, 1);
+    assert.deepStrictEqual(fs.readFileSync(destination), bytes);
+    policy.failWith = 'EIO';
+    await assert.rejects(() => ShareService.copyFileVerified(source, failedDestination), error => error.code === 'EIO');
+    assert.strictEqual(policy.syncs, 2);
+    assert.deepStrictEqual(fs.readFileSync(source), bytes);
+    assert.deepStrictEqual(fs.readdirSync(directory).sort(), ['copied.bin', 'source.bin']);
+  })));
 
 runSuite(suite);

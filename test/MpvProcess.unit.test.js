@@ -51,7 +51,7 @@ suite.test('uses a short macOS socket even when the normal temporary directory i
     nonce: 'abc123',
     temporaryDirectory: '/private/var/folders/very/long/per-user/temporary/directory/T'
   });
-  assert.strictEqual(path.dirname(socket), '/tmp');
+  assert.strictEqual(path.posix.dirname(socket), '/tmp');
   assert(socket.length < 100, `macOS socket path is unexpectedly long: ${socket}`);
 });
 
@@ -63,7 +63,7 @@ suite.test('uses named pipes on Windows and Unix sockets on Linux', () => {
     platform: 'linux', pid: 7, now: 8, nonce: 'linux', temporaryDirectory: '/var/tmp'
   });
   assert(windows.startsWith('\\\\.\\pipe\\mynda-mpv-'));
-  assert.strictEqual(path.dirname(linux), '/var/tmp');
+  assert.strictEqual(path.posix.dirname(linux), '/var/tmp');
   assert(linux.endsWith('.sock'));
 });
 

@@ -8,6 +8,7 @@ const {
   rejectsWithCode
 } = require('./helpers/TestHarness.js');
 const ShareManifest = require('../src/ShareManifest.js');
+const {withWindowsFileSync} = require('./helpers/WindowsFileSync.js');
 
 const suite = createSuite(
   'Share manifest validation and persistence',
@@ -172,5 +173,19 @@ suite.test('rejects old Share versions, incompatible ID schemes, and legacy IDs 
   const badFulfillment = validManifest(); badFulfillment.fulfillment.items[0].videoId = 'legacy-id';
   assert.throws(() => ShareManifest.validateManifest(badFulfillment), error => error.code === 'INVALID_SHARE_FULFILLMENT');
 });
+
+suite.test('flushes manifests with Windows permissions and preserves the previous copy on disk failure', () =>
+  withTemporaryDirectory('share-windows-flush', directory => withWindowsFileSync(async policy => {
+    const first = validManifest();
+    const filename = await ShareManifest.writeManifest(directory, first);
+    assert.strictEqual(policy.syncs, 1);
+    const before = fs.readFileSync(filename);
+    policy.failWith = 'EIO';
+    await assert.rejects(() => ShareManifest.writeManifest(directory, {...first, revision: 2}), error =>
+      error.code === 'SHARE_MANIFEST_WRITE_FAILED' && error.details.error.includes('EIO'));
+    assert.strictEqual(policy.syncs, 2);
+    assert.deepStrictEqual(fs.readFileSync(filename), before);
+    assert.deepStrictEqual(fs.readdirSync(directory), [ShareManifest.MANIFEST_FILENAME]);
+  })));
 
 runSuite(suite);

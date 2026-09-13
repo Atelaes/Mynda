@@ -417,7 +417,9 @@ async function readManifest(directory) {
 async function syncFile(filePath) {
   let handle;
   try {
-    handle = await fs.promises.open(filePath, 'r');
+    // Windows requires write access to flush a file. r+ preserves its bytes
+    // while opening a writable handle; actual flush failures still propagate.
+    handle = await fs.promises.open(filePath, 'r+');
     await handle.sync();
   } finally {
     if (handle) await handle.close();

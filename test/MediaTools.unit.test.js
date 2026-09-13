@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const MediaTools = require('../src/MediaTools.js');
+const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 const {
   assert,
   createSuite,
@@ -27,15 +28,15 @@ suite.test('uses one architecture-specific developer staging directory', () => {
       platform: 'darwin',
       arch: 'arm64'
     }),
-    path.join('/project', 'vendor', 'media-tools', 'mac-arm64')
+    '/project/vendor/media-tools/mac-arm64'
   );
   assert.strictEqual(
     MediaTools.stagedMediaRoot({projectRoot: 'C:\\project', platform: 'win32', arch: 'x64'}),
-    path.join('C:\\project', 'vendor', 'media-tools', 'win-x64')
+    'C:\\project\\vendor\\media-tools\\win-x64'
   );
   assert.strictEqual(
     MediaTools.stagedMediaRoot({projectRoot: '/project', platform: 'linux', arch: 'x64'}),
-    path.join('/project', 'vendor', 'media-tools', 'linux-x64')
+    '/project/vendor/media-tools/linux-x64'
   );
 });
 
@@ -64,7 +65,7 @@ suite.test('gives explicit executable overrides first priority', () => {
   });
   assert.strictEqual(candidates[0], '/custom/player/mpv');
   assert(candidates.includes('/resources/media-tools/mpv'));
-  assert(candidates.includes(path.join('/project', 'vendor', 'media-tools', 'linux-x64', 'mpv')));
+  assert(candidates.includes('/project/vendor/media-tools/linux-x64/mpv'));
   assert(candidates.includes('/one/mpv'));
 });
 
@@ -78,7 +79,7 @@ suite.test('looks in packaged Resources before the developer stage and PATH', ()
   });
   assert.deepStrictEqual(candidates.slice(0, 3), [
     '/Applications/Mynda.app/Contents/Resources/media-tools/ffprobe',
-    path.join('/project', 'vendor', 'media-tools', 'mac-arm64', 'ffprobe'),
+    '/project/vendor/media-tools/mac-arm64/ffprobe',
     '/usr/bin/ffprobe'
   ]);
 });
@@ -114,7 +115,7 @@ suite.test('finds the first executable MPV candidate', () => {
   assert.deepStrictEqual(inspected.slice(0, 4), [
     '/missing/mpv',
     '/resources/media-tools/mpv',
-    path.join('/project', 'vendor', 'media-tools', 'linux-x64', 'mpv'),
+    '/project/vendor/media-tools/linux-x64/mpv',
     '/working/mpv'
   ]);
 });
@@ -161,6 +162,30 @@ suite.test('reports staged, packaged, overridden, system, and missing sources', 
   );
   assert.strictEqual(MediaTools.mediaToolSource('mpv', '/usr/bin/mpv', options), 'system');
   assert.strictEqual(MediaTools.mediaToolSource('mpv', null, options), 'missing');
+  const windows = {
+    platform: 'win32', arch: 'x64', projectRoot: 'C:\\Project',
+    resourcesPath: 'C:\\App\\resources', env: {mynda_mpv_path: 'D:\\Custom\\mpv.exe'}
+  };
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', 'd:\\custom\\MPV.EXE', windows), 'override');
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', 'c:\\app\\resources\\media-tools\\mpv.exe', windows), 'packaged');
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', 'C:\\Project\\vendor\\media-tools\\win-x64\\mpv.exe', windows), 'staged');
+  assert.strictEqual(MediaTools.mediaToolSource('mpv', 'C:\\App\\resources\\media-tools-other\\mpv.exe', windows), 'system');
+});
+
+suite.test('uses the requested platform paths even when the host uses the other path convention', () => {
+  for (const flavor of [path.posix, path.win32]) {
+    const subject = loadFreshWithMocks(require.resolve('../src/MediaTools.js'), {path: flavor});
+    assert.deepStrictEqual(subject.mediaToolCandidates('ffprobe', {
+      platform: 'linux', arch: 'x64', projectRoot: '/project',
+      resourcesPath: '/app/resources', env: {PATH: '/tools:/other'}
+    }), ['/app/resources/media-tools/ffprobe', '/project/vendor/media-tools/linux-x64/ffprobe',
+      '/tools/ffprobe', '/other/ffprobe']);
+    assert.deepStrictEqual(subject.mediaToolCandidates('ffprobe', {
+      platform: 'win32', arch: 'x64', projectRoot: 'C:\\Project',
+      resourcesPath: 'C:\\App\\resources', env: {Path: 'C:\\Media Tools;D:\\Other'}
+    }), ['C:\\App\\resources\\media-tools\\ffprobe.exe', 'C:\\Project\\vendor\\media-tools\\win-x64\\ffprobe.exe',
+      'C:\\Media Tools\\ffprobe.exe', 'D:\\Other\\ffprobe.exe']);
+  }
 });
 
 runSuite(suite);

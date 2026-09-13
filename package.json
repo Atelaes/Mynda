@@ -6,6 +6,7 @@
   "scripts": {
     "test": "npm run test:fast",
     "test:fast": "node test/run-tests.js fast",
+    "test:core": "node test/run-tests.js core",
     "test:list": "node test/run-tests.js list",
     "test:unit": "node test/run-tests.js unit",
     "test:integration": "node test/run-tests.js integration",

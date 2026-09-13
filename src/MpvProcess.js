@@ -36,7 +36,7 @@ function uniqueMpvSocketPath(options = {}) {
   // MPV creates the socket with owner-only permissions.
   const directory = platform === 'darwin' ? '/tmp' :
     (options.temporaryDirectory || os.tmpdir());
-  return path.join(directory, `mynda-mpv-${suffix}.sock`);
+  return path.posix.join(directory, `mynda-mpv-${suffix}.sock`);
 }
 
 function removeSocketFile(socketPath, options = {}) {
