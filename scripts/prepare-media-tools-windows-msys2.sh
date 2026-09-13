@@ -53,213 +53,276 @@ done
 export PATH="/ucrt64/bin:/usr/bin:${PATH:-}"
 export PKG_CONFIG="/ucrt64/bin/pkgconf.exe"
 
-# Stay in MSYS2's POSIX namespace by default. A raw Windows TEMP value can
-# contain backslashes and a drive colon, which POSIX build tools do not all
-# interpret consistently. Developers can still supply an explicit cache path.
-CACHE_PARENT="${MYNDA_MEDIA_BUILD_CACHE:-${TMPDIR:-/tmp}/mynda-media-tools-cache-win-x64}"
-mkdir -p "$CACHE_PARENT/downloads"
-WORK_ROOT="$(mktemp -d "$CACHE_PARENT/work.XXXXXX")"
-DOWNLOAD_ROOT="$CACHE_PARENT/downloads"
-STAGE_PARENT="$PROJECT_ROOT/vendor/media-tools"
-FINAL_STAGE="$STAGE_PARENT/win-x64"
-CANDIDATE_STAGE="$STAGE_PARENT/.win-x64.candidate"
-NEW_STAGE="$STAGE_PARENT/.win-x64.new.$$"
-PACKAGE_INVENTORY="$WORK_ROOT/msys2-packages.txt"
-printf '%s\n' \
-  mingw-w64-ucrt-x86_64-zlib \
-  mingw-w64-ucrt-x86_64-ffmpeg \
-  mingw-w64-ucrt-x86_64-libass \
-  mingw-w64-ucrt-x86_64-libiconv \
-  mingw-w64-ucrt-x86_64-libplacebo \
-  mingw-w64-ucrt-x86_64-lua51 \
-  mingw-w64-ucrt-x86_64-shaderc \
-  mingw-w64-ucrt-x86_64-spirv-cross > "$PACKAGE_INVENTORY"
-
-cleanup() {
-  rm -rf "$WORK_ROOT" "$NEW_STAGE"
-}
-trap cleanup EXIT
-
-promote_candidate() {
-  local old_stage="$STAGE_PARENT/.win-x64.old.$$"
-  if [[ -d "$FINAL_STAGE" ]]; then mv "$FINAL_STAGE" "$old_stage"; fi
-  mv "$CANDIDATE_STAGE" "$FINAL_STAGE"
-  rm -rf "$old_stage"
-}
-
-mkdir -p "$STAGE_PARENT"
-if [[ -d "$CANDIDATE_STAGE" ]]; then
-  printf 'Checking the completed Windows media build preserved from the previous attempt...\n'
-  if node "$PROJECT_ROOT/scripts/verify-media-tools.js" \
-    --stage "$CANDIDATE_STAGE" --platform win32 --arch x64 \
-    --write-info "$CANDIDATE_STAGE/build-info.json"; then
-    promote_candidate
-    printf '\nPrepared Mynda media tools at:\n  %s\n' "$FINAL_STAGE"
-    printf 'The preserved build passed; no recompilation was needed.\n'
-    exit 0
-  fi
-  printf 'The preserved build is not valid under the current policy; rebuilding it.\n' >&2
-  rm -rf "$CANDIDATE_STAGE"
+# The pacman package is lua51, but it installs lua5.1.pc. MPV's -Dlua option
+# selects that pkg-config module name, not the pacman package or DLL name.
+# Check now so a metadata problem cannot waste a full FFmpeg/DVD build first.
+LUA_PKGCONFIG_NAME="lua5.1"
+if ! PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig:/ucrt64/share/pkgconfig" \
+    "$PKG_CONFIG" --atleast-version=5.1.0 "$LUA_PKGCONFIG_NAME"; then
+  fail "MSYS2 cannot find $LUA_PKGCONFIG_NAME.pc (Lua >= 5.1). In UCRT64, run: pacman -S mingw-w64-ucrt-x86_64-lua51"
 fi
 
+# Keep native build outputs outside the project/sync folder. Existing verified
+# downloads remain reusable, and incomplete compiler work survives a retry.
+CACHE_PARENT="${MYNDA_MEDIA_BUILD_CACHE:-${TMPDIR:-/tmp}/mynda-media-tools-cache-win-x64}"
+CACHE_PARENT="$(cygpath -u "$CACHE_PARENT")"
+mkdir -p "$CACHE_PARENT/downloads"
+CACHE_PARENT="$(cd "$CACHE_PARENT" && pwd -P)"
+DOWNLOAD_ROOT="$CACHE_PARENT/downloads"
+CACHE_HELPER="$PROJECT_ROOT/scripts/lib/MediaBuildCache.js"
+STAGE_PARENT="$PROJECT_ROOT/vendor/media-tools"
+FINAL_STAGE="$STAGE_PARENT/win-x64"
+JOBS="${NUMBER_OF_PROCESSORS:-4}"
+DVDREAD_PATCH="$PROJECT_ROOT/vendor/media-tools/patches/libdvdread-no-libdvdcss.patch"
+NOTICES="$PROJECT_ROOT/vendor/media-tools/THIRD_PARTY_NOTICES.md"
+[[ -f "$DVDREAD_PATCH" ]] || fail "Required libdvdread patch is missing: $DVDREAD_PATCH"
+
+# Run the lock command directly: its parent is the long-lived build shell,
+# rather than a command-substitution subshell that immediately exits.
+LOCK_TOKEN=""
+LOCK_TOKEN_FILE="$CACHE_PARENT/.lock-token.$$"
+finish() {
+  local result=$?
+  trap - EXIT
+  if [[ -n "$LOCK_TOKEN" ]]; then
+    node "$CACHE_HELPER" unlock "$CACHE_PARENT" "$LOCK_TOKEN" || true
+  fi
+  rm -f "$LOCK_TOKEN_FILE"
+  if (( result != 0 )); then
+    printf '\nBuild progress was preserved at:\n  %s\nRerun npm run media:prepare to resume.\n' "$CACHE_PARENT" >&2
+  fi
+  exit "$result"
+}
+trap finish EXIT
+node "$CACHE_HELPER" lock "$CACHE_PARENT" > "$LOCK_TOKEN_FILE"
+LOCK_TOKEN="$(cat "$LOCK_TOKEN_FILE")"
+rm -f "$LOCK_TOKEN_FILE"
+
+hash_inputs() {
+  printf '%s\0' "$@" | sha256sum | awk '{print $1}'
+}
+file_hash() {
+  sha256sum "$1" | awk '{print $1}'
+}
 download() {
-  local url="$1"
-  local destination="$2"
-  local expected="$3"
-  local actual=""
-  if [[ -f "$destination" ]]; then actual="$(sha256sum "$destination" | awk '{print $1}')"; fi
+  local url="$1" destination="$2" expected="$3" actual=""
+  if [[ -f "$destination" ]]; then actual="$(file_hash "$destination")"; fi
   if [[ "$actual" != "$expected" ]]; then
     rm -f "$destination"
     printf 'Downloading %s\n' "$url"
     curl -fL --retry 3 --progress-bar -o "$destination" "$url"
-    actual="$(sha256sum "$destination" | awk '{print $1}')"
+    actual="$(file_hash "$destination")"
   fi
   [[ "$actual" == "$expected" ]] || fail "Checksum mismatch for $destination"
 }
-
-FFMPEG_ARCHIVE="$DOWNLOAD_ROOT/ffmpeg-$FFMPEG_VERSION.tar.xz"
-MPV_ARCHIVE="$DOWNLOAD_ROOT/mpv-$MPV_VERSION.tar.gz"
-DVDREAD_ARCHIVE="$DOWNLOAD_ROOT/libdvdread-$DVDREAD_VERSION.tar.gz"
-DVDNAV_ARCHIVE="$DOWNLOAD_ROOT/libdvdnav-$DVDNAV_VERSION.tar.gz"
-download "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" "$FFMPEG_ARCHIVE" "$FFMPEG_SHA256"
-download "https://github.com/mpv-player/mpv/archive/refs/tags/v$MPV_VERSION.tar.gz" "$MPV_ARCHIVE" "$MPV_SHA256"
-download "https://code.videolan.org/videolan/libdvdread/-/archive/$DVDREAD_VERSION/libdvdread-$DVDREAD_VERSION.tar.gz" "$DVDREAD_ARCHIVE" "$DVDREAD_SHA256"
-download "https://code.videolan.org/videolan/libdvdnav/-/archive/$DVDNAV_VERSION/libdvdnav-$DVDNAV_VERSION.tar.gz" "$DVDNAV_ARCHIVE" "$DVDNAV_SHA256"
-
-tar -xJf "$FFMPEG_ARCHIVE" -C "$WORK_ROOT"
-tar -xzf "$MPV_ARCHIVE" -C "$WORK_ROOT"
-tar -xzf "$DVDREAD_ARCHIVE" -C "$WORK_ROOT"
-tar -xzf "$DVDNAV_ARCHIVE" -C "$WORK_ROOT"
-
-JOBS="${NUMBER_OF_PROCESSORS:-4}"
-FFMPEG_SOURCE="$WORK_ROOT/ffmpeg-$FFMPEG_VERSION"
-FFMPEG_PREFIX="$WORK_ROOT/ffmpeg-install"
-printf '\nBuilding LGPL-only Windows FFmpeg and FFprobe %s...\n' "$FFMPEG_VERSION"
-(
-  cd "$FFMPEG_SOURCE"
-  ./configure \
-    --prefix="$FFMPEG_PREFIX" \
-    --target-os=mingw32 \
-    --arch=x86_64 \
-    --disable-gpl \
-    --disable-nonfree \
-    --disable-version3 \
-    --disable-doc \
-    --disable-debug \
-    --disable-ffplay \
-    --disable-autodetect \
-    --enable-static \
-    --disable-shared \
-    --enable-zlib
-  make -j"$JOBS"
-  make install
-)
-
-DVD_PREFIX="$WORK_ROOT/dvd-install"
-DVDREAD_SOURCE="$WORK_ROOT/libdvdread-$DVDREAD_VERSION"
-DVDREAD_BUILD="$WORK_ROOT/libdvdread-build"
-DVDNAV_SOURCE="$WORK_ROOT/libdvdnav-$DVDNAV_VERSION"
-DVDNAV_BUILD="$WORK_ROOT/libdvdnav-build"
-DVDREAD_PATCH="$PROJECT_ROOT/vendor/media-tools/patches/libdvdread-no-libdvdcss.patch"
-[[ -f "$DVDREAD_PATCH" ]] || fail "Required libdvdread patch is missing: $DVDREAD_PATCH"
-
-printf '\nBuilding Windows libdvdread %s without libdvdcss...\n' "$DVDREAD_VERSION"
-(
-  cd "$DVDREAD_SOURCE"
-  patch -p1 < "$DVDREAD_PATCH"
-)
-meson setup "$DVDREAD_BUILD" "$DVDREAD_SOURCE" \
-  --prefix="$DVD_PREFIX" --libdir=lib --buildtype=release --default-library=shared \
-  -Dc_args=-DMYNDA_DISABLE_LIBDVDCSS -Dlibdvdcss=disabled -Denable_docs=false
-meson compile -C "$DVDREAD_BUILD"
-meson install -C "$DVDREAD_BUILD"
-
-printf '\nBuilding Windows libdvdnav %s...\n' "$DVDNAV_VERSION"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" meson setup "$DVDNAV_BUILD" "$DVDNAV_SOURCE" \
-  --prefix="$DVD_PREFIX" --libdir=lib --buildtype=release --default-library=shared \
-  -Denable_docs=false -Denable_examples=false
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" meson compile -C "$DVDNAV_BUILD"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" meson install -C "$DVDNAV_BUILD"
-
-MPV_SOURCE="$WORK_ROOT/mpv-$MPV_VERSION"
-MPV_BUILD="$WORK_ROOT/mpv-build"
-MPV_PREFIX="$WORK_ROOT/mpv-install"
-printf '\nBuilding Windows MPV %s with Direct3D 11 and unencrypted-DVD support...\n' "$MPV_VERSION"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig:/ucrt64/lib/pkgconfig" meson setup "$MPV_BUILD" "$MPV_SOURCE" \
-    --prefix="$MPV_PREFIX" --buildtype=release --auto-features=disabled \
-    -Dbuild-date=false -Dgpl=true -Dcplayer=true -Dlibmpv=false -Dtests=false \
-    -Ddvdnav=enabled -Dwasapi=enabled -Dwin32-threads=enabled \
-    -Dd3d11=enabled -Dshaderc=enabled -Dspirv-cross=enabled \
-    -Dgl=disabled -Dvulkan=disabled -Diconv=enabled -Dzlib=enabled -Dlua=lua51 \
-    -Dhtml-build=disabled -Dmanpage-build=disabled -Dpdf-build=disabled
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig:/ucrt64/lib/pkgconfig" meson compile -C "$MPV_BUILD"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig:/ucrt64/lib/pkgconfig" meson install -C "$MPV_BUILD"
-
-mkdir -p "$NEW_STAGE/licenses" "$NEW_STAGE/licenses/msys2"
-install -m 755 "$FFMPEG_PREFIX/bin/ffmpeg.exe" "$NEW_STAGE/ffmpeg.exe"
-install -m 755 "$FFMPEG_PREFIX/bin/ffprobe.exe" "$NEW_STAGE/ffprobe.exe"
-install -m 755 "$MPV_PREFIX/bin/mpv.exe" "$NEW_STAGE/mpv.exe"
-find "$DVD_PREFIX/bin" -maxdepth 1 -type f -iname '*.dll' -exec install -m 755 {} "$NEW_STAGE/" \;
-
-find_dll() {
-  local wanted="${1,,}"
-  find "$NEW_STAGE" /ucrt64/bin -maxdepth 1 -type f -iname "$wanted" -print -quit
+prepare_source() {
+  local archive="$1" archive_directory="$2" source_patch="${3:-}"
+  [[ -f "$COMPONENT_ROOT/source/.mynda-source-ready" ]] && return
+  node "$CACHE_HELPER" remove "$COMPONENT_ROOT/source"
+  node "$CACHE_HELPER" remove "$COMPONENT_ROOT/extract"
+  mkdir -p "$COMPONENT_ROOT/extract"
+  tar -xf "$archive" -C "$COMPONENT_ROOT/extract"
+  if [[ -n "$source_patch" ]]; then
+    (cd "$COMPONENT_ROOT/extract/$archive_directory" && patch -p1 < "$source_patch")
+  fi
+  touch "$COMPONENT_ROOT/extract/$archive_directory/.mynda-source-ready"
+  node "$CACHE_HELPER" move "$COMPONENT_ROOT/extract/$archive_directory" "$COMPONENT_ROOT/source"
+  node "$CACHE_HELPER" remove "$COMPONENT_ROOT/extract"
 }
-
-# Recursively copy every non-Windows DLL imported by the three executables and
-# their private DLLs. The independent verifier performs the authoritative
-# allow-list check after this collector finishes.
-changed=1
-while (( changed )); do
-  changed=0
-  while IFS= read -r binary; do
-    while IFS= read -r dependency; do
-      dependency="${dependency//$'\r'/}"
-      [[ -n "$dependency" ]] || continue
-      [[ "$dependency" =~ ^(api-ms-win-|ext-ms-win-) ]] && continue
-      if find "$NEW_STAGE" -maxdepth 1 -type f -iname "$dependency" -print -quit | grep -q .; then
-        continue
-      fi
-      source_dll="$(find_dll "$dependency")"
-      if [[ -n "$source_dll" && "$source_dll" == /ucrt64/bin/* ]]; then
+build_meson() {
+  # A failed setup is safe to restart; a configured Ninja tree resumes objects.
+  if [[ ! -f "$COMPONENT_ROOT/build/build.ninja" || ! -f "$COMPONENT_ROOT/build/meson-private/coredata.dat" ]]; then
+    node "$CACHE_HELPER" remove "$COMPONENT_ROOT/build"
+    meson setup "$COMPONENT_ROOT/build" "$COMPONENT_ROOT/source" --prefix="$COMPONENT_PREFIX" "$@"
+  fi
+  meson compile -C "$COMPONENT_ROOT/build"
+  meson install -C "$COMPONENT_ROOT/build"
+}
+prepare_component() {
+  local name="$1" key="$2" builder="$3"
+  shift 3
+  local COMPONENT_ROOT="$CACHE_PARENT/components/$name/$key"
+  local COMPONENT_PREFIX="$COMPONENT_ROOT/install"
+  local status
+  status="$(node "$CACHE_HELPER" status "$COMPONENT_ROOT" "$key" component)"
+  if [[ "$status" == ready ]]; then
+    printf 'Reusing completed %s (checksums verified).\n' "$name"
+    return
+  fi
+  if [[ "$status" == damaged ]]; then
+    printf 'The cached %s output changed; rebuilding that component.\n' "$name"
+    node "$CACHE_HELPER" remove "$COMPONENT_ROOT"
+  fi
+  mkdir -p "$COMPONENT_PREFIX/licenses"
+  # Do not call this function from a conditional: Bash must stop on build errors.
+  "$builder"
+  node "$CACHE_HELPER" seal "$COMPONENT_ROOT" "$key" component "$@"
+  printf 'Checkpoint saved: %s.\n' "$name"
+}
+build_ffmpeg() {
+  local archive="$DOWNLOAD_ROOT/ffmpeg-$FFMPEG_VERSION.tar.xz"
+  download "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" "$archive" "$FFMPEG_SHA256"
+  prepare_source "$archive" "ffmpeg-$FFMPEG_VERSION"
+  printf '\nBuilding/resuming LGPL-only Windows FFmpeg and FFprobe %s...\n' "$FFMPEG_VERSION"
+  (
+    cd "$COMPONENT_ROOT/source"
+    if [[ ! -f ffbuild/config.mak ]]; then
+      ./configure --prefix="$COMPONENT_PREFIX" --target-os=mingw32 --arch=x86_64 \
+        --disable-gpl --disable-nonfree --disable-version3 --disable-doc --disable-debug \
+        --disable-ffplay --disable-autodetect --enable-static --disable-shared --enable-zlib
+    fi
+    make -j"$JOBS"
+    make install
+  )
+  install -m 644 "$COMPONENT_ROOT/source/COPYING.LGPLv2.1" "$COMPONENT_PREFIX/licenses/FFmpeg-COPYING.LGPLv2.1"
+  install -m 644 "$COMPONENT_ROOT/source/LICENSE.md" "$COMPONENT_PREFIX/licenses/FFmpeg-LICENSE.md"
+}
+build_dvdread() {
+  local archive="$DOWNLOAD_ROOT/libdvdread-$DVDREAD_VERSION.tar.gz"
+  download "https://code.videolan.org/videolan/libdvdread/-/archive/$DVDREAD_VERSION/libdvdread-$DVDREAD_VERSION.tar.gz" "$archive" "$DVDREAD_SHA256"
+  prepare_source "$archive" "libdvdread-$DVDREAD_VERSION" "$DVDREAD_PATCH"
+  printf '\nBuilding/resuming Windows libdvdread %s without libdvdcss...\n' "$DVDREAD_VERSION"
+  build_meson --libdir=lib --buildtype=release --default-library=shared \
+    -Dc_args=-DMYNDA_DISABLE_LIBDVDCSS -Dlibdvdcss=disabled -Denable_docs=false
+  install -m 644 "$COMPONENT_ROOT/source/COPYING" "$COMPONENT_PREFIX/licenses/libdvdread-COPYING"
+  install -m 644 "$DVDREAD_PATCH" "$COMPONENT_PREFIX/licenses/libdvdread-no-libdvdcss.patch"
+}
+build_dvdnav() {
+  local archive="$DOWNLOAD_ROOT/libdvdnav-$DVDNAV_VERSION.tar.gz"
+  download "https://code.videolan.org/videolan/libdvdnav/-/archive/$DVDNAV_VERSION/libdvdnav-$DVDNAV_VERSION.tar.gz" "$archive" "$DVDNAV_SHA256"
+  prepare_source "$archive" "libdvdnav-$DVDNAV_VERSION"
+  printf '\nBuilding/resuming Windows libdvdnav %s...\n' "$DVDNAV_VERSION"
+  PKG_CONFIG_PATH="$DVDREAD_PREFIX/lib/pkgconfig:/ucrt64/lib/pkgconfig" \
+    build_meson --libdir=lib --buildtype=release --default-library=shared \
+      -Denable_docs=false -Denable_examples=false
+  install -m 644 "$COMPONENT_ROOT/source/COPYING" "$COMPONENT_PREFIX/licenses/libdvdnav-COPYING"
+}
+build_mpv() {
+  local archive="$DOWNLOAD_ROOT/mpv-$MPV_VERSION.tar.gz"
+  download "https://github.com/mpv-player/mpv/archive/refs/tags/v$MPV_VERSION.tar.gz" "$archive" "$MPV_SHA256"
+  prepare_source "$archive" "mpv-$MPV_VERSION"
+  printf '\nBuilding/resuming Windows MPV %s with Direct3D 11 and unencrypted-DVD support...\n' "$MPV_VERSION"
+  PKG_CONFIG_PATH="$DVDNAV_PREFIX/lib/pkgconfig:$DVDREAD_PREFIX/lib/pkgconfig:/ucrt64/lib/pkgconfig" \
+    build_meson --buildtype=release --auto-features=disabled \
+      -Dbuild-date=false -Dgpl=true -Dcplayer=true -Dlibmpv=false -Dtests=false \
+      -Ddvdnav=enabled -Dwasapi=enabled -Dwin32-threads=enabled \
+      -Dd3d11=enabled -Dshaderc=enabled -Dspirv-cross=enabled \
+      -Dgl=disabled -Dvulkan=disabled -Diconv=enabled -Dzlib=enabled -Dlua="$LUA_PKGCONFIG_NAME" \
+      -Dhtml-build=disabled -Dmanpage-build=disabled -Dpdf-build=disabled
+  install -m 644 "$COMPONENT_ROOT/source/LICENSE.GPL" "$COMPONENT_PREFIX/licenses/MPV-LICENSE.GPL"
+  install -m 644 "$COMPONENT_ROOT/source/Copyright" "$COMPONENT_PREFIX/licenses/MPV-Copyright"
+}
+assemble_bundle() {
+  local stage="$BUNDLE_ROOT/bundle" inventory="$BUNDLE_ROOT/msys2-packages.txt"
+  local binary dependency source_dll package_name short_name license_source prefix changed
+  node "$CACHE_HELPER" remove "$stage"
+  mkdir -p "$stage/licenses/msys2"
+  printf '%s\n' \
+    mingw-w64-ucrt-x86_64-zlib mingw-w64-ucrt-x86_64-ffmpeg \
+    mingw-w64-ucrt-x86_64-libass mingw-w64-ucrt-x86_64-libiconv \
+    mingw-w64-ucrt-x86_64-libplacebo mingw-w64-ucrt-x86_64-lua51 \
+    mingw-w64-ucrt-x86_64-shaderc mingw-w64-ucrt-x86_64-spirv-cross > "$inventory"
+  install -m 755 "$FFMPEG_PREFIX/bin/ffmpeg.exe" "$stage/ffmpeg.exe"
+  install -m 755 "$FFMPEG_PREFIX/bin/ffprobe.exe" "$stage/ffprobe.exe"
+  install -m 755 "$MPV_PREFIX/bin/mpv.exe" "$stage/mpv.exe"
+  for prefix in "$DVDREAD_PREFIX" "$DVDNAV_PREFIX"; do
+    find "$prefix/bin" -maxdepth 1 -type f -iname '*.dll' -exec install -m 755 {} "$stage/" \;
+  done
+  # Recursively copy private DLLs; the independent verifier checks the resulting
+  # dependency closure against its Windows system-library allow-list.
+  changed=1
+  while (( changed )); do
+    changed=0
+    while IFS= read -r binary; do
+      while IFS= read -r dependency; do
+        dependency="${dependency//$'\r'/}"
+        [[ -n "$dependency" ]] || continue
+        [[ "$dependency" =~ ^(api-ms-win-|ext-ms-win-) ]] && continue
         [[ "${dependency,,}" != *libdvdcss* ]] || fail "MPV unexpectedly imports prohibited $dependency"
-        install -m 755 "$source_dll" "$NEW_STAGE/$(basename "$source_dll")"
-        pacman -Qqo "$source_dll" >> "$PACKAGE_INVENTORY" 2>/dev/null || true
-        changed=1
-      fi
-    done < <(objdump -p "$binary" | awk 'tolower($0) ~ /dll name:/ {print tolower($3)}')
-  done < <(find "$NEW_STAGE" -maxdepth 1 -type f \( -iname '*.exe' -o -iname '*.dll' \))
-done
-
-install -m 644 "$PROJECT_ROOT/vendor/media-tools/THIRD_PARTY_NOTICES.md" "$NEW_STAGE/THIRD_PARTY_NOTICES.md"
-install -m 644 "$FFMPEG_SOURCE/COPYING.LGPLv2.1" "$NEW_STAGE/licenses/FFmpeg-COPYING.LGPLv2.1"
-install -m 644 "$FFMPEG_SOURCE/LICENSE.md" "$NEW_STAGE/licenses/FFmpeg-LICENSE.md"
-install -m 644 "$MPV_SOURCE/LICENSE.GPL" "$NEW_STAGE/licenses/MPV-LICENSE.GPL"
-install -m 644 "$MPV_SOURCE/Copyright" "$NEW_STAGE/licenses/MPV-Copyright"
-install -m 644 "$DVDREAD_SOURCE/COPYING" "$NEW_STAGE/licenses/libdvdread-COPYING"
-install -m 644 "$DVDNAV_SOURCE/COPYING" "$NEW_STAGE/licenses/libdvdnav-COPYING"
-install -m 644 "$DVDREAD_PATCH" "$NEW_STAGE/licenses/libdvdread-no-libdvdcss.patch"
-find "$NEW_STAGE" -maxdepth 1 -type f -iname '*.dll' -printf '%f\n' | sort > "$NEW_STAGE/licenses/msys2/bundled-dlls.txt"
-
-if [[ -s "$PACKAGE_INVENTORY" ]]; then
-  sort -u "$PACKAGE_INVENTORY" -o "$PACKAGE_INVENTORY"
+        if find "$stage" -maxdepth 1 -type f -iname "$dependency" -print -quit | grep -q .; then continue; fi
+        source_dll="$(find /ucrt64/bin -maxdepth 1 -type f -iname "$dependency" -print -quit)"
+        if [[ -n "$source_dll" ]]; then
+          install -m 755 "$source_dll" "$stage/$(basename "$source_dll")"
+          pacman -Qqo "$source_dll" >> "$inventory" 2>/dev/null || true
+          changed=1
+        fi
+      done < <(objdump -p "$binary" | awk 'tolower($0) ~ /dll name:/ {print tolower($3)}')
+    done < <(find "$stage" -maxdepth 1 -type f \( -iname '*.exe' -o -iname '*.dll' \))
+  done
+  install -m 644 "$NOTICES" "$stage/THIRD_PARTY_NOTICES.md"
+  for prefix in "$FFMPEG_PREFIX" "$DVDREAD_PREFIX" "$DVDNAV_PREFIX" "$MPV_PREFIX"; do
+    cp -R "$prefix/licenses/." "$stage/licenses/"
+  done
+  find "$stage" -maxdepth 1 -type f -iname '*.dll' -printf '%f\n' | sort > "$stage/licenses/msys2/bundled-dlls.txt"
+  sort -u "$inventory" -o "$inventory"
   while IFS= read -r package_name; do
-    pacman -Q "$package_name" >> "$NEW_STAGE/licenses/msys2/packages.txt"
+    pacman -Q "$package_name" >> "$stage/licenses/msys2/packages.txt"
     short_name="${package_name#mingw-w64-ucrt-x86_64-}"
     license_source="/ucrt64/share/licenses/$short_name"
     if [[ -d "$license_source" ]]; then
-      mkdir -p "$NEW_STAGE/licenses/msys2/$short_name"
-      cp -R "$license_source/." "$NEW_STAGE/licenses/msys2/$short_name/"
+      mkdir -p "$stage/licenses/msys2/$short_name"
+      cp -R "$license_source/." "$stage/licenses/msys2/$short_name/"
     fi
-  done < "$PACKAGE_INVENTORY"
+  done < "$inventory"
+}
+
+# Cache keys include actual component recipes, source/patch checksums and the
+# installed toolchain. Publication/verifier changes do not invalidate compilers.
+TOOLCHAIN_KEY="$(hash_inputs "windows-components-v1" "$(pacman -Q | LC_ALL=C sort)" \
+  "$(cygpath -am /ucrt64)" "$CACHE_PARENT" "${CC:-}" "${CXX:-}" "${CFLAGS:-}" \
+  "${CXXFLAGS:-}" "${CPPFLAGS:-}" "${LDFLAGS:-}" "${PKG_CONFIG_PATH:-}" "${PKG_CONFIG_LIBDIR:-}")"
+SOURCE_KEY="$(hash_inputs "$(declare -f prepare_source)" "$(declare -f download)")"
+MESON_KEY="$(hash_inputs "$(declare -f build_meson)")"
+FFMPEG_KEY="$(hash_inputs "$TOOLCHAIN_KEY" "$SOURCE_KEY" "$FFMPEG_VERSION" "$FFMPEG_SHA256" "$(declare -f build_ffmpeg)")"
+DVDREAD_KEY="$(hash_inputs "$TOOLCHAIN_KEY" "$SOURCE_KEY" "$MESON_KEY" "$DVDREAD_VERSION" "$DVDREAD_SHA256" "$(file_hash "$DVDREAD_PATCH")" "$(declare -f build_dvdread)")"
+DVDNAV_KEY="$(hash_inputs "$TOOLCHAIN_KEY" "$SOURCE_KEY" "$MESON_KEY" "$DVDNAV_VERSION" "$DVDNAV_SHA256" "$DVDREAD_KEY" "$(declare -f build_dvdnav)")"
+MPV_KEY="$(hash_inputs "$TOOLCHAIN_KEY" "$SOURCE_KEY" "$MESON_KEY" "$MPV_VERSION" "$MPV_SHA256" "$DVDREAD_KEY" "$DVDNAV_KEY" "$LUA_PKGCONFIG_NAME" "$(declare -f build_mpv)")"
+FFMPEG_PREFIX="$CACHE_PARENT/components/ffmpeg/$FFMPEG_KEY/install"
+DVDREAD_PREFIX="$CACHE_PARENT/components/libdvdread/$DVDREAD_KEY/install"
+DVDNAV_PREFIX="$CACHE_PARENT/components/libdvdnav/$DVDNAV_KEY/install"
+MPV_PREFIX="$CACHE_PARENT/components/mpv/$MPV_KEY/install"
+BUNDLE_KEY="$(hash_inputs "windows-bundle-v1" "$FFMPEG_KEY" "$DVDREAD_KEY" "$DVDNAV_KEY" "$MPV_KEY" "$(file_hash "$NOTICES")" "$(declare -f assemble_bundle)")"
+BUNDLE_ROOT="$CACHE_PARENT/bundles/$BUNDLE_KEY"
+BUNDLE_STAGE="$BUNDLE_ROOT/bundle"
+
+# A complete old staging directory can sometimes survive the previous recipe's
+# cleanup. Recover it only after the full current verifier accepts it.
+status="$(node "$CACHE_HELPER" status "$BUNDLE_ROOT" "$BUNDLE_KEY" bundle)"
+if [[ "$status" != ready && ! -f "$CACHE_PARENT/legacy-stage-checked" ]]; then
+  for legacy in "$STAGE_PARENT/.win-x64.candidate" "$STAGE_PARENT"/.win-x64.new.*; do
+    [[ -f "$legacy/ffmpeg.exe" && -f "$legacy/ffprobe.exe" && -f "$legacy/mpv.exe" ]] || continue
+    printf 'Checking preserved media bundle: %s\n' "$legacy"
+    if node "$PROJECT_ROOT/scripts/verify-media-tools.js" --stage "$legacy" --platform win32 --arch x64; then
+      node "$CACHE_HELPER" remove "$BUNDLE_STAGE"
+      node "$CACHE_HELPER" copy "$legacy" "$BUNDLE_STAGE"
+      node "$CACHE_HELPER" seal "$BUNDLE_ROOT" "$BUNDLE_KEY" bundle ffmpeg.exe ffprobe.exe mpv.exe THIRD_PARTY_NOTICES.md
+      status=ready
+      break
+    fi
+    printf 'That old bundle is incomplete or invalid; leaving it untouched.\n' >&2
+  done
+  # Import old unkeyed stages only once; later recipe/toolchain changes must
+  # use their own cache keys instead of re-adopting an obsolete old bundle.
+  touch "$CACHE_PARENT/legacy-stage-checked"
 fi
 
-rm -rf "$CANDIDATE_STAGE"
-mv "$NEW_STAGE" "$CANDIDATE_STAGE"
+if [[ "$status" == ready ]]; then
+  printf 'Reusing the completed Windows media bundle (checksums verified).\n'
+else
+  prepare_component ffmpeg "$FFMPEG_KEY" build_ffmpeg bin/ffmpeg.exe bin/ffprobe.exe licenses/FFmpeg-COPYING.LGPLv2.1
+  prepare_component libdvdread "$DVDREAD_KEY" build_dvdread 'bin/*.dll' lib/pkgconfig/dvdread.pc licenses/libdvdread-COPYING
+  prepare_component libdvdnav "$DVDNAV_KEY" build_dvdnav 'bin/*.dll' lib/pkgconfig/dvdnav.pc licenses/libdvdnav-COPYING
+  prepare_component mpv "$MPV_KEY" build_mpv bin/mpv.exe licenses/MPV-LICENSE.GPL
+  printf '\nAssembling the Windows media bundle in the build cache...\n'
+  assemble_bundle
+  node "$CACHE_HELPER" seal "$BUNDLE_ROOT" "$BUNDLE_KEY" bundle ffmpeg.exe ffprobe.exe mpv.exe THIRD_PARTY_NOTICES.md
+fi
+
+# Always run the executable/license/dependency checks, even for a cached bundle.
+# A failed check or locked destination leaves all completed checkpoints intact.
 node "$PROJECT_ROOT/scripts/verify-media-tools.js" \
-  --stage "$CANDIDATE_STAGE" --platform win32 --arch x64 \
-  --write-info "$CANDIDATE_STAGE/build-info.json"
-promote_candidate
+  --stage "$BUNDLE_STAGE" --platform win32 --arch x64 --write-info "$BUNDLE_STAGE/build-info.json"
+node "$CACHE_HELPER" publish "$BUNDLE_STAGE" "$FINAL_STAGE" "$CACHE_PARENT/publications"
 
 printf '\nPrepared Mynda media tools at:\n  %s\n' "$FINAL_STAGE"
 printf 'Run: npm run media:status && npm run test:media && npm run test:package\n'

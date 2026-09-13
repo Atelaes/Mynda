@@ -68,7 +68,15 @@ suite.test('uses UCRT64/Direct3D on Windows and an Ubuntu 24.04 Wayland/X11 base
   assert(windows.includes('MSYSTEM:-}') && windows.includes('UCRT64'));
   assert(powershell.includes("$env:MSYSTEM = 'UCRT64'"));
   assert(powershell.includes('MYNDA_MSYS2_ROOT'));
-  assert(powershell.includes('cygpath -u'));
+  assert(powershell.includes('cygpath.exe'));
+  assert(powershell.includes("$env:MSYS2_PATH_TYPE = 'inherit'"));
+  // Native PowerShell arguments must contain a filename, not Bash source with
+  // embedded quotes. Windows PowerShell 5.1 corrupts the latter before launch.
+  assert.strictEqual(
+    /^\s*&\s*\$Bash\b[^\r\n]*(?:\s-[a-z]*c[a-z]*\b|\s--command\b)/m.test(powershell),
+    false,
+    'Pass the Windows build script as a file; do not restore a bash -c command string'
+  );
   assert(windows.includes('mingw-w64-ucrt-x86_64-shaderc'));
   assert(windows.includes('-Dd3d11=enabled'));
   assert(windows.includes('objdump -p'));

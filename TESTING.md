@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 35 suites: 34 fast suites with 285 named cases, plus the Electron end-to-end suite. Before media-tool setup, `npm run test:core` selects 32 suites with 278 cases.
+The current catalog contains 36 suites: 35 fast suites with 297 named cases, plus the Electron end-to-end suite. Before media-tool setup, `npm run test:core` selects 33 suites with 290 cases.
 
 ## The first commands to learn
 
@@ -84,6 +84,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | `RendererUtils.unit.test.js` | Unit | Batch-edit states, metadata repair without inventing IDs, portable artwork URLs, desktop labels, DOM ancestry, and object diffs |
 | `Player.unit.test.js` | Unit | Playback-attempt logs, missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
 | `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
+| `MediaBuildCache.integration.test.js` | Integration | Actual temporary files with simulated Windows locks: checkpoint integrity, copy/rename retries, old-bundle preservation, interrupted replacement recovery, and build ownership |
 | `ContentFingerprint.integration.test.js` | Integration | Fixed SHA-256 protocol vectors, sample boundaries, copied files/DVDs, complete control files, cache checks, cancellation, and sampled-hash limitations |
 | `VideoIdMigration.integration.test.js` | Integration | Separate conversion, exact original preservation, metadata/history and filter remapping, unavailable media, conflicts, resume, and real CLI installation safeguards |
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
@@ -114,6 +115,8 @@ The first Windows run reported 16 failed cases in eight suites. They had three c
 Windows requires a writable handle for its file-buffer flush operation. See [Microsoft's FlushFileBuffers documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers). Regression tests enforce that constraint while using real temporary files on any host, and verify that a simulated disk failure preserves the previous manifest or removes the incomplete media copy.
 
 `test:core` still covers library persistence, Share, fingerprinting, migration fixtures, settings, player orchestration, and the media path/policy helpers. Its success does not certify executable availability, playback, or packaging. The two real-media suites remain mandatory in `npm test`, `test:all`, and `test:package`. Use `MEDIA_TOOLS.md` for Windows setup and command order. A new library does not need ID migration; the migration tests only operate on disposable fixtures.
+
+The Windows build-cache suite runs in `test:core` on every host. It does not need MSYS2 or launch media tools. It tests real files with controlled failures in filesystem operations; a passing run does not prove native Windows compilation or playback. Fix75's resumable preparation workflow is documented in `MEDIA_TOOLS.md`.
 
 ## Content ID and migration checks
 

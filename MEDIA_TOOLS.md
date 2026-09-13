@@ -56,8 +56,9 @@ npm run test:package
 ```
 
 `media:prepare` dispatches to the current platform. Compilation can take a
-while, but downloads are cached and a completed candidate is preserved if only
-a verifier rule needs correction. Generated stages are ignored by Git; do not
+while, but downloads are cached. Windows also checkpoints each completed
+component and keeps incomplete compiler work for retries (see fix75 below).
+Generated stages are ignored by Git; do not
 commit native binaries or `dist/`.
 
 `test:core` checks the application without requiring media executables. `npm test` includes two suites that really execute FFmpeg/FFprobe against generated fixtures, so those tools must be available first. `test:package` consumes a prepared stage; it does not build the media tools for you.
@@ -93,7 +94,7 @@ builds the pinned standalone FFmpeg/FFprobe, patched DVD libraries, and MPV
 source. It recursively copies non-Windows DLLs beside `mpv.exe` and records
 which MSYS2 packages supplied them.
 
-For the current Windows checkout, after applying fix72, run in PowerShell:
+For the current Windows checkout, run in PowerShell:
 
 ```powershell
 Set-Location 'H:\Dropbox\Coding\Mynda'
@@ -106,9 +107,105 @@ npm run test:media
 npm run test:package
 ```
 
-Run each command after the preceding one succeeds. `test:core` should report 32 suites and 278 cases. After preparation, `media:status` should show all three tools as available with `source: staged`, under `vendor/media-tools/win-x64/`. `npm test` should then report 34 suites and 285 cases. `test:media` and the package smoke check briefly open MPV to verify actual graphical playback. If preparation cannot start, it prints the missing prerequisite packages or commands; install the requested build inputs in UCRT64 and retry from PowerShell.
+Run each command after the preceding one succeeds. `test:core` should report 33 suites and 290 cases. After preparation, `media:status` should show all three tools as available with `source: staged`, under `vendor/media-tools/win-x64/`. `npm test` should then report 35 suites and 297 cases. `test:media` and the package smoke check briefly open MPV to verify actual graphical playback. If preparation cannot start, it prints the missing prerequisite packages or commands; install the requested build inputs in UCRT64 and retry from PowerShell.
 
 You do not need to migrate a freshly created library. Applying this overlay requires no new npm packages. The fixes also apply to the macOS/Linux source; the existing media source pins, licensing policy, and Electron version are unchanged.
+
+### Windows launcher fix73
+
+An immediate `-u: -c: line 2: unexpected EOF while looking for matching ')'`
+means the PowerShell-to-Bash launcher failed before compilation started.
+Windows PowerShell's legacy argument handling can alter embedded quotes in
+native command arguments. Fix73 calls MSYS2's `cygpath.exe` separately, then
+passes the converted script filename directly to Bash. It also preserves the
+invoking Windows `PATH` behind UCRT64's build tools so the recipe can find Node.
+See [PowerShell's native argument documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_parsing#passing-arguments-that-contain-quote-characters).
+
+After applying fix73, retry from the Mynda directory in PowerShell:
+
+```powershell
+npm run test:core
+npm run media:prepare
+```
+
+At fix73, the core test count was 32 suites and 278 cases. The preparation unit suite
+guards against restoring a Bash command string in the Windows wrapper. Launcher
+verification reproduced the original error with real PowerShell in Legacy mode
+and passed the corrected wrapper in Legacy and Standard modes, including paths
+with spaces, parentheses, brackets, apostrophes, and dollar signs. That check ran
+on Linux with real Bash and a substitute path converter; the native Windows
+compilation still needs to run on Windows. Failed path conversions and build
+processes retain their nonzero exit status.
+
+### Windows Lua lookup fix74
+
+If MPV's Meson configuration stops with `Dependency "lua51" not found`, the
+Windows recipe is asking for the wrong pkg-config module name. The installed
+MSYS2 package is named `mingw-w64-ucrt-x86_64-lua51`, but its metadata file is
+`/ucrt64/lib/pkgconfig/lua5.1.pc`. MPV 0.41.0 accepts `lua5.1` as its Lua option.
+See the [MSYS2 package file list](https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-lua51)
+and [MPV's Lua dependency lookup](https://github.com/mpv-player/mpv/blob/v0.41.0/meson.build).
+
+Fix74 uses `lua5.1` for both the MPV option and an early pkg-config version
+check. A missing or unusable Lua package now stops preparation before any
+FFmpeg/DVD compilation and prints the package-install command.
+
+After applying the overlay, retry `npm run media:prepare` from PowerShell in
+the Mynda directory. There are no new dependencies to install for this fix.
+Before fix75, failed attempts removed temporary compilation files, so FFmpeg
+and the DVD libraries had to compile again; verified downloads remained cached.
+Fix75 supersedes that cleanup behavior. Native Windows compilation and playback
+still require a successful run on Windows.
+
+### Windows resumable builds and locked folders: fix75
+
+A `Permission denied` or `Device or resource busy` error while renaming the
+completed bundle occurs during installation into the project folder. The log
+alone cannot identify which process or permission prevented the operation.
+Windows can block deletion/renaming when a file is held open without delete
+sharing; see [Microsoft's file-handle documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-deletefilew).
+For a project inside Dropbox, close Mynda and MPV and temporarily pause Dropbox
+sync before retrying. Resume sync afterward. No administrator terminal is required.
+
+Fix75 stores compiler work and completed installs in MSYS2's cache, normally
+`C:\msys64\tmp\mynda-media-tools-cache-win-x64`, outside the project folder.
+It saves separate checkpoints for FFmpeg/FFprobe, libdvdread, libdvdnav, and MPV.
+On retry it prints `Reusing completed ...` for unchanged successful stages.
+An interrupted component keeps its source and object files so Make/Ninja can
+resume. Failed configuration is retried before compilation.
+
+Reuse requires matching source versions, archive and patch checksums, component
+build options, toolchain packages, and installed-file checksums. Changed inputs
+or damaged output trigger the affected builds again. MPV/DVD dependency changes
+propagate to their consumers. A change only to final verification or publication
+does not rebuild the compilers. The final executable, license, architecture,
+DVD/video and DLL-dependency checks always run, including for reused bundles.
+
+The complete bundle is assembled in the cache before being copied into a new
+project staging folder. Brief locks receive bounded retries. Replacement keeps
+the previous installed bundle as a backup until the new copy is in place; a
+failed rename attempts restoration. A recovery journal outside the project
+lets the next run finish an interrupted replacement. If a backup is still locked,
+the script reports its retained path. It never deletes the compiled cache on
+failure. Run just one preparation at a time; a process lock prevents overlap.
+
+Retry with the same command from PowerShell:
+
+```powershell
+npm run media:prepare
+```
+
+The first fix75 run checks once for a complete staging folder left by the old
+recipe, verifies it, and reuses it if possible. The old cleanup may already have
+deleted its executables and compiler work, in which case one new build is
+unavoidable. Incomplete remnants are left alone. New failures preserve progress.
+
+The cache consumes disk space and is not a source backup. If it is deleted by
+you or temporary-file cleanup, the next run rebuilds it. To use a different
+cache, set `MYNDA_MEDIA_BUILD_CACHE` to a local folder outside synced directories
+before starting; changing its location causes a fresh build because installed
+pkg-config files can contain absolute paths. Native macOS/Linux recipes are
+unchanged by fix75. No new npm or MSYS2 dependencies are required.
 
 ## Linux preparation
 

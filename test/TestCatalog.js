@@ -130,6 +130,12 @@ module.exports = [
   },
   {
     category: 'integration',
+    file: 'test/MediaBuildCache.integration.test.js',
+    title: 'Resumable Windows media build storage',
+    protects: 'verified checkpoints, locked-file retries, preserved compiler outputs, safe replacement, and interrupted publication recovery'
+  },
+  {
+    category: 'integration',
     file: 'test/ContentFingerprint.integration.test.js',
     title: 'Content-based video IDs',
     protects: 'fixed hash vectors, distributed samples, file sizes, DVD normalization, cache validation, and read failures'
