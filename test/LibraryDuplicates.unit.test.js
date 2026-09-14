@@ -7,7 +7,7 @@ const {
   duplicatePathKey,
   normalizeDuplicatePaths,
   ScanDuplicateTracker
-} = require('../src/LibraryDuplicates.js');
+} = require('../src/library/LibraryDuplicates.js');
 
 const suite = createSuite(
   'Library duplicate-path tracking',

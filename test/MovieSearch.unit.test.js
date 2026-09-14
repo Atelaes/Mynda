@@ -3,7 +3,7 @@ const {
   createSuite,
   runSuite
 } = require('./helpers/TestHarness.js');
-const MovieSearch = require('../src/MovieSearch.js');
+const MovieSearch = require('../src/tagging/MovieSearch.js');
 
 const suite = createSuite(
   'Movie search and auto-tag matching',

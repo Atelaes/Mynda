@@ -55,7 +55,7 @@ function parseResult(output, entry, exitCode) {
 
 function runEntry(entry) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, [path.join(projectRoot, entry.file)], {
+    const child = spawn(process.execPath, [path.join(projectRoot, entry.file), ...(entry.args || [])], {
       cwd: projectRoot,
       env: Object.assign({}, process.env, {BROWSERSLIST_IGNORE_OLD_DATA: 'true'}),
       stdio: ['ignore', 'pipe', 'pipe']
@@ -133,7 +133,7 @@ async function main() {
 
   if (failedSuites.length > 0) {
     console.error('\nFailed suites:');
-    failedSuites.forEach(run => console.error(`  ${run.entry.file}`));
+    failedSuites.forEach(run => console.error(`  ${run.entry.file}${run.entry.args ? ' ' + run.entry.args.join(' ') : ''}`));
     process.exitCode = 1;
   } else {
     console.log('\nPASS: every selected Mynda test suite passed.');

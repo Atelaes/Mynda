@@ -1,7 +1,7 @@
 // Shared renderer services. CommonJS caches this module, so every component
 // receives the same Library instance and logger set.
-const Library = require('../Library.js');
-const Logger = require('../Logger.js');
+const Library = require('../library/Library.js');
+const Logger = require('../platform/Logger.js');
 
 const library = new Library();
 
@@ -12,7 +12,7 @@ const settingsLog = Logger.child('Settings');
 const editorLog = Logger.child('Editor');
 const artworkLog = Logger.child('Artwork');
 
-const placeholderImage = "../images/qmark.png";
+const placeholderImage = "../../images/qmark.png";
 
 // Most long-running status messages originate in index.js and arrive through
 // Electron IPC. Batch editing is different: the renderer prepares the edited

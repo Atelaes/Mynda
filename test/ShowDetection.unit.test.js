@@ -1,5 +1,5 @@
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness.js');
-const {findSeasonEpisode: detect, findEpisodeTitle} = require('../src/ShowDetection.js');
+const {findSeasonEpisode: detect, findEpisodeTitle} = require('../src/scanning/ShowDetection.js');
 
 const suite = createSuite('Show detection for scans and filename resets', 'unit',
   'Uses the shared production detector for numbered episodes, extras, titles and folder grouping.');

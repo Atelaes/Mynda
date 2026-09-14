@@ -4,7 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const _ = require('lodash');
 const { ipcRenderer } = require('electron');
-const { trackManualSubtitleEdit } = require('./SubtitleMatcher.js');
+const { trackManualSubtitleEdit } = require('../scanning/SubtitleMatcher.js');
 const {normalizeDuplicatePaths} = require('./LibraryDuplicates.js');
 const VideoIdentity = require('./VideoIdentity.js');
 
@@ -13,7 +13,7 @@ const VideoIdentity = require('./VideoIdentity.js');
 // this class lets a future manual-backup UI reuse them without duplicating the
 // main library's save logic.
 const LibraryPersistence = require('./LibraryPersistence.js');
-const Logger = require('./Logger.js');
+const Logger = require('../platform/Logger.js');
 
 const libraryLog = Logger.child('Library');
 
@@ -847,7 +847,7 @@ const defaultLibrary = {
       "appearances": [
         {
           "name": "Dark Theme",
-          "path": "../themes/appearances/dark-theme.css",
+          "path": "styles/themes/appearances/dark-theme.css",
           "dependencies": {
             "fonts": [],
             "images": []
@@ -857,7 +857,7 @@ const defaultLibrary = {
       "layouts": [
         {
           "name": "Default Layout Theme",
-          "path": "../themes/layouts/default-layout-theme.css",
+          "path": "styles/themes/layouts/default-layout-theme.css",
           "dependencies": {}
         }
       ]

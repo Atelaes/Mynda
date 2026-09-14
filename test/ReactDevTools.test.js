@@ -1,6 +1,6 @@
 const assert = require('assert');
 const path = require('path');
-const loadReactDeveloperTools = require('../src/ReactDevTools.js');
+const loadReactDeveloperTools = require('../src/main/ReactDevTools.js');
 
 async function run() {
   console.log('\n[UNIT] React developer-tools loader');

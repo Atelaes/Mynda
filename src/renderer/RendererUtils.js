@@ -2,8 +2,8 @@
 const _ = require('lodash');
 const path = require('path');
 const URL = require('url');
-const {normalizeDuplicatePaths} = require('../LibraryDuplicates.js');
-const {isVideoID} = require('../VideoIdentity.js');
+const {normalizeDuplicatePaths} = require('../library/LibraryDuplicates.js');
+const {isVideoID} = require('../library/VideoIdentity.js');
 
 // Sort display titles by their meaningful first word while preserving the
 // original title for display. This is shared by flat video tables and the
@@ -13,7 +13,7 @@ function removeLeadingArticle(value) {
   return value.replace(/^(?:a\s|an\s|the\s)/i, '');
 }
 
-// Preserve renderer-relative assets such as ../images/qmark.png so they stay
+// Preserve renderer-relative assets such as ../../images/qmark.png so they stay
 // inside app.asar. Only absolute artwork paths from a user's library need
 // conversion to file: URLs.
 function artworkSourceURL(artwork, placeholder = '') {

@@ -1,0 +1,517 @@
+{
+  "version": 77,
+  "requires": "fix76",
+  "files": [
+    {
+      "from": "src/index.js",
+      "to": "src/main/index.js",
+      "text": true,
+      "before": "bda22597cd963bdc36cdca8967ee51c547db970cd77b53cb9a5a33cb8cb95dc0",
+      "after": "077a1f1570b5e8f7d5fa0e119a17df7e6e758a7db8ce2fde283eba769af88c13"
+    },
+    {
+      "from": "src/ReactDevTools.js",
+      "to": "src/main/ReactDevTools.js",
+      "text": true,
+      "before": "00a9a974d6575ca10022a9b1dff6f8d4319599c11a000d8bd17535e6c108f119",
+      "after": "c26cadaa9b9aa4c98a7fed7179bcb2e530ffd72b5f129c1c46148cf3a213e43a"
+    },
+    {
+      "from": "src/PackagedMediaSmoke.js",
+      "to": "src/main/PackagedMediaSmoke.js",
+      "text": true,
+      "before": "f9585956203920d727f3a46ff0c5edeebf21dca84968db5926c52d88d64e141f",
+      "after": "f7208ac6143f06c20f20e7eafc831ef427cd896334240edfad94084d15ce9935"
+    },
+    {
+      "from": "src/Renderer.js",
+      "to": "src/renderer/Renderer.js",
+      "text": true,
+      "before": "7719e95c9904d06aa07b2a0f6648d1c481360eb71f9289c4ebd0c774b8ce424f",
+      "after": "157ca1708026454c5bca8f2a3e4df3eb0dcd024099194a372e1633e09460582f"
+    },
+    {
+      "from": "src/index.html",
+      "to": "src/renderer/index.html",
+      "text": true,
+      "before": "fe597560aa814c18dfa18506bd214ecf249a5b1f062ef8e23510658e6c680116",
+      "after": "fe597560aa814c18dfa18506bd214ecf249a5b1f062ef8e23510658e6c680116"
+    },
+    {
+      "from": "src/Library.js",
+      "to": "src/library/Library.js",
+      "text": true,
+      "before": "c10a777b329e19cbf3105b7f43a2c420b5f709309a84708ff6b5852045656eb4",
+      "after": "ad8ae8f0df18910f7adff66ab84794097d90528a2952cd50c4b65795cbcc81b6"
+    },
+    {
+      "from": "src/LibraryPersistence.js",
+      "to": "src/library/LibraryPersistence.js",
+      "text": true,
+      "before": "8dc5fd752cae8fa08fb6bf8e839f23bf16128232e8f95cba28ff46e46e88f5c1",
+      "after": "8dc5fd752cae8fa08fb6bf8e839f23bf16128232e8f95cba28ff46e46e88f5c1"
+    },
+    {
+      "from": "src/LibraryExport.js",
+      "to": "src/library/LibraryExport.js",
+      "text": true,
+      "before": "31393f2426d608c704031956d04b3cbfa809dc1b3bc77642def40735ecc31023",
+      "after": "31393f2426d608c704031956d04b3cbfa809dc1b3bc77642def40735ecc31023"
+    },
+    {
+      "from": "src/LibraryDuplicates.js",
+      "to": "src/library/LibraryDuplicates.js",
+      "text": true,
+      "before": "8c05af05046241f4bad540e25798df2a3691aa85d1740e5fac1a4b26cb80aa6f",
+      "after": "8c05af05046241f4bad540e25798df2a3691aa85d1740e5fac1a4b26cb80aa6f"
+    },
+    {
+      "from": "src/LibraryStats.js",
+      "to": "src/library/LibraryStats.js",
+      "text": true,
+      "before": "1dc65016a366d32cbd3725b81b65f02bb3a65ce7bf39112055c1f0a1edf4e340",
+      "after": "aea6181af7c076adeeab49fd48bb9c6438bd2422cb1397783fa823ef454e8dd1"
+    },
+    {
+      "from": "src/PlaylistFilter.js",
+      "to": "src/library/PlaylistFilter.js",
+      "text": true,
+      "before": "4c8dc944fb746da8d867a0b00667442b97efa4c3fa31198f1861c762f301889f",
+      "after": "4c8dc944fb746da8d867a0b00667442b97efa4c3fa31198f1861c762f301889f"
+    },
+    {
+      "from": "src/ContentFingerprint.js",
+      "to": "src/library/ContentFingerprint.js",
+      "text": true,
+      "before": "6b581225b0831367fe7a8ac4b6e90efbe0a1c3a9b54fea7874d8e9a813fc2d8b",
+      "after": "6b581225b0831367fe7a8ac4b6e90efbe0a1c3a9b54fea7874d8e9a813fc2d8b"
+    },
+    {
+      "from": "src/VideoIdentity.js",
+      "to": "src/library/VideoIdentity.js",
+      "text": true,
+      "before": "8c0c3389bba40bcd39530a1afe5614f0ac9d2e96213c5187f788b9fc29bd292c",
+      "after": "8c0c3389bba40bcd39530a1afe5614f0ac9d2e96213c5187f788b9fc29bd292c"
+    },
+    {
+      "from": "src/BoxOffice.js",
+      "to": "src/library/BoxOffice.js",
+      "text": true,
+      "before": "9944a51c897fe458cc9b5392b51d2fc32161f55d253a2e352b250f6f27c3dd0c",
+      "after": "9944a51c897fe458cc9b5392b51d2fc32161f55d253a2e352b250f6f27c3dd0c"
+    },
+    {
+      "from": "src/ShowDetection.js",
+      "to": "src/scanning/ShowDetection.js",
+      "text": true,
+      "before": "6e28547d725cced6aecca2a15fbf92446ae5ceebee28cc3e4f4a149754834445",
+      "after": "6e28547d725cced6aecca2a15fbf92446ae5ceebee28cc3e4f4a149754834445"
+    },
+    {
+      "from": "src/SubtitleMatcher.js",
+      "to": "src/scanning/SubtitleMatcher.js",
+      "text": true,
+      "before": "e9e9a683b81de4cba78b5a4a46ce5c1d40d135f93bdcf41d3361fbce5f43826c",
+      "after": "e9e9a683b81de4cba78b5a4a46ce5c1d40d135f93bdcf41d3361fbce5f43826c"
+    },
+    {
+      "from": "src/VideoExclusion.js",
+      "to": "src/scanning/VideoExclusion.js",
+      "text": true,
+      "before": "6190790432668211842ab6f2b5597e4f706f842d6b432144b1a9d418d8940d18",
+      "after": "6f89a0493100f16c04b153bfea3c573d480add64ff9a12e81d7d4ea7392ab466"
+    },
+    {
+      "from": "src/VideoRuntimeVerifier.js",
+      "to": "src/scanning/VideoRuntimeVerifier.js",
+      "text": true,
+      "before": "cbeb8f726b120ae273f0825d89fca3a927ebb5175736d9a9c645fdb39a9b4f0c",
+      "after": "cbeb8f726b120ae273f0825d89fca3a927ebb5175736d9a9c645fdb39a9b4f0c"
+    },
+    {
+      "from": "src/OmdbHelper.js",
+      "to": "src/tagging/OmdbHelper.js",
+      "text": true,
+      "before": "36693e4bfc6c85ef057ccd6b5c8cc8a59c30738360bf74ec7d5533785100d340",
+      "after": "2f272afe9e49fa92d80af95718c31d83e998307a24a715d647f96ede720543ef"
+    },
+    {
+      "from": "src/MovieSearch.js",
+      "to": "src/tagging/MovieSearch.js",
+      "text": true,
+      "before": "b178f35b2dc69b1c30173de41de5ff14031e43ddb34d5f8723c424397625b7c8",
+      "after": "b178f35b2dc69b1c30173de41de5ff14031e43ddb34d5f8723c424397625b7c8"
+    },
+    {
+      "from": "src/EpisodeMatch.js",
+      "to": "src/tagging/EpisodeMatch.js",
+      "text": true,
+      "before": "0a475fa817922533d3c2c9086dd0ffcc143bb71484f504570e1017ff91fc65ff",
+      "after": "0a475fa817922533d3c2c9086dd0ffcc143bb71484f504570e1017ff91fc65ff"
+    },
+    {
+      "from": "src/EpisodeRuntime.js",
+      "to": "src/tagging/EpisodeRuntime.js",
+      "text": true,
+      "before": "f504fd8b58e0076a4740d4d00cdc829cb0b9b8117fc0a0857aa544baebfa62e9",
+      "after": "1a14241bd1ed2fe98b0d11cfeb60389d5374cfb17f08c5acf418a9fa6bc95d79"
+    },
+    {
+      "from": "src/MediaMetadata.js",
+      "to": "src/media/MediaMetadata.js",
+      "text": true,
+      "before": "957e9536490d74b081d1f1baa40d7f739dd1239b22bdff553f2f4c6eaaacfb7a",
+      "after": "957e9536490d74b081d1f1baa40d7f739dd1239b22bdff553f2f4c6eaaacfb7a"
+    },
+    {
+      "from": "src/VideoResolution.js",
+      "to": "src/media/VideoResolution.js",
+      "text": true,
+      "before": "d9007ca7b2eb12fd76003b6412d5890f758661384a6ce676e568336834985d7a",
+      "after": "d9007ca7b2eb12fd76003b6412d5890f758661384a6ce676e568336834985d7a"
+    },
+    {
+      "from": "src/MediaTools.js",
+      "to": "src/media/MediaTools.js",
+      "text": true,
+      "before": "ac0f14f5bdb20e3269698e04f341f5f2248be60b15616b61d6c7747ba1a652a6",
+      "after": "a9b45915ac34c754f93749849aaa8da9fa20cbd0cf39e48a6c33a21f379e330b"
+    },
+    {
+      "from": "src/MpvProcess.js",
+      "to": "src/media/MpvProcess.js",
+      "text": true,
+      "before": "313cee8189f6d02e765746a1e114fdc12b089ef092636fc7762719a68eb74fd7",
+      "after": "313cee8189f6d02e765746a1e114fdc12b089ef092636fc7762719a68eb74fd7"
+    },
+    {
+      "from": "src/MediaToolPolicy.js",
+      "to": "src/media/MediaToolPolicy.js",
+      "text": true,
+      "before": "cec7411960509dad3547687b300c651a825800fa98b8b7f087888cfb2778a359",
+      "after": "cec7411960509dad3547687b300c651a825800fa98b8b7f087888cfb2778a359"
+    },
+    {
+      "from": "src/MediaBundleInspection.js",
+      "to": "src/media/MediaBundleInspection.js",
+      "text": true,
+      "before": "a491ebea573990bb593ae7506b9dbf68b3b411679c5f3f52494f20450ef0bd3c",
+      "after": "a491ebea573990bb593ae7506b9dbf68b3b411679c5f3f52494f20450ef0bd3c"
+    },
+    {
+      "from": "src/MediaDependencyCheck.js",
+      "to": "src/media/MediaDependencyCheck.js",
+      "text": true,
+      "before": "06a744877dde58d6ba752ff73432976d3c41d6c56bfe91081f6a1cc762a4eb1c",
+      "after": "06a744877dde58d6ba752ff73432976d3c41d6c56bfe91081f6a1cc762a4eb1c"
+    },
+    {
+      "from": "src/ShareManifest.js",
+      "to": "src/sharing/ShareManifest.js",
+      "text": true,
+      "before": "6a41fe93c527422b7ca3ba23306dc13753d836afba644f85dec0890500cb3d26",
+      "after": "3222c4234f165586caa3a09efd1bccb5520f356df619872484389be1559c57bc"
+    },
+    {
+      "from": "src/ShareService.js",
+      "to": "src/sharing/ShareService.js",
+      "text": true,
+      "before": "80e9a0200d06acd1f60113a5734d9d20ca6fa17bd7c9f32e9d873c583f162364",
+      "after": "caea6e21be872d6cfb6468a4b51b53d8ba7ed575c7b318418c9099ed798e6fec"
+    },
+    {
+      "from": "src/Logger.js",
+      "to": "src/platform/Logger.js",
+      "text": true,
+      "before": "bde6951e5c73a5f5c1bf6cae3c50c808113ba0c373d25e5a03a128c30b15715c",
+      "after": "bde6951e5c73a5f5c1bf6cae3c50c808113ba0c373d25e5a03a128c30b15715c"
+    },
+    {
+      "from": "src/ReadWrite.js",
+      "to": "src/platform/ReadWrite.js",
+      "text": true,
+      "before": "0e1bfcf69bc348efe8f273342db4e9130fbbcf795ce8a0a2188a8b6f1eb4c7bc",
+      "after": "0e1bfcf69bc348efe8f273342db4e9130fbbcf795ce8a0a2188a8b6f1eb4c7bc"
+    },
+    {
+      "from": "src/download.js",
+      "to": "src/platform/download.js",
+      "text": true,
+      "before": "d60b34f15eb7dddf39d5bd62128d8983af70dcc322f87e68b1b10cee06cef531",
+      "after": "d60b34f15eb7dddf39d5bd62128d8983af70dcc322f87e68b1b10cee06cef531"
+    },
+    {
+      "from": "src/Stream.js",
+      "to": "src/legacy/Stream.js",
+      "text": true,
+      "before": "bf4f94e84679797c1a1f70119f0673285e3651ff6de4990cd1dbb4d8ca0511d6",
+      "after": "568d0ff6bf75e4c2f677aeed6073e21bbef0ad9edd95ce1715f2240bda76e271"
+    },
+    {
+      "from": "src/oldMynPlayer.js",
+      "to": "src/legacy/oldMynPlayer.js",
+      "text": true,
+      "before": "62eeeb7be86513eaec36242824315d8b6dee4956fc73239cd13519e82e9f6b60",
+      "after": "d3e3181a0deb2f41efa94adb8433974efcd2847940ab64254986ccac066fc5f1"
+    },
+    {
+      "from": "src/player.html",
+      "to": "src/legacy/player.html",
+      "text": true,
+      "before": "ba149c2082e450d0a93a0721a382c6614a4c8773a9a8ed0e0e7f2803a319858f",
+      "after": "ba149c2082e450d0a93a0721a382c6614a4c8773a9a8ed0e0e7f2803a319858f"
+    },
+    {
+      "from": "src/styles/main.css",
+      "to": "src/renderer/styles/main.css",
+      "text": true,
+      "before": "eede04dfa26aea7aaab20d58335983e605c7aee4939261e409e21773fb383a44",
+      "after": "3a776f17a3b8142822d64ce7e52e43e602fae958ff78562ad202b52043697fc3"
+    },
+    {
+      "from": "themes/_fonts/BalooTamma2-Bold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/BalooTamma2-Bold.ttf",
+      "text": false,
+      "before": "8a5c01b56ee58fa4376eb27fe5bf0e673688f4bb90fb02faceeb7ca386537e1e",
+      "after": "8a5c01b56ee58fa4376eb27fe5bf0e673688f4bb90fb02faceeb7ca386537e1e"
+    },
+    {
+      "from": "themes/_fonts/BalooTamma2-ExtraBold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/BalooTamma2-ExtraBold.ttf",
+      "text": false,
+      "before": "9a51fcce87a5129394009657bba114920d7927a82134e9850d434434b24488c5",
+      "after": "9a51fcce87a5129394009657bba114920d7927a82134e9850d434434b24488c5"
+    },
+    {
+      "from": "themes/_fonts/BalooTamma2-Medium.ttf",
+      "to": "src/renderer/styles/themes/_fonts/BalooTamma2-Medium.ttf",
+      "text": false,
+      "before": "678cb86bc2c6b7ca64cf69bfe38f77af4dc3c5399b75c0e16b8230453e6a8a3f",
+      "after": "678cb86bc2c6b7ca64cf69bfe38f77af4dc3c5399b75c0e16b8230453e6a8a3f"
+    },
+    {
+      "from": "themes/_fonts/BalooTamma2-Regular.ttf",
+      "to": "src/renderer/styles/themes/_fonts/BalooTamma2-Regular.ttf",
+      "text": false,
+      "before": "7d27e71cd4d45d7bdb0d60900fadc0cd319f5a7587fa9080d46ced4d1e8c22e7",
+      "after": "7d27e71cd4d45d7bdb0d60900fadc0cd319f5a7587fa9080d46ced4d1e8c22e7"
+    },
+    {
+      "from": "themes/_fonts/BalooTamma2-SemiBold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/BalooTamma2-SemiBold.ttf",
+      "text": false,
+      "before": "3b6de5d36a210fa98322352953afb59d6ece4cfde68ca2e89cd4dcb0da816e27",
+      "after": "3b6de5d36a210fa98322352953afb59d6ece4cfde68ca2e89cd4dcb0da816e27"
+    },
+    {
+      "from": "themes/_fonts/Dorsa-Regular.ttf",
+      "to": "src/renderer/styles/themes/_fonts/Dorsa-Regular.ttf",
+      "text": false,
+      "before": "9ac7d22779353a06104649652c87a38d96e8fed87d7b1dfbf38062a206c9c8aa",
+      "after": "9ac7d22779353a06104649652c87a38d96e8fed87d7b1dfbf38062a206c9c8aa"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-Black.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-Black.ttf",
+      "text": false,
+      "before": "9653deb875c650225c3e4567c01d6b5c8f3f733910d0c878c68118fe88535f5e",
+      "after": "9653deb875c650225c3e4567c01d6b5c8f3f733910d0c878c68118fe88535f5e"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-Bold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-Bold.ttf",
+      "text": false,
+      "before": "d945faf3971e14cf76e56317264c99986f6f826c92f5a0026a76514d0e49988f",
+      "after": "d945faf3971e14cf76e56317264c99986f6f826c92f5a0026a76514d0e49988f"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-BoldItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-BoldItalic.ttf",
+      "text": false,
+      "before": "0b50dc0a35596d269faa48c52c0a8cd545a74eb88dd640a69846fda2d4f28472",
+      "after": "0b50dc0a35596d269faa48c52c0a8cd545a74eb88dd640a69846fda2d4f28472"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-ExtraBold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-ExtraBold.ttf",
+      "text": false,
+      "before": "4654d4831d90a584da37721ff80ca5fa5f68b1a10baef37365eebc2e4fabf714",
+      "after": "4654d4831d90a584da37721ff80ca5fa5f68b1a10baef37365eebc2e4fabf714"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-Italic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-Italic.ttf",
+      "text": false,
+      "before": "d7650c084ddefa06ddb0b5e6c15ae5e7336302b25b1d6254b44cca035d3091e4",
+      "after": "d7650c084ddefa06ddb0b5e6c15ae5e7336302b25b1d6254b44cca035d3091e4"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-Light.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-Light.ttf",
+      "text": false,
+      "before": "58099b98ffde0befcf10aa1e408376e47bb390f2c0f3be0d2c7de0f7fe016e36",
+      "after": "58099b98ffde0befcf10aa1e408376e47bb390f2c0f3be0d2c7de0f7fe016e36"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-LightItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-LightItalic.ttf",
+      "text": false,
+      "before": "09ead463969077f8510bbdd3606a53ebb0856089d179ff294a77e4aba6c8d036",
+      "after": "09ead463969077f8510bbdd3606a53ebb0856089d179ff294a77e4aba6c8d036"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-Medium.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-Medium.ttf",
+      "text": false,
+      "before": "b6b521b2c34cffb36902ffc30f0300aa3160df1559933f6bc753cdeb1767cb75",
+      "after": "b6b521b2c34cffb36902ffc30f0300aa3160df1559933f6bc753cdeb1767cb75"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-MediumItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-MediumItalic.ttf",
+      "text": false,
+      "before": "b7d2ba73d648619af4dc7c2ac9a2aaef92970949a3eaae4b1ea357c5603b3c2c",
+      "after": "b7d2ba73d648619af4dc7c2ac9a2aaef92970949a3eaae4b1ea357c5603b3c2c"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-Regular.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-Regular.ttf",
+      "text": false,
+      "before": "dc354d11aadb3d4fdd9601dc557b53db8d81e437b9b799a515532cd9cae60fee",
+      "after": "dc354d11aadb3d4fdd9601dc557b53db8d81e437b9b799a515532cd9cae60fee"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-SemiBold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-SemiBold.ttf",
+      "text": false,
+      "before": "80026784aca1d78b829d01f7a215c14612e2ef30db509408cfadd82e84123fbf",
+      "after": "80026784aca1d78b829d01f7a215c14612e2ef30db509408cfadd82e84123fbf"
+    },
+    {
+      "from": "themes/_fonts/HKGrotesk-SemiBoldItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/HKGrotesk-SemiBoldItalic.ttf",
+      "text": false,
+      "before": "a8b75504504cebfa4871a6564c91ea5d04c69c034a027662b0f485e3ddba04ea",
+      "after": "a8b75504504cebfa4871a6564c91ea5d04c69c034a027662b0f485e3ddba04ea"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-Black.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-Black.ttf",
+      "text": false,
+      "before": "a0b6f6ad096c2364f561c0ba471a4581e645e605e0d8a5ccdfd35b11997a3cf2",
+      "after": "a0b6f6ad096c2364f561c0ba471a4581e645e605e0d8a5ccdfd35b11997a3cf2"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-BlackItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-BlackItalic.ttf",
+      "text": false,
+      "before": "6d88253765422fc746698f8582253c955a2cd4d170bf44e2e63bce7fd6193df1",
+      "after": "6d88253765422fc746698f8582253c955a2cd4d170bf44e2e63bce7fd6193df1"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-Bold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-Bold.ttf",
+      "text": false,
+      "before": "839f42df29a5a83470888b9a3aa4064fc1bc35e6616bb542226d89086f019ec5",
+      "after": "839f42df29a5a83470888b9a3aa4064fc1bc35e6616bb542226d89086f019ec5"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-BoldItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-BoldItalic.ttf",
+      "text": false,
+      "before": "a0cfec834df50e21cdb3d15bf93e87ed033d8c26693f9ede6efe24325ae22c9e",
+      "after": "a0cfec834df50e21cdb3d15bf93e87ed033d8c26693f9ede6efe24325ae22c9e"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-ExtraLight.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-ExtraLight.ttf",
+      "text": false,
+      "before": "34f4efe3ab6b23c52eefaed4da1c43165d4c072c5d9a1f3b56f77c7be06834b0",
+      "after": "34f4efe3ab6b23c52eefaed4da1c43165d4c072c5d9a1f3b56f77c7be06834b0"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-ExtraLightItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-ExtraLightItalic.ttf",
+      "text": false,
+      "before": "e2beee0d42192cb64aefd9d8bb6037f626d6343fa3f7bf08f9d1aac5301e41d8",
+      "after": "e2beee0d42192cb64aefd9d8bb6037f626d6343fa3f7bf08f9d1aac5301e41d8"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-Italic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-Italic.ttf",
+      "text": false,
+      "before": "ba51b929995b3088ff1932d9d6835c90ccf304b296a3b8e103d2e95b958109ee",
+      "after": "ba51b929995b3088ff1932d9d6835c90ccf304b296a3b8e103d2e95b958109ee"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-Light.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-Light.ttf",
+      "text": false,
+      "before": "4a8b8632f0d57fdcc5ce5403d6ac0fbd6b22ceaa1c836887dc2ec18864f04063",
+      "after": "4a8b8632f0d57fdcc5ce5403d6ac0fbd6b22ceaa1c836887dc2ec18864f04063"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-LightItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-LightItalic.ttf",
+      "text": false,
+      "before": "d3267c4ddecc98e8958c177d10c0be7b48c8772703c69ce379146a37bd6f05f5",
+      "after": "d3267c4ddecc98e8958c177d10c0be7b48c8772703c69ce379146a37bd6f05f5"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-Medium.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-Medium.ttf",
+      "text": false,
+      "before": "7f031f9d7e44d670d5fb459e44bbf09f48083c15fbdac060d9c19b233b243551",
+      "after": "7f031f9d7e44d670d5fb459e44bbf09f48083c15fbdac060d9c19b233b243551"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-MediumItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-MediumItalic.ttf",
+      "text": false,
+      "before": "9fc164d0335d5a1a3197b8350a1801d0cda01e0c929a7c731c8cd247704fe50f",
+      "after": "9fc164d0335d5a1a3197b8350a1801d0cda01e0c929a7c731c8cd247704fe50f"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-Regular.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-Regular.ttf",
+      "text": false,
+      "before": "6e5dd0494f63d85970156cd54b6ac568b82a392d135db08bbf5cc3048d489aa9",
+      "after": "6e5dd0494f63d85970156cd54b6ac568b82a392d135db08bbf5cc3048d489aa9"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-SemiBold.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-SemiBold.ttf",
+      "text": false,
+      "before": "ccfba5669d713b6a22cb1c717597c4cd64481163fbc09611cfbc7d1a777e1acf",
+      "after": "ccfba5669d713b6a22cb1c717597c4cd64481163fbc09611cfbc7d1a777e1acf"
+    },
+    {
+      "from": "themes/_fonts/SourceCodePro-SemiBoldItalic.ttf",
+      "to": "src/renderer/styles/themes/_fonts/SourceCodePro-SemiBoldItalic.ttf",
+      "text": false,
+      "before": "fdc5224ce33286d16620904686c6f4387ba5b9f9f055cdcc0faf913877c61494",
+      "after": "fdc5224ce33286d16620904686c6f4387ba5b9f9f055cdcc0faf913877c61494"
+    },
+    {
+      "from": "themes/_fonts/WireOne-Regular.ttf",
+      "to": "src/renderer/styles/themes/_fonts/WireOne-Regular.ttf",
+      "text": false,
+      "before": "1ecfd4cf7896a726c304937f68129d2daa9d8024f93350b1390af1f8787e139f",
+      "after": "1ecfd4cf7896a726c304937f68129d2daa9d8024f93350b1390af1f8787e139f"
+    },
+    {
+      "from": "themes/appearances/dark-theme.css",
+      "to": "src/renderer/styles/themes/appearances/dark-theme.css",
+      "text": true,
+      "before": "2ac3d52e2dfa0a3d6631dba83532b044407dcd182802bc0658bb8af60dd4aae7",
+      "after": "49505d08e2a1ff8dd30e521bfe55c01af9d49e3f2600f0137478f210ba1011a6"
+    },
+    {
+      "from": "themes/layouts/default-layout-theme.css",
+      "to": "src/renderer/styles/themes/layouts/default-layout-theme.css",
+      "text": true,
+      "before": "2ec91271ed272adac01a3a610761a6d03345f7ece3e5d22a3a28a04b2c3b2359",
+      "after": "2ec91271ed272adac01a3a610761a6d03345f7ece3e5d22a3a28a04b2c3b2359"
+    }
+  ]
+}

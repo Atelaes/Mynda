@@ -1,5 +1,5 @@
 const {normalizeDuplicatePaths} = require('./LibraryDuplicates.js');
-const {RESOLUTION_BUCKETS, getResolutionInfo} = require('./VideoResolution.js');
+const {RESOLUTION_BUCKETS, getResolutionInfo} = require('../media/VideoResolution.js');
 
 function percentage(part, total) {
   const numericPart = Number(part);

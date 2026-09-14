@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
-const MediaTools = require('../src/MediaTools.js');
-const MediaMetadata = require('../src/MediaMetadata.js');
-const {getResolutionInfo} = require('../src/VideoResolution.js');
+const MediaTools = require('../src/media/MediaTools.js');
+const MediaMetadata = require('../src/media/MediaMetadata.js');
+const {getResolutionInfo} = require('../src/media/VideoResolution.js');
 const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness.js');
 
 if (MediaTools.ffmpegPath) ffmpeg.setFfmpegPath(MediaTools.ffmpegPath);

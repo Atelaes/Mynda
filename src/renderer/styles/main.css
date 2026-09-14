@@ -1,5 +1,5 @@
-@import url('../../themes/appearances/dark-theme.css');
-@import url('../../themes/layouts/default-layout-theme.css');
+@import url('themes/appearances/dark-theme.css');
+@import url('themes/layouts/default-layout-theme.css');
 
 :root {
   overflow-x:hidden;
@@ -11,7 +11,7 @@
 :root ::-webkit-scrollbar {
   display: none;
 }
- 
+
 pre {
   display: unset;
   font-family: unset;
@@ -240,17 +240,17 @@ img.ratings-icon {
   margin-left: .2em;
   width: .7em;
   height: .7em;
-  background-image: url('../../images/tooltip-icon_white.png');
+  background-image: url('../../../images/tooltip-icon_white.png');
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
   overflow:visible;
 }
 .tooltip-icon.light {
-  background-image: url('../../images/tooltip-icon_white.png');
+  background-image: url('../../../images/tooltip-icon_white.png');
 }
 .tooltip-icon.dark {
-  background-image: url('../../images/tooltip-icon_black.png');
+  background-image: url('../../../images/tooltip-icon_black.png');
 }
 
 
@@ -597,10 +597,10 @@ table.compact .movie-row {
   animation-fill-mode: forwards;
 }
 .movie-row.locked::after {
-  background-image: url('../../images/padlock-lock-animation_white.gif');
+  background-image: url('../../../images/padlock-lock-animation_white.gif');
 }
 .movie-row.unlocking::after {
-  background-image: url('../../images/padlock-unlock-animation_white.gif');
+  background-image: url('../../../images/padlock-unlock-animation_white.gif');
 }
 
 @keyframes row-locked-flash {
@@ -2362,7 +2362,7 @@ table.compact .movie-row {
 }
 .editor-inline-button.list-widget-browse div {
   opacity: .8;
-  background-image: url('../../images/folder-icon_white.png');
+  background-image: url('../../../images/folder-icon_white.png');
   background-position: center;
   background-repeat: no-repeat;
   background-size: 1em;

@@ -37,9 +37,9 @@ suite.test('continues to exclude development-only files', () => {
   [
     '!devtools/**/*',
     '!scripts/**/*',
-    '!src/Stream.js',
-    '!src/oldMynPlayer.js',
-    '!src/player.html',
+    '!src/legacy{,/**/*}',
+    '!themes{,/**/*}',
+    '!SOURCE_LAYOUT.md',
     '!test/**/*',
     '!vendor/**/*',
     '!TESTING.md',
@@ -84,9 +84,7 @@ suite.test('does not ship an opaque npm FFmpeg binary package', () => {
 suite.test('does not ship the retired HLS player or its dependencies', () => {
   assert.strictEqual(dependencies['hls-server'], undefined);
   assert.strictEqual(dependencies['hls.js'], undefined);
-  assert(buildFiles.includes('!src/Stream.js'));
-  assert(buildFiles.includes('!src/oldMynPlayer.js'));
-  assert(buildFiles.includes('!src/player.html'));
+  assert(buildFiles.includes('!src/legacy{,/**/*}'));
 });
 
 suite.test('copies only the matching staged platform media directory into Resources', () => {

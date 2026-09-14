@@ -3,32 +3,32 @@ const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const {findSeasonEpisode} = require('./ShowDetection.js');
+const {findSeasonEpisode} = require('../scanning/ShowDetection.js');
 const {v4: uuidv4} = require('uuid');
-const ContentFingerprint = require('./ContentFingerprint.js');
-const Library = require("./Library.js");
+const ContentFingerprint = require('../library/ContentFingerprint.js');
+const Library = require("../library/Library.js");
 const {
   subtitleExtensions,
   prepareSubtitleMatches,
   buildLegacySubtitleCounts,
   reconcileVideoSubtitles
-} = require('./SubtitleMatcher.js');
-const dl = require('./download');
+} = require('../scanning/SubtitleMatcher.js');
+const dl = require('../platform/download');
 const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
-const MediaTools = require('./MediaTools.js');
-const MediaMetadata = require('./MediaMetadata.js');
+const MediaTools = require('../media/MediaTools.js');
+const MediaMetadata = require('../media/MediaMetadata.js');
 if (MediaTools.ffmpegPath) ffmpeg.setFfmpegPath(MediaTools.ffmpegPath);
 if (MediaTools.ffprobePath) ffmpeg.setFfprobePath(MediaTools.ffprobePath);
-const Logger = require('./Logger.js');
-const OmdbHelper = require('./OmdbHelper.js');
-const MovieSearch = require('./MovieSearch.js');
-const VideoExclusion = require('./VideoExclusion.js');
-const VideoRuntimeVerifier = require('./VideoRuntimeVerifier.js');
-const {ScanDuplicateTracker} = require('./LibraryDuplicates.js');
-const LibraryExport = require('./LibraryExport.js');
-const ShareService = require('./ShareService.js');
-const ShareManifest = require('./ShareManifest.js');
+const Logger = require('../platform/Logger.js');
+const OmdbHelper = require('../tagging/OmdbHelper.js');
+const MovieSearch = require('../tagging/MovieSearch.js');
+const VideoExclusion = require('../scanning/VideoExclusion.js');
+const VideoRuntimeVerifier = require('../scanning/VideoRuntimeVerifier.js');
+const {ScanDuplicateTracker} = require('../library/LibraryDuplicates.js');
+const LibraryExport = require('../library/LibraryExport.js');
+const ShareService = require('../sharing/ShareService.js');
+const ShareManifest = require('../sharing/ShareManifest.js');
 const loadReactDeveloperTools = require('./ReactDevTools.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
@@ -430,8 +430,8 @@ async function createWindow() {
   })
 
   win.webContents.openDevTools();
-  await win.loadFile('src/index.html');
-  // win.loadFile('src/player.html');
+  await win.loadFile(path.join(app.getAppPath(), 'src', 'renderer', 'index.html'));
+  // win.loadFile('src/legacy/player.html');
 }
 
 // get rid of any null values in media, inactive_media, watchfolders, etc.

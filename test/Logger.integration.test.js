@@ -9,7 +9,7 @@ const {
 } = require('./helpers/TestHarness.js');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 
-const loggerPath = path.join(__dirname, '..', 'src', 'Logger.js');
+const loggerPath = path.join(__dirname, '..', 'src', 'platform', 'Logger.js');
 const suite = createSuite(
   'Backend logging, redaction, IPC forwarding, and rotation',
   'integration',

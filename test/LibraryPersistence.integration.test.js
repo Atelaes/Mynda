@@ -7,7 +7,7 @@ const {
   withTemporaryDirectory
 } = require('./helpers/TestHarness.js');
 const {libraryFixture, videoFixture} = require('./helpers/Fixtures.js');
-const Persistence = require('../src/LibraryPersistence.js');
+const Persistence = require('../src/library/LibraryPersistence.js');
 
 const suite = createSuite(
   'Library persistence and recovery',

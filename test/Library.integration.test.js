@@ -9,8 +9,8 @@ const {
 } = require('./helpers/TestHarness.js');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 const {libraryFixture, videoFixture} = require('./helpers/Fixtures.js');
-const Persistence = require('../src/LibraryPersistence.js');
-const LibraryExport = require('../src/LibraryExport.js');
+const Persistence = require('../src/library/LibraryPersistence.js');
+const LibraryExport = require('../src/library/LibraryExport.js');
 
 const suite = createSuite(
   'Library model, migration, synchronization, and recovery',
@@ -42,8 +42,8 @@ function loadLibraryClass(userData, renderer = false) {
     ipcRenderer
   };
   const Library = loadFreshWithMocks(
-    path.join(__dirname, '..', 'src', 'Library.js'),
-    {'electron': electron, './Logger.js': quietLogger}
+    path.join(__dirname, '..', 'src', 'library', 'Library.js'),
+    {'electron': electron, '../platform/Logger.js': quietLogger}
   );
   return {Library, electron, ipcMain, ipcRenderer};
 }

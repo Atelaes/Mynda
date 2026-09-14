@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const Persistence = require('../../src/LibraryPersistence.js');
-const Fingerprint = require('../../src/ContentFingerprint.js');
-const Identity = require('../../src/VideoIdentity.js');
+const Persistence = require('../../src/library/LibraryPersistence.js');
+const Fingerprint = require('../../src/library/ContentFingerprint.js');
+const Identity = require('../../src/library/VideoIdentity.js');
 
 const FORMAT = 'mynda-video-id-migration-v2';
 const filenames = {
@@ -42,7 +42,7 @@ function assertOrdinaryFile(filename) {
 // conversion for review instead of doing a global UUID replacement in JSON.
 function rewriteFilter(source, mapping) {
   if (typeof source !== 'string') return source;
-  const {compilePlaylistFilter} = require('../../src/PlaylistFilter.js');
+  const {compilePlaylistFilter} = require('../../src/library/PlaylistFilter.js');
   let ast;
   try { ast = compilePlaylistFilter(source).ast; } catch(error) {
     // Preserve unrelated pre-existing invalid filters. An invalid expression

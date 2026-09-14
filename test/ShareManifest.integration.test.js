@@ -7,7 +7,7 @@ const {
   withTemporaryDirectory,
   rejectsWithCode
 } = require('./helpers/TestHarness.js');
-const ShareManifest = require('../src/ShareManifest.js');
+const ShareManifest = require('../src/sharing/ShareManifest.js');
 const {withWindowsFileSync} = require('./helpers/WindowsFileSync.js');
 
 const suite = createSuite(

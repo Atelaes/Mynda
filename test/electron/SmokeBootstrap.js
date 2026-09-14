@@ -1,8 +1,9 @@
 // This file runs as the temporary Electron app's main process. The parent
-// runner sets userData before src/index.js constructs either Library instance,
+// runner sets userData before src/main/index.js constructs either Library instance,
 // so the smoke test cannot read or overwrite the user's real library.
 const fs = require('fs');
 const path = require('path');
+const {pathToFileURL} = require('url');
 const {app, BrowserWindow} = require('electron');
 
 const RESULT_PREFIX = 'MYNDA_ELECTRON_SMOKE_RESULT:';
@@ -40,6 +41,57 @@ function finish(ok, details) {
   setTimeout(() => app.exit(ok ? 0 : 1), 20);
 }
 
+async function inspectAssets(window) {
+  const imageDirectory = path.join(app.getAppPath(), 'images');
+  function imageFiles(directory) {
+    return fs.readdirSync(directory, {withFileTypes: true}).flatMap(entry => {
+      const filename = path.join(directory, entry.name);
+      return entry.isDirectory() ? imageFiles(filename) : /\.(png|gif)$/i.test(filename) ? [filename] : [];
+    });
+  }
+  const urls = imageFiles(imageDirectory).map(filename => pathToFileURL(filename).href);
+  return window.webContents.executeJavaScript(`(async () => {
+    const loadImage = url => new Promise((resolve, reject) => {
+      const image = new Image();
+      const timeout = setTimeout(() => reject(new Error('Image timed out: ' + url)), 8000);
+      image.onload = () => { clearTimeout(timeout); resolve(); };
+      image.onerror = () => { clearTimeout(timeout); reject(new Error('Image failed: ' + url)); };
+      image.src = url;
+    });
+    const main = [...document.styleSheets].find(sheet => sheet.href && sheet.href.endsWith('/renderer/styles/main.css'));
+    if (!main || !main.cssRules.length) throw new Error('Main stylesheet did not load');
+    const themes = [...main.cssRules].filter(rule => rule.type === CSSRule.IMPORT_RULE);
+    if (themes.length !== 2 || themes.some(rule => !rule.styleSheet || !rule.styleSheet.cssRules.length)) {
+      throw new Error('Bundled appearance/layout themes did not load');
+    }
+    const families = ['HKGrotesk', 'SourceCodePro', 'BalooTamma2', 'Dorsa', 'WireOne'];
+    for (const family of families) {
+      const faces = await document.fonts.load('16px ' + family);
+      if (!faces.length || faces.some(face => face.status !== 'loaded')) throw new Error('Font failed: ' + family);
+    }
+    const variables = ['--inputicon-filled', '--searchicon-empty', '--scanicon-image', '--settingsicon-image'];
+    const icons = [];
+    for (const variable of variables) {
+      const element = document.createElement('div');
+      element.className = 'mynda-smoke-asset';
+      // Insert into main.css so URL resolution matches the actual UI rules.
+      const index = main.insertRule('.mynda-smoke-asset { background-image: var(' + variable + '); display: none; }', main.cssRules.length);
+      document.body.appendChild(element);
+      const value = getComputedStyle(element).backgroundImage;
+      const match = value.match(/url\\(["']?(.*?)["']?\\)/);
+      element.remove();
+      main.deleteRule(index);
+      if (!match) throw new Error('Theme icon has no image: ' + variable);
+      icons.push(match[1]);
+    }
+    await Promise.all(${JSON.stringify(urls)}.concat(icons).map(loadImage));
+    if (getComputedStyle(document.getElementById('grid-container')).display !== 'grid') {
+      throw new Error('Main layout rules were not applied');
+    }
+    return {ok: true, images: ${urls.length}, fonts: families.length, icons: icons.length};
+  })()`);
+}
+
 async function inspectMainWindow(window) {
   try {
     await delay(300);
@@ -60,6 +112,14 @@ async function inspectMainWindow(window) {
         initial,
         rendererConsole: rendererDiagnostics()
       });
+      return;
+    }
+
+    let assets;
+    try {
+      assets = await inspectAssets(window);
+    } catch (error) {
+      finish(false, {stage: 'renderer-assets', initial, error: error.message, rendererConsole: rendererDiagnostics()});
       return;
     }
 
@@ -129,7 +189,8 @@ async function inspectMainWindow(window) {
       settings,
       libraryStats,
       settingsClosed,
-      libraryCreated
+      libraryCreated,
+      assets
     });
   } catch(err) {
     finish(false, {
@@ -158,7 +219,7 @@ app.on('browser-window-created', (event, window) => {
     if (rendererConsole.length > 100) rendererConsole.shift();
   });
   window.webContents.on('did-fail-load', (loadEvent, errorCode, errorDescription, validatedURL) => {
-    if (validatedURL && validatedURL.includes('/src/index.html')) {
+    if (validatedURL && validatedURL.includes('/src/renderer/index.html')) {
       finish(false, {
         stage: 'did-fail-load',
         errorCode,
@@ -177,7 +238,7 @@ app.on('browser-window-created', (event, window) => {
   });
   window.webContents.on('did-finish-load', () => {
     const loadedUrl = window.webContents.getURL();
-    if (!loadedUrl.includes('/src/index.html') || mainWindowFound) return;
+    if (!loadedUrl.includes('/src/renderer/index.html') || mainWindowFound) return;
     mainWindowFound = true;
     inspectMainWindow(window);
   });
@@ -190,4 +251,4 @@ process.on('unhandledRejection', error => {
   finish(false, {stage: 'unhandled-rejection', error: error && error.stack ? error.stack : String(error)});
 });
 
-require('./src/index.js');
+require('./src/main/index.js');

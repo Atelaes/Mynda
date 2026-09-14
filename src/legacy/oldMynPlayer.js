@@ -182,7 +182,7 @@ class MynPlayer extends MynOpenablePane {
         this.loadingIndicatorTimeout = setTimeout(() => {
             console.log('Actually showing loading indicator!');
             this.state.loadingIndicator = (
-                <img className='loading' src='../images/loading-icon.gif' />
+                <img className='loading' src='../../images/loading-icon.gif' />
             );
         }, 500);
     }

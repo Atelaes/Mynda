@@ -3,7 +3,7 @@ const {app} = require('electron');
 async function run() {
   let result;
   try {
-    const MediaDependencyCheck = require('./MediaDependencyCheck.js');
+    const MediaDependencyCheck = require('../media/MediaDependencyCheck.js');
     result = await MediaDependencyCheck.run({
       requireMpv: true,
       requireBundled: true,

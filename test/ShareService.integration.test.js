@@ -8,9 +8,9 @@ const {
   withTemporaryDirectory,
   rejectsWithCode
 } = require('./helpers/TestHarness.js');
-const ShareService = require('../src/ShareService.js');
-const ShareManifest = require('../src/ShareManifest.js');
-const {fingerprintPath} = require('../src/ContentFingerprint.js');
+const ShareService = require('../src/sharing/ShareService.js');
+const ShareManifest = require('../src/sharing/ShareManifest.js');
+const {fingerprintPath} = require('../src/library/ContentFingerprint.js');
 const {withWindowsFileSync} = require('./helpers/WindowsFileSync.js');
 
 const suite = createSuite(

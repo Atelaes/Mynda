@@ -1,5 +1,5 @@
 const path = require('path');
-const MovieSearch = require('./MovieSearch.js');
+const MovieSearch = require('../tagging/MovieSearch.js');
 
 // Release samples and trailers in the real library are all under four minutes.
 // Five minutes leaves substantial headroom while protecting a feature-length

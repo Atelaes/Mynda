@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const {spawn} = require('child_process');
+const asar = require('asar');
+const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
 const {
   assert,
   createSuite,
@@ -10,20 +12,22 @@ const {
 } = require('../helpers/TestHarness.js');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
+const useAsar = process.argv.includes('--asar');
 const suite = createSuite(
-  'Real Electron startup and Settings interaction',
+  `Real Electron startup and Settings interaction${useAsar ? ' from ASAR' : ''}`,
   'end-to-end',
   'Launches a disposable Mynda copy with an isolated user-data directory; a window briefly appears.'
 );
 
-function copyDirectory(source, destination) {
+function copyDirectory(source, destination, filter) {
   fs.mkdirSync(destination, {recursive: true});
   fs.readdirSync(source, {withFileTypes: true}).forEach(entry => {
     if (entry.name === '.DS_Store') return;
     const sourcePath = path.join(source, entry.name);
     const destinationPath = path.join(destination, entry.name);
+    if (filter && !filter(sourcePath, fs.statSync(sourcePath))) return;
     if (entry.isDirectory()) {
-      copyDirectory(sourcePath, destinationPath);
+      copyDirectory(sourcePath, destinationPath, filter);
     } else if (entry.isSymbolicLink()) {
       fs.symlinkSync(fs.readlinkSync(sourcePath), destinationPath);
     } else {
@@ -55,7 +59,8 @@ function launchElectron(executable, appDirectory, userData) {
     }
     args.push(appDirectory);
     const child = spawn(executable, args, {
-      cwd: appDirectory,
+      // Launch from elsewhere to catch accidentally cwd-relative app paths.
+      cwd: path.dirname(appDirectory),
       env: Object.assign({}, process.env, {
         MYNDA_E2E_USER_DATA: userData,
         MYNDA_E2E_TIMEOUT_MS: '45000',
@@ -134,7 +139,9 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
   const userData = path.join(temporaryRoot, 'user-data');
   try {
     fs.mkdirSync(appDirectory, {recursive: true});
-    copyDirectory(path.join(projectRoot, 'src'), path.join(appDirectory, 'src'));
+    const include = useAsar ? new FileMatcher(projectRoot, appDirectory, value => value,
+      require('../../package.json').build.files).createFilter() : null;
+    copyDirectory(path.join(projectRoot, 'src'), path.join(appDirectory, 'src'), include);
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
     fs.writeFileSync(path.join(appDirectory, 'omdb.js'), "module.exports = {key: 'test-only-key'};\n");
     fs.writeFileSync(path.join(appDirectory, 'package.json'), JSON.stringify({
@@ -142,18 +149,22 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
       version: '1.0.0',
       main: 'SmokeBootstrap.js'
     }, null, 2));
-    fs.symlinkSync(
-      nodeModules,
-      path.join(appDirectory, 'node_modules'),
-      process.platform === 'win32' ? 'junction' : 'dir'
-    );
+    // With ASAR, dependencies are shared from the disposable parent directory.
+    // The archive itself contains only app source/assets and the test bootstrap.
+    fs.symlinkSync(nodeModules, path.join(useAsar ? temporaryRoot : appDirectory, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir');
     // These links are read-only inputs to the disposable app. Including them
-    // makes its CSS and development-extension environment match a source run
-    // without copying megabytes into every smoke-test directory.
-    linkProjectDirectoryIfPresent('themes', appDirectory);
-    linkProjectDirectoryIfPresent('devtools', appDirectory);
+    // makes its images and development-extension environment match a source
+    // run. Bundled themes and fonts are already included in the src copy.
+    if (useAsar) copyDirectory(path.join(projectRoot, 'images'), path.join(appDirectory, 'images'), include);
+    else {
+      linkProjectDirectoryIfPresent('images', appDirectory);
+      linkProjectDirectoryIfPresent('devtools', appDirectory);
+    }
 
-    const result = await launchElectron(electronExecutable, appDirectory, userData);
+    const target = useAsar ? `${appDirectory}.asar` : appDirectory;
+    if (useAsar) await asar.createPackage(appDirectory, target);
+    const result = await launchElectron(electronExecutable, target, userData);
     assert.strictEqual(result.libraryCreated, true);
     const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
     assert.strictEqual(savedLibrary.videoIdScheme, 2, 'First launch must persist the new video ID scheme');
@@ -164,6 +175,8 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
     assert.strictEqual(result.libraryStats.kinds, true);
     assert.strictEqual(result.libraryStats.resolution, true);
     assert.strictEqual(result.libraryStats.duplicates, true);
+    assert.strictEqual(result.assets.ok, true);
+    console.log(`        Loaded ${result.assets.images} images, ${result.assets.fonts} font families, both themes, and theme icons${useAsar ? ' from ASAR' : ''}.`);
   } finally {
     removeDirectory(temporaryRoot);
   }

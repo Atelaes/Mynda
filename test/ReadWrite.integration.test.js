@@ -21,7 +21,7 @@ function loadReadWrite(directory, renderer = false) {
     return directory;
   }};
   return loadFreshWithMocks(
-    path.join(__dirname, '..', 'src', 'ReadWrite.js'),
+    path.join(__dirname, '..', 'src', 'platform', 'ReadWrite.js'),
     {
       'electron': renderer ? {remote: {app}} : {app},
       './Logger.js': quietLogger

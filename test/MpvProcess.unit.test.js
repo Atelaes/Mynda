@@ -1,6 +1,6 @@
 const {EventEmitter} = require('events');
 const path = require('path');
-const MpvProcess = require('../src/MpvProcess.js');
+const MpvProcess = require('../src/media/MpvProcess.js');
 const {
   assert,
   createSuite,

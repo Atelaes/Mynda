@@ -10,7 +10,7 @@ const {
 } = require('./helpers/TestHarness.js');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 const {videoFixture} = require('./helpers/Fixtures.js');
-const {buildLibraryStats} = require('../src/LibraryStats.js');
+const {buildLibraryStats} = require('../src/library/LibraryStats.js');
 
 require('@babel/register')({
   presets: [require.resolve('@babel/preset-react')],
@@ -58,7 +58,7 @@ const {MynRecentlyWatched, MynLibTable, MynLibTableRow} = loadFreshWithMocks(
   {
     'electron': {ipcRenderer, shell: {showItemInFolder() {}}},
     'react-virtuoso': {TableVirtuoso: EmptyComponent},
-    '../BoxOffice.js': {
+    '../library/BoxOffice.js': {
       formatBoxOffice: value => String(value),
       formatCompactBoxOffice: value => String(value)
     },
@@ -66,7 +66,7 @@ const {MynRecentlyWatched, MynLibTable, MynLibTableRow} = loadFreshWithMocks(
       library: runtimeLibrary,
       libraryViewLog: quietLog,
       playerLog: quietLog,
-      placeholderImage: '../images/qmark.png',
+      placeholderImage: '../../images/qmark.png',
       disableConfirmationDialog() {}
     },
     './RendererUtils.js': {
@@ -234,7 +234,7 @@ suite.test('shows Play Next only when a later video exists in the same series', 
 
 suite.test('keeps recently played rows the same width when Play Next is hidden', () => {
   const stylesheet = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'styles', 'main.css'),
+    path.join(__dirname, '..', 'src', 'renderer', 'styles', 'main.css'),
     'utf8'
   );
   const noNextRule = stylesheet.match(

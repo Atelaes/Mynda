@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const {execFile} = require('child_process');
 
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 function pathsFor(platform = process.platform) {
   return platform === 'win32' ? path.win32 : path.posix;

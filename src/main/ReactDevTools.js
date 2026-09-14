@@ -3,6 +3,7 @@ const path = require('path');
 const DEFAULT_EXTENSION_PATH = path.resolve(
   __dirname,
   '..',
+  '..',
   'devtools',
   'react-developer-tools'
 );

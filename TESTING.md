@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 39 suites: 38 fast suites with 345 named cases, plus the Electron end-to-end suite. Before media-tool setup, `npm run test:core` selects 36 suites with 338 cases. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
+The current catalog contains 42 suites: 40 fast suites with 356 named cases, plus two Electron end-to-end suites (source and ASAR). Before media-tool setup, `npm run test:core` selects 38 suites with 349 cases. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
 
 ## The first commands to learn
 
@@ -63,6 +63,8 @@ A “test double” is simply a small, predictable substitute for something outs
 
 | Suite | Category | What it protects |
 |---|---|---|
+| `SourceLayout.integration.test.js` | Integration | Exact import capitalization, renderer resources, relocated themes/fonts, default executable roots, and actual ASAR source/asset contents |
+| `SourceReorganization.integration.test.js` | Integration | Verified old-file backups, incomplete overlays, unexpected edits, Windows line endings, and safe cleanup reruns |
 | `PlaylistFilter.test.js` | Unit | Safe playlist expressions, allowed syntax, runtime errors, caching, and security limits |
 | `TableSelection.test.js` | Unit | Single, toggle, range, cross-table, offscreen, and ordered row selection |
 | `ReactDevTools.test.js` | Unit | Development extension path/loading, packaged-app skip, and graceful failures |
@@ -199,7 +201,7 @@ After conversion, the manual acceptance pass should include edited metadata, Rec
 
 ## Resolution checks
 
-Playlist cells, resolution sorting, and Library statistics all use `src/VideoResolution.js`. Labels are calculated from technical metadata; no derived resolution string is saved in a video. Unknown values sort last in either direction. Hovering over a playlist resolution shows stored pixel dimensions and, for anamorphic video, the adjusted display dimensions.
+Playlist cells, resolution sorting, and Library statistics all use `src/media/VideoResolution.js`. Labels are calculated from technical metadata; no derived resolution string is saved in a video. Unknown values sort last in either direction. Hovering over a playlist resolution shows stored pixel dimensions and, for anamorphic video, the adjusted display dimensions.
 
 The buckets are 8K, 4K, 1440p, 1080p, 720p, 576p, 480p, 360p, 240p, Below 240p, and Unknown. The helper corrects for pixel/display aspect ratio and uses the shorter/longer display edges, with a 5% allowance for small crops. Width can preserve the class of an ordinary widescreen crop (1920×800 is 1080p), but cannot promote a panorama wider than 3:1 (3840×1080 is 1080p). These are size categories; the `p` labels do not certify progressive scanning or picture quality.
 
@@ -262,3 +264,13 @@ That is why the small manual acceptance pass remains part of the release checkli
 If Node reports a missing package, run `npm install` in the Mynda folder and retry. If only the Electron test reports that Electron's executable is missing, Electron's installation/download did not finish; run `npm install` again before diagnosing Mynda itself. If `test:media` reports that the staged tools are missing, run `npm run media:prepare`; it will list absent Homebrew, MSYS2 UCRT64, or Ubuntu build prerequisites. Use `npm run media:status` when development may be finding a system copy unexpectedly. Packaged tests intentionally ignore media overrides and the system `PATH` so an installed player cannot mask an incomplete application bundle. MPV startup and load failures retain subprocess warning/error output in Mynda's log. See `MEDIA_TOOLS.md` for the complete preparation guide.
 
 When reporting a failure, copy from the category header (such as `[INTEGRATION]`) through the final summary. That includes the useful context without requiring the entire Terminal history.
+
+## Source organization and renderer resources (fix77)
+
+See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) for the folder map and one-time `npm run source:cleanup` step after extracting fix77 over fix76. The fast suite now includes a source/resource path audit and cleanup safety checks. No media-tool rebuild or npm installation is needed for the reorganization.
+
+`npm run test:paths` runs the focused import/resource/ASAR integration suite. It checks real paths and exact capitalization, including CSS imports, font files, placeholder images, rating logos, themes, and both JavaScript entry points.
+
+`npm run test:electron` now opens two disposable applications in sequence: first the source copy, then a copy in an ASAR archive. Both launch from outside the application directory and check the interface, Settings, images, fonts, theme stylesheets, and theme icon variables. `npm run test:electron:asar` runs only the archived-source check. `test:all` includes both.
+
+The ASAR journey deliberately shares installed npm dependencies from the temporary parent directory. It verifies source/resource paths inside an archive; `npm run test:package` separately assembles the complete native application and checks its bundled media dependencies.

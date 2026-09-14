@@ -21,11 +21,11 @@ const {
   MynEditInlineAddListWidget
 } = require('./EditorFields.js');
 const {getObjectDiff, isEqualIgnoreFuncs, fileManagerName} = require('./RendererUtils.js');
-const {buildLibraryStats, formatPercentage, percentage} = require('../LibraryStats.js');
+const {buildLibraryStats, formatPercentage, percentage} = require('../library/LibraryStats.js');
 const {
   PLAYLIST_FILTER_REFERENCE,
   validatePlaylistFilter
-} = require('../PlaylistFilter.js');
+} = require('../library/PlaylistFilter.js');
 
 // ###### Settings Pane: allows user to edit settings. Only appears when user clicks to open it ###### //
 class MynSettings extends MynOpenablePane {

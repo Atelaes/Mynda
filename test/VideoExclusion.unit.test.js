@@ -3,7 +3,7 @@ const {
   createSuite,
   runSuite
 } = require('./helpers/TestHarness.js');
-const VideoExclusion = require('../src/VideoExclusion.js');
+const VideoExclusion = require('../src/scanning/VideoExclusion.js');
 
 const suite = createSuite(
   'Sample and trailer exclusion policy',

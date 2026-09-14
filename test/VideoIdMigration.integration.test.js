@@ -3,8 +3,8 @@ const path = require('path');
 const {spawnSync} = require('child_process');
 const Migration = require('../scripts/lib/VideoIdMigration.js');
 const {defaultLibraryPath, parseArguments} = require('../scripts/migrate-video-ids.js');
-const {fingerprintPath} = require('../src/ContentFingerprint.js');
-const {assertLibraryIdentity} = require('../src/VideoIdentity.js');
+const {fingerprintPath} = require('../src/library/ContentFingerprint.js');
+const {assertLibraryIdentity} = require('../src/library/VideoIdentity.js');
 const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness.js');
 
 const suite = createSuite('One-time video ID migration', 'integration',

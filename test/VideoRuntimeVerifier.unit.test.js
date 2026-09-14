@@ -5,7 +5,7 @@ const {
   createSuite,
   runSuite
 } = require('./helpers/TestHarness.js');
-const VideoRuntimeVerifier = require('../src/VideoRuntimeVerifier.js');
+const VideoRuntimeVerifier = require('../src/scanning/VideoRuntimeVerifier.js');
 
 const suite = createSuite(
   'Bounded FFmpeg runtime verification',

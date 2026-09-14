@@ -4,7 +4,7 @@ const {
   createSuite,
   runSuite
 } = require('./helpers/TestHarness.js');
-const SubtitleMatcher = require('../src/SubtitleMatcher.js');
+const SubtitleMatcher = require('../src/scanning/SubtitleMatcher.js');
 
 const suite = createSuite(
   'Subtitle matching and edit reconciliation',

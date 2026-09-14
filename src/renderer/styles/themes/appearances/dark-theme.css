@@ -1,3 +1,5 @@
+/* Image URLs in custom properties resolve where they are consumed, in
+   renderer/styles/main.css. Font-face URLs resolve relative to this file. */
 @font-face {
   font-family: Dorsa;
   src: url('../_fonts/Dorsa-Regular.ttf') format('truetype');
@@ -210,7 +212,7 @@
 
   --inputicon-opacity: .25;
   --inputicon-empty: none;
-  --inputicon-filled: url('../../images/x-icon_white.png');
+  --inputicon-filled: url('../../../images/x-icon_white.png');
   --inputicon-position: absolute;
   --inputicon-top: 0em;
   --inputicon-bottom: inherit;
@@ -294,10 +296,10 @@
   --searchinput-text-placeholder-opacity: var(--textinput-text-placeholder-opacity);
 
   --searchfield-height: var(--navcontrols-height);
-  --searchicon-empty: url('../../images/mag-icon_white.png');
+  --searchicon-empty: url('../../../images/mag-icon_white.png');
   --searchicon-background-empty: rgba(0,0,0,0) var(--searchicon-empty) no-repeat 0% 50%;
 
-  --scanicon-image: url('../../images/scan-icon_white.png');
+  --scanicon-image: url('../../../images/scan-icon_white.png');
   --scanicon-opacity: .3;
   --scanicon-opacity-hover: calc(var(--scanicon-opacity) + .4);
   --scanicon-height: var(--inputicon-height);
@@ -308,7 +310,7 @@
   --scanicon-margin: inherit;
   --scanicon-border: initial;
 
-  --settingsicon-image: url('../../images/settings-icon_white.png');
+  --settingsicon-image: url('../../../images/settings-icon_white.png');
   --settingsicon-opacity: .3;
   --settingsicon-opacity-hover: calc(var(--settingsicon-opacity) + .4);
   --settingsicon-height: var(--inputicon-height);
@@ -997,7 +999,7 @@ in lieu of that, we will use a negative margin on the selected element instead (
 
 /* --inputicon-opacity: .25;
 --inputicon-empty: none;
---inputicon-filled: url('../../images/x-icon_white.png');
+--inputicon-filled: url('../../../images/x-icon_white.png');
 --inputicon-position: absolute;
 --inputicon-top: 0em;
 --inputicon-bottom: inherit;

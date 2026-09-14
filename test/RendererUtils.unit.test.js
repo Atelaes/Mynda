@@ -22,15 +22,15 @@ suite.test('sorts titles without leading articles', () => {
 
 suite.test('keeps packaged renderer assets relative while encoding absolute artwork paths', () => {
   assert.strictEqual(
-    RendererUtils.artworkSourceURL('', '../images/qmark.png'),
-    '../images/qmark.png'
+    RendererUtils.artworkSourceURL('', '../../images/qmark.png'),
+    '../../images/qmark.png'
   );
   assert.strictEqual(
-    RendererUtils.artworkSourceURL('https://example.com/poster.jpg', '../images/qmark.png'),
+    RendererUtils.artworkSourceURL('https://example.com/poster.jpg', '../../images/qmark.png'),
     'https://example.com/poster.jpg'
   );
   const localArtwork = path.resolve('/tmp', 'Poster With Spaces.jpg');
-  const artworkURL = RendererUtils.artworkSourceURL(localArtwork, '../images/qmark.png');
+  const artworkURL = RendererUtils.artworkSourceURL(localArtwork, '../../images/qmark.png');
   assert(artworkURL.startsWith('file:'));
   assert(artworkURL.includes('Poster%20With%20Spaces.jpg'));
 });

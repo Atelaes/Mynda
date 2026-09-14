@@ -1,5 +1,5 @@
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness.js');
-const {RESOLUTION_TIERS, RESOLUTION_BUCKETS, getResolutionInfo} = require('../src/VideoResolution.js');
+const {RESOLUTION_TIERS, RESOLUTION_BUCKETS, getResolutionInfo} = require('../src/media/VideoResolution.js');
 
 const suite = createSuite('Shared video resolution buckets', 'unit',
   'Protects common sizes, exact cutoffs, cropped/portrait/anamorphic video, unreliable metadata, and numeric ranks.');

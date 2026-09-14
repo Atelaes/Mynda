@@ -10,7 +10,7 @@ const {
   formatPercentage,
   resolutionBucket,
   buildLibraryStats
-} = require('../src/LibraryStats.js');
+} = require('../src/library/LibraryStats.js');
 
 const suite = createSuite(
   'Library statistics',

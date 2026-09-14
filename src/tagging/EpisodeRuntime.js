@@ -1,7 +1,7 @@
-const MediaTools = require('./MediaTools.js');
-const {durationFromProbe} = require('./MediaMetadata.js');
+const MediaTools = require('../media/MediaTools.js');
+const {durationFromProbe} = require('../media/MediaMetadata.js');
 const {parseRuntimeMinutes} = require('./MovieSearch.js');
-const log = require('./Logger.js').child('OMDb');
+const log = require('../platform/Logger.js').child('OMDb');
 
 // Technical duration may be read from the media, but no title/series information
 // is read here. Failed probes remain optional evidence and receive a short cache

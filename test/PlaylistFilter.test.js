@@ -6,7 +6,7 @@ const {
   compilePlaylistFilter,
   createPlaylistFilterContext,
   validatePlaylistFilter
-} = require('../src/PlaylistFilter.js');
+} = require('../src/library/PlaylistFilter.js');
 
 const NOW_MILLISECONDS = 1700000000000;
 const NOW_SECONDS = NOW_MILLISECONDS / 1000;

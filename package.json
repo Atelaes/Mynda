@@ -25,7 +25,10 @@
     "test:media": "npm run media:verify && node test/MediaDependencies.integration.test.js --require-bundled",
     "test:package": "npm run test:fast && npm run media:verify && electron-builder --dir --publish never && node test/package/run-packaged-media-smoke.js",
     "start": "electron .",
-    "dist": "npm run media:verify && electron-builder"
+    "dist": "npm run media:verify && electron-builder",
+    "test:paths": "node test/SourceLayout.integration.test.js",
+    "source:cleanup": "node scripts/finish-source-reorganization.js",
+    "test:electron:asar": "node test/electron/run-electron-smoke.js --asar"
   },
   "author": "",
   "license": "ISC",
@@ -79,14 +82,14 @@
       "!sandbox{,/**/*}",
       "!devtools/**/*",
       "!scripts/**/*",
-      "!src/Stream.js",
-      "!src/oldMynPlayer.js",
-      "!src/player.html",
       "!test/**/*",
       "!vendor/**/*",
       "!TESTING.md",
       "!MEDIA_TOOLS.md",
-      "!MIGRATING_VIDEO_IDS.md"
+      "!MIGRATING_VIDEO_IDS.md",
+      "!src/legacy{,/**/*}",
+      "!themes{,/**/*}",
+      "!SOURCE_LAYOUT.md"
     ],
     "win": {
       "target": "nsis"

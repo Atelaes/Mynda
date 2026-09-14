@@ -31,13 +31,13 @@ fakeFfmpeg.setFfmpegPath = () => {};
 fakeFfmpeg.setFfprobePath = () => {};
 
 const Stream = loadFreshWithMocks(
-  path.join(__dirname, '..', 'src', 'Stream.js'),
+  path.join(__dirname, '..', 'src', 'legacy', 'Stream.js'),
   {
     'electron': {},
     'fluent-ffmpeg': fakeFfmpeg,
-    './MediaTools.js': {ffmpegPath: '/fake/ffmpeg', ffprobePath: '/fake/ffprobe'},
+    '../media/MediaTools.js': {ffmpegPath: '/fake/ffmpeg', ffprobePath: '/fake/ffprobe'},
     'hls-server': class FakeHlsServer {},
-    './Logger.js': {child: () => ({debug() {}, info() {}, warn() {}, error() {}})}
+    '../platform/Logger.js': {child: () => ({debug() {}, info() {}, warn() {}, error() {}})}
   }
 );
 

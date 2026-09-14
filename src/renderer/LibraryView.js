@@ -3,8 +3,8 @@ const React = require('react');
 const {ipcRenderer, shell} = require('electron');
 const os = require('os');
 const _ = require('lodash');
-const {formatBoxOffice, formatCompactBoxOffice} = require('../BoxOffice.js');
-const {getResolutionInfo} = require('../VideoResolution.js');
+const {formatBoxOffice, formatCompactBoxOffice} = require('../library/BoxOffice.js');
+const {getResolutionInfo} = require('../media/VideoResolution.js');
 
 // Electron 12 predates Object.hasOwn(), which current React Virtuoso uses in
 // its prop plumbing. Supply the standards-equivalent operation for that older
@@ -1210,7 +1210,7 @@ class MynDetails extends React.Component {
       let rating = Number(ratings[source]);
 
       // image path
-      let path = '../images/logos/' + source + '-logo';
+      let path = '../../images/logos/' + source + '-logo';
       if (source === 'rt' && rating < 60) {
         path += '-splat';
       }
@@ -1296,7 +1296,7 @@ class MynDetails extends React.Component {
     try {
       const video = this.props.video;
       const imageURL = artworkSourceURL(video.artwork);
-      const imageSource = artworkSourceURL(video.artwork, '../images/qmark-details.png');
+      const imageSource = artworkSourceURL(video.artwork, '../../images/qmark-details.png');
       details = (
         <ul>
           <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={imageSource} /></li>
@@ -1329,7 +1329,7 @@ class MynDetails extends React.Component {
       // dummy details as a visual placeholder when no video is hovered/selected
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img id="detail-artwork-img" src={'../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><img id="detail-artwork-img" src={'../../images/qmark-details.png'} /></li>
           <li className="detail dummy" id="detail-title"><div className="detail-title-text">A Movie Title</div></li>
           <li className="detail dummy first"><div className="dummy-field"></div></li>
           <li className="detail dummy second"><div className="dummy-field"></div></li>
@@ -1482,7 +1482,7 @@ class MynRecentlyWatched extends MynDropdown {
               </div>
             </div>
             {nextVidID ? (
-              <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../images/ff-icon_white.png' title='Play next video in series' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
+              <div className='next-btn' onClick={() => this.playNextVideo(nextVidID)}><img src='../../images/ff-icon_white.png' title='Play next video in series' alt='Icon by Font Awesome by Dave Gandy - https://fortawesome.github.com/Font-Awesome, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=24230861' /></div>
             ) : null}
           </div>
         );

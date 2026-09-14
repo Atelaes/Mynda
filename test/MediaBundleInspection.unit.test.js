@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const Inspection = require('../src/MediaBundleInspection.js');
+const Inspection = require('../src/media/MediaBundleInspection.js');
 const {
   assert,
   createSuite,

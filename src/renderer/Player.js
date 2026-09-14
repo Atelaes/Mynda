@@ -4,8 +4,8 @@ const {spawn} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const mpvAPI = require('node-mpv');
-const MediaTools = require('../MediaTools.js');
-const MpvProcess = require('../MpvProcess.js');
+const MediaTools = require('../media/MediaTools.js');
+const MpvProcess = require('../media/MpvProcess.js');
 const {library, playerLog} = require('./RendererRuntime.js');
 const {MynOpenablePane} = require('./SharedComponents.js');
 
@@ -760,7 +760,7 @@ class MynPlayer extends MynOpenablePane {
           ) : null}
           {this.state.showLoadingIndicator ? (
             <div className='player-loading'>
-              <img className='loading' src='../images/loading-icon.gif' />
+              <img className='loading' src='../../images/loading-icon.gif' />
             </div>
           ) : null}
           {this.state.errorMessage ? (

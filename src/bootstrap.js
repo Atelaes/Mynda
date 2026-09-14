@@ -2,7 +2,7 @@
 // startup. In particular, it must be able to diagnose packaged media tools
 // even when an unrelated application module or local configuration is absent.
 if (process.env.MYNDA_PACKAGED_MEDIA_SMOKE === '1') {
-  require('./PackagedMediaSmoke.js');
+  require('./main/PackagedMediaSmoke.js');
 } else {
-  require('./index.js');
+  require('./main/index.js');
 }

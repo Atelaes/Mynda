@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const MediaMetadata = require('../src/MediaMetadata.js');
+const MediaMetadata = require('../src/media/MediaMetadata.js');
 const {
   assert,
   createSuite,

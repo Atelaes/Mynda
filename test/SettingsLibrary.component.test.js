@@ -76,7 +76,7 @@ const {MynSettingsLibrary} = loadFreshWithMocks(
       isEqualIgnoreFuncs: () => true,
       fileManagerName: () => 'Finder'
     },
-    '../PlaylistFilter.js': {
+    '../library/PlaylistFilter.js': {
       PLAYLIST_FILTER_REFERENCE: {},
       validatePlaylistFilter: () => ({valid: true})
     }
@@ -199,7 +199,7 @@ suite.test('reserves a fixed monospace percentage column and keeps one decimal p
     const html = ReactDOMServer.renderToStaticMarkup(instance.renderViewingCount(example.count, example.total));
     assert.strictEqual(html, `<span class="viewing-number">${example.count}</span> (<span class="viewing-percentage">${example.percentage}</span>)`);
   });
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles', 'main.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles', 'main.css'), 'utf8');
   const rule = css.match(/#settings-library \.kinds-table \.viewing-percentage\s*\{([^}]+)\}/);
   assert(rule, 'The percentage span needs its own layout rule');
   assert(/display:\s*inline-block/.test(rule[1]));

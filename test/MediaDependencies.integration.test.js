@@ -1,4 +1,4 @@
-const MediaDependencyCheck = require('../src/MediaDependencyCheck.js');
+const MediaDependencyCheck = require('../src/media/MediaDependencyCheck.js');
 const {
   assert,
   createSuite,
@@ -37,7 +37,7 @@ suite.test('loads node-mpv and connects it to MPV over JSON IPC when available',
     if (requireBundled) {
       assert.strictEqual(report.checks.nodeMpv.value.graphicalVideoChecked, true);
       assert.strictEqual(report.checks.nodeMpv.value.videoOutput, 'gpu-next');
-      const requirements = require('../src/MediaToolPolicy.js')
+      const requirements = require('../src/media/MediaToolPolicy.js')
         .mpvVideoRequirements(process.platform);
       assert(requirements.runtimeContexts.includes(report.checks.nodeMpv.value.gpuContext));
       assert(report.checks.nodeMpv.value.width > 0);

@@ -160,7 +160,7 @@ Existing backups are not rewritten wholesale. Restoring a pre-conversion backup 
 
 ## The permanent fingerprint recipe
 
-Normal scans and migration call the same `src/ContentFingerprint.js` implementation. Libraries store `videoIdScheme: 2`; Share manifests use version 2 and also declare that scheme.
+Normal scans and migration call the same `src/library/ContentFingerprint.js` implementation. Libraries store `videoIdScheme: 2`; Share manifests use version 2 and also declare that scheme.
 
 For an ordinary file, the hash includes its exact byte size and five 256 KiB blocks distributed across it. That reads at most 1.25 MiB of video data, plus filesystem metadata. Files at or below 1.25 MiB are read completely. For larger files, block starts are `floor((size - 262144) * i / 4)` for `i = 0, 1, 2, 3, 4`. These are positions across the byte stream, not playback timestamps.
 

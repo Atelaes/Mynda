@@ -36,12 +36,12 @@ function loadSearch(responder, options = {}) {
     if (response instanceof Error) throw response;
     return {status:200, statusText:'OK', data:response || notFound};
   };
-  const api = loadFreshWithMocks(path.join(__dirname,'../src/OmdbHelper.js'), {
-    '../omdb':{key:'fixture-only'}, axios,
+  const api = loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'), {
+    '../../omdb':{key:'fixture-only'}, axios,
     electron:{app:{getPath:() => '/unused-fixture-user-data'}, ipcRenderer:{}},
-    './Logger.js':{child:() => logger},
+    '../platform/Logger.js':{child:() => logger},
     './EpisodeRuntime.js':{withEpisodeDuration:options.readDuration || (async video => video)},
-    './download':{download:(url, destination, callback) => {downloads.push(url);callback({path:destination});}}
+    '../platform/download':{download:(url, destination, callback) => {downloads.push(url);callback({path:destination});}}
   });
   return {api, requests, logs, downloads};
 }

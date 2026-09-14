@@ -1,17 +1,17 @@
 const path = require('path');
-const omdb = require('../omdb');
+const omdb = require('../../omdb');
 const axios = require('axios');
 const _ = require('lodash');
 const fs = require('fs');
 const electron = require('electron');
-const dl = require('./download');
+const dl = require('../platform/download');
 const { ipcRenderer } = require('electron');
-const Logger = require('./Logger.js');
+const Logger = require('../platform/Logger.js');
 const MovieSearch = require('./MovieSearch.js');
 const EpisodeMatch = require('./EpisodeMatch.js');
 const {episodeTitlesMatch, comparableEpisodeTitle} = EpisodeMatch;
 const {withEpisodeDuration} = require('./EpisodeRuntime.js');
-const {parseOmdbBoxOffice} = require('./BoxOffice.js');
+const {parseOmdbBoxOffice} = require('../library/BoxOffice.js');
 
 const log = Logger.child('OMDb');
 

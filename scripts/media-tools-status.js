@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const MediaTools = require('../src/MediaTools.js');
+const MediaTools = require('../src/media/MediaTools.js');
 
 const status = MediaTools.status();
 const target = `${MediaTools.builderPlatform(process.platform)}-${process.arch}`;

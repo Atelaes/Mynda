@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const MediaTools = require('../src/MediaTools.js');
+const MediaTools = require('../src/media/MediaTools.js');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 const {
   assert,
@@ -174,7 +174,7 @@ suite.test('reports staged, packaged, overridden, system, and missing sources', 
 
 suite.test('uses the requested platform paths even when the host uses the other path convention', () => {
   for (const flavor of [path.posix, path.win32]) {
-    const subject = loadFreshWithMocks(require.resolve('../src/MediaTools.js'), {path: flavor});
+    const subject = loadFreshWithMocks(require.resolve('../src/media/MediaTools.js'), {path: flavor});
     assert.deepStrictEqual(subject.mediaToolCandidates('ffprobe', {
       platform: 'linux', arch: 'x64', projectRoot: '/project',
       resourcesPath: '/app/resources', env: {PATH: '/tools:/other'}

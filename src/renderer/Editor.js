@@ -7,8 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const hashObject = require('object-hash');
-const OmdbHelper = require('../OmdbHelper.js');
-const {parseBoxOffice, formatBoxOffice} = require('../BoxOffice.js');
+const OmdbHelper = require('../tagging/OmdbHelper.js');
+const {parseBoxOffice, formatBoxOffice} = require('../library/BoxOffice.js');
 const {
   library,
   editorLog,
@@ -1058,7 +1058,7 @@ class MynEditorSearch extends React.Component {
       }
     } else {
       searchBtn = this.state.searching ?
-        (<img src='../images/loading-icon.gif' className='loading-icon' />) :
+        (<img src='../../images/loading-icon.gif' className='loading-icon' />) :
         (<button type='button' id='edit-search-button' onClick={this.handleSearch} title='Search OMDb for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
     }
     return (

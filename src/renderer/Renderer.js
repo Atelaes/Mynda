@@ -18,10 +18,10 @@ const URL = require("url");
 const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
-const Library = require("./Library.js");
-const Logger = require('./Logger.js');
-const OmdbHelper = require('./OmdbHelper.js');
-const omdb = require('../omdb');
+const Library = require("../library/Library.js");
+const Logger = require('../platform/Logger.js');
+const OmdbHelper = require('../tagging/OmdbHelper.js');
+const omdb = require('../../omdb');
 const axios = require('axios');
 const { DragDropContext, Droppable, Draggable } = require('react-beautiful-dnd');
 const hashObject = require('object-hash');
@@ -34,8 +34,8 @@ const settingsLog = Logger.child('Settings');
 const editorLog = Logger.child('Editor');
 const artworkLog = Logger.child('Artwork');
 
-const {library} = require('./renderer/RendererRuntime.js');
+const {library} = require('./RendererRuntime.js');
 
-const {Mynda} = require('./renderer/Mynda.js');
+const {Mynda} = require('./Mynda.js');
 
 ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));

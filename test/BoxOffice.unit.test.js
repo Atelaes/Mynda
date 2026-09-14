@@ -10,7 +10,7 @@ const {
   parseOmdbBoxOffice,
   formatBoxOffice,
   formatCompactBoxOffice
-} = require('../src/BoxOffice.js');
+} = require('../src/library/BoxOffice.js');
 
 const suite = createSuite(
   'Box-office parsing and formatting',

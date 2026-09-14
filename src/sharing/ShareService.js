@@ -5,7 +5,7 @@ const {pipeline} = require('stream');
 const {promisify} = require('util');
 const {v4: uuidv4} = require('uuid');
 const ShareManifest = require('./ShareManifest.js');
-const {VIDEO_ID_SCHEME, assertLibraryIdentity} = require('./VideoIdentity.js');
+const {VIDEO_ID_SCHEME, assertLibraryIdentity} = require('../library/VideoIdentity.js');
 
 const pipelineAsync = promisify(pipeline);
 const MIN_FREE_SPACE_RESERVE = 128 * 1024 * 1024;

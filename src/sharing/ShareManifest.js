@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const {VIDEO_ID_SCHEME, isVideoID} = require('./VideoIdentity.js');
+const {VIDEO_ID_SCHEME, isVideoID} = require('../library/VideoIdentity.js');
 
 const SHARE_FORMAT = 'mynda-share';
 const SHARE_VERSION = 2;

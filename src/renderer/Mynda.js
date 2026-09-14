@@ -5,7 +5,7 @@ const _ = require('lodash');
 const {
   compilePlaylistFilter,
   createPlaylistFilterContext
-} = require('../PlaylistFilter.js');
+} = require('../library/PlaylistFilter.js');
 const {
   library,
   frontendLog,
@@ -90,9 +90,9 @@ class Mynda extends React.Component {
       "ratings_user" : "rating",
       "dateadded" : "added",
       "lastseen" : "last seen",
-      "ratings_rt" : (<img src="../images/logos/rt-logo.png" className='ratings-icon' />),
-      "ratings_imdb" : (<img src="../images/logos/imdb-logo.png" className='ratings-icon' />),
-      "ratings_mc" : (<img src="../images/logos/mc-logo.png" className='ratings-icon' />),
+      "ratings_rt" : (<img src="../../images/logos/rt-logo.png" className='ratings-icon' />),
+      "ratings_imdb" : (<img src="../../images/logos/imdb-logo.png" className='ratings-icon' />),
+      "ratings_mc" : (<img src="../../images/logos/mc-logo.png" className='ratings-icon' />),
       "ratings_avg" : "avg",
       "boxoffice" : "BoxOffice",
       "languages" : "language",

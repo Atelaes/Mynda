@@ -1,7 +1,7 @@
 const path = require('path');
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness.js');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
-const Match = require('../src/EpisodeMatch.js');
+const Match = require('../src/tagging/EpisodeMatch.js');
 const corpus = require('./fixtures/EpisodeTitleCorpus.json');
 
 const suite = createSuite('Episode title and runtime sanity checks', 'unit',
@@ -107,9 +107,9 @@ suite.test('does not infer a mismatch from missing duration or incomparable medi
 
 const quietLogger = {child: () => ({debug() {}})};
 function durationReader(options = {}) {
-  const Runtime = loadFreshWithMocks(path.join(__dirname, '../src/EpisodeRuntime.js'), {
-    './MediaTools.js': {probeFile() { throw new Error('Unexpected real probe'); }},
-    './Logger.js': quietLogger
+  const Runtime = loadFreshWithMocks(path.join(__dirname, '../src/tagging/EpisodeRuntime.js'), {
+    '../media/MediaTools.js': {probeFile() { throw new Error('Unexpected real probe'); }},
+    '../platform/Logger.js': quietLogger
   });
   return Runtime.createDurationReader(options);
 }

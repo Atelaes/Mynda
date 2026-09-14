@@ -1,4 +1,4 @@
-const MediaToolPolicy = require('../src/MediaToolPolicy.js');
+const MediaToolPolicy = require('../src/media/MediaToolPolicy.js');
 const {
   assert,
   createSuite,

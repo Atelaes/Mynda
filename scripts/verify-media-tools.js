@@ -2,8 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const {execFile} = require('child_process');
-const MediaBundleInspection = require('../src/MediaBundleInspection.js');
-const MediaToolPolicy = require('../src/MediaToolPolicy.js');
+const MediaBundleInspection = require('../src/media/MediaBundleInspection.js');
+const MediaToolPolicy = require('../src/media/MediaToolPolicy.js');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const EXPECTED = {

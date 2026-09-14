@@ -159,7 +159,7 @@ class MynEditRatings extends MynEdit {
           return (
             <tr key={source}>
               <td className="ratings-icon">
-                <img src={`../images/logos/${source}-logo` + (source=='rt' && this.props.video[this.props.property][source]<60 && this.props.video[this.props.property][source] !== '' ? '-splat' : '') + '.png'} />
+                <img src={`../../images/logos/${source}-logo` + (source=='rt' && this.props.video[this.props.property][source]<60 && this.props.video[this.props.property][source] !== '' ? '-splat' : '') + '.png'} />
               </td>
               <td className="ratings-input">
                 <input

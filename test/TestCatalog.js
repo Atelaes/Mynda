@@ -3,6 +3,18 @@
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
   {
+    category: 'integration',
+    file: 'test/SourceLayout.integration.test.js',
+    title: 'Source imports, assets, and packaged layout',
+    protects: 'case-correct module references, renderer resources, relocated themes/fonts, default media roots, and actual ASAR contents'
+  },
+  {
+    category: 'integration',
+    file: 'test/SourceReorganization.integration.test.js',
+    title: 'Source reorganization cleanup safety',
+    protects: 'verified backups, complete-overlay checks, edited-file preservation, Windows line endings, and repeatable cleanup'
+  },
+  {
     category: 'unit',
     file: 'test/EpisodeMatch.unit.test.js',
     title: 'Episode title and runtime sanity checks',
@@ -236,6 +248,13 @@ module.exports = [
     category: 'end-to-end',
     file: 'test/electron/run-electron-smoke.js',
     title: 'Real Electron startup',
-    protects: 'main/renderer boot, first-launch storage, root panes, Settings tabs, and Library statistics'
+    protects: 'main/renderer boot from another working directory, first-launch storage, panes, Settings, styles, themes, fonts, and icons'
+  },
+  {
+    category: 'end-to-end',
+    file: 'test/electron/run-electron-smoke.js',
+    args: ['--asar'],
+    title: 'Real Electron startup from ASAR',
+    protects: 'the same UI/assets journey from an actual source-and-assets archive; separate from the full bundled-media packaging test'
   }
 ];

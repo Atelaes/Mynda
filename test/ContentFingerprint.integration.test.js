@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const Fingerprint = require('../src/ContentFingerprint.js');
-const Identity = require('../src/VideoIdentity.js');
+const Fingerprint = require('../src/library/ContentFingerprint.js');
+const Identity = require('../src/library/VideoIdentity.js');
 const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness.js');
 
 const suite = createSuite('Content-based video IDs', 'integration',
