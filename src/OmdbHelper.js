@@ -8,6 +8,9 @@ const dl = require('./download');
 const { ipcRenderer } = require('electron');
 const Logger = require('./Logger.js');
 const MovieSearch = require('./MovieSearch.js');
+const EpisodeMatch = require('./EpisodeMatch.js');
+const {episodeTitlesMatch, comparableEpisodeTitle} = EpisodeMatch;
+const {withEpisodeDuration} = require('./EpisodeRuntime.js');
 const {parseOmdbBoxOffice} = require('./BoxOffice.js');
 
 const log = Logger.child('OMDb');
@@ -1595,151 +1598,11 @@ function seriesTitlesMatch(requestedTitle, resultTitle, allowContainedTitle) {
   return allowedEdits > 0 && editDistance(requested, result) <= allowedEdits;
 }
 
-// Produces a deliberately strict comparison key for episode titles. It ignores
-// punctuation and a few display-only conventions, including "Chapter 4: Title",
-// "Chapter Four 'Title'", and equivalent part suffixes such as "(1)" versus
-// "Part I". Unlike series matching, it does not use substring or edit-distance
-// matching: a nearby episode number is accepted only when the titles clearly
-// agree.
-function comparableEpisodeTitle(title) {
-  let normalized = String(title || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-
-  // Some shows use an editorial chapter wrapper around the real episode title.
-  // Heroes, for example, is returned by OMDb as "Chapter One 'Genesis'" even
-  // when the release filename contains only "Genesis". Treat the wrapper as
-  // presentation text, but require a numeric/number-word chapter and either a
-  // clear separator or balanced-looking quotation marks. This remains much
-  // stricter than accepting an arbitrary substring of an episode title.
-  const smallNumber = '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)';
-  const tensNumber = '(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\\s-]+(?:one|two|three|four|five|six|seven|eight|nine))?';
-  const chapterNumber = `(?:\\d{1,3}|${smallNumber}|${tensNumber})`;
-  normalized = normalized.replace(
-    new RegExp(`^\\s*(?:episode|chapter)\\s+${chapterNumber}\\s+['\"“‘](.+)['\"”’]\\s*$`, 'i'),
-    '$1'
-  );
-  normalized = normalized.replace(
-    new RegExp(`^\\s*(?:episode|chapter)\\s+${chapterNumber}\\s*[:\\-–—]\\s*`, 'i'),
-    ''
-  );
-
-  const partNumbers = {
-    one: 1, two: 2, three: 3, four: 4, five: 5,
-    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    i: 1, ii: 2, iii: 3, iv: 4, v: 5,
-    vi: 6, vii: 7, viii: 8, ix: 9, x: 10
-  };
-  const normalizePartNumber = value => {
-    let key = String(value || '').toLowerCase();
-    let number = /^\d{1,2}$/.test(key) ? Number(key) : partNumbers[key];
-    return number >= 1 && number <= 10 ? number : null;
-  };
-  const replacePartSuffix = (whole, value) => {
-    let number = normalizePartNumber(value);
-    return number === null ? whole : ` part ${number}`;
-  };
-
-  normalized = normalized.replace(
-    /\s*(?:[:\-–—]\s*)?(?:part|pt)\.?\s*(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3}|iv|v|vi{0,3}|ix|x)\s*$/i,
-    replacePartSuffix
-  );
-  normalized = normalized.replace(
-    /\s*[\[(](\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3}|iv|v|vi{0,3}|ix|x)[\])]\s*$/i,
-    replacePartSuffix
-  );
-
-  normalized = normalized.toLowerCase().replace(/&/g, ' and ');
-  return normalized.replace(/[^a-z0-9]+/g, '');
-}
-
-// Older releases sometimes leave presentation/source flags at the end of the
-// title extracted from their filename. For example, the ER files in the user's
-// library produce titles such as "Day One FS", "Chicago Heat WS", and
-// "Another Perfect Day FS DVD-SFM". These are not alternate episode titles:
-// FS and WS mean fullscreen and widescreen, while the following tokens describe
-// the audio, disc/source, encoder, or codec.
-//
-// Keep this deliberately narrower than the general filename parser. A suffix is
-// removable only when it starts with the standalone FS or WS release flag, and
-// every later token is also recognized technical metadata. Unknown trailing
-// words are preserved, so "Day One fan edit" cannot become a match for OMDb's
-// "Day One" merely because the beginning happens to agree.
-function stripTrailingEpisodeReleaseFlags(title) {
-  let original = String(title || '').trim();
-  let stripped = original.replace(
-    /[\s._-]+(?:fs|ws)(?:[\s._-]+(?:ac-?3|eac-?3|aac|dvd(?:rip)?|sfm|smis|xvid|x26[45]|h26[45]|hevc))*\s*$/i,
-    ''
-  ).trim();
-
-  // Never turn a title made entirely from release flags into an empty match.
-  return stripped ? stripped : original;
-}
-
-// Some episode filenames identify the film or program shown in the episode by
-// appending its release year, while OMDb stores only the episode title. This is
-// especially common for anthology and hosted-film shows (for example,
-// "The Crawling Eye (1958)"). Remove only one final parenthesized/bracketed
-// four-digit year or year range, and use the result for comparison only. A year
-// in ordinary title text remains untouched and the video's stored title is
-// never changed.
-function stripTrailingEpisodeReleaseYear(title) {
-  let original = String(title || '').trim();
-  let stripped = original.replace(
-    /\s*(?:\((?:18|19|20)\d{2}(?:\s*[-–—]\s*(?:18|19|20)\d{2})?\)|\[(?:18|19|20)\d{2}(?:\s*[-–—]\s*(?:18|19|20)\d{2})?\])\s*$/,
-    ''
-  ).trim();
-  return stripped ? stripped : original;
-}
-
-function episodeTitlesMatch(localTitle, omdbTitle) {
-  let local = comparableEpisodeTitle(localTitle);
-  let omdb = comparableEpisodeTitle(omdbTitle);
-  if (!local || !omdb) {
-    return false;
-  }
-  if (local === omdb) {
-    return true;
-  }
-
-  // Only the local filename-derived title can contain release flags or a
-  // trailing source-title year. Try every conservative combination, but still
-  // require exact normalized equality. The four-character minimum retains
-  // useful short titles such as ER's "Home FS" while rejecting very weak one-
-  // or two-letter evidence produced by stripping a suffix.
-  let localVariants = new Set();
-  let withoutReleaseFlags = stripTrailingEpisodeReleaseFlags(localTitle);
-  let withoutReleaseYear = stripTrailingEpisodeReleaseYear(localTitle);
-  localVariants.add(withoutReleaseFlags);
-  localVariants.add(withoutReleaseYear);
-  localVariants.add(stripTrailingEpisodeReleaseYear(withoutReleaseFlags));
-  localVariants.add(stripTrailingEpisodeReleaseFlags(withoutReleaseYear));
-
-  for (let variant of localVariants) {
-    let comparableVariant = comparableEpisodeTitle(variant);
-    if (comparableVariant.length >= 4 && comparableVariant !== local &&
-        comparableVariant === omdb) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// findEpisodeTitle() leaves the complete basename in video.title when it could
-// not confidently extract a real episode title. Only a title that differs from
-// that fallback, and contains enough information to be useful, may correct an
-// nearby OMDb episode number.
+// The editable title is authoritative, even when it happens to equal the file's
+// basename. Detect generic numbering from the tag itself; never substitute a
+// filename-derived title for a user's correction or an existing catalog title.
 function localEpisodeTitleForVerification(video) {
-  let title = video && typeof video.title === 'string' ? video.title.trim() : '';
-  let filename = video && typeof video.filename === 'string' ? video.filename : '';
-  if (!title || !filename) {
-    return null;
-  }
-
-  let basename = path.basename(filename, path.extname(filename)).trim();
-  let titleKey = comparableEpisodeTitle(title);
-  if (titleKey.length < 6 || titleKey === comparableEpisodeTitle(basename)) {
-    return null;
-  }
-  return title;
+  return EpisodeMatch.usefulEpisodeTitle(video && video.title, video && video.series);
 }
 
 // Checks an optional series-year hint against OMDb's Year field. startsWith()
@@ -1799,7 +1662,7 @@ function ambiguousSeriesFailure(series, candidates) {
 }
 
 // When two series have the same exact title, test the requested episode against
-// each series ID. If Mynda has a clean filename-derived episode title, require
+// each series ID. If Mynda has a usable current episode title tag, require
 // that title to agree as well. This matters when both an original and a remake
 // have the same S/E number, and it prevents the only series with a returned
 // episode from winning when its title clearly describes different content.
@@ -1841,7 +1704,7 @@ async function disambiguateSeriesByEpisode(candidates, season, episode, localTit
     }))
   });
 
-  // A title extracted independently from the filename is stronger evidence
+  // A useful title tag is stronger evidence
   // than episode existence. Kung Fu S1E6 exposed why: OMDb temporarily returned
   // no episode for the 1972 series and "Rage" for the 2021 series, while the
   // local title was "The Soul Is the Warrior". Existence alone selected and
@@ -1896,7 +1759,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
       queryYear: searchParts.year,
       imdbID: storedID
     });
-    return {success: true, data: storedID};
+    return {success: true, data: storedID, confidentSeries: true};
   }
   if (!options.ignoreSeriesCache && seriesIdCache.has(cacheKey)) {
     let cachedID = seriesIdCache.get(cacheKey);
@@ -1906,7 +1769,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
       queryYear: searchParts.year,
       imdbID: cachedID
     });
-    return {success: true, data: cachedID};
+    return {success: true, data: cachedID, confidentSeries: true};
   }
 
   try {
@@ -2023,8 +1886,8 @@ async function resolveSeries(video, season, episode, localTitle, context, option
     let candidates = matches.candidates;
     if (candidates.length === 1) {
       let result = candidates[0];
-      seriesIdCache.set(cacheKey, result.imdbID);
-      return {success: true, data: result.imdbID};
+      // A single search hit is provisional until the episode checks pass.
+      return {success: true, data: result.imdbID, confidentSeries: Boolean(searchParts.year)};
     }
     if (candidates.length > 1) {
       // Exact and acronym matches are strong enough to disambiguate further
@@ -2043,6 +1906,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
           return {
             success: true,
             data: episodeResult.candidate.imdbID,
+            confidentSeries: Boolean(localTitle || searchParts.year),
             episodeData: episodeResult.episodeData
           };
         }
@@ -2096,8 +1960,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
       if (result.Type === 'series' && result.imdbID &&
           seriesYearMatches(searchParts.year, result.Year) &&
           seriesTitlesMatch(searchParts.title, result.Title, false)) {
-        seriesIdCache.set(cacheKey, result.imdbID);
-        return {success: true, data: result.imdbID};
+        return {success: true, data: result.imdbID, confidentSeries: Boolean(searchParts.year)};
       }
 
       invalidFallbackFound = true;
@@ -2131,7 +1994,7 @@ async function resolveSeries(video, season, episode, localTitle, context, option
 // batch begins saving episodes. Stored IDs and the process cache are bypassed:
 // this path is specifically for an unsettled batch, including one whose videos
 // disagree about their saved seriesImdbID values. Prefer a usable episode with
-// an independently extracted local title because it supplies the strongest
+// a useful current title tag because it supplies the strongest
 // evidence when same-name originals and remakes both exist.
 async function resolveSeriesForBatch(videos) {
   const context = {searchID: `${process.pid}-${++nextSearchNumber}`};
@@ -2147,7 +2010,19 @@ async function resolveSeriesForBatch(videos) {
       localTitle: localEpisodeTitleForVerification(video)
     }));
 
-  const representative = candidates.find(candidate => candidate.localTitle) || candidates[0];
+  // A selected batch may start with an intro or an unusually named episode.
+  // Try at most three distinct representatives before giving up, so one bad
+  // entry does not prevent the rest of a sound series from being tagged.
+  const seenRepresentatives = new Set();
+  const representatives = candidates.filter(candidate => candidate.localTitle)
+    .concat(candidates.filter(candidate => !candidate.localTitle))
+    .filter(candidate => {
+      const key = JSON.stringify([candidate.season, candidate.episode, candidate.localTitle]);
+      if (seenRepresentatives.has(key)) return false;
+      seenRepresentatives.add(key);
+      return true;
+    }).slice(0, 3);
+  let representative = representatives[0];
   log.info('Selected-batch series preflight started', {
     searchID: context.searchID,
     videoCount: Array.isArray(videos) ? videos.length : 0,
@@ -2168,18 +2043,23 @@ async function resolveSeriesForBatch(videos) {
     return failure;
   }
 
-  const result = await resolveSeries(
-    representative.video,
-    representative.season,
-    representative.episode,
-    representative.localTitle,
-    context,
-    {
-      ignoreStoredSeriesImdbID: true,
-      ignoreSeriesCache: true
+  let result, ambiguousResult;
+  for (representative of representatives) {
+    result = await resolveSeries(
+      representative.video, representative.season, representative.episode,
+      representative.localTitle, context,
+      {ignoreStoredSeriesImdbID: true, ignoreSeriesCache: true}
+    );
+    // The caller writes this ID onto the selected batch; validate before that.
+    if (result.success) {
+      result = await searchShowEpisode(representative.video, context, undefined, undefined, {
+        seriesResult: result, validateOnly: true
+      });
     }
-  );
-
+    if (result.success || !result.permanentFailure) break;
+    if (result.choices && !ambiguousResult) ambiguousResult = result;
+  }
+  if (!result.success && result.permanentFailure && ambiguousResult) result = ambiguousResult;
   if (result.success && validSeriesImdbID(result.data)) {
     const success = {success: true, data: result.data.trim()};
     log.info('Selected-batch series preflight finished', {
@@ -2459,7 +2339,7 @@ function rememberSeasonOffsetHint(hints, seriesID, offset, context) {
 // The structural response checks are deliberately stronger than an ordinary
 // lookup because this path is correcting Mynda's requested coordinates: OMDb
 // must explicitly confirm the parent series, probed season, and episode, and
-// the filename-derived title must agree exactly under the conservative episode
+// the current title tag must agree exactly under the conservative episode
 // title normalizations above.
 async function probeAdjacentSeasonEpisodeByTitle(
   seriesID, season, episode, localTitle, offset, context, stage
@@ -2569,7 +2449,7 @@ async function findAdjacentSeasonEpisodeByTitle(
 // two places away or an adjacent-season numbering convention, but it never
 // changes the season/episode stored by Mynda.
 async function searchShowEpisode(
-  video, context, selectedSeriesImdbID, seasonOffsetHints
+  video, context, selectedSeriesImdbID, seasonOffsetHints, validation = {}
 ) {
   let series = typeof video.series === 'string' ? video.series.trim() : '';
   let season = normalizeEpisodeNumber(video.season);
@@ -2596,11 +2476,12 @@ async function searchShowEpisode(
     return predictableFailure('Not enough data', reason);
   }
 
-  // Resolve this before choosing a series so a clean filename-derived episode
-  // title can distinguish same-name originals and remakes during the probes.
+  // The current title tag can distinguish same-name originals and remakes.
   let localTitle = localEpisodeTitleForVerification(video);
   let seriesResult;
-  if (typeof selectedSeriesImdbID !== 'undefined') {
+  if (validation.seriesResult) {
+    seriesResult = validation.seriesResult;
+  } else if (typeof selectedSeriesImdbID !== 'undefined') {
     if (!validSeriesImdbID(String(selectedSeriesImdbID))) {
       return predictableFailure('Invalid series selection', 'The selected series did not have a valid IMDb ID');
     }
@@ -2610,10 +2491,7 @@ async function searchShowEpisode(
       series: series,
       selectedSeriesImdbID: selectedSeriesImdbID
     });
-    let selectedSearchParts = seriesSearchPartsForVideo(video);
-    let selectedCacheKey = seriesCacheKey(selectedSearchParts);
-    seriesIdCache.set(selectedCacheKey, String(selectedSeriesImdbID));
-    seriesResult = {success: true, data: String(selectedSeriesImdbID)};
+    seriesResult = {success: true, data: selectedSeriesImdbID, confidentSeries: true};
   } else {
     seriesResult = await resolveSeries(video, season, episode, localTitle, context);
   }
@@ -2634,7 +2512,7 @@ async function searchShowEpisode(
 
     // A season offset learned earlier in this Auto-Tag batch changes only the
     // first place we look. The hinted record still has to match this video's
-    // own filename-derived title, so a stale hint cannot authorize a tag.
+    // own current title tag, so a stale hint cannot authorize a tag.
     let seasonOffsetHint = seasonOffsetHintFor(seasonOffsetHints, seriesID);
     if (!episodeData && localTitle && seasonOffsetHint !== null) {
       let hintedEpisode = await probeAdjacentSeasonEpisodeByTitle(
@@ -2699,8 +2577,8 @@ async function searchShowEpisode(
       }
 
       // A missing episode 0 is the common signal for a release whose numbering
-      // is shifted by one. Do not broaden the search unless the filename parser
-      // supplied a useful title that can verify the nearby result.
+      // is shifted by one. Do not broaden the search without a useful current
+      // title tag that can verify the nearby result.
       if (!episodeData && lookupFailure.failure === 'No results' && localTitle) {
         let correction = await findNearbyEpisodeByTitle(
           seriesID, season, episode, localTitle, context
@@ -2760,11 +2638,9 @@ async function searchShowEpisode(
       );
     }
 
-    // A structurally valid S/E response can still describe the wrong content
-    // when a release uses a different episode order. A unique nearby title
-    // match is stronger evidence than the numeric label alone. If no nearby title
-    // matches, preserve the existing exact-S/E behavior to avoid introducing
-    // false negatives for alternate episode titles.
+    // Preserve strict, bounded episode-order corrections. The forgiving check
+    // below may accept the requested episode, but cannot select another one.
+    let correctionFailure = null;
     if (matchedSeason === season && matchedEpisode === episode && localTitle &&
         !episodeTitlesMatch(localTitle, episodeData.Title)) {
       let correction = await findNearbyEpisodeByTitle(
@@ -2788,7 +2664,8 @@ async function searchShowEpisode(
             context
           );
         } else {
-          log.warn('Local and OMDb episode titles differed; retaining the exact season/episode result', {
+          correctionFailure = correction.requestFailure || seasonCorrection.requestFailure;
+          log.debug('No exact title correction found; checking episode plausibility', {
             searchID: context.searchID,
             localTitle: localTitle,
             omdbTitle: episodeData.Title,
@@ -2803,7 +2680,40 @@ async function searchShowEpisode(
       }
     }
 
-    let taggedVideo = addTagsToVideo(_.cloneDeep(video), episodeData, context);
+    const titleAssessment = EpisodeMatch.assessEpisodeTitle(localTitle, episodeData.Title, series);
+    const cacheKey = seriesCacheKey(seriesSearchPartsForVideo(video));
+    const rejectMatch = reason => {
+      if (seriesIdCache.get(cacheKey) === seriesID) seriesIdCache.delete(cacheKey);
+      log.warn('Rejected implausible episode match', {
+        searchID: context.searchID, videoID: video.id, series, seriesID,
+        season, episode, localTitle, omdbTitle: episodeData.Title,
+        reason, titleAssessment
+      });
+      return predictableFailure('Episode mismatch', reason);
+    };
+    if (titleAssessment.state === 'contradiction') {
+      // A transient error may have hidden the correct nearby episode; retry it.
+      if (correctionFailure) {
+        if (seriesIdCache.get(cacheKey) === seriesID) seriesIdCache.delete(cacheKey);
+        return correctionFailure;
+      }
+      return rejectMatch(`Episode title mismatch: "${localTitle}" does not agree with OMDb's "${episodeData.Title}".`);
+    }
+    if (!EpisodeMatch.usefulEpisodeTitle(episodeData.Title) && !seriesResult.confidentSeries) {
+      return rejectMatch('OMDb returned a generic episode title for an unconfirmed series. Select the correct series before retrying.');
+    }
+    const withDuration = await withEpisodeDuration(video, episodeData, context);
+    const runtimeAssessment = EpisodeMatch.assessEpisodeRuntime(withDuration, episodeData);
+    if (runtimeAssessment.state === 'contradiction') {
+      return rejectMatch(`Episode runtime mismatch: the video is ${runtimeAssessment.localMinutes.toFixed(1)} minutes, but OMDb reports ${runtimeAssessment.omdbMinutes} minutes.`);
+    }
+    log.debug('Episode match passed sanity checks', {
+      searchID: context.searchID, titleAssessment, runtimeAssessment
+    });
+    seriesIdCache.set(cacheKey, seriesID);
+    if (validation.validateOnly) return {success: true, data: seriesID};
+
+    let taggedVideo = addTagsToVideo(_.cloneDeep(withDuration), episodeData, context);
     taggedVideo.seriesImdbID = seriesID;
     taggedVideo.artwork = await downloadArtworkWithSeriesFallback(
       episodeData,

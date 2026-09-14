@@ -4,6 +4,24 @@
 module.exports = [
   {
     category: 'unit',
+    file: 'test/EpisodeMatch.unit.test.js',
+    title: 'Episode title and runtime sanity checks',
+    protects: '2657 reviewed title pairs, strict correction boundaries, broad runtime checks, and cached optional probes'
+  },
+  {
+    category: 'unit',
+    file: 'test/ShowDetection.unit.test.js',
+    title: 'Show detection for scans and filename resets',
+    protects: 'shared scan/reset parsing, dedicated extras, mixed folders, season-zero specials, and existing release conventions'
+  },
+  {
+    category: 'integration',
+    file: 'test/OmdbEpisodes.integration.test.js',
+    title: 'OMDb episode selection and tagging safeguards',
+    protects: 'current-tag precedence, optional folder years, recorded corrections, series validation/cache, runtime vetoes, and exact-ID overrides'
+  },
+  {
+    category: 'unit',
     file: 'test/PlaylistFilter.test.js',
     title: 'Safe playlist expressions',
     protects: 'playlist syntax, operators, security limits, cache, and runtime errors'

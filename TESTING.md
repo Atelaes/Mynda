@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 36 suites: 35 fast suites with 297 named cases, plus the Electron end-to-end suite. Before media-tool setup, `npm run test:core` selects 33 suites with 290 cases.
+The current catalog contains 39 suites: 38 fast suites with 345 named cases, plus the Electron end-to-end suite. Before media-tool setup, `npm run test:core` selects 36 suites with 338 cases. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
 
 ## The first commands to learn
 
@@ -78,6 +78,9 @@ A “test double” is simply a small, predictable substitute for something outs
 | `MediaPlatformPreparation.unit.test.js` | Unit | Native preparation dispatch, source pins, Windows UCRT64 policy, and the Ubuntu Linux baseline |
 | `MediaMetadata.unit.test.js` | Unit | Video-stream selection, cover-art rejection, aspect ratios, safe fallback merging, one-time legacy rechecks, durations, and writable scratch output |
 | `MovieSearch.unit.test.js` | Unit | Filename parsing, title variants, result scoring, ambiguity, and confidence |
+| `EpisodeMatch.unit.test.js` | Unit | Both libraries' title corpus, forgiving acceptance versus strict corrections, runtime thresholds, optional probe caching and failures |
+| `ShowDetection.unit.test.js` | Unit | The actual shared scan/reset parser, dedicated extras, mixed folders, season-zero specials, and release-title conventions |
+| `OmdbEpisodes.integration.test.js` | Integration | Actual OMDb orchestration with controlled responses: current tags, folder-year hints, series validation, title/runtime vetoes, corrections, cache safety and exact-ID behavior |
 | `SubtitleMatcher.unit.test.js` | Unit | Sidecar matching, episode evidence, ambiguity, folder boundaries, and manual provenance |
 | `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
 | `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, early EOF, process errors, timeouts, and cleanup |
@@ -101,6 +104,69 @@ A “test double” is simply a small, predictable substitute for something outs
 | `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, and Library-statistics interaction |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
+
+## Episode auto-tag safeguards: fix76
+
+Run these checks individually, or use `npm run test:core` / `npm test`:
+
+```bash
+node test/EpisodeMatch.unit.test.js
+node test/ShowDetection.unit.test.js
+node test/OmdbEpisodes.integration.test.js
+```
+
+The unit corpus includes all 84 accepted episode-title warnings in Atelaes'
+September 13 logs. It marks 53 clear contradictions for rejection, retains 30
+reviewed wording/multipart variations, and treats the remaining generic
+Ghost in the Shell title as inconclusive. The integration suite additionally
+rejects that placeholder under an unconfirmed series, including the case with
+no useful local title. It also replays the 16 successful Lost/Dead Like Me
+numbering corrections from those logs.
+
+The other 2,573 comparison pairs come from Torgo's uploaded library snapshot:
+scan/reset-derived title text versus the stored reference title. This exercises
+ER release flags, Heroes chapter prefixes, compact MST3K release names,
+Quantum Leap date suffixes, Seinfeld's alternate title, and many ordinary
+episodes. Thirteen pairs contain conflicting content/part labels and are
+explicitly recorded as contradictions. These are comparison fixtures, not a
+claim that every saved reference tag is correct or a live re-tag of the library.
+Fixtures contain title/series/numbering only, with no personal media paths,
+library identifiers, media bytes, or API credentials.
+
+Auto-Tag's current editable title, series and IDs remain authoritative. A
+matching folder can still supply a missing series premiere year; it cannot
+replace a tagged series, and an explicit year in the series field wins. Series
+display names and local season/episode numbers keep their existing behavior.
+Nearby/adjacent-season correction still requires a unique exact normalized
+title. The forgiving comparison only judges whether the requested episode is
+plausible. Failed matches do not apply catalog metadata or download artwork.
+Selected-series batch preflight can try up to three distinct representatives,
+so one bonus or conflicting entry cannot needlessly block the whole batch.
+
+Runtime is an optional second check using the specific episode's `Runtime`.
+The initial threshold requires both a gap greater than five minutes and a
+ratio greater than four. DVDs and tags indicating split/combined episodes are
+incomparable for this check. Missing duration does not itself fail a match.
+When useful catalog runtime exists but local duration is missing, a seven-second
+FFprobe query may supply it; repeated requests share the result. Failed probes
+are cached for one minute, then become retryable. No title is extracted by this
+technical metadata query. The unit suite controls probes; these three new
+suites need no media executables or network service.
+
+Dedicated Extras folders now yield `season: "extras"` during scanning or
+Reset from Filename even if the shorts have their own ordinary-looking
+numbers. Explicit season-zero specials and episodes in mixed `Season 1 + Extras`
+folders remain supported. Extras stay in the library. Existing tags are not
+rewritten by installing the patch.
+
+To retry an earlier wrong match, use **Reset from Filename**, or correct the
+identifying tags and clear the wrong IMDb ID, save, then Auto-Tag. An existing
+exact IMDb ID deliberately keeps its authoritative lookup behavior.
+
+These tests exercise logic and orchestration using recorded pairs and controlled
+responses. They do not certify every episode in either library, run live OMDb
+requests, or verify native Electron startup. No npm install or media rebuild is
+required for fix76.
 
 ## Windows first-run failures and fix72
 
