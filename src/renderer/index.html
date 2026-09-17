@@ -26,6 +26,11 @@
         presets: [require.resolve("@babel/preset-react")],
         extensions: [".js"],
         ignore: [/node_modules/],
+        // ZIP overlays can preserve a previous source modification time.
+        // Babel's persistent cache checks mtime, not the source contents, and
+        // can therefore keep running an older renderer after an update.
+        // Node still caches required modules for the lifetime of this window.
+        cache: false,
         babelrc: false,
         configFile: false
       });

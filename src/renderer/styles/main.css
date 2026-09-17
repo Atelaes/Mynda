@@ -2520,6 +2520,53 @@ table.compact .movie-row {
   margin: var(--editfield-name-margin);
 }
 
+/* Saved autotag outcomes: a keyboard-accessible heading and selectable body. */
+#editor-pane #edit-autotag-report {
+  margin: 1.2em .3em .5em;
+  border-top: 1px solid var(--main-text);
+  padding-top: .7em;
+  font-size: .85em;
+  line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#editor-pane #edit-autotag-report .folder-heading {
+  display: flex;
+  align-items: baseline;
+  gap: .6em;
+  width: 100%;
+  padding: .25em 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+  cursor: pointer;
+}
+#editor-pane #edit-autotag-report .folder-heading:focus-visible {
+  outline: 2px solid var(--bright-text);
+  outline-offset: 3px;
+}
+#editor-pane #edit-autotag-report .twirl-icon { font-size: .7em; opacity: .65; }
+#editor-pane #edit-autotag-report a { color: var(--colorful-text); text-decoration: none; }
+#editor-pane #edit-autotag-report a:hover {
+  color: var(--bright-text);
+}
+#editor-pane #edit-autotag-report a:focus-visible { outline: 2px solid var(--bright-text); outline-offset: 2px; }
+#editor-pane #edit-autotag-report .paragraph { user-select: text; }
+#editor-pane #edit-autotag-report p { margin: .6em 0; }
+#editor-pane #edit-autotag-report dl { margin: 1em 0; }
+#editor-pane #edit-autotag-report dt { font-weight: bold; margin-top: .65em; }
+#editor-pane #edit-autotag-report dd { margin: .1em 0 0; }
+#editor-pane #edit-autotag-report h4 { font-size: inherit; margin: 1em 0 .3em; }
+#editor-pane #edit-autotag-report ul { padding-left: 1.3em; margin: .3em 0; }
+#editor-pane #edit-autotag-report li { margin-bottom: .5em; }
+#editor-pane #edit-autotag-report li p { margin: .2em 0; }
+#editor-pane #edit-autotag-report .autotag-report-next { margin-top: 1em; }
+#editor-pane #edit-autotag-report .autotag-report-note,
+#editor-pane #edit-autotag-report .autotag-report-footnote { opacity: .75; }
+
 /* message displayed to user at the top of the edit pane
    when multiple videos are being edited at once */
 #editor-pane #edit-batch-notification {

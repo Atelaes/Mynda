@@ -45,6 +45,12 @@ suite.test('automatic results keep the evidence supplied by the policy',()=>{
   assert.strictEqual(instance.state.video.taggingEvidence,evidence);
   assert.strictEqual(Evidence.identity(instance.state.video,'imdbID').origin,'automatic');
 });
+suite.test('applying an accepted record clears the previous failure in the editor working copy',()=>{
+  const instance=editor(show({taggingDecision:{status:'unmatched',reason:{code:'no-results'}}}));
+  instance.handleChange({imdbID:'tt333',taggingDecision:null,
+    taggingEvidence:{kind:'episode',imdbID:'tt333',identities:{record:{value:'tt333',origin:'user'}}}});
+  assert.strictEqual(instance.state.video.taggingDecision,null);
+});
 suite.test('an explicit record choice keeps the file input and marks the selection as user supplied',async()=>{
   const original=show();
   const instance=new MynEditorSearch({video:original,handleChange:video=>{changed=video;}});

@@ -3,6 +3,7 @@
 const _ = require('lodash');
 const BatchEvidence = require('./BatchEvidence');
 const {planRecovery} = require('./BatchSeriesRecovery');
+const {planNumberingRecovery} = require('./BatchNumberingRecovery');
 const Evidence = require('./TaggingEvidence');
 const Decision = require('./TaggingDecision');
 const Limits = require('./TaggingLimits');
@@ -11,10 +12,10 @@ const {validSeriesImdbID} = require('./CatalogResponse');
 
 function shouldDefer(result) {
   return result.status === 'candidate' && result.candidate.evidence.kind === 'episode' &&
-    !result.candidate.evidence.localTitle;
+    (!result.candidate.evidence.localTitle || result.candidate.evidence.exactTitle === false);
 }
 
-function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,chooseSeries,preferences,whenIdle}) {
+function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,save,notifyStatus,chooseSeries,preferences,whenIdle}) {
   return async function autoTag(options = {}) {
     if (state.running) return;
     const videos = _.cloneDeep(Array.isArray(options.videos) ? options.videos : getCandidates());
@@ -24,9 +25,9 @@ function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,
     state.scope = options.scope === 'selected' ? 'selected' : 'library';
     const seriesBatch = options.seriesBatch;
     const session = catalog.createSeriesSearchSession();
-    const ledger = BatchEvidence.createEvidence(videos);
+    const ledger = BatchEvidence.createEvidence(videos,getLibraryVideos ? getLibraryVideos() : []);
     const seasonOffsetHints = new Map();
-    const retryCandidates = [], pendingMatches = [], outcomes = new Map();
+    const retryCandidates = [], pendingMatches = [], outcomes = new Map(), attempts = new Map();
     const statistics = {totalVideos:videos.length};
     let batchSave = [], processed = 0, canceledPending = 0;
     let sharedID = seriesBatch && validSeriesImdbID(seriesBatch.storedSeriesImdbID) ? seriesBatch.storedSeriesImdbID.trim() : '';
@@ -37,7 +38,16 @@ function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,
       if (!batchSave.length) return;
       const completed = batchSave;
       batchSave = [];
-      await save(completed);
+      try { await save(completed); }
+      catch(cause) {
+        const error = new Error('Auto-Tag could not finish saving its results.');
+        error.name = 'AutoTagSaveError';
+        error.cause = cause;
+        error.code = cause && cause.code;
+        error.autoTagFailure = {stage:'save',videoCount:completed.length,
+          committed:Boolean(cause && cause.libraryOperation && cause.libraryOperation.committed)};
+        throw error;
+      }
     }
     async function canContinue() {
       if (state.cancellationDecision) await state.cancellationDecision;
@@ -57,12 +67,16 @@ function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,
     // Every pass uses this one outcome recorder. Retries replace a disposition;
     // a service failure never marks the file permanently attempted.
     async function record(video,result,index,retry = false,parent) {
+      attempts.set(index,{video,result,index,parent});
       const previous = outcomes.get(index);
       if (previous) statistics[previous]--;
       const disposition = result.status === 'matched' ? 'Success' : result.failure || result.reason.code;
       outcomes.set(index,disposition);
       statistics[disposition] = (statistics[disposition] || 0) + 1;
-      if (retry && result.status === 'matched') statistics.recoveredSeriesRetries = (statistics.recoveredSeriesRetries || 0) + 1;
+      if (retry && result.status === 'matched') {
+        const counter=retry === 'numbering' ? 'recoveredNumberingRetries' : 'recoveredSeriesRetries';
+        statistics[counter]=(statistics[counter] || 0)+1;
+      }
       if (result.status === 'matched') {
         const tagged = result.video;
         tagged.autotag_tried = true;
@@ -70,11 +84,16 @@ function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,
         delete tagged.taggingDecision;
         ledger.observe(video,result);
         batchSave.push(tagged);
-      } else if (!result.retryable || retry) {
+      } else {
         const parentID = parent ? parent.seriesID : sharedID;
-        const unresolved = parentID ? Evidence.assignParent(video,parentID,
+        // First-pass service errors previously saved nothing. Persist their
+        // report without changing a previously tagged video's selected parent.
+        const preserveTags = result.retryable && !retry;
+        const unresolved = parentID && !preserveTags ? Evidence.assignParent(video,parentID,
           Evidence.selectedParent(video,parentID,{seriesSelectionSource:parent ? parent.source || 'siblings' : sharedSource,
             parentEvidence:parent ? parent.evidence : sharedEvidence})) : video;
+        // Keep a report for every completed attempt, including first-pass
+        // service errors. Their retry eligibility and existing tags stay intact.
         batchSave.push({...unresolved,autotag_tried:!result.retryable,
           taggingDecision:Evidence.copy({status:result.status,reason:result.reason,evidence:result.evidence})});
       }
@@ -144,7 +163,8 @@ function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,
           continue;
         }
         const result = await resolve(pending.video,{seasonOffsetHints,seriesSearchSession:session,requestBudget:budgets[pending.index],
-          seriesImdbID:parent.seriesID,seriesSelectionSource:parent.source || 'siblings',parentEvidence:parent.evidence});
+          seriesImdbID:parent.seriesID,seriesSelectionSource:parent.source || 'siblings',parentEvidence:parent.evidence,
+          priorCorrectionChecks:pending.result.evidence && pending.result.evidence.correctionChecks});
         statistics.seriesRetries = (statistics.seriesRetries || 0) + 1;
         if (shouldDefer(result)) {
           pendingMatches.push({...pending,result,retry:true});
@@ -155,9 +175,31 @@ function createAutoTagRunner({state,catalog,log,getCandidates,save,notifyStatus,
         log.info('Automatic tagging series retry finished',{id:pending.video.id,filename:pending.video.filename,
           seriesImdbID:parent.seriesID,success:finished.status === 'matched',reason:finished.reason});
       }
+      // Freeze a separate numbering plan after independent exact matches and
+      // parent retries. Later fuzzy recoveries cannot create additional votes.
+      await flush();
+      const numberingInputs=new Map(attempts);
+      pendingMatches.forEach(item=>numberingInputs.set(item.index,item));
+      const numberingRetries=planNumberingRecovery([...numberingInputs.values()],ledger);
+      const numberingCompleted=new Set();
+      for (const pending of numberingRetries) {
+        if (!await canContinue()) break;
+        const {seriesID}=pending.numberingEvidence;
+        const previous=pending.result.evidence;
+        const result=await resolve(pending.video,{...searchOptions(pending.index),
+          seriesImdbID:seriesID,seriesSelectionSource:'siblings',parentEvidence:pending.parentEvidence,
+          numberingEvidence:pending.numberingEvidence,priorCorrectionChecks:previous && previous.correctionChecks});
+        statistics.numberingRetries=(statistics.numberingRetries || 0)+1;
+        const finished=await finish(pending.video,result);
+        await record(pending.video,finished,pending.index,'numbering');
+        numberingCompleted.add(pending.index);
+        log.info('Automatic tagging numbering retry finished',{id:pending.video.id,seriesID,
+          success:finished.status === 'matched',reason:finished.reason});
+      }
       // Named matches supply observations. The final policy alone decides
       // whether they establish the order for a numbered-only proposal.
       for (const pending of pendingMatches) {
+        if (numberingCompleted.has(pending.index)) continue;
         if (!await canContinue()) {
           if (!pending.retry) canceledPending++;
           continue;

@@ -12,7 +12,7 @@ async function runAutoTag(videos, responder, options = {}) {
   const run = createAutoTagRunner({state,catalog:fixture.api,
     log:Object.fromEntries(['debug','info','warn','error'].map(level => [level,
       (message,data) => logs.push({level,message,data})])),
-    getCandidates:() => videos, preferences:{remove_autotagged_from_new:false},
+    getCandidates:() => videos,getLibraryVideos:() => options.libraryVideos || [], preferences:{remove_autotagged_from_new:false},
     chooseSeries:async () => options.selectedSeries || null,
     notifyStatus() {}, whenIdle:async () => {},
     save:async batch => {

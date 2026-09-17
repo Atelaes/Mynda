@@ -2,6 +2,16 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/AutoTagStorage.integration.test.js',title:'Auto-Tag storage failure and notification',
+    protects:'disk-full and permission errors, atomic-write rollback, retry eligibility, queues and visible failure dialogs'},
+  {category:'integration',file:'test/RendererStartup.integration.test.js',title:'Renderer startup after an update',
+    protects:'persistent Babel cache, source overlays with identical timestamps, and actual rendered IMDb links'},
+  {category:'integration',file:'test/SiblingNumbering.integration.test.js',title:'Sibling-supported numbering and correction lookups',
+    protects:'independent exact witnesses, release scope, conflicting offsets, saved evidence, shuffled order and shared episode lookup fallback'},
+  {category:'unit',file:'test/TaggingReport.unit.test.js',title:'Saved autotag explanations',
+    protects:'historical decisions, provenance, numbering, runtime, bounded candidates and safe error explanations'},
+  {category:'component',file:'test/AutotagReport.component.test.js',title:'Editor autotag report',
+    protects:'saved-video binding, collapsible selectable reports, keyboard semantics, stale edits and navigation'},
   {category:'integration',file:'test/SeriesEvidence.integration.test.js',title:'Incomplete catalog evidence and release collections',
     protects:'recorded parent observations, positive season counts, inferred seasons, bounded candidates, release suffixes and numbering origins'},
   {category:'integration',file:'test/EpisodeTitleAnnotations.integration.test.js',title:'Episode title annotations and correction boundaries',

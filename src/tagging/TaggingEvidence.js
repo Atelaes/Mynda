@@ -67,9 +67,10 @@ function envelope(video, detail = {}, context = {}) {
     seriesID:context.selectedSeriesID,
     parentEvidence:selectedParent(video,context.selectedSeriesID,context)
   } : {};
-  return {...retained, version:83, schemaVersion:2, original:copy(original),...selected,
+  return {...retained, version:85, schemaVersion:2, original:copy(original),...selected,
     input:snapshot(video), ...copy(detail),
     ...(refreshing && prior ? {kind:prior.kind, lookup:copy(detail)} : {}),
+    ...(context.correctionChecks && context.correctionChecks.length ? {correctionChecks:copy(context.correctionChecks)} : {}),
     requests:copy(context.requestTrace || []),
     requestBudget:context.requestBudget ? copy(context.requestBudget) : undefined};
 }
@@ -102,7 +103,7 @@ function markUserEdit(video, changes) {
   const fields = ['imdbID','seriesImdbID'].filter(field => Object.prototype.hasOwnProperty.call(changes,field));
   if (!fields.length) return video;
   const replacing = fields.includes('imdbID') && video.taggingEvidence && video.taggingEvidence.imdbID !== changes.imdbID;
-  const evidence = copy(!replacing && video.taggingEvidence || {version:83,schemaVersion:2,original:snapshot(video)});
+  const evidence = copy(!replacing && video.taggingEvidence || {version:85,schemaVersion:2,original:snapshot(video)});
   evidence.identities = evidence.identities || {};
   for (const field of fields) {
     const name = field === 'imdbID' ? 'record' : 'series';
@@ -114,7 +115,7 @@ function markUserEdit(video, changes) {
 }
 
 function assignParent(video,seriesID,parentEvidence) {
-  const prior = copy(video.taggingEvidence || {version:83,schemaVersion:2,original:snapshot(video)});
+  const prior = copy(video.taggingEvidence || {version:85,schemaVersion:2,original:snapshot(video)});
   return {...video,seriesImdbID:seriesID,taggingEvidence:{...prior,seriesID,parentEvidence:copy(parentEvidence),
     identities:{...prior.identities,series:{value:seriesID,origin:parentEvidence.origin,basis:parentEvidence.basis}}}};
 }

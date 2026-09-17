@@ -74,17 +74,17 @@ suite.test('a parent identified in another season permits explicit numbering wit
   }
 });
 
-suite.test('shifted named anchors veto number-only proposals even when processed later',async () => {
+suite.test('two consistent shifted anchors correct number-only proposals even when processed later',async () => {
   const records = [episode('Opening',1,1),episode('Ink',1,2),episode('Acceptance',1,3),
     episode('Return',1,4),episode('Journey',1,5)];
   const videos = [input(1,4),input(1,3,'Ink'),input(1,5,'Return')];
   for (const order of [videos,[...videos].reverse()]) {
     const run = await runAutoTag(order,catalog(records));
-    assert.strictEqual(run.result.statistics.Success,2);
-    assert(!run.saved.get('s1e4').imdbID);
+    assert.strictEqual(run.result.statistics.Success,3);
+    assert.strictEqual(run.saved.get('s1e4').imdbID,records[2].imdbID);
     assert.strictEqual(run.saved.get('s1e3').imdbID,records[1].imdbID);
     assert.strictEqual(run.saved.get('s1e5').imdbID,records[3].imdbID);
-    assert(run.logs.some(item => item.data && /different catalog numbering/.test(item.data.reason)));
+    assert.strictEqual(run.saved.get('s1e4').taggingEvidence.orderAssessment.basis,'sibling-numbering');
   }
 });
 
@@ -101,7 +101,7 @@ suite.test('two independently named same-season files support one bounded ambigu
   const recovered = run.saved.get('s1e1');
   assert.strictEqual(recovered.imdbID,records[0].imdbID);
   assert.strictEqual(recovered.taggingEvidence.orderAssessment.basis,'consistent-named-siblings');
-  assert.strictEqual(recovered.taggingEvidence.version,83);
+  assert.strictEqual(recovered.taggingEvidence.version,85);
 });
 
 suite.test('one named neighbor cannot make unique-parent cache order change the result',async () => {

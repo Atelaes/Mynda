@@ -48,6 +48,10 @@ const scanLog = Logger.child('WatchfolderScan');
 const metadataLog = Logger.child('Metadata');
 const autoTagLog = Logger.child('AutoTag');
 const {createAutoTagRunner} = require('../tagging/AutoTagRunner');
+const reportAutoTagFailure = require('./AutoTagFailure').createFailureReporter({
+  dialog, log:autoTagLog, getLibraryPath:() => library.path,
+  getWindow:() => win && !win.isDestroyed() ? win : null
+});
 const shareLog = Logger.child('Share');
 const videoExclusionLog = Logger.child('VideoExclusion');
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
@@ -1887,6 +1891,7 @@ async function autoTag(options = {}) {
   return createAutoTagRunner({
     state: autoTagState, catalog: OmdbHelper, log: autoTagLog,
     getCandidates: getAutoTagCandidates, save: saveBatch,
+    getLibraryVideos: () => library.media,
     notifyStatus: status => win.webContents.send('status-update', status),
     chooseSeries: chooseSeriesForSelectedBatch, preferences: library.settings.preferences,
     whenIdle: () => library.whenIdle()
@@ -1907,7 +1912,9 @@ function saveBatch(batch) {
       if (err) {
         autoTagLog.error('Could not save automatic tagging batch', {
           videoCount: replacements.length,
-          error: String(err)
+          code: err.code,
+          libraryPath: library.path,
+          error: err.message || String(err)
         });
         reject(err);
         return;
@@ -2138,20 +2145,11 @@ ipcMain.on('scan-watchfolders', () => {
 })
 
 ipcMain.on('autotag', () => {
-  requestAutoTag().catch(err => {
-    autoTagLog.error('Could not start automatic tagging', {
-      error: err && err.stack ? err.stack : String(err)
-    });
-  });
+  requestAutoTag().catch(err => reportAutoTagFailure(err,'library'));
 })
 
 ipcMain.on('autotag-selected', (event, videoIDs) => {
-  requestSelectedAutoTag(videoIDs).catch(err => {
-    autoTagLog.error('Could not start selected automatic tagging', {
-      requestedVideos: Array.isArray(videoIDs) ? videoIDs.length : 0,
-      error: err && err.stack ? err.stack : String(err)
-    });
-  });
+  requestSelectedAutoTag(videoIDs).catch(err => reportAutoTagFailure(err,'selected'));
 })
 
 ipcMain.on('autotag-cancel', () => {

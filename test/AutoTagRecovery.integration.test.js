@@ -132,6 +132,33 @@ suite.test('a service error during recovery clears the earlier permanent-attempt
   assert.strictEqual(r.requests.length,4);
 });
 
+suite.test('a first-pass service error saves a report while retaining tags and retry eligibility', async () => {
+  const original=video(1,{imdbID:'tt777',seriesImdbID:PARENT,autotag_tried:true,
+    taggingEvidence:{kind:'episode',imdbID:'tt777',original:{title:'Original story'}},metadata:{duration:1200}});
+  const before=JSON.stringify(original);
+  const r=await runBatch(()=>({status:'service-error',retryable:true,failure:'Error',
+    reason:{code:'ECONNABORTED',message:'Lookup timed out'},evidence:{original:{...original}}}),
+    {videos:[original],seriesBatch:{storedSeriesImdbID:OTHER}});
+  assert.strictEqual(r.saves.flat().length,1);
+  const saved=r.saves[0][0];
+  assert.strictEqual(saved.taggingDecision.status,'service-error');
+  assert.strictEqual(saved.autotag_tried,false);
+  for (const field of ['title','imdbID','seriesImdbID','taggingEvidence','metadata','new']) assert.deepStrictEqual(saved[field],original[field],field);
+  assert.strictEqual(r.result.statistics.processedVideos,1);
+  assert.strictEqual(r.result.statistics.Error,1);
+  assert.strictEqual(JSON.stringify(original),before);
+});
+
+suite.test('a thrown first-pass error is reported but cancellation leaves unattempted files untouched', async () => {
+  const r=await runBatch((v,o,c)=>{c.autoTagCancelRequested=true;throw Error('offline');});
+  assert.strictEqual(r.saves.flat().length,1);
+  assert.strictEqual(r.saves[0][0].taggingDecision.status,'service-error');
+  assert.strictEqual(r.saves[0][0].autotag_tried,false);
+  assert.strictEqual(r.requests.length,1);
+  assert.strictEqual(r.result.statistics.processedVideos,1);
+  assert.strictEqual(r.result.statistics.remainingVideos,2);
+});
+
 suite.test('cooperative cancellation prevents the retry pass and preserves completed saves', async () => {
   const r=await runBatch((v,o,c)=>{if(v.episode==='3')c.autoTagCancelRequested=true;return v.episode==='1'?ambiguous():accepted(v);});
   assert.strictEqual(r.requests.length,3);

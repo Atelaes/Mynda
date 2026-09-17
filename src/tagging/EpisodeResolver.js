@@ -1,5 +1,5 @@
 const Response = require('./CatalogResponse');
-const {validImdbID, validSeriesImdbID, normalizeEpisodeNumber, predictableFailure, requestFailure, episodeResponseMatches} = Response;
+const {validSeriesImdbID, normalizeEpisodeNumber, predictableFailure, requestFailure, episodeResponseMatches} = Response;
 const {summarizeError, summarizeOMDbResponse} = require('./TaggingDiagnostics');
 const Identity = require('./SeriesIdentity');
 const {seriesSearchPartsForVideo, seriesCacheKey, seriesTitlesMatch, localEpisodeTitleForVerification, seriesYearMatches, canInferSingleSeason} = Identity;
@@ -11,143 +11,42 @@ const MatchPolicy = require('./MatchPolicy');
 const Decision = require('./TaggingDecision');
 const Evidence = require('./TaggingEvidence');
 const Limits = require('./TaggingLimits');
+const Numbering = require('./EpisodeNumbering');
 function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, withEpisodeDuration}) {
-  function seasonEpisodeIndexKey(seriesID, season) {
-    return `${seriesID}|${season}`;
+  const {lookup} = require('./EpisodeLookup').createEpisodeLookup({log,pollOMDB,createURLParts});
+  // These observations survive both rejected discovery and accepted proposals.
+  // The report distinguishes finding a candidate from actually applying it.
+  async function probe(seriesID, requested, probed, localTitle, context, kind) {
+    const check={kind,seriesID,requested:{...requested},probed:{...probed}};
+    (context.correctionChecks || (context.correctionChecks=[])).push(check);
+    let found;
+    try { found=await lookup(seriesID,probed.season,probed.episode,context,
+      kind === 'adjacent-season' ? 'adjacent season title probe' :
+      kind === 'sibling-numbering' ? 'sibling numbering lookup' : 'nearby episode title probe'); }
+    catch(error) {check.outcome='service-error';throw error;}
+    check.via=found.via;
+    if (!found.success) {
+      const failure=found.requestFailure;
+      check.outcome=found.outcome || (failure && failure.failure === 'No results' ? 'not-found' : 'service-error');
+      if (found.rejectedRecord) Object.assign(check,{imdbID:found.rejectedRecord.imdbID,catalogTitle:found.rejectedRecord.Title});
+      return failure && failure.failure !== 'No results' ? {success:false,requestFailure:failure} : {success:false};
+    }
+    const data=found.data;
+    check.imdbID=data && data.imdbID;
+    check.catalogTitle=data && data.Title;
+    if (!episodeResponseMatches(data,seriesID,probed.season,probed.episode) || data.seriesID !== seriesID) {
+      check.outcome='invalid-record';
+      return {success:false};
+    }
+    const comparison=EpisodeMatch.episodeTitleComparison(localTitle,data.Title,context.originalInput && context.originalInput.series);
+    check.outcome=kind === 'sibling-numbering' ? 'proposed' : comparison.matched ? 'title-matched' : 'title-mismatch';
+    return {success:kind === 'sibling-numbering' || comparison.matched,data,comparison,check};
   }
-
-  async function getSeasonEpisodeIndex(seriesID, season, context) {
-    const seasonEpisodeIndexCache = context.seriesSession.episodeIndexes;
-    const cacheKey = seasonEpisodeIndexKey(seriesID, season);
-    if (seasonEpisodeIndexCache.has(cacheKey)) {
-      const cachedIndex = seasonEpisodeIndexCache.get(cacheKey);
-      log.debug('Using cached OMDb season episode index', {
-        searchID: context.searchID,
-        seriesID: seriesID,
-        season: season,
-        episodeCount: cachedIndex.size
-      });
-      return {success: true, data: cachedIndex};
-    }
-
-    const response = await pollOMDB(createURLParts({
-      id: seriesID,
-      season: season
-    }), {...context, searchID: context.searchID, stage: 'season episode index fallback'});
-    const failure = requestFailure(response);
-    if (failure) {
-      if (failure.failure === 'No results') {
-        const emptyIndex = new Map();
-        seasonEpisodeIndexCache.set(cacheKey, emptyIndex);
-        log.debug('OMDb had no season episode index for fallback', {
-          searchID: context.searchID,
-          seriesID: seriesID,
-          season: season
-        });
-        return {success: true, data: emptyIndex};
-      }
-      return {success: false, requestFailure: failure};
-    }
-
-    const seasonData = response.data;
-    if (!seasonData || normalizeEpisodeNumber(seasonData.Season) !== season ||
-        !Array.isArray(seasonData.Episodes)) {
-      log.warn('OMDb season episode index did not match the fallback request', {
-        searchID: context.searchID,
-        expected: {seriesID: seriesID, season: season},
-        received: summarizeOMDbResponse(response)
-      });
-      return {success: false};
-    }
-
-    const episodeIndex = new Map();
-    const ambiguousEpisodes = new Set();
-    let unusableEntries = 0;
-    for (const listedEpisode of seasonData.Episodes) {
-      const listedNumber = normalizeEpisodeNumber(listedEpisode && listedEpisode.Episode);
-      const listedImdbID = listedEpisode && typeof listedEpisode.imdbID === 'string' ?
-        listedEpisode.imdbID.trim() : '';
-      if (listedNumber === null || !validImdbID(listedImdbID)) {
-        unusableEntries++;
-        continue;
-      }
-      if (ambiguousEpisodes.has(listedNumber)) {
-        continue;
-      }
-      if (episodeIndex.has(listedNumber) && episodeIndex.get(listedNumber) !== listedImdbID) {
-        episodeIndex.delete(listedNumber);
-        ambiguousEpisodes.add(listedNumber);
-        continue;
-      }
-      episodeIndex.set(listedNumber, listedImdbID);
-    }
-
-    seasonEpisodeIndexCache.set(cacheKey, episodeIndex);
-    log.debug('Cached OMDb season episode index for fallback', {
-      searchID: context.searchID,
-      seriesID: seriesID,
-      season: season,
-      listedEpisodeCount: seasonData.Episodes.length,
-      usableEpisodeCount: episodeIndex.size,
-      unusableEntryCount: unusableEntries,
-      ambiguousEpisodes: Array.from(ambiguousEpisodes)
-    });
-    return {success: true, data: episodeIndex};
-  }
-
-  async function findEpisodeViaSeasonIndex(seriesID, season, episode, context) {
-    const indexResult = await getSeasonEpisodeIndex(seriesID, season, context);
-    if (!indexResult.success) {
-      return indexResult;
-    }
-
-    const episodeImdbID = indexResult.data.get(episode);
-    if (!episodeImdbID) {
-      log.debug('OMDb season episode index did not contain the requested episode', {
-        searchID: context.searchID,
-        seriesID: seriesID,
-        season: season,
-        episode: episode
-      });
-      return {success: false};
-    }
-
-    const response = await pollOMDB(createURLParts({id: episodeImdbID}), {...context,
-      searchID: context.searchID,
-      stage: 'season index exact episode fallback'
-    });
-    const failure = requestFailure(response);
-    if (failure) {
-      return {success: false, requestFailure: failure};
-    }
-
-    const episodeData = response.data;
-    if (!episodeResponseMatches(episodeData, seriesID, season, episode) ||
-        episodeData.seriesID !== seriesID || episodeData.imdbID !== episodeImdbID) {
-      log.warn('OMDb season-index episode did not match the fallback request', {
-        searchID: context.searchID,
-        seasonIndexImdbID: episodeImdbID,
-        expected: {seriesID: seriesID, season: season, episode: episode},
-        received: summarizeOMDbResponse(response)
-      });
-      return {success: false};
-    }
-
-    log.info('Recovered episode through OMDb season index fallback', {
-      searchID: context.searchID,
-      seriesID: seriesID,
-      season: season,
-      episode: episode,
-      imdbID: episodeData.imdbID,
-      title: episodeData.Title
-    });
-    return {success: true, data: episodeData};
-  }
-
   async function findNearbyEpisodeByTitle(seriesID, season, episode, localTitle, context) {
     let episodeNumber = Number(episode);
     const matches=[];
     const accept = match => {
+      match.check.outcome='selected';
       log.warn('Corrected shifted OMDb episode number using the local title', {
         searchID:context.searchID,localTitle,requested:{season,episode},
         matched:{season,episode:match.episode,distance:match.distance,title:match.data.Title,imdbID:match.data.imdbID}
@@ -160,45 +59,27 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
         .map(String);
 
       for (let nearbyEpisode of nearbyEpisodes) {
-        let response = await pollOMDB(createURLParts({
-          id: seriesID,
-          season: season,
-          episode: nearbyEpisode
-        }), {...context, searchID: context.searchID, stage: 'nearby episode title probe'});
-        let failure = requestFailure(response);
-        if (failure) {
-          if (failure.failure !== 'No results') {
-            return {success: false, requestFailure: failure};
-          }
-          continue;
-        }
-
-        if (!episodeResponseMatches(response.data, seriesID, season, nearbyEpisode)) {
-          log.warn('Nearby OMDb episode response did not match the probe', {
-            searchID: context.searchID,
-            expected: {seriesID: seriesID, season: season, episode: nearbyEpisode},
-            received: summarizeOMDbResponse(response)
-          });
-          continue;
-        }
-
-        const comparison = EpisodeMatch.episodeTitleComparison(localTitle, response.data.Title, context.originalInput && context.originalInput.series);
+        const found=await probe(seriesID,{season,episode},{season,episode:nearbyEpisode},localTitle,context,'nearby-episode');
+        if (found.requestFailure) return found;
+        if (!found.data) continue;
+        const comparison = found.comparison;
         const titleMatches = comparison.matched;
         log.debug('Compared nearby OMDb episode title', {
           searchID: context.searchID,
           localTitle: localTitle,
-          omdbTitle: response.data.Title,
+          omdbTitle: found.data.Title,
           season: season,
           episode: nearbyEpisode,
           distance: distance,
           titleMatches: titleMatches
         });
         if (titleMatches) {
-          matches.push({episode: nearbyEpisode, data: response.data, distance, annotations:comparison.annotations});
+          matches.push({episode: nearbyEpisode, data: found.data, distance, annotations:comparison.annotations,check:found.check});
         }
       }
 
       if (matches.length > 1) {
+        matches.forEach(match=>{match.check.outcome='ambiguous-title';});
         log.warn('More than one nearby OMDb episode matched the local title; retaining normal lookup behavior', {
           searchID: context.searchID,
           localTitle: localTitle,
@@ -236,39 +117,20 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
   }
 
   async function probeAdjacentSeasonEpisodeByTitle(
-    seriesID, season, episode, localTitle, offset, context, stage
+    seriesID, season, episode, localTitle, offset, context
   ) {
     let adjacentSeasonNumber = Number(season) + offset;
     if (!Number.isInteger(adjacentSeasonNumber) || adjacentSeasonNumber < 0) {
       return {success: false};
     }
     let adjacentSeason = String(adjacentSeasonNumber);
-    let response = await pollOMDB(createURLParts({
-      id: seriesID,
-      season: adjacentSeason,
-      episode: episode
-    }), {...context, searchID: context.searchID, stage: stage || 'adjacent season title probe'});
-    let failure = requestFailure(response);
-    if (failure) {
-      return failure.failure === 'No results' ?
-        {success: false} : {success: false, requestFailure: failure};
-    }
-
-    if (!episodeResponseMatches(response.data, seriesID, adjacentSeason, episode) ||
-        response.data.seriesID !== seriesID) {
-      log.warn('Adjacent-season OMDb episode response did not match the probe', {
-        searchID: context.searchID,
-        expected: {seriesID: seriesID, season: adjacentSeason, episode: episode},
-        received: summarizeOMDbResponse(response)
-      });
-      return {success: false};
-    }
-
-    let titleMatches = episodeTitlesMatch(localTitle, response.data.Title, context.originalInput && context.originalInput.series);
+    const found=await probe(seriesID,{season,episode},{season:adjacentSeason,episode},localTitle,context,'adjacent-season');
+    if (!found.data) return found;
+    let titleMatches = found.comparison.matched;
     log.debug('Compared adjacent-season OMDb episode title', {
       searchID: context.searchID,
       localTitle: localTitle,
-      omdbTitle: response.data.Title,
+      omdbTitle: found.data.Title,
       requested: {season: season, episode: episode},
       probed: {season: adjacentSeason, episode: episode},
       seasonOffset: offset,
@@ -278,10 +140,10 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
 
     return {
       success: true,
-      data: response.data,
+      data: found.data,
       season: adjacentSeason,
       episode: episode,
-      offset: offset
+      offset: offset,check:found.check
     };
   }
 
@@ -298,14 +160,14 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
         episode,
         localTitle,
         offset,
-        context,
-        'adjacent season title probe'
+        context
       );
       if (candidate.requestFailure) return candidate;
       if (candidate.success) matches.push(candidate);
     }
 
     if (matches.length !== 1) {
+      matches.forEach(match=>{match.check.outcome='ambiguous-title';});
       if (matches.length > 1) {
         log.warn('Both adjacent OMDb seasons matched the local episode title; retaining normal lookup behavior', {
           searchID: context.searchID,
@@ -318,6 +180,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
     }
 
     let match = matches[0];
+    match.check.outcome='selected';
     log.warn('Corrected shifted OMDb season using the local title', {
       searchID: context.searchID,
       localTitle: localTitle,
@@ -455,41 +318,32 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
       let matchedSeason = seriesResult.matchedSeason || season;
       let matchedEpisode = seriesResult.matchedEpisode || episode;
       let lookupFailure = null;
+      let numberingMapping;
 
       // A learned offset only orders the adjacent probes after direct lookup
       // and nearby correction fail. It never takes precedence over the requested
       // position, and both adjacent seasons still participate in uniqueness.
       const seasonOffsetHint = seasonOffsetHintFor(seasonOffsetHints,seriesID);
 
+      if (context.numberingEvidence) {
+        numberingMapping=Numbering.assess(video,seriesID,context.numberingEvidence.support,{season,episode});
+        const target=Numbering.translated(numberingMapping,{season,episode});
+        if (!target) return {...predictableFailure('Episode mismatch','Sibling numbering evidence could not establish a valid corrected position'),
+          policyReason:'unverified-episode-order',evidence:{numberingMapping}};
+        const found=await probe(seriesID,{season,episode},target,localTitle,context,'sibling-numbering');
+        if (!found.success) return {...(found.requestFailure || predictableFailure('No results','The sibling-corrected episode could not be retrieved')),
+          evidence:{seriesID,parentEvidence:seriesResult.parentEvidence,requested:{season,episode},matched:target,numberingMapping}};
+        episodeData=found.data;
+        matchedSeason=target.season;matchedEpisode=target.episode;
+      }
+
       if (!episodeData) {
-        let response = await pollOMDB(createURLParts({
-          id: seriesID,
-          season: season,
-          episode: episode
-        }), {...context, searchID: context.searchID, stage: 'episode lookup'});
-        lookupFailure = requestFailure(response);
-        if (!lookupFailure) {
-          episodeData = response.data;
-        }
+        const found=await lookup(seriesID,season,episode,context);
+        lookupFailure=found.requestFailure;
+        if (found.success) episodeData=found.data;
       }
 
       if (lookupFailure) {
-        // OMDb occasionally has a complete episode record but a hole in its
-        // direct series+Season+Episode index. Before giving up—or probing nearby
-        // episode numbers—ask for this season's cached episode list and retry the
-        // requested episode by its exact IMDb ID.
-        if (lookupFailure.failure === 'No results') {
-          let seasonIndexResult = await findEpisodeViaSeasonIndex(
-            seriesID, season, episode, context
-          );
-          if (seasonIndexResult.success) {
-            episodeData = seasonIndexResult.data;
-          } else if (seasonIndexResult.requestFailure &&
-                     seasonIndexResult.requestFailure.failure !== 'No results') {
-            return seasonIndexResult.requestFailure;
-          }
-        }
-
         // A missing episode 0 is the common signal for a release whose numbering
         // is shifted by one. Do not broaden the search without a useful current
         // title tag that can verify the nearby result.
@@ -552,10 +406,10 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
         );
       }
 
-      // Preserve strict, bounded episode-order corrections. The forgiving check
-      // below may accept the requested episode, but cannot select another one.
+      // Without an independently established sibling mapping, speculative
+      // corrections still require an exact title in the bounded probe window.
       let correctionFailure = null;
-      if (matchedSeason === season && matchedEpisode === episode && localTitle &&
+      if (!numberingMapping && matchedSeason === season && matchedEpisode === episode && localTitle &&
           !episodeTitlesMatch(localTitle, episodeData.Title, series)) {
         let correction = await findNearbyEpisodeByTitle(
           seriesID, season, episode, localTitle, context
@@ -610,6 +464,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
         requested:{season,episode}, matched:{season:matchedSeason,episode:matchedEpisode},
         seriesID, titleAssessment, exactTitle:episodeTitlesMatch(localTitle, episodeData.Title, series),
         confidentSeries:Boolean(seriesResult.confidentSeries),
+        ...(numberingMapping ? {numberingMapping} : {}),
         parentEvidence:seriesResult.parentEvidence || {basis:'catalog-candidate',origin:'automatic',confident:Boolean(seriesResult.confidentSeries)}};
       const titleDecision = MatchPolicy.evaluateEpisode({localTitle, record:episodeData, titleAssessment,
         confidentSeries:evidence.confidentSeries, remoteTitle:EpisodeMatch.usefulEpisodeTitle(episodeData.Title),video});

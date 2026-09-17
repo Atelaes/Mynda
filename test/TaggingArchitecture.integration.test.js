@@ -114,6 +114,19 @@ suite.test('explicit user selections and subsequent refreshes retain user proven
   assert.strictEqual(selected.evidence.identities.record.origin,'automatic');
 });
 
+suite.test('an accepted selection explicitly clears an older failure when applied as an editor patch',async()=>{
+  const target=episode('Arrival'),fixture=loadSearch(catalog([target]));
+  const original=input(1,'Other',{imdbID:target.imdbID,
+    taggingDecision:{status:'unmatched',reason:{code:'no-results'},evidence:{original:{title:'Other'}}}});
+  const result=await fixture.api.tag(original,{imdbIDSource:'user'});
+  assert.strictEqual(result.status,'matched');
+  assert.strictEqual(result.video.taggingDecision,null);
+  const patched={...original,...result.video};
+  assert.strictEqual(patched.taggingDecision,null);
+  assert.strictEqual(patched.taggingEvidence.identities.record.origin,'user');
+  assert.strictEqual(original.taggingDecision.status,'unmatched');
+});
+
 suite.test('editing an ID discards stale approval details and records the new user choice',()=>{
   const video=input(1,'Arrival',{imdbID:'tt222',taggingEvidence:{imdbID:'tt111',kind:'episode',
     requested:{season:'1',episode:'99'},identities:{record:{value:'tt111',origin:'automatic'}}}});
@@ -154,7 +167,11 @@ suite.test('global HTTP budgets stop nested probes and leave files retryable',as
   assert.strictEqual(fixture.requests.length,3);
   assert.strictEqual(result.evidence.requestBudget.used,3);
   const run=await runAutoTag([input(1,'Arrival')],catalog([episode('Wrong Story')]),{batchOptions:{requestBudgetLimit:1}});
-  assert.strictEqual(run.saved.size,0);
+  assert.strictEqual(run.saved.size,1);
+  const saved=run.saved.get('v1');
+  assert.strictEqual(saved.autotag_tried,false);
+  assert.strictEqual(saved.taggingDecision.reason.code,'request-budget-exhausted');
+  assert.strictEqual(saved.imdbID,'');
   assert.strictEqual(run.requests.length,1);
   assert.strictEqual(run.result.statistics.Error,1);
 });

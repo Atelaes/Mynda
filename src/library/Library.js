@@ -216,6 +216,9 @@ class Library {
   } } = {}) {
     //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
     //let startTime = new Date();
+    const operation = summarizeLibraryOperation({opType, address, entry, sync});
+    const batchMediaBefore = opType === 'replace-media-batch' && !sync ? this.media : null;
+    let phase = 'change', committed = false;
     try {
       // A large editor batch arrives as a list of complete replacement videos,
       // not as a prebuilt media array. Resolve it only when this operation
@@ -445,12 +448,16 @@ class Library {
       } else {
 
         // Start by saving to file.
+        phase = 'save';
         this.save();
+        committed = true;
 
         //If this was a local operation, request other library mirror it
+        phase = 'sync';
         this.sync({ opType: opType, address: address, entry: entry, sync: sync, origin: origin });
 
         // execute callback;
+        phase = 'callback';
         cb();
       }
 
@@ -459,7 +466,24 @@ class Library {
         savedPing.saved(address);
       }
     } catch (e) {
-      cb(`Error with library alter event.  op: ${opType}, add: ${address}, value: ${JSON.stringify(entry)}, sync: ${sync}, origin: ${origin} - ${e}`);
+      // A failed atomic save leaves the previous file intact. Keep the batch's
+      // in-memory videos intact too, so unsaved attempts do not disappear from
+      // New or become ineligible for a retry. Never undo a committed save.
+      if (batchMediaBefore && !committed) this.media = batchMediaBefore;
+      const error = new Error(`Library ${operation.opType} at ${operation.address} failed: ${e && e.message ? e.message : String(e)}`);
+      error.cause = e;
+      error.code = e && e.code;
+      error.libraryPath = this.path;
+      error.libraryOperation = {...operation, phase, committed};
+      // Preserve the OS error without serializing the entire media array into
+      // the message (which previously buried the cause in truncated logs).
+      try { cb(error); }
+      finally {
+        // A failed queued operation has no mirror confirmation to advance it.
+        // Let subsequent jobs finish or report their own error, and unblock
+        // whenIdle once the queue is actually empty.
+        if (!this.waitConfirm) this.getConfirm();
+      }
     }
     //let endTime = new Date();
     //let totalTime = endTime - startTime;

@@ -22,7 +22,8 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
       requestBudget:options.requestBudget || createRequestBudget(options.requestBudgetLimit),
       seriesSelectionSource:options.seriesSelectionSource || 'user',
       selectedSeriesID:options.seriesImdbID,deferSeriesEvidence:Boolean(options.deferSeriesEvidence),
-      parentEvidence:options.parentEvidence};
+      parentEvidence:options.parentEvidence,numberingEvidence:options.numberingEvidence,
+      correctionChecks:Evidence.copy(options.priorCorrectionChecks || [])};
   }
   const movies = createMovieResolver({...client,log});
   const series = createSeriesResolver({...client,log,
@@ -88,6 +89,9 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
         result.evidence.requests = Evidence.copy(context.requestTrace);
         result.evidence.requestBudget = Evidence.copy(context.requestBudget);
         applied.data.taggingEvidence = Evidence.copy(result.evidence);
+        // An editor applies this as a field patch. Explicitly clear an older
+        // failure so it cannot mask the newly accepted record in the report.
+        applied.data.taggingDecision = null;
         result.video = applied.data;
       }
     } catch(error) {

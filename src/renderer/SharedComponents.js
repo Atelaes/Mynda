@@ -547,6 +547,7 @@ class MynOpenablePane extends React.Component {
 // 'hideLede' : whether to hide the lede when the paragraph is expanded
 // 'className' and 'id' pass the class and id to the main div of the component
 // 'keepEllipsis' : whether to keep the ellipsis when the paragraph is expanded
+// 'headerOnly' : use an accessible button to toggle, leaving the body selectable
 class MynParagraphFolder extends React.Component {
   constructor(props) {
     super(props)
@@ -565,6 +566,23 @@ class MynParagraphFolder extends React.Component {
   }
 
   render() {
+    // Opt-in heading control for longer, selectable reports. Existing folders
+    // retain their click-anywhere behavior.
+    if (this.props.headerOnly) {
+      const paragraphID = this.props.id ? this.props.id + '-body' : undefined;
+      return (
+        <div id={this.props.id} className={'paragraph-fold header-only ' + (this.props.className || '')}>
+          <button type="button" className="folder-heading" onClick={this.toggle}
+            aria-expanded={this.state.expanded} aria-controls={paragraphID}>
+            <span className="twirl-icon" aria-hidden="true">{this.state.expanded ? '\u25BC' : '\u25B6'}</span>
+            <span className="lede">{this.props.lede}</span>
+          </button>
+          <div id={paragraphID} className="paragraph" hidden={!this.state.expanded}>
+            {this.props.paragraph}
+          </div>
+        </div>
+      );
+    }
     return (
       <div onClick={this.toggle} id={this.props.id} className={'paragraph-fold ' + this.props.className} style={{display:'flex'/*, alignItems: (this.state.expanded ? 'flex-start' : 'center')*/}}>
 

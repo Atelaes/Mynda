@@ -88,16 +88,15 @@ suite.test('recovered names verify their own season order before numbered-only a
   }
 });
 
-suite.test('cross-season identity never licenses a shifted local release in any processing order',async()=>{
+suite.test('cross-season identity plus two local exact witnesses permits a consistent shift in any order',async()=>{
   const records=[episode('Arrival',3,1),episode('Opening',2,1),episode('Other',2,2),episode('Return',2,3),episode('Journey',2,4)];
   const videos=[input(3,1,'Arrival'),input(2,1),input(2,2,'Return'),input(2,3,'Journey')];
   for (const order of permutations(videos)) {
     const run=await runAutoTag(order,responder(records,records.slice(1).map(alternate)));
-    assert.strictEqual(run.result.statistics.Success,3);
+    assert.strictEqual(run.result.statistics.Success,4);
     const numbered=run.saved.get('s2e1');
-    assert(!numbered.imdbID);
-    assert.strictEqual(numbered.taggingDecision.reason.code,'unverified-episode-order');
-    assert(/different catalog numbering/.test(numbered.taggingDecision.reason.message));
+    assert.strictEqual(numbered.imdbID,records[2].imdbID);
+    assert.strictEqual(numbered.taggingEvidence.orderAssessment.basis,'sibling-numbering');
     assert.strictEqual(run.saved.get('s2e2').imdbID,records[3].imdbID);
     assert.strictEqual(run.saved.get('s2e3').imdbID,records[4].imdbID);
   }

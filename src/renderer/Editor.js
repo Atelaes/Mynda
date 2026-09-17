@@ -9,6 +9,7 @@ const {v4: uuidv4} = require('uuid');
 const hashObject = require('object-hash');
 const OmdbHelper = require('../tagging/OmdbHelper.js');
 const TaggingEvidence = require('../tagging/TaggingEvidence');
+const {MynAutotagReport} = require('./AutotagReport.js');
 const {parseBoxOffice, formatBoxOffice} = require('../library/BoxOffice.js');
 const {
   library,
@@ -818,6 +819,10 @@ class MynEditor extends MynOpenablePane {
           reportValid={this.reportValid}
           saveHash={this.state.saveHash}
         />
+        {!this.isBatchEdit() && this.props.show !== false && (
+          <MynAutotagReport key={this.props.video && this.props.video.id}
+            video={this.props.video} hasUnsavedChanges={hasUnsavedChanges} />
+        )}
       </div>
     );
   }

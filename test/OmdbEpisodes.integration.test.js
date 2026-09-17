@@ -62,7 +62,9 @@ suite.test('rejects every suspect Atelaes title pair before artwork or mutation'
     assert.strictEqual(result.failure, 'Episode mismatch');
     assert.strictEqual(original.imdbID, '');
     assert.strictEqual(downloads.length, 0);
-    assert(requests.length <= 8, 'Episode correction requests must remain bounded');
+    assert(requests.filter(q=>q.Episode !== undefined).length <= 7, 'Episode correction positions must remain bounded');
+    assert(requests.filter(q=>q.Season !== undefined && q.Episode === undefined).length <= 3,
+      'At most one cached episode list per visited season');
   }
 });
 

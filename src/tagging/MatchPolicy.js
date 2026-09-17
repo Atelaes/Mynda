@@ -7,6 +7,7 @@ const Evidence = require('./TaggingEvidence');
 const Decision = require('./TaggingDecision');
 const {validImdbID,episodeResponseMatches} = require('./CatalogResponse');
 const {scopeFor} = require('./SeriesCollection');
+const Numbering = require('./EpisodeNumbering');
 
 function evaluateMovie(record, candidate, video, options) {
   const evaluation = MovieSearch.evaluateFullResult(record, candidate, video, options);
@@ -101,6 +102,17 @@ function decide(proposal, context = {}, options = {}) {
   } else if (detail.kind === 'episode') {
     if (!detail.matched || !episodeResponseMatches(record,detail.seriesID,
         String(detail.matched.season),String(detail.matched.episode))) return reject('The episode record does not match the resolved parent and position');
+    let numbering;
+    if (detail.numberingMapping) {
+      // Discovery's mapping is a proposal. Recompute it from the runner's
+      // independent ledger, never from cached approval or the proposal's votes.
+      numbering=Numbering.assess(evidence.original || video,detail.seriesID,options.anchors || [],detail.requested);
+      evidence.numberingMapping=numbering;
+      const translated=Numbering.translated(numbering,detail.requested);
+      if (!translated || translated.season !== String(detail.matched.season) || translated.episode !== String(detail.matched.episode)) {
+        return reject('Independent siblings do not establish the proposed numbering correction','unverified-episode-order');
+      }
+    }
     const localTitle = EpisodeMatch.usefulEpisodeTitle(video.title,video.series,{dvd:Boolean(video.dvd)});
     const titleAssessment = EpisodeMatch.assessEpisodeTitle(localTitle,record.Title,video.series);
     const runtimeAssessment = EpisodeMatch.assessEpisodeRuntime(video,record);
@@ -110,7 +122,7 @@ function decide(proposal, context = {}, options = {}) {
       confidentSeries:Boolean(detail.parentEvidence && detail.parentEvidence.confident),
       remoteTitle:EpisodeMatch.usefulEpisodeTitle(record.Title)});
     if (!assessment.accepted) return reject(assessment.reason,assessment.policyReason || 'episode-mismatch');
-    const order = options.recordSelectionSource === 'user' ?
+    const order = numbering ? {accepted:true,basis:'sibling-numbering',support:numbering.support} : options.recordSelectionSource === 'user' ?
       {accepted:true,basis:'user-confirmed-record',support:[]} :
       evaluateEpisodeOrder({anchors:options.anchors || [],record,evidence});
     evidence.orderAssessment = order;
