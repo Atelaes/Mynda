@@ -1,0 +1,1028 @@
+[
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Devil's Foot",
+    "requested": {
+      "season": "2",
+      "episode": "2"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "1",
+      "distance": 1,
+      "title": "The Devil's Foot",
+      "imdbID": "tt0685621"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "Silver Blaze",
+    "requested": {
+      "season": "2",
+      "episode": "3"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "2",
+      "distance": 1,
+      "title": "Silver Blaze",
+      "imdbID": "tt0685618"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "Wisteria Lodge",
+    "requested": {
+      "season": "2",
+      "episode": "4"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "3",
+      "distance": 1,
+      "title": "Wisteria Lodge",
+      "imdbID": "tt0685630"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Bruce Partington Plans",
+    "requested": {
+      "season": "2",
+      "episode": "5"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "4",
+      "distance": 1,
+      "title": "The Bruce Partington Plans",
+      "imdbID": "tt0685620"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Hound of the Baskervilles",
+    "requested": {
+      "season": "2",
+      "episode": "6"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "5",
+      "distance": 1,
+      "title": "The Hound of the Baskervilles",
+      "imdbID": "tt27646178"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Devils Foot",
+    "requested": {
+      "season": "2",
+      "episode": "2"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "1",
+      "distance": 1,
+      "title": "The Devil's Foot",
+      "imdbID": "tt0685621"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Hound Of The Baskervilles",
+    "requested": {
+      "season": "2",
+      "episode": "6"
+    },
+    "matched": {
+      "season": "2",
+      "episode": "5",
+      "distance": 1,
+      "title": "The Hound of the Baskervilles",
+      "imdbID": "tt27646178"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Musgrave Ritual",
+    "requested": {
+      "season": "1",
+      "episode": "3"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "4",
+      "distance": 1,
+      "title": "The Musgrave Ritual",
+      "imdbID": "tt0685625"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Second Stain",
+    "requested": {
+      "season": "1",
+      "episode": "4"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "3",
+      "distance": 1,
+      "title": "The Second Stain",
+      "imdbID": "tt0210968"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Man with the Twisted Lip",
+    "requested": {
+      "season": "1",
+      "episode": "5"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "6",
+      "distance": 1,
+      "title": "The Man with the Twisted Lip",
+      "imdbID": "tt0685624"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Return of Sherlock Holmes",
+    "localTitle": "The Man With The Twisted Lip",
+    "requested": {
+      "season": "1",
+      "episode": "5"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "6",
+      "distance": 1,
+      "title": "The Man with the Twisted Lip",
+      "imdbID": "tt0685624"
+    },
+    "seriesID": "tt0090509",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Arrival",
+    "requested": {
+      "season": "1",
+      "episode": "0"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "1",
+      "distance": 1,
+      "title": "Arrival",
+      "imdbID": "tt0679174"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Mystery Science Theater 3000",
+    "localTitle": "Invaders from the Deep (1981)",
+    "requested": {
+      "season": "0",
+      "episode": "1"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "1",
+      "seasonOffset": 1,
+      "title": "Invaders from the Deep",
+      "imdbID": "tt0756959"
+    },
+    "seriesID": "tt0094517",
+    "event": "Corrected shifted OMDb season using the local title"
+  },
+  {
+    "series": "Mystery Science Theater 3000",
+    "localTitle": "The Brute Man",
+    "requested": {
+      "season": "9",
+      "episode": "2"
+    },
+    "matched": {
+      "season": "8",
+      "episode": "2",
+      "seasonOffset": -1,
+      "title": "The Brute Man",
+      "imdbID": "tt0655457"
+    },
+    "seriesID": "tt0094517",
+    "event": "Corrected shifted OMDb season using the local title"
+  },
+  {
+    "series": "Mystery Science Theater 3000",
+    "localTitle": "Deathstalker and the Warriors from Hell",
+    "requested": {
+      "season": "9",
+      "episode": "3"
+    },
+    "matched": {
+      "season": "8",
+      "episode": "3",
+      "seasonOffset": -1,
+      "title": "Deathstalker and the Warriors from Hell",
+      "imdbID": "tt0762886"
+    },
+    "seriesID": "tt0094517",
+    "event": "Corrected shifted OMDb season using the local title"
+  },
+  {
+    "series": "Star Trek - 02 - The Next Generation",
+    "localTitle": "Where No One Has Gone Before",
+    "requested": {
+      "season": "1",
+      "episode": "6"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "5",
+      "title": "Where No One Has Gone Before",
+      "imdbID": "tt0708842"
+    },
+    "seriesID": "tt0092455",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "The General",
+    "requested": {
+      "season": "1",
+      "episode": "5"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "6",
+      "title": "The General",
+      "imdbID": "tt0679186"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "The Chimes Of Big Ben",
+    "requested": {
+      "season": "1",
+      "episode": "1"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "2",
+      "title": "The Chimes of Big Ben",
+      "imdbID": "tt0679185"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "A B And C",
+    "requested": {
+      "season": "1",
+      "episode": "2"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "3",
+      "title": "A. B. and C.",
+      "imdbID": "tt0679173"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Free For All",
+    "requested": {
+      "season": "1",
+      "episode": "3"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "4",
+      "title": "Free for All",
+      "imdbID": "tt0679179"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "The Schizoid Man",
+    "requested": {
+      "season": "1",
+      "episode": "4"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "5",
+      "title": "The Schizoid Man",
+      "imdbID": "tt0679188"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Many Happy Returns",
+    "requested": {
+      "season": "1",
+      "episode": "6"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "7",
+      "title": "Many Happy Returns",
+      "imdbID": "tt0679183"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Dance Of The Dead",
+    "requested": {
+      "season": "1",
+      "episode": "7"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "8",
+      "title": "Dance of the Dead",
+      "imdbID": "tt0679176"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Checkmate",
+    "requested": {
+      "season": "1",
+      "episode": "8"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "9",
+      "title": "Checkmate",
+      "imdbID": "tt0679175"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Hammer Into Anvil",
+    "requested": {
+      "season": "1",
+      "episode": "9"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "10",
+      "title": "Hammer Into Anvil",
+      "imdbID": "tt0679180"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "It's Your Funeral",
+    "requested": {
+      "season": "1",
+      "episode": "10"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "11",
+      "title": "It's Your Funeral",
+      "imdbID": "tt0679181"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "A Change Of Mind",
+    "requested": {
+      "season": "1",
+      "episode": "11"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "12",
+      "title": "A Change of Mind",
+      "imdbID": "tt0679172"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Do Not Forsake Me Oh My Darling",
+    "requested": {
+      "season": "1",
+      "episode": "12"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "13",
+      "title": "Do Not Forsake Me Oh My Darling",
+      "imdbID": "tt0679177"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Living In Harmony",
+    "requested": {
+      "season": "1",
+      "episode": "13"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "14",
+      "title": "Living in Harmony",
+      "imdbID": "tt0679182"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "The Girl Who Was Death",
+    "requested": {
+      "season": "1",
+      "episode": "14"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "15",
+      "title": "The Girl Who Was Death",
+      "imdbID": "tt0679187"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Once Upon A Time",
+    "requested": {
+      "season": "1",
+      "episode": "15"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "16",
+      "title": "Once Upon a Time",
+      "imdbID": "tt0679184"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "The Prisoner",
+    "localTitle": "Fall Out",
+    "requested": {
+      "season": "1",
+      "episode": "16"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "17",
+      "title": "Fall Out",
+      "imdbID": "tt0679178"
+    },
+    "seriesID": "tt0061287",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Day One fs",
+    "requested": {
+      "season": "1",
+      "episode": "3"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "2",
+      "title": "Day One",
+      "imdbID": "tt0567951"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Going Home FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "4"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "3",
+      "title": "Going Home",
+      "imdbID": "tt0567992"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "9 1 2 Hours FS SFM-DVD",
+    "requested": {
+      "season": "1",
+      "episode": "9"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "8",
+      "title": "9 1/2 Hours",
+      "imdbID": "tt0567906"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "ER Confidential WS",
+    "requested": {
+      "season": "1",
+      "episode": "10"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "9",
+      "title": "ER Confidential",
+      "imdbID": "tt0567965"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Hit and Run FS",
+    "requested": {
+      "season": "1",
+      "episode": "5"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "4",
+      "title": "Hit and Run",
+      "imdbID": "tt0568004"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Into That Good Night FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "6"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "5",
+      "title": "Into That Good Night",
+      "imdbID": "tt0568018"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Chicago Heat ws",
+    "requested": {
+      "season": "1",
+      "episode": "7"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "6",
+      "title": "Chicago Heat",
+      "imdbID": "tt0567947"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Another Perfect Day FS DVD-SFM",
+    "requested": {
+      "season": "1",
+      "episode": "8"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "7",
+      "title": "Another Perfect Day",
+      "imdbID": "tt0567926"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Blizzard WS",
+    "requested": {
+      "season": "1",
+      "episode": "11"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "10",
+      "title": "Blizzard",
+      "imdbID": "tt0567936"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "The Gift FS",
+    "requested": {
+      "season": "1",
+      "episode": "12"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "11",
+      "title": "The Gift",
+      "imdbID": "tt0568115"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Happy New Year FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "13"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "12",
+      "title": "Happy New Year",
+      "imdbID": "tt0567999"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Luck of the Draw FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "14"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "13",
+      "title": "Luck of the Draw",
+      "imdbID": "tt0568034"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Long Days Journey FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "15"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "14",
+      "title": "Long Day's Journey",
+      "imdbID": "tt0568030"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Feb 5 95 ws dvd",
+    "requested": {
+      "season": "1",
+      "episode": "16"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "15",
+      "title": "Feb 5, '95",
+      "imdbID": "tt0567975"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "The Birthday Party WS",
+    "requested": {
+      "season": "1",
+      "episode": "18"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "17",
+      "title": "The Birthday Party",
+      "imdbID": "tt0568110"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Sleepless in Chicago FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "19"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "18",
+      "title": "Sleepless in Chicago",
+      "imdbID": "tt0568094"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Loves Labor Lost ws",
+    "requested": {
+      "season": "1",
+      "episode": "20"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "19",
+      "title": "Love's Labor Lost",
+      "imdbID": "tt0568033"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Full Moon Saturday Night FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "21"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "20",
+      "title": "Full Moon, Saturday Night",
+      "imdbID": "tt0567988"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "House of Cards WS",
+    "requested": {
+      "season": "1",
+      "episode": "22"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "21",
+      "title": "House of Cards",
+      "imdbID": "tt0568008"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Men Plan God Laughs FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "23"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "22",
+      "title": "Men Plan, God Laughs",
+      "imdbID": "tt0568043"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Love Among the Ruins FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "24"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "23",
+      "title": "Love Among the Ruins",
+      "imdbID": "tt0568032"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Motherhood FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "25"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "24",
+      "title": "Motherhood",
+      "imdbID": "tt0568048"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "E.R.",
+    "localTitle": "Everything Old Is New Again FS AC3",
+    "requested": {
+      "season": "1",
+      "episode": "26"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "25",
+      "title": "Everything Old Is New Again",
+      "imdbID": "tt0567966"
+    },
+    "seriesID": "tt0108757",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Heroes",
+    "localTitle": "Brothers Keeper",
+    "requested": {
+      "season": "4",
+      "episode": "10"
+    },
+    "matched": {
+      "season": "4",
+      "episode": "9",
+      "title": "Chapter Nine 'Brother's Keeper'",
+      "imdbID": "tt1510002"
+    },
+    "seriesID": "tt0813715",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Heroes",
+    "localTitle": "Thanksgiving",
+    "requested": {
+      "season": "4",
+      "episode": "11"
+    },
+    "matched": {
+      "season": "4",
+      "episode": "10",
+      "title": "Chapter Ten 'Thanksgiving'",
+      "imdbID": "tt1510003"
+    },
+    "seriesID": "tt0813715",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Heroes",
+    "localTitle": "Upon This Rock",
+    "requested": {
+      "season": "4",
+      "episode": "13"
+    },
+    "matched": {
+      "season": "4",
+      "episode": "12",
+      "title": "Chapter Twelve 'Upon This Rock'",
+      "imdbID": "tt1510005"
+    },
+    "seriesID": "tt0813715",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Law and Order SVU",
+    "localTitle": "Closure",
+    "requested": {
+      "season": "1",
+      "episode": "9"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "10",
+      "title": "Closure",
+      "imdbID": "tt0629626"
+    },
+    "seriesID": "tt0203259",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Law and Order SVU",
+    "localTitle": "Bad Blood",
+    "requested": {
+      "season": "1",
+      "episode": "10"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "11",
+      "title": "Bad Blood",
+      "imdbID": "tt0629614"
+    },
+    "seriesID": "tt0203259",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Law and Order SVU",
+    "localTitle": "Closure",
+    "requested": {
+      "season": "1",
+      "episode": "9"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "10",
+      "distance": 1,
+      "title": "Closure",
+      "imdbID": "tt0629626"
+    },
+    "seriesID": "tt0203259",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Law and Order SVU",
+    "localTitle": "Bad Blood",
+    "requested": {
+      "season": "1",
+      "episode": "10"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "11",
+      "distance": 1,
+      "title": "Bad Blood",
+      "imdbID": "tt0629614"
+    },
+    "seriesID": "tt0203259",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  },
+  {
+    "series": "Law and Order SVU",
+    "localTitle": "Stocks And Bondage",
+    "requested": {
+      "season": "1",
+      "episode": "11"
+    },
+    "matched": {
+      "season": "1",
+      "episode": "9",
+      "distance": 2,
+      "title": "Stocks & Bondage",
+      "imdbID": "tt0629739"
+    },
+    "seriesID": "tt0203259",
+    "event": "Corrected shifted OMDb episode number using the local title"
+  }
+]

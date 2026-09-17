@@ -1,0 +1,57 @@
+{
+  "description": "Controlled responses for new fix79 queries, derived from recorded rows. These are not recorded responses to the new queries and do not establish live provider availability. Original historical inputs, responses, and expected IDs are unchanged.",
+  "cases": [
+    {
+      "caseNumber": 1131,
+      "label": "The Prisoner: The General",
+      "derivation": "Copied the 1967 series row from the recorded yearless search; the episode replies and expected IDs remain the recorded originals.",
+      "query": {
+        "s": "The Prisoner",
+        "y": "1967",
+        "type": "series"
+      },
+      "data": {
+        "Response": "True",
+        "Poster": "N/A",
+        "Ratings": [],
+        "Search": [
+          {
+            "Title": "The Prisoner",
+            "Year": "1967\u20131968",
+            "Type": "series",
+            "imdbID": "tt0061287",
+            "Poster": "N/A",
+            "Ratings": []
+          }
+        ],
+        "totalResults": "1"
+      }
+    },
+    {
+      "caseNumber": 1425,
+      "label": "The Prisoner: The Chimes of Big Ben",
+      "derivation": "Copied the 1967 series row from the recorded yearless search; the episode replies and expected IDs remain the recorded originals.",
+      "query": {
+        "s": "The Prisoner",
+        "y": "1967",
+        "type": "series"
+      },
+      "data": {
+        "Response": "True",
+        "Poster": "N/A",
+        "Ratings": [],
+        "Search": [
+          {
+            "Title": "The Prisoner",
+            "Year": "1967\u20131968",
+            "Type": "series",
+            "imdbID": "tt0061287",
+            "Poster": "N/A",
+            "Ratings": []
+          }
+        ],
+        "totalResults": "1"
+      }
+    }
+  ]
+}

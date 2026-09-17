@@ -75,6 +75,23 @@ suite.test('recognizes bonus labels even against generic episode results', () =>
   assert.strictEqual(state('Behind the Scenes', 'Different Episode'), 'contradiction');
 });
 
+suite.test('release-only tags are inconclusive without hiding edited episode titles', () => {
+  for (const [title,series] of [
+    ['Better.Call.Saul.S02E01.720p.BluRay.x264.ShAaNiG','Better Call Saul'],
+    ['friends_s01e02_720p_bluray_x264-sujaidr','Friends'],
+    ['WandaVision.S01E01.720p.DSNP.WEBRip.x264-GalaxyTV','WandaVision'],
+    ['bob.ep01.dvdrip.xvid-deity','Band of Brothers']
+  ]) assert.strictEqual(Match.usefulEpisodeTitle(title,series),null,title);
+  for (const title of ['Heroes S01E01 Genesis 1080p','Heroes S01E01 Loglady 1080p',
+    'Heroes S01E01 My Edited Title','Heroes S01E01 1080p fan edit',
+    'Heroes S01E01 1080p My Edited Title','Heroes 1080p My Edited Title S01E01',
+    'Heroes S01E01 1080p-fan-edit','Heroes S01E01 1080p [fan edit]']) {
+    assert.strictEqual(Match.usefulEpisodeTitle(title,'Heroes'),title);
+  }
+  assert.strictEqual(Match.usefulEpisodeTitle('Elfen Lied - Vector 1','Elfen Lied',{dvd:true}),null);
+  assert.strictEqual(Match.usefulEpisodeTitle('Elfen Lied - Vector 1','Elfen Lied'), 'Elfen Lied - Vector 1');
+});
+
 suite.test('keeps the reviewed Seinfeld alias scoped to that series', () => {
   assert.strictEqual(state('The Clip Show', 'The Chronicle', 'Seinfeld'), 'compatible');
   assert.strictEqual(state('The Clip Show', 'The Chronicle', 'Another Show'), 'contradiction');
@@ -147,6 +164,43 @@ suite.test('allows a failed probe, suppresses immediate retries, and retries aft
   await read(video, {Runtime:'45 min'}); assert.strictEqual(calls, 1);
   time += 60001;
   await read(video, {Runtime:'45 min'}); assert.strictEqual(calls, 2);
+});
+
+suite.test('recognizes all 198 observed release labels without weakening real title contradictions', () => {
+  const recovery = require('./fixtures/UnmatchedShowRecovery.json');
+  assert.strictEqual(recovery.releaseLabels.length, 198);
+  for (const item of recovery.releaseLabels) {
+    assert.strictEqual(Match.usefulEpisodeTitle(item.video.title, item.video.series), null, item.video.title);
+    assert.strictEqual(state(item.video.title, item.catalogTitle, item.video.series), 'inconclusive');
+    assert.strictEqual(Match.episodeTitlesMatch(item.video.title, item.catalogTitle), false);
+  }
+  for (const item of recovery.protectedPairs) {
+    assert.strictEqual(state(item.video.title, item.catalogTitle, item.video.series), 'contradiction');
+  }
+  for (const title of ['Friends S01E01 The Wrong Episode 1080p', 'An Edited Title',
+    'Home commentary', 'Wrong Series S01E01 A Real Title']) {
+    assert.strictEqual(Match.usefulEpisodeTitle(title, 'Friends'), title);
+  }
+});
+
+suite.test('keeps numerical titles and short acronym titles as evidence without inventing Roman parts', () => {
+  assert.strictEqual(Match.usefulEpisodeTitle('11001001'), '11001001');
+  assert.strictEqual(state('11001001', 'Too Short a Season'), 'contradiction');
+  assert.strictEqual(state('11001001', '11001001'), 'compatible');
+  assert.strictEqual(state('LA X', 'LA X: Part 1', 'Lost'), 'compatible');
+  assert.strictEqual(state('Workforce Part 1', 'Workforce Part II'), 'contradiction');
+  assert.strictEqual(state('Unification I', 'Unification II'), 'contradiction');
+});
+
+suite.test('normalizes structured Doctor Who titles while preserving parts, edits, and clips', () => {
+  assert.strictEqual(Match.usefulEpisodeTitle('The Daleks Pt 1 The Dead Planet', 'Dr Who'), 'The Dead Planet');
+  assert.strictEqual(Match.usefulEpisodeTitle('The Smugglers Pt 2 [missing]', 'Doctor Who'), 'The Smugglers: Episode 2');
+  assert.strictEqual(state('The Smugglers Pt 2 [missing]', 'The Smugglers: Episode 3', 'Dr Who'), 'contradiction');
+  assert.strictEqual(Match.usefulEpisodeTitle('Story Pt 2 Specific Title', 'Another Show'), 'Story Pt 2 Specific Title');
+  assert.strictEqual(state('Pilot Loglady', 'Pilot', 'Twin Peaks'), 'contradiction');
+  assert.strictEqual(state('The Smugglers - Surviving Clips', 'The Smugglers: Episode 4', 'Dr Who'), 'contradiction');
+  assert.strictEqual(Match.episodeTitlesMatch('RevengeOfTheCreature Vol25 Shout', 'Revenge of the Creature'), true);
+  assert.strictEqual(Match.episodeTitlesMatch('Home unknown Shout', 'Home'), false);
 });
 
 runSuite(suite);

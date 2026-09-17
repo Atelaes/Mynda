@@ -2,6 +2,11 @@
 // is for choosing a different episode; the forgiving assessment only checks the
 // plausibility of the episode already requested by number.
 const {parseRuntimeMinutes} = require('./MovieSearch.js');
+const {EPISODE_TITLE_ALIASES,SERIAL_TITLE_RULES,BONUS_TITLE_PATTERNS,equivalentSeriesTitles} = require('./CatalogAliases');
+const {releaseTitleInfo,repeatedSeriesPrefix} = require('./EpisodeTitleEvidence.js');
+const {editDistance,fold,PART_NUMBERS} = require('./TitleNormalization');
+const {isTechnicalToken} = require('./ReleaseTokens');
+const TitleAnnotations = require('./EpisodeTitleAnnotations');
 
 // Produces a deliberately strict comparison key for episode titles. It ignores
 // punctuation and a few display-only conventions, including "Chapter 4: Title",
@@ -10,7 +15,7 @@ const {parseRuntimeMinutes} = require('./MovieSearch.js');
 // matching: a nearby episode number is accepted only when the titles clearly
 // agree.
 function comparableEpisodeTitle(title) {
-  let normalized = String(title || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  let normalized = fold(title);
 
   // Some shows use an editorial chapter wrapper around the real episode title.
   // Heroes, for example, is returned by OMDb as "Chapter One 'Genesis'" even
@@ -30,15 +35,9 @@ function comparableEpisodeTitle(title) {
     ''
   );
 
-  const partNumbers = {
-    one: 1, two: 2, three: 3, four: 4, five: 5,
-    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    i: 1, ii: 2, iii: 3, iv: 4, v: 5,
-    vi: 6, vii: 7, viii: 8, ix: 9, x: 10
-  };
   const normalizePartNumber = value => {
     let key = String(value || '').toLowerCase();
-    let number = /^\d{1,2}$/.test(key) ? Number(key) : partNumbers[key];
+    let number = /^\d{1,2}$/.test(key) ? Number(key) : PART_NUMBERS[key];
     return number >= 1 && number <= 10 ? number : null;
   };
   const replacePartSuffix = (whole, value) => {
@@ -73,6 +72,7 @@ function comparableEpisodeTitle(title) {
 // "Day One" merely because the beginning happens to agree.
 function stripTrailingEpisodeReleaseFlags(title) {
   let original = String(title || '').trim();
+  original = original.replace(/\s+(?:Vol\d+|Single)\s+(?:Shout|Rhino)(?:\s+subs)?\s*$/i, '').trim() || original;
   let stripped = original.replace(
     /[\s._-]+(?:fs|ws)(?:[\s._-]+(?:ac-?3|eac-?3|aac|dvd(?:rip)?|sfm|smis|xvid|x26[45]|h26[45]|hevc))*\s*$/i,
     ''
@@ -98,7 +98,7 @@ function stripTrailingEpisodeReleaseYear(title) {
   return stripped ? stripped : original;
 }
 
-function episodeTitlesMatch(localTitle, omdbTitle) {
+function strictEpisodeTitlesMatch(localTitle, omdbTitle) {
   let local = comparableEpisodeTitle(localTitle);
   let omdb = comparableEpisodeTitle(omdbTitle);
   if (!local || !omdb) {
@@ -131,6 +131,24 @@ function episodeTitlesMatch(localTitle, omdbTitle) {
   return false;
 }
 
+function episodeTitleComparison(localTitle, omdbTitle, series = '') {
+  const annotations=TitleAnnotations.compare(localTitle,omdbTitle);
+  const detail=annotations.normalized ? {annotations} : {};
+  if (annotations.conflicts.length) return {matched:false,title:localTitle,...detail};
+  if (strictEpisodeTitlesMatch(localTitle,omdbTitle)) return {matched:true,title:localTitle,basis:'exact-normalized-title',...detail};
+  if (annotations.normalized && strictEpisodeTitlesMatch(annotations.local.core,annotations.catalog.core)) {
+    return {matched:true,title:annotations.local.core,basis:'catalog-title-annotation',...detail};
+  }
+  const prefix = repeatedSeriesPrefix(annotations.local.core,series);
+  if (prefix && strictEpisodeTitlesMatch(prefix.title,annotations.catalog.core)) return {
+    matched:true,...prefix,prefixRemoved:true,...detail};
+  return {matched:false,title:localTitle,...detail};
+}
+
+function episodeTitlesMatch(localTitle, omdbTitle, series = '') {
+  return episodeTitleComparison(localTitle,omdbTitle,series).matched;
+}
+
 // Cap comparison work for malformed tags. Normal episode titles are much
 // shorter; a huge or non-Latin tag is inconclusive, never negative evidence.
 const MAX_TITLE_LENGTH = 400;
@@ -140,13 +158,39 @@ function titleText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function usefulEpisodeTitle(value, series = '') {
-  const title = titleText(value);
+function usefulEpisodeTitle(value, series = '', options = {}) {
+  let title = titleText(value);
   if (!title || title.length > MAX_TITLE_LENGTH || /^(?:n\/?a|unknown|untitled|tba|tbd)$/i.test(title)) return null;
+  const serialRule = SERIAL_TITLE_RULES.find(rule =>
+    rule.seriesKeys.includes(String(series).replace(/[^a-z]/gi, '').toLowerCase()));
+  if (serialRule) {
+    for (const [pattern,replacement] of serialRule.replacements) title = title.replace(pattern,replacement);
+  }
+  if (releaseTitleInfo(title, series)) return null;
+  // Numeric titles such as 11001001 carry identity evidence. Explicit episode
+  // designators are handled above/below instead of discarding all digits.
+  if (/^\d+$/.test(title)) return title;
   let evidence = title;
   // Recognize placeholder TAGS left by detection; do not consult a filename to
   // decide whether a deliberately edited title is allowed to count as evidence.
   const seriesWords = titleText(series).replace(/\s*\((?:19|20)\d{2}[^)]*\)\s*$/, '');
+  // Historical tags can consist entirely of a series label, numbering and
+  // release flags. Compare TAG text only; never read the file to undo an edit.
+  // A real title between the numbering and flags prevents this exemption.
+  const plain = text => text.replace(/[._\[\]()?:,'-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const labels = equivalentSeriesTitles(seriesWords).map(plain);
+  labels.push(plain(seriesWords).split(' ').map(word=>word[0] || '').join(''));
+  for (const label of [...new Set(labels)].filter(Boolean)) {
+    // A leading release-group bracket is disposable only when everything
+    // after it proves to be a known series label plus numbering/technical text.
+    const tag = plain(title.replace(/^\[[^\]]{1,40}\]\s*/,''));
+    if (!tag.startsWith(`${label} `)) continue;
+    const remainder = tag.slice(label.length).trim();
+    if (options.dvd && /^(?:disc|disk|volume|vector)\s*\d+$/.test(remainder)) return null;
+    const numbered = remainder.match(/^(?:s\d+\s*e\d+|\d+x\d+|(?:episode|ep|part)\s*\d+)\b\s*(.*)$/);
+    if (!numbered) continue;
+    if (!numbered[1] || numbered[1].split(' ').every(word=>isTechnicalToken(word))) return null;
+  }
   if (seriesWords && evidence.toLowerCase().startsWith(seriesWords.toLowerCase())) {
     const rest = evidence.slice(seriesWords.length);
     if (/^[\s._-]*(?:s\d+|season\b|episode\b|ep\d|\d)/i.test(rest)) evidence = rest;
@@ -154,24 +198,15 @@ function usefulEpisodeTitle(value, series = '') {
   evidence = evidence.replace(/\b(?:season\s*\d+\s*)?(?:episode|ep|part)\s*[#._-]?\s*\d+(?:[._-]\d+)*\b/gi, '');
   evidence = evidence.replace(/\bs\d+[\s._-]*e\d+(?:[\s._-]*e?\d+)*\b/gi, '');
   evidence = evidence.replace(/\b(?:\d{3,4}[pi]|[hx]26[45]|hevc|web[._ -]?(?:dl|rip)|blu[._ -]?ray|dvd[._ -]?rip|aac|ac3|10bit)\b/gi, '');
-  return /[a-z\u00c0-\uffff]{3}/i.test(evidence) ? title : null;
-}
-
-function editDistance(a, b) {
-  let previous = Array.from({length: b.length + 1}, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    const current = [i];
-    for (let j = 1; j <= b.length; j++) {
-      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1,
-        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    previous = current;
-  }
-  return previous[b.length];
+  // Identity is not proportional to the number of letters: Q2, 11:59,
+  // .07% and 5 to 9 are useful titles. Explicit designators and technical
+  // placeholders have already been removed above. Keep any remaining text
+  // containing a letter or digit for exact comparison.
+  return /[a-z0-9\u00c0-\uffff]/i.test(evidence) ? title : null;
 }
 
 function sanityParts(value) {
-  let text = titleText(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  let text = fold(titleText(value));
   text = text.replace(/([a-z])([A-Z])/g, '$1 $2');
   text = stripTrailingEpisodeReleaseYear(stripTrailingEpisodeReleaseFlags(text));
   // The detector historically leaves additional episode numbers at the start
@@ -181,12 +216,14 @@ function sanityParts(value) {
   const key = comparableEpisodeTitle(text);
   const suffix = key.match(/part(\d+)$/);
   // A bare trailing Roman numeral is another spelling of an episode part.
-  const roman = text.match(/\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\s*$/);
+  let roman = text.match(/\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\s*$/);
+  // LA X is not evidence of part ten. A bare Roman suffix after an acronym
+  // supplies too little evidence; explicit Part/pt labels remain authoritative.
+  if (roman && !/[a-z]{3}/i.test(text.slice(0, roman.index))) roman = null;
   const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   const explicitPart = text.match(/\b(?:part|pt)\.?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten|[ivx]+)\b/i);
-  const numbers = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
   const partValue = explicitPart && explicitPart[1].toLowerCase();
-  const namedPart = partValue && (numbers.indexOf(partValue) + 1 || romans.indexOf(partValue.toUpperCase()) + 1);
+  const namedPart = partValue && (PART_NUMBERS[partValue] || 0);
   const part = suffix ? Number(suffix[1]) : explicitPart ? Number(partValue) || namedPart : roman ? romans.indexOf(roman[1]) + 1 : null;
   if (part !== null) {
     text = text.replace(/\s*(?:[(:–—-]\s*)?(?:part|pt)\.?\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|[ivx]+)[\])]?[\s]*$/i, '');
@@ -199,22 +236,36 @@ function sanityParts(value) {
 }
 
 function assessEpisodeTitle(localTitle, omdbTitle, series = '') {
-  const local = usefulEpisodeTitle(localTitle, series);
-  const remote = usefulEpisodeTitle(omdbTitle);
-  const result = (state, reason) => ({state, reason});
+  const original = usefulEpisodeTitle(localTitle, series);
+  const catalogTitle = usefulEpisodeTitle(omdbTitle);
+  // Whole-title agreement wins. Otherwise the same explicit prefix
+  // interpretation must reach both strict correction and fuzzy assessment.
+  const comparison = episodeTitleComparison(original,catalogTitle,series);
+  const annotations = comparison.annotations;
+  const core = annotations ? annotations.local.core : original;
+  const remote = annotations ? usefulEpisodeTitle(annotations.catalog.core) : catalogTitle;
+  const prefix = comparison.matched && !comparison.prefixRemoved ? null : repeatedSeriesPrefix(core,series);
+  const local = usefulEpisodeTitle(prefix ? prefix.title : core);
+  const result = (state, reason) => ({state, reason,...(annotations ? {annotations} : {}),...(prefix ? {
+    originalTitle:original,comparedTitle:prefix.title,normalization:prefix.basis
+  } : annotations ? {originalTitle:original,comparedTitle:core,normalization:'catalog-title-annotation'} : {})});
+  if (annotations && annotations.conflicts.length) return result('contradiction','different explicit episode-title annotations');
   // An introduction/bonus label is positive contrary evidence, even when the
   // returned regular episode has only a placeholder title. Exact matching bonus
   // records remain possible; this never removes the clip from the library.
-  const bonusLabel = value => /^(?:log[ ._-]*lady(?:\s+intro(?:duction)?s?)?|(?:episode\s+)?intro(?:duction)?|deleted scenes?|behind the scenes|making of|surviving clips)$/i.test(titleText(value));
+  const bonusLabel = value => BONUS_TITLE_PATTERNS.some(pattern => pattern.test(titleText(value)));
   if (local && bonusLabel(local) && !bonusLabel(remote)) {
     return result('contradiction', 'introduction or bonus title does not describe the returned episode');
   }
   if (!local || !remote) return result('inconclusive', 'missing or generic episode title');
-  if (episodeTitlesMatch(local, remote)) return result('compatible', 'exact normalized title');
-  // A reviewed alternate in Torgo's library. Keep the mapping series-specific
-  // and outside the strict correction matcher: it must not choose a new number.
-  if (comparableEpisodeTitle(series) === 'seinfeld' &&
-      [local, remote].map(comparableEpisodeTitle).sort().join('|') === 'thechronicle|theclipshow') {
+  if (comparison.matched) return result('compatible', comparison.basis === 'repeated-series-prefix' ?
+    'exact title after removing repeated series prefix' : comparison.basis === 'catalog-title-annotation' ?
+      'exact title after normalizing catalog annotations' : 'exact normalized title');
+  // Reviewed catalog names are data, separate from the strict correction
+  // matcher. An alias may confirm the requested position, never pick another.
+  if (EPISODE_TITLE_ALIASES.some(alias =>
+      comparableEpisodeTitle(series) === comparableEpisodeTitle(alias.series) &&
+      [local,remote].every(title => alias.names.some(name => comparableEpisodeTitle(name) === comparableEpisodeTitle(title))))) {
     return result('compatible', 'established series-specific alternate title');
   }
   // Do not transliterate a different script into an empty/partial English title.
@@ -270,6 +321,6 @@ function assessEpisodeRuntime(video, episodeData) {
 }
 
 module.exports = {
-  comparableEpisodeTitle, episodeTitlesMatch, usefulEpisodeTitle,
+  comparableEpisodeTitle, episodeTitlesMatch, episodeTitleComparison, usefulEpisodeTitle,
   assessEpisodeTitle, assessEpisodeRuntime
 };

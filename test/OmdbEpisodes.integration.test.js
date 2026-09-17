@@ -1,61 +1,11 @@
-const path = require('path');
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness.js');
-const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
-const {videoFixture} = require('./helpers/Fixtures.js');
 const corpus = require('./fixtures/EpisodeTitleCorpus.json');
 const corrections = require('./fixtures/EpisodeCorrections.json');
+const precisionChanges = require('./fixtures/Fix80PolicyChanges.json');
 
 const suite = createSuite('OMDb episode selection and tagging safeguards', 'integration',
   'Runs real search, caching, correction and tagging code against controlled OMDb responses; no network or real library access.');
-const SERIES = 'tt1000001';
-const notFound = {Response:'False', Error:'Movie not found!'};
-const show = overrides => videoFixture({
-  id:'test-video', title:'A Real Episode', kind:'show', series:'Test Series',
-  season:'1', episode:'1', imdbID:'', seriesImdbID:'', filename:'unrelated.mkv',
-  metadata:{duration:2700}, ...overrides
-});
-const series = (id = SERIES, title = 'Test Series', year = '2000') => ({
-  Response:'True', Type:'series', Title:title, Year:year, imdbID:id, Poster:'N/A'
-});
-const episode = (title, season = '1', number = '1', parent = SERIES, extra = {}) => ({
-  Response:'True', Type:'episode', Title:title, Season:String(season), Episode:String(number),
-  seriesID:parent, imdbID:`tt2${String(season).padStart(3,'0')}${String(number).padStart(3,'0')}`,
-  Runtime:'45 min', Year:'2000', Poster:'N/A', Plot:'Fixture episode', Ratings:[],
-  Genre:'Drama', Director:'Example Director', Actors:'Example Actor', Language:'English', ...extra
-});
-
-function loadSearch(responder, options = {}) {
-  const requests = [], logs = [], downloads = [];
-  const logger = Object.fromEntries(['debug','info','warn','error'].map(level => [level,
-    (message, data) => logs.push({level, message, data})]));
-  const axios = async request => {
-    const query = Object.fromEntries(new URL(request.url).searchParams);
-    delete query.apikey;
-    requests.push(query);
-    const response = await responder(query, requests);
-    if (response instanceof Error) throw response;
-    return {status:200, statusText:'OK', data:response || notFound};
-  };
-  const api = loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'), {
-    '../../omdb':{key:'fixture-only'}, axios,
-    electron:{app:{getPath:() => '/unused-fixture-user-data'}, ipcRenderer:{}},
-    '../platform/Logger.js':{child:() => logger},
-    './EpisodeRuntime.js':{withEpisodeDuration:options.readDuration || (async video => video)},
-    '../platform/download':{download:(url, destination, callback) => {downloads.push(url);callback({path:destination});}}
-  });
-  return {api, requests, logs, downloads};
-}
-
-function catalog(episodes, parent = series()) {
-  return query => {
-    if (query.s || query.t) return query.s ? {Response:'True', Search:[parent]} : parent;
-    if (query.i === parent.imdbID && !query.Season) return parent;
-    if (query.i === parent.imdbID && query.Episode) {
-      return episodes.find(item => item.Season === query.Season && item.Episode === query.Episode);
-    }
-    return episodes.find(item => item.imdbID === query.i);
-  };
-}
+const {SERIES, notFound, show, series, episode, loadSearch, catalog} = require('./helpers/OmdbFixtures.js');
 
 suite.test('uses edited title tags and preserves display series names', async () => {
   const original = show({title:'My Edited Title', series:'Test Series (2000)',
@@ -116,10 +66,16 @@ suite.test('rejects every suspect Atelaes title pair before artwork or mutation'
   }
 });
 
-suite.test('retains all 30 reviewed Atelaes wording and multipart variations', async () => {
+suite.test('retains 27 reviewed wording variations and explicitly withholds three unverified alternates', async () => {
   for (const pair of corpus.pairs.filter(p => p.source === 'Atelaes' && p.expected === 'allow')) {
     const {api} = loadSearch(catalog([episode(pair.omdbTitle,pair.season,pair.episode)],series(SERIES,pair.series)));
     const result = await api.search(show({title:pair.localTitle,series:pair.series,season:pair.season,episode:pair.episode}));
+    const change=precisionChanges.reviewedTitles.find(row=>row.localTitle===pair.localTitle && row.omdbTitle===pair.omdbTitle);
+    if(change) {
+      assert.strictEqual(result.success,false,change.explanation);
+      assert.strictEqual(result.policyReason,change.policyReason);
+      continue;
+    }
     assert(result.success, `${pair.localTitle} -> ${pair.omdbTitle}: ${JSON.stringify(result)}`);
   }
 });
@@ -231,8 +187,10 @@ suite.test('does not cache a rejected parent, but reuses validated series withou
   });
   assert.strictEqual((await api.search(show())).success,false);
   corrected = true;
-  assert((await api.search(show())).success);
-  assert((await api.search(show())).success);
+  // A corrected provider record is visible in a new run; that run then shares responses.
+  const session = api.createSeriesSearchSession();
+  assert((await api.search(show(),{seriesSearchSession:session})).success);
+  assert((await api.search(show(),{seriesSearchSession:session})).success);
   assert.strictEqual(requests.filter(q=>q.s).length,2);
 });
 
@@ -265,7 +223,8 @@ suite.test('batch representative retries remain bounded and do not repeatedly pr
   const videos = Array.from({length:10},(_,i)=>show({episode:String(i+1)}));
   const result = await api.resolveSeriesForBatch([videos[0],videos[0],...videos]);
   assert.strictEqual(result.failure,'Episode mismatch');
-  assert.strictEqual(requests.filter(q=>q.s).length,3);
+  assert.strictEqual(requests.filter(q=>q.s).length,1, 'Representatives share the series query, not their episode decisions');
+  assert(requests.length <= 25, 'At most three representatives may be probed');
 });
 
 suite.test('blocks gross runtime mismatches even when the episode title matches', async () => {
@@ -310,6 +269,214 @@ suite.test('current exact IMDb IDs remain authoritative regardless of older file
   assert.strictEqual(result.data.imdbID,data.imdbID);
   assert.strictEqual(result.data.title,'Previously Chosen Episode');
   assert.strictEqual(requests.filter(q=>q.Episode||q.s).length,0);
+});
+
+// These fixtures record identities and local duration, not catalog runtime.
+// An invented default 45-minute runtime would test false catalog facts.
+suite.test('tags all 198 supplied release-label cases through the full guarded search', async () => {
+  const recovery = require('./fixtures/UnmatchedShowRecovery.json');
+  for (const item of recovery.releaseLabels) {
+    const parentTitle = item.video.series.replace(/\s+-\s+\d{1,2}\s+-\s+/g, ' ');
+    const target = episode(item.catalogTitle, item.video.season, item.video.episode, item.parentID, {imdbID:item.episodeID,Runtime:'N/A'});
+    const {api, requests} = loadSearch(catalog([target], series(item.parentID, parentTitle)));
+    const original = show(item.video), before = JSON.stringify(original);
+    const result = await api.search(original);
+    assert(result.success, `${item.video.title}: ${JSON.stringify(result)}`);
+    assert.strictEqual(result.data.imdbID, item.episodeID);
+    assert.strictEqual(result.data.seriesImdbID, item.parentID);
+    assert.strictEqual(JSON.stringify(original), before);
+    assert.strictEqual(requests.filter(q => q.Season && q.Episode).length, 1, 'A release label must not trigger irrelevant neighboring-title probes');
+  }
+});
+
+suite.test('infers the season for all 30 miniseries files, verifying the repeated series prefix explicitly', async () => {
+  const items = require('./fixtures/UnmatchedShowRecovery.json').miniseries;
+  for (const name of new Set(items.map(item => item.video.series))) {
+    const group = items.filter(item => item.video.series === name);
+    const parent = {...series(SERIES, group[0].parentTitle, group[0].parentYear), totalSeasons:'1'};
+    const targets = group.map(item => episode(item.catalogTitle, '1', item.video.episode, SERIES, {imdbID:item.episodeID,Runtime:'N/A'}));
+    const {api, requests} = loadSearch(catalog(targets, parent));
+    const session = api.createSeriesSearchSession();
+    for (const item of group) {
+      const original = show(item.video), before = JSON.stringify(original);
+      const result = await api.search(original,{seriesSearchSession:session});
+      const change=precisionChanges.miniseries.find(row=>row.title===item.video.title && row.episodeID===item.episodeID);
+      if(change && !change.resolvedBy) {
+        assert.strictEqual(result.success,false);
+        assert.strictEqual(result.policyReason,change.policyReason);
+        assert.strictEqual(JSON.stringify(original),before);
+        continue;
+      }
+      assert(result.success, `${name}: ${item.video.title}: ${JSON.stringify(result)}`);
+      assert.strictEqual(result.data.season, '1');
+      assert.strictEqual(result.data.series, item.video.series);
+      assert.strictEqual(result.data.imdbID, item.episodeID);
+      if (change && change.resolvedBy) {
+        assert.strictEqual(result.evidence.titleComparison.basis,change.resolvedBy);
+        assert.strictEqual(result.evidence.titleComparison.originalTitle,item.video.title);
+      }
+      assert.strictEqual(JSON.stringify(original), before);
+    }
+    assert(requests.filter(q => q.i === SERIES && !q.Season).length <= 2,
+      'Cache verified parent details; at most one additional parent request is needed for artwork fallback');
+    if (/Roots|Pride and Prejudice/.test(name)) assert.strictEqual(requests.find(q => q.s).y, group[0].parentYear);
+  }
+});
+
+suite.test('does not default ambiguous, unknown, multi-season, disc or pilot records to season one', async () => {
+  for (const totalSeasons of ['2', 'N/A', undefined]) {
+    const parent = {...series(), totalSeasons};
+    const {api} = loadSearch(catalog([episode('A Real Episode')], parent));
+    const original = show({season:''});
+    assert.strictEqual((await api.search(original)).failure, 'Not enough data');
+    assert.strictEqual(original.season, '');
+  }
+  for (const extra of [{dvd:true}, {episode:'0'}, {episode:'1.5'}, {season:'extras'}, {season:'bad'}]) {
+    const {api, requests} = loadSearch(() => {throw new Error('No request should be made');});
+    assert.strictEqual((await api.search(show({season:'', ...extra}))).failure, 'Not enough data');
+    assert.strictEqual(requests.length, 0);
+  }
+  const {api} = loadSearch(q => q.s ? {Response:'True', Search:[series(),series('tt9999999')]} : notFound);
+  assert.strictEqual((await api.search(show({season:''}))).failure, 'Ambiguous series');
+});
+
+suite.test('validates the full parent identity and leaves a failed inferred episode untouched', async () => {
+  for (const parent of [{...series(), Type:'movie', totalSeasons:'1'},
+    {...series(), imdbID:'tt9999999', totalSeasons:'1'},
+    {...series(), Title:'Another Show', totalSeasons:'1'}]) {
+    const {api} = loadSearch(q => q.s ? {Response:'True',Search:[series()]} : parent);
+    const original = show({season:''});
+    assert.strictEqual((await api.search(original)).success, false);
+    assert.strictEqual(original.season, '');
+  }
+  const parent = {...series(), totalSeasons:'1'};
+  const {api} = loadSearch(catalog([episode('Birthday Party')], parent));
+  const original = show({season:'',title:'Arrival'}), before = JSON.stringify(original);
+  assert.strictEqual((await api.search(original)).failure, 'Episode mismatch');
+  assert.strictEqual(JSON.stringify(original), before);
+});
+
+suite.test('selected miniseries preflight verifies season and episode before returning a shared parent', async () => {
+  const {api, downloads} = loadSearch(catalog([episode('A Real Episode')], {...series(),totalSeasons:'1'}));
+  const original = show({season:''});
+  const result = await api.resolveSeriesForBatch([original]);
+  assert(result.success, JSON.stringify(result));
+  assert.strictEqual(result.data, SERIES);
+  assert.strictEqual(original.season, '');
+  assert.strictEqual(downloads.length, 0);
+});
+
+suite.test('discovers Doctor Who with its explicit collection year and validates the serial subtitle', async () => {
+  const parent = series(SERIES, 'Doctor Who', '1963–1989');
+  const target = episode('The Cave of Skulls', '1', '2');
+  const {api, requests} = loadSearch(q => {
+    if (q.s === 'Dr Who') return {Response:'True',Search:[series('tt9999999','Dr. Who FA','2015')]};
+    if (q.s === 'Doctor Who') return {Response:'True',Search:[parent]};
+    return catalog([target], parent)(q);
+  });
+  const result = await api.search(show({series:'Dr Who',title:'An Unearthly Child Pt 2 The Cave of Skulls',episode:'2',
+    filename:'/Fixtures/Dr Who/Doctor Who 01 S01-S04 (1963- 360p re-rip)/Serial/episode.mp4'}));
+  assert(result.success, JSON.stringify(result));
+  assert(requests.some(q => q.s === 'Doctor Who' && q.y === '1963'));
+  assert.strictEqual(result.data.series, 'Dr Who');
+});
+
+suite.test('uses the dotted Prisoner premiere year before reconciling episode zero', async () => {
+  const parent = series(SERIES,'The Prisoner','1967–1968');
+  const {api, requests} = loadSearch(catalog([episode('Arrival')],parent));
+  const result = await api.search(show({series:'The Prisoner',title:'Arrival',episode:'0',
+    filename:'/Fixtures/The.Prisoner.1967-1968.Complete.Series.Subs.English+Nordic/The.Prisoner.S01E00.Arrival.mkv'}));
+  assert(result.success, JSON.stringify(result));
+  assert.strictEqual(requests[0].y, '1967');
+  assert.strictEqual(result.data.episode, '0');
+});
+
+suite.test('retains all 167 current-run episode and season corrections', async () => {
+  const cases = require('./fixtures/UnmatchedShowRecovery.json').numberCorrections;
+  assert.strictEqual(cases.length, 167);
+  for (const item of cases) {
+    const target = episode(item.matched.title,item.matched.season,item.matched.episode);
+    const {api} = loadSearch(catalog([target]));
+    const result = await api.search(show({title:item.localTitle,season:item.requested.season,episode:item.requested.episode}));
+    assert(result.success, `${item.series}: ${item.localTitle}: ${JSON.stringify(result)}`);
+    assert.strictEqual(result.data.imdbID, target.imdbID);
+    assert.strictEqual(result.data.season, item.requested.season);
+    assert.strictEqual(result.data.episode, item.requested.episode);
+  }
+});
+
+suite.test('keeps new release placeholders ambiguous between two returning remakes and rejects wrong-parent responses', async () => {
+  const first = series(SERIES,'Dr. Death','2021'), other = series('tt9999999','Dr. Death','2018');
+  const {api} = loadSearch(q => q.s ? {Response:'True',Search:[first,other]} :
+    q.Episode ? episode('A Title','2','1',q.i) : notFound);
+  const result = await api.search(show({series:'Dr Death',title:'Dr.Death.S02E01.1080p.WEBRip.x265-KONTRAST',season:'2'}));
+  assert.strictEqual(result.failure, 'Ambiguous series');
+  const wrong = loadSearch(catalog([episode('A Title','1','1','tt9999999')]));
+  assert.strictEqual((await wrong.api.search(show({title:'Test.Series.S01E01.1080p.WEB.x264'}))).success,false);
+});
+
+suite.test('retains LA X and uses the numeric title to correct the observed TNG-style mismatch', async () => {
+  const short = loadSearch(catalog([episode('LA X: Part 1')]));
+  assert((await short.api.search(show({series:'Test Series',title:'LA X'}))).success);
+  const target = episode('11001001','1','14');
+  const numeric = loadSearch(catalog([episode('Too Short a Season','1','15'),target]));
+  const result = await numeric.api.search(show({title:'11001001',episode:'15'}));
+  assert(result.success,JSON.stringify(result));
+  assert.strictEqual(result.data.imdbID,target.imdbID);
+  assert.strictEqual(result.data.episode,'15');
+});
+
+suite.test('replays 138 Doctor Who variants with one explicitly unverified subtitle withheld', async () => {
+  const cases = require('./fixtures/UnmatchedShowRecovery.json').doctorWho;
+  const parent = series(SERIES,'Doctor Who','1963–1989');
+  const targets = cases.map(item=>episode(item.catalogTitle,item.video.season,item.video.episode,SERIES,
+    {imdbID:item.episodeID,Runtime:'25 min'}));
+  const {api} = loadSearch(q=>q.s==='Dr Who'?notFound:catalog(targets,parent)(q));
+  for(const item of cases) {
+    const result=await api.search(show(item.video));
+    const change=precisionChanges.doctorWho.find(row=>row.title===item.video.title && row.episodeID===item.episodeID);
+    if(change) {
+      assert.strictEqual(result.success,false,change.explanation);
+      assert.strictEqual(result.policyReason,change.policyReason);
+      continue;
+    }
+    assert(result.success,`${item.video.title}: ${JSON.stringify(result)}`);
+    assert.strictEqual(result.data.imdbID,item.episodeID);
+  }
+});
+
+suite.test('MST3K disc suffixes enable 19 exact corrections without accepting the abbreviated twentieth title', async () => {
+  const cases=require('./fixtures/UnmatchedShowRecovery.json').mstDiscTitles;
+  const parent=series(SERIES,'Mystery Science Theater 3000','1988–1999');
+  const hints=new Map();let recovered=0;
+  for(const item of cases) {
+    const target=episode(item.catalogTitle,'9',item.video.episode,SERIES,{imdbID:item.episodeID,Runtime:'95 min'});
+    const {api}=loadSearch(catalog([target],parent));
+    const result=await api.search(show(item.video),{seasonOffsetHints:hints});
+    if(item.video.title.startsWith('TheIncrediblyStrangeCreatures')) {
+      assert.strictEqual(result.success,false);
+    } else {
+      assert(result.success,`${item.video.title}: ${JSON.stringify(result)}`);
+      assert.strictEqual(result.data.imdbID,item.episodeID);
+      assert.strictEqual(result.data.season,'8');recovered++;
+    }
+  }
+  assert.strictEqual(recovered,19);
+});
+
+suite.test('incomplete parent metadata does not poison later missing-season attempts', async () => {
+  let details=0;
+  const parent=series();
+  const target=episode('Arrival');
+  const {api}=loadSearch(q=>{
+    if(q.s)return {Response:'True',Search:[parent]};
+    if(q.i===SERIES&&!q.Season)return {...parent,totalSeasons:++details===1?'N/A':'1'};
+    return catalog([target],parent)(q);
+  });
+  const original=show({season:'',title:'Arrival'});
+  assert.strictEqual((await api.search(original)).failure,'Not enough data');
+  assert((await api.search(original)).success);
+  assert.strictEqual(original.season,'');
 });
 
 runSuite(suite);

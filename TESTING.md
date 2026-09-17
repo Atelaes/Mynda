@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 42 suites: 40 fast suites with 356 named cases, plus two Electron end-to-end suites (source and ASAR). Before media-tool setup, `npm run test:core` selects 38 suites with 349 cases. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
+The current catalog contains 52 suites: 50 fast suites with 2,550 named cases, plus two Electron end-to-end suites (source and ASAR). Before media-tool setup, `npm run test:core` selects 48 suites with 2,543 cases. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
 
 ## The first commands to learn
 
@@ -63,6 +63,11 @@ A “test double” is simply a small, predictable substitute for something outs
 
 | Suite | Category | What it protects |
 |---|---|---|
+| Tagging architectural contracts | Integration | Final policy ownership, shared budgets, provenance, cache lifetime and exhaustive small-batch permutations |
+| Tagging editor provenance | Component | User ID authorship, one application per preview and stale selection rejection |
+| `TaggingPrecision.integration.test.js` | Integration | Short titles, original evidence, order-independent decisions, same-season support, cancellation, coverage mismatches and movie title expansion |
+| `CatalogClient.unit.test.js` | Unit | Concurrent request reuse, retryable failures, run isolation and duplicate-probe suppression |
+| `AutoTagRecovery.integration.test.js` | Integration | Directory-scoped sibling evidence, bounded retries, shared discovery session, save order, cancellation, and per-file statistics |
 | `SourceLayout.integration.test.js` | Integration | Exact import capitalization, renderer resources, relocated themes/fonts, default executable roots, and actual ASAR source/asset contents |
 | `SourceReorganization.integration.test.js` | Integration | Verified old-file backups, incomplete overlays, unexpected edits, Windows line endings, and safe cleanup reruns |
 | `PlaylistFilter.test.js` | Unit | Safe playlist expressions, allowed syntax, runtime errors, caching, and security limits |
@@ -83,6 +88,11 @@ A “test double” is simply a small, predictable substitute for something outs
 | `EpisodeMatch.unit.test.js` | Unit | Both libraries' title corpus, forgiving acceptance versus strict corrections, runtime thresholds, optional probe caching and failures |
 | `ShowDetection.unit.test.js` | Unit | The actual shared scan/reset parser, dedicated extras, mixed folders, season-zero specials, and release-title conventions |
 | `OmdbEpisodes.integration.test.js` | Integration | Actual OMDb orchestration with controlled responses: current tags, folder-year hints, series validation, title/runtime vetoes, corrections, cache safety and exact-ID behavior |
+| `SeriesSearch.unit.test.js` | Unit | Series annotations, reviewed aliases, full-title identity, spacing/ligatures, request caps, and explicit regional constraints |
+| `OmdbSeries.integration.test.js` | Integration | Actual fallback discovery, pagination, episode safeguards, batch request reuse, and retryable failures |
+| `HistoricalTagging.integration.test.js` | Integration | 1,921 individual historical searches and 63 logged numbering corrections, with expected IMDb identities and explicit rejection of old wrong matches |
+| `HistoricalMovies.integration.test.js` | Integration | All 73 new/corrected movie matches recovered from the fix03–fix05 before/after libraries |
+| `OmdbHistoricalBehaviors.integration.test.js` | Integration | Named artwork fallbacks, failed-download caching, batch representatives, series-ID handoff, edited labels, title variants, and authoritative IMDb IDs |
 | `SubtitleMatcher.unit.test.js` | Unit | Sidecar matching, episode evidence, ambiguity, folder boundaries, and manual provenance |
 | `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
 | `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, early EOF, process errors, timeouts, and cleanup |
@@ -106,6 +116,82 @@ A “test double” is simply a small, predictable substitute for something outs
 | `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, and Library-statistics interaction |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
+
+## Unmatched-show recovery integrated with fix78: fix79
+
+See [FIX79.md](FIX79.md) for the integrated change summary. The core run passed
+all 44 suites and 2,489 cases, including the complete fix78 historical suite and
+fix79's 198 release-label, 30 miniseries, Doctor Who, MST3K and numbering cases.
+Release fields cannot swallow edited text such as `1080p fan edit`. Automatic
+retries share fix78's discovery session and retain cancellation, save order and
+one final disposition per processed file.
+
+`HistoricalTaggingReplay.json` and its expected IDs are unchanged. Two Prisoner
+cases use documented supplements in `HistoricalTaggingSupplements.json`: the
+1967 row from their recorded yearless query is provided to the new year-filtered
+query. These supplemental responses are controlled fixtures, not new live
+recordings. Two prior Doctor Who surviving-clips expectations in the separate
+title-pair corpus are corrected to reject full-episode matches.
+
+These tests do not measure live catalog availability or the recovered count in
+a new autotag run. Electron, real-media and packaged-application validation is
+separate from the core run.
+
+## Series discovery and individual historical regressions: fix78
+
+The [complete case inventory](test/TAGGING_REGRESSIONS.md) lists every recovered
+historical search, all 73 fix03–fix05 movie improvements, all 63 recorded episode
+corrections, and the named workflow checks. These are tests of the actual tagging
+code with controlled responses. They do not query OMDb or touch your library.
+Each historical search/movie/correction has its own named PASS/FAIL result.
+
+Run everything with `npm test`, or use these files when investigating tagging:
+
+```bash
+node test/SeriesSearch.unit.test.js
+node test/OmdbSeries.integration.test.js
+node test/HistoricalTagging.integration.test.js
+node test/HistoricalMovies.integration.test.js
+node test/OmdbHistoricalBehaviors.integration.test.js
+node test/EpisodeMatch.unit.test.js
+node test/ShowDetection.unit.test.js
+node test/OmdbEpisodes.integration.test.js
+node test/MovieSearch.unit.test.js
+```
+
+Fix78 first tries the existing series resolver. If discovery is exhausted, it
+tries bounded spelling/spacing queries, recognized series-tag annotations, and
+reviewed aliases such as SATC, House MD, MST3K, The Office US, and DanMachi.
+A keyword result must still match the complete series identity. The Office US
+cannot silently become the UK adaptation. Several same-name candidates still
+require an unambiguous episode-title match or a user selection. Title/runtime
+checks and exact-title requirements for numbering corrections remain in force.
+
+The historical replay also found that fix76 treated some release-only **title
+tags**, such as `WandaVision.S01E01.720p.WEB...`, as meaningful conflicting episode
+titles. These can now acquire the actual episode title when the existing tag
+contains only the known series, numbering, and recognized release details. A
+meaningful edited title remains authoritative; the helper does not re-read the
+filename to override it. Seventy replay cases failed against fix77 and pass
+with fix78. Old Loglady and other confirmed/unconfirmed bad matches remain
+rejections rather than being restored as successes.
+
+Series queries and definitive no-result responses are reused within one Auto-Tag
+batch. Network/quota errors remain retryable. INFO logs now contain `Series
+discovery diagnostics`, successful fallback recoveries, and `Automatic tagging
+series discovery summary`, including request/reuse counts. This makes another
+"Series not found" run diagnosable without requiring DEBUG file logging.
+
+To retry previously attempted unmatched videos, select the affected episodes
+and use **Auto-Tag Selected**. Ordinary whole-library Auto-Tag continues to skip
+videos already marked attempted. Installing this patch does not change stored
+tags, retry flags, display series names, or local season/episode numbers.
+An existing wrong IMDb ID still needs clearing or Reset from Filename before
+retrying, as described below. No `npm install` or `media:prepare` is needed.
+
+The 1,153 historical Atelaes failures are a starting dataset, not a promised
+recovery count. An actual retry is needed to measure current OMDb coverage;
+these offline tests cannot prove that every catalog record is available now.
 
 ## Episode auto-tag safeguards: fix76
 

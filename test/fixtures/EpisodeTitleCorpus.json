@@ -3788,7 +3788,8 @@
       "omdbTitle": "The Smugglers: Episode 4",
       "season": "4",
       "episode": "4",
-      "expected": "allow"
+      "expected": "reject",
+      "reviewNote": "fix79: the supplied file is a surviving-clips compilation, not the complete episode; the old reference identity was misleading."
     },
     {
       "source": "Torgo",
@@ -3842,7 +3843,8 @@
       "omdbTitle": "The Tenth Planet: Episode 4",
       "season": "4",
       "episode": "8",
-      "expected": "allow"
+      "expected": "reject",
+      "reviewNote": "fix79: the supplied file is a surviving-clips compilation, not the complete episode; the old reference identity was misleading."
     },
     {
       "source": "Torgo",

@@ -1,0 +1,2459 @@
+{
+  "description": "Original tags and examined catalog IDs/titles/positions recovered from the supplied fix81 run. 90 expected IDs agree with the supplied reference. The 50 no-result positions remain absent. This is an offline reconstruction, not fresh provider coverage. Unknown catalog runtimes are N/A. Personal volume paths and video hashes have been removed.",
+  "videos": [
+    {
+      "id": "s1e1",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x01",
+      "season": "1",
+      "episode": "1",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x01.avi",
+      "metadata": {
+        "duration": 2733.667
+      }
+    },
+    {
+      "id": "s1e2",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x02",
+      "season": "1",
+      "episode": "2",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x02.avi",
+      "metadata": {
+        "duration": 2678.011345
+      }
+    },
+    {
+      "id": "s1e3",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x03",
+      "season": "1",
+      "episode": "3",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x03.avi",
+      "metadata": {
+        "duration": 2673.673674
+      }
+    },
+    {
+      "id": "s1e4",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x04",
+      "season": "1",
+      "episode": "4",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x04.avi",
+      "metadata": {
+        "duration": 2656.990324
+      }
+    },
+    {
+      "id": "s1e5",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x05",
+      "season": "1",
+      "episode": "5",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x05.avi",
+      "metadata": {
+        "duration": 2677.677678
+      }
+    },
+    {
+      "id": "s1e6",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x06",
+      "season": "1",
+      "episode": "6",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x06.avi",
+      "metadata": {
+        "duration": 2702.035369
+      }
+    },
+    {
+      "id": "s1e7",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x07",
+      "season": "1",
+      "episode": "7",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x07.avi",
+      "metadata": {
+        "duration": 2671.671672
+      }
+    },
+    {
+      "id": "s1e8",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x08",
+      "season": "1",
+      "episode": "8",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x08.avi",
+      "metadata": {
+        "duration": 2636.036036
+      }
+    },
+    {
+      "id": "s1e9",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x09",
+      "season": "1",
+      "episode": "9",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x09.avi",
+      "metadata": {
+        "duration": 2682.015349
+      }
+    },
+    {
+      "id": "s1e10",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x10",
+      "season": "1",
+      "episode": "10",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x10.avi",
+      "metadata": {
+        "duration": 2717.650984
+      }
+    },
+    {
+      "id": "s1e11",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x11",
+      "season": "1",
+      "episode": "11",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x11.avi",
+      "metadata": {
+        "duration": 2681.681682
+      }
+    },
+    {
+      "id": "s1e12",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x12",
+      "season": "1",
+      "episode": "12",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x12.avi",
+      "metadata": {
+        "duration": 2654.654655
+      }
+    },
+    {
+      "id": "s1e13",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x13",
+      "season": "1",
+      "episode": "13",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x13.avi",
+      "metadata": {
+        "duration": 2679.67968
+      }
+    },
+    {
+      "id": "s1e14",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x14",
+      "season": "1",
+      "episode": "14",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x14.avi",
+      "metadata": {
+        "duration": 2682.682683
+      }
+    },
+    {
+      "id": "s1e15",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x15",
+      "season": "1",
+      "episode": "15",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x15.avi",
+      "metadata": {
+        "duration": 2681.014348
+      }
+    },
+    {
+      "id": "s1e16",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x16",
+      "season": "1",
+      "episode": "16",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x16.avi",
+      "metadata": {
+        "duration": 2681.681682
+      }
+    },
+    {
+      "id": "s1e17",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x17",
+      "season": "1",
+      "episode": "17",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x17.avi",
+      "metadata": {
+        "duration": 2682.682683
+      }
+    },
+    {
+      "id": "s1e18",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x18",
+      "season": "1",
+      "episode": "18",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x18.avi",
+      "metadata": {
+        "duration": 2680.680681
+      }
+    },
+    {
+      "id": "s1e19",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x19",
+      "season": "1",
+      "episode": "19",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x19.avi",
+      "metadata": {
+        "duration": 2638.705372
+      }
+    },
+    {
+      "id": "s1e20",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x20",
+      "season": "1",
+      "episode": "20",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x20.avi",
+      "metadata": {
+        "duration": 2681.014348
+      }
+    },
+    {
+      "id": "s1e21",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x21",
+      "season": "1",
+      "episode": "21",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x21.avi",
+      "metadata": {
+        "duration": 2680.013347
+      }
+    },
+    {
+      "id": "s1e22",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 1x22",
+      "season": "1",
+      "episode": "22",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 1/Party of Five 1x22.avi",
+      "metadata": {
+        "duration": 2689.356023
+      }
+    },
+    {
+      "id": "s2e1",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x01",
+      "season": "2",
+      "episode": "1",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x01.avi",
+      "metadata": {
+        "duration": 2670.003337
+      }
+    },
+    {
+      "id": "s2e2",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x02",
+      "season": "2",
+      "episode": "2",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x02.avi",
+      "metadata": {
+        "duration": 2682.015349
+      }
+    },
+    {
+      "id": "s2e3",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x03",
+      "season": "2",
+      "episode": "3",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x03.avi",
+      "metadata": {
+        "duration": 2680.013347
+      }
+    },
+    {
+      "id": "s2e4",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x04",
+      "season": "2",
+      "episode": "4",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x04.avi",
+      "metadata": {
+        "duration": 2681.014348
+      }
+    },
+    {
+      "id": "s2e5",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x05",
+      "season": "2",
+      "episode": "5",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x05.avi",
+      "metadata": {
+        "duration": 2615.015015
+      }
+    },
+    {
+      "id": "s2e6",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x06",
+      "season": "2",
+      "episode": "6",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x06.avi",
+      "metadata": {
+        "duration": 2690.023357
+      }
+    },
+    {
+      "id": "s2e7",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x07",
+      "season": "2",
+      "episode": "7",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x07.avi",
+      "metadata": {
+        "duration": 2679.012346
+      }
+    },
+    {
+      "id": "s2e8",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x08",
+      "season": "2",
+      "episode": "8",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x08.avi",
+      "metadata": {
+        "duration": 2634.034034
+      }
+    },
+    {
+      "id": "s2e9",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x09",
+      "season": "2",
+      "episode": "9",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x09.avi",
+      "metadata": {
+        "duration": 2746.846847
+      }
+    },
+    {
+      "id": "s2e10",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x10",
+      "season": "2",
+      "episode": "10",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x10.avi",
+      "metadata": {
+        "duration": 2680.847514
+      }
+    },
+    {
+      "id": "s2e11",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x11",
+      "season": "2",
+      "episode": "11",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x11.avi",
+      "metadata": {
+        "duration": 2630.864198
+      }
+    },
+    {
+      "id": "s2e12",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x12",
+      "season": "2",
+      "episode": "12",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x12.avi",
+      "metadata": {
+        "duration": 2650.817484
+      }
+    },
+    {
+      "id": "s2e13",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x13",
+      "season": "2",
+      "episode": "13",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x13.avi",
+      "metadata": {
+        "duration": 2650.984318
+      }
+    },
+    {
+      "id": "s2e14",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x14",
+      "season": "2",
+      "episode": "14",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x14.avi",
+      "metadata": {
+        "duration": 2650.984318
+      }
+    },
+    {
+      "id": "s2e15",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x15",
+      "season": "2",
+      "episode": "15",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x15.avi",
+      "metadata": {
+        "duration": 2660.994328
+      }
+    },
+    {
+      "id": "s2e16",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x16",
+      "season": "2",
+      "episode": "16",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x16.avi",
+      "metadata": {
+        "duration": 2650.984318
+      }
+    },
+    {
+      "id": "s2e17",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x17",
+      "season": "2",
+      "episode": "17",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x17.avi",
+      "metadata": {
+        "duration": 2659.826493
+      }
+    },
+    {
+      "id": "s2e18",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x18",
+      "season": "2",
+      "episode": "18",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x18.avi",
+      "metadata": {
+        "duration": 2664.998332
+      }
+    },
+    {
+      "id": "s2e19",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x19",
+      "season": "2",
+      "episode": "19",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x19.avi",
+      "metadata": {
+        "duration": 2659.826493
+      }
+    },
+    {
+      "id": "s2e20",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x20",
+      "season": "2",
+      "episode": "20",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x20.avi",
+      "metadata": {
+        "duration": 2650.984318
+      }
+    },
+    {
+      "id": "s2e21",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x21",
+      "season": "2",
+      "episode": "21",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x21.avi",
+      "metadata": {
+        "duration": 2634.843177
+      }
+    },
+    {
+      "id": "s2e22",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five 2x22",
+      "season": "2",
+      "episode": "22",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 2/Party of Five 2x22.avi",
+      "metadata": {
+        "duration": 2918.985652
+      }
+    },
+    {
+      "id": "s3e1",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Summer Fun Summer Not",
+      "season": "3",
+      "episode": "1",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x01 Summer Fun Summer Not  .avi",
+      "metadata": {
+        "duration": 2744.1414
+      }
+    },
+    {
+      "id": "s3e2",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Going, Going, Gone",
+      "season": "3",
+      "episode": "2",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x02 Going, Going, Gone.avi",
+      "metadata": {
+        "duration": 2702.5999
+      }
+    },
+    {
+      "id": "s3e3",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Short Cuts",
+      "season": "3",
+      "episode": "3",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x03 Short Cuts.avi",
+      "metadata": {
+        "duration": 2712.6099
+      }
+    },
+    {
+      "id": "s3e4",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Deal With It",
+      "season": "3",
+      "episode": "4",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x04 Deal With It .avi",
+      "metadata": {
+        "duration": 2698.0954
+      }
+    },
+    {
+      "id": "s3e5",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Mixed Signals",
+      "season": "3",
+      "episode": "5",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x05 Mixed Signals.avi",
+      "metadata": {
+        "duration": 2729.6269
+      }
+    },
+    {
+      "id": "s3e6",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Going Home",
+      "season": "3",
+      "episode": "6",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x06 Going Home.avi",
+      "metadata": {
+        "duration": 2706.1034
+      }
+    },
+    {
+      "id": "s3e7",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Personal Demons",
+      "season": "3",
+      "episode": "7",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x07 Personal Demons.avi",
+      "metadata": {
+        "duration": 2612.5099
+      }
+    },
+    {
+      "id": "s3e8",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Not So Fast",
+      "season": "3",
+      "episode": "8",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x08 Not So Fast.avi",
+      "metadata": {
+        "duration": 2686.5839
+      }
+    },
+    {
+      "id": "s3e9",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Gimme Shelter",
+      "season": "3",
+      "episode": "9",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x09 Gimme Shelter.avi",
+      "metadata": {
+        "duration": 2750.6479
+      }
+    },
+    {
+      "id": "s3e10",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Close to You",
+      "season": "3",
+      "episode": "10",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x10 Close to You.avi",
+      "metadata": {
+        "duration": 2692.5899
+      }
+    },
+    {
+      "id": "s3e11",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "I Do",
+      "season": "3",
+      "episode": "11",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x11 I Do .avi",
+      "metadata": {
+        "duration": 2683.5809
+      }
+    },
+    {
+      "id": "s3e12",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Desperate Measures",
+      "season": "3",
+      "episode": "12",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x12 Desperate Measures.avi",
+      "metadata": {
+        "duration": 2695.0924
+      }
+    },
+    {
+      "id": "s3e13",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Christmas",
+      "season": "3",
+      "episode": "13",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x13 Christmas .avi",
+      "metadata": {
+        "duration": 2707.1044
+      }
+    },
+    {
+      "id": "s3e14",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Life's Too Short",
+      "season": "3",
+      "episode": "14",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x14 Life's Too Short.avi",
+      "metadata": {
+        "duration": 2739.6369
+      }
+    },
+    {
+      "id": "s3e15",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Significant Others",
+      "season": "3",
+      "episode": "15",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x15 Significant Others.avi",
+      "metadata": {
+        "duration": 2689.5869
+      }
+    },
+    {
+      "id": "s3e16",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "I Declare",
+      "season": "3",
+      "episode": "16",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x16 I Declare .avi",
+      "metadata": {
+        "duration": 2712.1094
+      }
+    },
+    {
+      "id": "s3e17",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Misery Loves Company",
+      "season": "3",
+      "episode": "17",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x17 Misery Loves Company .avi",
+      "metadata": {
+        "duration": 2704.6019
+      }
+    },
+    {
+      "id": "s3e18",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "MYOB",
+      "season": "3",
+      "episode": "18",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x18 MYOB .avi",
+      "metadata": {
+        "duration": 2726.6239
+      }
+    },
+    {
+      "id": "s3e19",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Point of No Return",
+      "season": "3",
+      "episode": "19",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x19 Point of No Return.avi",
+      "metadata": {
+        "duration": 2683.0804
+      }
+    },
+    {
+      "id": "s3e20",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Intervention",
+      "season": "3",
+      "episode": "20",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x20 Intervention .avi",
+      "metadata": {
+        "duration": 2731.6289
+      }
+    },
+    {
+      "id": "s3e21",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Hitting Bottom",
+      "season": "3",
+      "episode": "21",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x21 Hitting Bottom .avi",
+      "metadata": {
+        "duration": 2738.1354
+      }
+    },
+    {
+      "id": "s3e22",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Leap of Faith",
+      "season": "3",
+      "episode": "22",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x22 Leap of Faith .avi",
+      "metadata": {
+        "duration": 2678.0754
+      }
+    },
+    {
+      "id": "s3e23",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Promises, Promises",
+      "season": "3",
+      "episode": "23",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x23 Promises, Promises.avi",
+      "metadata": {
+        "duration": 2731.6289
+      }
+    },
+    {
+      "id": "s3e24",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "A Little Faith",
+      "season": "3",
+      "episode": "24",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x24 A Little Faith .avi",
+      "metadata": {
+        "duration": 2772.6699
+      }
+    },
+    {
+      "id": "s3e25",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "You Win Some You Lose Some",
+      "season": "3",
+      "episode": "25",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 3/Party of Five 3x25 You Win Some You Lose Some.avi",
+      "metadata": {
+        "duration": 2635.1325
+      }
+    },
+    {
+      "id": "s4e1",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five What a Drag",
+      "season": "4",
+      "episode": "1",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x01 Party of Five What a Drag.avi",
+      "metadata": {
+        "duration": 2577.007767
+      }
+    },
+    {
+      "id": "s4e2",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Past Imperfect",
+      "season": "4",
+      "episode": "2",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x02  Party of Five  Past Imperfect.avi",
+      "metadata": {
+        "duration": 2523.854667
+      }
+    },
+    {
+      "id": "s4e3",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Handicaps",
+      "season": "4",
+      "episode": "3",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x03  Party of Five Handicaps.avi",
+      "metadata": {
+        "duration": 2637.167867
+      }
+    },
+    {
+      "id": "s4e4",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Zap",
+      "season": "4",
+      "episode": "4",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x04 Party of Five Zap.avi",
+      "metadata": {
+        "duration": 2624.054767
+      }
+    },
+    {
+      "id": "s4e5",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Fight or Flight",
+      "season": "4",
+      "episode": "5",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x05 Party of Five Fight or Flight.avi",
+      "metadata": {
+        "duration": 2609.0064
+      }
+    },
+    {
+      "id": "s4e6",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Immediate Family",
+      "season": "4",
+      "episode": "6",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x06 Party of Five  Immediate Family.avi",
+      "metadata": {
+        "duration": 2698.662633
+      }
+    },
+    {
+      "id": "s4e7",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Positive Attitude",
+      "season": "4",
+      "episode": "7",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x07 Party of Five  Positive Attitude.avi",
+      "metadata": {
+        "duration": 2709.8071
+      }
+    },
+    {
+      "id": "s4e8",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Sickness Health Riche , Poorer",
+      "season": "4",
+      "episode": "8",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x08 Party of Five  Sickness_ Health _ Riche_, Poorer.avi",
+      "metadata": {
+        "duration": 2739.970567
+      }
+    },
+    {
+      "id": "s4e9",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Truth Be Told",
+      "season": "4",
+      "episode": "9",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x09 Party of Five  Truth Be Told.avi",
+      "metadata": {
+        "duration": 2741.805733
+      }
+    },
+    {
+      "id": "s4e10",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Adjustments",
+      "season": "4",
+      "episode": "10",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x10 Party of Five  Adjustments.avi",
+      "metadata": {
+        "duration": 2539.870667
+      }
+    },
+    {
+      "id": "s4e11",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five S'Wunnerful Life",
+      "season": "4",
+      "episode": "11",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x11 Party of Five  S'Wunnerful Life.avi",
+      "metadata": {
+        "duration": 2537.501633
+      }
+    },
+    {
+      "id": "s4e12",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Empty Shoes",
+      "season": "4",
+      "episode": "12",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x12 Party of Five  Empty Shoes.avi",
+      "metadata": {
+        "duration": 2724.4217
+      }
+    },
+    {
+      "id": "s4e13",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Parent Trap",
+      "season": "4",
+      "episode": "13",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x13 Party of Five Parent Trap .avi",
+      "metadata": {
+        "duration": 2667.831833
+      }
+    },
+    {
+      "id": "s4e14",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Of Human Bonding",
+      "season": "4",
+      "episode": "14",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x14 Party of Five Of Human Bonding.avi",
+      "metadata": {
+        "duration": 2679.410067
+      }
+    },
+    {
+      "id": "s4e15",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Here and Now",
+      "season": "4",
+      "episode": "15",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x15 Party of Five  Here and Now.avi",
+      "metadata": {
+        "duration": 2564.628733
+      }
+    },
+    {
+      "id": "s4e16",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five I Give Up",
+      "season": "4",
+      "episode": "16",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x16 Party of Five  I Give Up_.avi",
+      "metadata": {
+        "duration": 2845.876367
+      }
+    },
+    {
+      "id": "s4e17",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Of Sound Mind and Body",
+      "season": "4",
+      "episode": "17",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x17 Party of Five  Of Sound Mind and Body.avi",
+      "metadata": {
+        "duration": 2593.4909
+      }
+    },
+    {
+      "id": "s4e18",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five True or False",
+      "season": "4",
+      "episode": "18",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x18 Party of Five True or False.avi",
+      "metadata": {
+        "duration": 2631.762467
+      }
+    },
+    {
+      "id": "s4e19",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Go Away",
+      "season": "4",
+      "episode": "19",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x19 Party of Five  Go Away.avi",
+      "metadata": {
+        "duration": 2816.666667
+      }
+    },
+    {
+      "id": "s4e20",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "and 4x21 Party of Five Square One (1) Free and Clear(2)",
+      "season": "4",
+      "episode": "20",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x20 and 4x21 Party of Five  Square One (1) Free and Clear(2).avi",
+      "metadata": {
+        "duration": 7194.620767
+      }
+    },
+    {
+      "id": "s4e22",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Opposites Distract",
+      "season": "4",
+      "episode": "22",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x22 Party of Five Opposites Distract.avi",
+      "metadata": {
+        "duration": 2670.934933
+      }
+    },
+    {
+      "id": "s4e23",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Fools Rush In",
+      "season": "4",
+      "episode": "23",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x23 Party of Five Fools Rush In.avi",
+      "metadata": {
+        "duration": 2685.416067
+      }
+    },
+    {
+      "id": "s4e24",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Fools Rush Out",
+      "season": "4",
+      "episode": "24",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 4/4x24 Party of Five Fools Rush Out.avi",
+      "metadata": {
+        "duration": 3559.489267
+      }
+    },
+    {
+      "id": "s5e1",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Moving on",
+      "season": "5",
+      "episode": "1",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x01 Party of Five Moving on.avi",
+      "metadata": {
+        "duration": 2763.5608
+      }
+    },
+    {
+      "id": "s5e2",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Separation Anxiety",
+      "season": "5",
+      "episode": "2",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x02 Party of Five Separation Anxiety.avi",
+      "metadata": {
+        "duration": 2703.233867
+      }
+    },
+    {
+      "id": "s5e3",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Naming Names",
+      "season": "5",
+      "episode": "3",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x03 Party of Five Naming Names.avi",
+      "metadata": {
+        "duration": 2661.325333
+      }
+    },
+    {
+      "id": "s5e4",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five A Mid-Semester's Night Dream",
+      "season": "5",
+      "episode": "4",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x04 Party of Five A Mid-Semester's Night Dream.avi",
+      "metadata": {
+        "duration": 2854.218033
+      }
+    },
+    {
+      "id": "s5e5",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five The Baby",
+      "season": "5",
+      "episode": "5",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x05 Party of Five The Baby.avi",
+      "metadata": {
+        "duration": 2722.986933
+      }
+    },
+    {
+      "id": "s5e6",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Forgive and or Forget",
+      "season": "5",
+      "episode": "6",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x06 Party of Five Forgive and or Forget.avi",
+      "metadata": {
+        "duration": 2811.842367
+      }
+    },
+    {
+      "id": "s5e7",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Tender Age",
+      "season": "5",
+      "episode": "7",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x07 Party of Five Tender Age.avi",
+      "metadata": {
+        "duration": 2763.026933
+      }
+    },
+    {
+      "id": "s5e8",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Love and War",
+      "season": "5",
+      "episode": "8",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x08 Party of Five Love and War.avi",
+      "metadata": {
+        "duration": 2714.178133
+      }
+    },
+    {
+      "id": "s5e9",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Gifts",
+      "season": "5",
+      "episode": "9",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x09 Party of Five Gifts.avi",
+      "metadata": {
+        "duration": 2733.9312
+      }
+    },
+    {
+      "id": "s5e10",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five One Christmas to Go",
+      "season": "5",
+      "episode": "10",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x10 Party of Five One Christmas to Go.avi",
+      "metadata": {
+        "duration": 2736.500433
+      }
+    },
+    {
+      "id": "s5e11",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Rings of Saturn",
+      "season": "5",
+      "episode": "11",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x11 Party of Five Rings of Saturn.avi",
+      "metadata": {
+        "duration": 2740.2375
+      }
+    },
+    {
+      "id": "s5e12",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Witness for the Persecution",
+      "season": "5",
+      "episode": "12",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x12 Party of Five Witness for the Persecution.avi",
+      "metadata": {
+        "duration": 2710.8081
+      }
+    },
+    {
+      "id": "s5e13",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Fillmore Street",
+      "season": "5",
+      "episode": "13",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x13 Party of Five Fillmore Street.avi",
+      "metadata": {
+        "duration": 2746.510433
+      }
+    },
+    {
+      "id": "s5e14",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Stand by Me",
+      "season": "5",
+      "episode": "14",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x14 Party of Five Stand by Me.avi",
+      "metadata": {
+        "duration": 2754.6519
+      }
+    },
+    {
+      "id": "s5e15",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Whatever Works",
+      "season": "5",
+      "episode": "15",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x15 Party of Five Whatever Works.avi",
+      "metadata": {
+        "duration": 2717.381333
+      }
+    },
+    {
+      "id": "s5e16",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Party of Freud",
+      "season": "5",
+      "episode": "16",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x16 Party of Five Party of Freud.avi",
+      "metadata": {
+        "duration": 2726.490433
+      }
+    },
+    {
+      "id": "s5e17",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five fam-i-ly",
+      "season": "5",
+      "episode": "17",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x17 Party of Five fam-i-ly.avi",
+      "metadata": {
+        "duration": 2678.942933
+      }
+    },
+    {
+      "id": "s5e18",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Driven to Extremes",
+      "season": "5",
+      "episode": "18",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x18 Party of Five Driven to Extremes.avi",
+      "metadata": {
+        "duration": 2780.844733
+      }
+    },
+    {
+      "id": "s5e19",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Judgment Day",
+      "season": "5",
+      "episode": "19",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x19 Party of Five Judgment Day_.avi",
+      "metadata": {
+        "duration": 2724.188133
+      }
+    },
+    {
+      "id": "s5e20",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five The Wish",
+      "season": "5",
+      "episode": "20",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x20 Party of Five The Wish .avi",
+      "metadata": {
+        "duration": 2727.758367
+      }
+    },
+    {
+      "id": "s5e21",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Get Back",
+      "season": "5",
+      "episode": "21",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x21 Party of Five Get Back.avi",
+      "metadata": {
+        "duration": 2730.160767
+      }
+    },
+    {
+      "id": "s5e22",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Fragile",
+      "season": "5",
+      "episode": "22",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x22 Party of Five Fragile.avi",
+      "metadata": {
+        "duration": 2755.419333
+      }
+    },
+    {
+      "id": "s5e23",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five I'll Show You Mine",
+      "season": "5",
+      "episode": "23",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x23 Party of Five I'll Show You Mine.avi",
+      "metadata": {
+        "duration": 2725.8231
+      }
+    },
+    {
+      "id": "s5e24",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Haunted",
+      "season": "5",
+      "episode": "24",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x24 Party of Five Haunted.avi",
+      "metadata": {
+        "duration": 2745.609533
+      }
+    },
+    {
+      "id": "s5e25",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Otherwise Engaged",
+      "season": "5",
+      "episode": "25",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 5/5x25 Party of Five Otherwise Engaged.avi",
+      "metadata": {
+        "duration": 2735.833333
+      }
+    },
+    {
+      "id": "s6e1",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Don't Let Go",
+      "season": "6",
+      "episode": "1",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x01 Party of Five Don't Let Go.avi",
+      "metadata": {
+        "duration": 2773.5708
+      }
+    },
+    {
+      "id": "s6e2",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Naked",
+      "season": "6",
+      "episode": "2",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x02 Party of Five Naked.avi",
+      "metadata": {
+        "duration": 2655.586267
+      }
+    },
+    {
+      "id": "s6e3",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Bye, Bye, Love",
+      "season": "6",
+      "episode": "3",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x03 Party of Five Bye, Bye, Love.avi",
+      "metadata": {
+        "duration": 2564.895667
+      }
+    },
+    {
+      "id": "s6e4",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Wrestling Demons",
+      "season": "6",
+      "episode": "4",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x04 Party of Five Wrestling Demons.avi",
+      "metadata": {
+        "duration": 2986.5836
+      }
+    },
+    {
+      "id": "s6e5",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five The Shortest Distance",
+      "season": "6",
+      "episode": "5",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x05 Party of Five The Shortest Distance .avi",
+      "metadata": {
+        "duration": 2631.095133
+      }
+    },
+    {
+      "id": "s6e6",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Too Close",
+      "season": "6",
+      "episode": "6",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x06 Party of Five Too Close.avi",
+      "metadata": {
+        "duration": 2674.204867
+      }
+    },
+    {
+      "id": "s6e7",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five We Gather Together",
+      "season": "6",
+      "episode": "7",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x07 Party of Five We Gather Together.avi",
+      "metadata": {
+        "duration": 2713.3106
+      }
+    },
+    {
+      "id": "s6e8",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Faith, Hope and Charity",
+      "season": "6",
+      "episode": "8",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x08 Party of Five Faith, Hope and Charity.avi",
+      "metadata": {
+        "duration": 2680.1775
+      }
+    },
+    {
+      "id": "s6e9",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Ties That Bind",
+      "season": "6",
+      "episode": "9",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x09 Party of Five Ties That Bind.avi",
+      "metadata": {
+        "duration": 2648.7461
+      }
+    },
+    {
+      "id": "s6e10",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Dog Day After New Year",
+      "season": "6",
+      "episode": "10",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x10 Party of Five Dog Day After New Year.avi",
+      "metadata": {
+        "duration": 2650.381067
+      }
+    },
+    {
+      "id": "s6e11",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Fear and Loathing",
+      "season": "6",
+      "episode": "11",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x11 Party of Five Fear and Loathing.avi",
+      "metadata": {
+        "duration": 2660.791467
+      }
+    },
+    {
+      "id": "s6e12",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Bad Behavior",
+      "season": "6",
+      "episode": "12",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x12 Party of Five Bad Behavior.avi",
+      "metadata": {
+        "duration": 2590.454533
+      }
+    },
+    {
+      "id": "s6e13",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five The Declaration of Co-Dependence",
+      "season": "6",
+      "episode": "13",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x13 Party of Five The Declaration of Co-Dependence.avi",
+      "metadata": {
+        "duration": 2649.880567
+      }
+    },
+    {
+      "id": "s6e14",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five One for the Road",
+      "season": "6",
+      "episode": "14",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x14 Party of Five One for the Road.avi",
+      "metadata": {
+        "duration": 2617.147867
+      }
+    },
+    {
+      "id": "s6e15",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five What If",
+      "season": "6",
+      "episode": "15",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x15 Party of Five What If.avi",
+      "metadata": {
+        "duration": 2700.8982
+      }
+    },
+    {
+      "id": "s6e16",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Blast the Past",
+      "season": "6",
+      "episode": "16",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x16 Party of Five Blast the Past.avi",
+      "metadata": {
+        "duration": 2694.725367
+      }
+    },
+    {
+      "id": "s6e17",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Getting There",
+      "season": "6",
+      "episode": "17",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x17 Party of Five Getting There.avi",
+      "metadata": {
+        "duration": 2538.102233
+      }
+    },
+    {
+      "id": "s6e18",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Too Cool for School",
+      "season": "6",
+      "episode": "18",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x18 Party of Five Too Cool for School.avi",
+      "metadata": {
+        "duration": 2637.1345
+      }
+    },
+    {
+      "id": "s6e19",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Isn't It Romantic",
+      "season": "6",
+      "episode": "19",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x19 Party of Five Isn't It Romantic.avi",
+      "metadata": {
+        "duration": 2579.343433
+      }
+    },
+    {
+      "id": "s6e20",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Great Expectations",
+      "season": "6",
+      "episode": "20",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x20 Party of Five Great Expectations .avi",
+      "metadata": {
+        "duration": 2530.861667
+      }
+    },
+    {
+      "id": "s6e21",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Taboo or Not Taboo",
+      "season": "6",
+      "episode": "21",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x21 Party of Five Taboo or Not Taboo.avi",
+      "metadata": {
+        "duration": 2694.3917
+      }
+    },
+    {
+      "id": "s6e22",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five Falling Forward",
+      "season": "6",
+      "episode": "22",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x22 Party of Five Falling Forward.avi",
+      "metadata": {
+        "duration": 2590.7882
+      }
+    },
+    {
+      "id": "s6e23",
+      "kind": "show",
+      "series": "Party of Five",
+      "title": "Party of Five All's Well,,.that ends well",
+      "season": "6",
+      "episode": "23",
+      "filename": "/Shows/Party of Five - Complete Series (S01-06)/Party of Five Season 6/6x23 Party of Five All's Well,,.that ends well.avi",
+      "metadata": {
+        "duration": 5268.229633
+      }
+    }
+  ],
+  "records": [
+    {
+      "Title": "Pilot",
+      "Season": "1",
+      "Episode": "1",
+      "imdbID": "tt0670343",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Homework",
+      "Season": "1",
+      "Episode": "2",
+      "imdbID": "tt0670310",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Good Sports",
+      "Season": "1",
+      "Episode": "3",
+      "imdbID": "tt0670299",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Worth Waiting For",
+      "Season": "1",
+      "Episode": "4",
+      "imdbID": "tt0670388",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "All's Fair",
+      "Season": "1",
+      "Episode": "5",
+      "imdbID": "tt0670255",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Fathers and Sons",
+      "Season": "1",
+      "Episode": "6",
+      "imdbID": "tt0670282",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Much Ado",
+      "Season": "1",
+      "Episode": "7",
+      "imdbID": "tt0670328",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Kiss Me Kate",
+      "Season": "1",
+      "Episode": "8",
+      "imdbID": "tt0670320",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Something Out of Nothing",
+      "Season": "1",
+      "Episode": "9",
+      "imdbID": "tt0670356",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Thanksgiving",
+      "Season": "1",
+      "Episode": "10",
+      "imdbID": "tt0670365",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Private Lives",
+      "Season": "1",
+      "Episode": "11",
+      "imdbID": "tt0670347",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Games People Play",
+      "Season": "1",
+      "Episode": "12",
+      "imdbID": "tt0670291",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Grownups",
+      "Season": "1",
+      "Episode": "13",
+      "imdbID": "tt0670302",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "It's Not Easy Being Green",
+      "Season": "1",
+      "Episode": "15",
+      "imdbID": "tt0670318",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Aftershocks",
+      "Season": "1",
+      "Episode": "16",
+      "imdbID": "tt0670254",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Brother's Keeper",
+      "Season": "1",
+      "Episode": "19",
+      "imdbID": "tt0670265",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "The Trouble with Charlie",
+      "Season": "1",
+      "Episode": "20",
+      "imdbID": "tt0670371",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "The Ides of March",
+      "Season": "1",
+      "Episode": "22",
+      "imdbID": "tt0670368",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Ready or Not",
+      "Season": "2",
+      "Episode": "1",
+      "imdbID": "tt0670349",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Falsies",
+      "Season": "2",
+      "Episode": "2",
+      "imdbID": "tt0670279",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Dearly Beloved",
+      "Season": "2",
+      "Episode": "3",
+      "imdbID": "tt0670272",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Have No Fear",
+      "Season": "2",
+      "Episode": "4",
+      "imdbID": "tt0670306",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Change Partners... and Dance",
+      "Season": "2",
+      "Episode": "5",
+      "imdbID": "tt0670267",
+      "Runtime": "43 min"
+    },
+    {
+      "Title": "Analogies",
+      "Season": "2",
+      "Episode": "6",
+      "imdbID": "tt0670259",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Where There's Smoke",
+      "Season": "2",
+      "Episode": "7",
+      "imdbID": "tt0670385",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Best Laid Plans",
+      "Season": "2",
+      "Episode": "8",
+      "imdbID": "tt0670263",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "The Wedding",
+      "Season": "2",
+      "Episode": "9",
+      "imdbID": "tt0670372",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Grand Delusions",
+      "Season": "2",
+      "Episode": "10",
+      "imdbID": "tt0670300",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Unfair Advantage",
+      "Season": "2",
+      "Episode": "11",
+      "imdbID": "tt0670379",
+      "Runtime": "43 min"
+    },
+    {
+      "Title": "Hold on Tight",
+      "Season": "2",
+      "Episode": "12",
+      "imdbID": "tt0670309",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Poor Substitutes",
+      "Season": "2",
+      "Episode": "13",
+      "imdbID": "tt0670345",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Strange Bedfellows",
+      "Season": "2",
+      "Episode": "14",
+      "imdbID": "tt0670361",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Benefactors",
+      "Season": "2",
+      "Episode": "15",
+      "imdbID": "tt0670262",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Comings and Goings",
+      "Season": "2",
+      "Episode": "16",
+      "imdbID": "tt0670270",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Valentine's Day",
+      "Season": "2",
+      "Episode": "17",
+      "imdbID": "tt0670380",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Before and After",
+      "Season": "2",
+      "Episode": "18",
+      "imdbID": "tt0670261",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Altered States",
+      "Season": "2",
+      "Episode": "19",
+      "imdbID": "tt0670258",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Happily Ever After",
+      "Season": "2",
+      "Episode": "20",
+      "imdbID": "tt0670304",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Spring Breaks: Part 1",
+      "Season": "2",
+      "Episode": "21",
+      "imdbID": "tt0670357",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Spring Breaks: Part 2",
+      "Season": "2",
+      "Episode": "22",
+      "imdbID": "tt0670358",
+      "Runtime": "48 min"
+    },
+    {
+      "Title": "Summer Fun, Summer Not",
+      "Season": "3",
+      "Episode": "1",
+      "imdbID": "tt0670362",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Going, Going, Gone",
+      "Season": "3",
+      "Episode": "2",
+      "imdbID": "tt0670298",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Short Cuts",
+      "Season": "3",
+      "Episode": "3",
+      "imdbID": "tt0670353",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Mixed Signals",
+      "Season": "3",
+      "Episode": "5",
+      "imdbID": "tt0670326",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Going Home",
+      "Season": "3",
+      "Episode": "6",
+      "imdbID": "tt0670297",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Personal Demons",
+      "Season": "3",
+      "Episode": "7",
+      "imdbID": "tt0670342",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Not So Fast",
+      "Season": "3",
+      "Episode": "8",
+      "imdbID": "tt0670332",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Gimme Shelter",
+      "Season": "3",
+      "Episode": "9",
+      "imdbID": "tt0670295",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Close to You",
+      "Season": "3",
+      "Episode": "10",
+      "imdbID": "tt0670269",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "I Do",
+      "Season": "3",
+      "Episode": "11",
+      "imdbID": "tt0670312",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Desperate Measures",
+      "Season": "3",
+      "Episode": "12",
+      "imdbID": "tt0670273",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Christmas",
+      "Season": "3",
+      "Episode": "13",
+      "imdbID": "tt0670268",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "I Declare",
+      "Season": "3",
+      "Episode": "16",
+      "imdbID": "tt0670311",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Misery Loves Company",
+      "Season": "3",
+      "Episode": "17",
+      "imdbID": "tt0670325",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "MYOB",
+      "Season": "3",
+      "Episode": "18",
+      "imdbID": "tt0670324",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Point of No Return",
+      "Season": "3",
+      "Episode": "19",
+      "imdbID": "tt0670344",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Handicaps",
+      "Season": "4",
+      "Episode": "3",
+      "imdbID": "tt0670303",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Fight or Flight",
+      "Season": "4",
+      "Episode": "5",
+      "imdbID": "tt0670284",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Immediate Family",
+      "Season": "4",
+      "Episode": "6",
+      "imdbID": "tt0670315",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Truth Be Told",
+      "Season": "4",
+      "Episode": "9",
+      "imdbID": "tt0670378",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Empty Shoes",
+      "Season": "4",
+      "Episode": "12",
+      "imdbID": "tt0670277",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Parent Trap",
+      "Season": "4",
+      "Episode": "13",
+      "imdbID": "tt0670339",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Of Human Bonding",
+      "Season": "4",
+      "Episode": "14",
+      "imdbID": "tt0670333",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Here and Now",
+      "Season": "4",
+      "Episode": "15",
+      "imdbID": "tt0670307",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "I Give Up",
+      "Season": "4",
+      "Episode": "16",
+      "imdbID": "tt0670313",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Of Sound Mind and Body",
+      "Season": "4",
+      "Episode": "17",
+      "imdbID": "tt0670334",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "True or False",
+      "Season": "4",
+      "Episode": "18",
+      "imdbID": "tt0670377",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Go Away",
+      "Season": "4",
+      "Episode": "19",
+      "imdbID": "tt0670296",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Moving On",
+      "Season": "5",
+      "Episode": "1",
+      "imdbID": "tt0670327",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Separation Anxiety",
+      "Season": "5",
+      "Episode": "2",
+      "imdbID": "tt0670352",
+      "Runtime": "60 min"
+    },
+    {
+      "Title": "Forgive and/or Forget",
+      "Season": "5",
+      "Episode": "6",
+      "imdbID": "tt0670288",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Love and War",
+      "Season": "5",
+      "Episode": "8",
+      "imdbID": "tt0670323",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Rings of Saturn",
+      "Season": "5",
+      "Episode": "11",
+      "imdbID": "tt0670350",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Stand by Me",
+      "Season": "5",
+      "Episode": "14",
+      "imdbID": "tt0670360",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Whatever Works",
+      "Season": "5",
+      "Episode": "15",
+      "imdbID": "tt0670384",
+      "Runtime": "46 min"
+    },
+    {
+      "Title": "Party of Freud",
+      "Season": "5",
+      "Episode": "16",
+      "imdbID": "tt0670340",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Driven to Extremes",
+      "Season": "5",
+      "Episode": "18",
+      "imdbID": "tt0670276",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "The Wish",
+      "Season": "5",
+      "Episode": "20",
+      "imdbID": "tt0670373",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Wrestling Demons",
+      "Season": "6",
+      "Episode": "4",
+      "imdbID": "tt0670389",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "The Shortest Distance",
+      "Season": "6",
+      "Episode": "5",
+      "imdbID": "tt0670370",
+      "Runtime": "45 min"
+    },
+    {
+      "Title": "Too Close",
+      "Season": "6",
+      "Episode": "6",
+      "imdbID": "tt0670375",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "We Gather Together",
+      "Season": "6",
+      "Episode": "7",
+      "imdbID": "tt0670381",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Fate, Hope and Charity",
+      "Season": "6",
+      "Episode": "8",
+      "imdbID": "tt0670281",
+      "Runtime": "N/A"
+    },
+    {
+      "Title": "Ties That Bind",
+      "Season": "6",
+      "Episode": "9",
+      "imdbID": "tt0670374",
+      "Runtime": "43 min"
+    },
+    {
+      "Title": "Dog Day After New Year",
+      "Season": "6",
+      "Episode": "10",
+      "imdbID": "tt0670274",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Fear and Loathing",
+      "Season": "6",
+      "Episode": "11",
+      "imdbID": "tt0670283",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "One for the Road",
+      "Season": "6",
+      "Episode": "14",
+      "imdbID": "tt0670336",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "What If...",
+      "Season": "6",
+      "Episode": "15",
+      "imdbID": "tt0670382",
+      "Runtime": "44 min"
+    },
+    {
+      "Title": "Blast from the Past",
+      "Season": "6",
+      "Episode": "16",
+      "imdbID": "tt0670264",
+      "Runtime": "N/A"
+    },
+    {
+      "Title": "Too Cool for School",
+      "Season": "6",
+      "Episode": "18",
+      "imdbID": "tt0670376",
+      "Runtime": "44 min"
+    }
+  ],
+  "expected": {
+    "s1e1": "tt0670343",
+    "s1e2": "tt0670310",
+    "s1e3": "tt0670299",
+    "s1e4": "tt0670388",
+    "s1e5": "tt0670255",
+    "s1e6": "tt0670282",
+    "s1e7": "tt0670328",
+    "s1e8": "tt0670320",
+    "s1e9": "tt0670356",
+    "s1e10": "tt0670365",
+    "s1e11": "tt0670347",
+    "s1e12": "tt0670291",
+    "s1e13": "tt0670302",
+    "s1e14": null,
+    "s1e15": "tt0670318",
+    "s1e16": "tt0670254",
+    "s1e17": null,
+    "s1e18": null,
+    "s1e19": "tt0670265",
+    "s1e20": "tt0670371",
+    "s1e21": null,
+    "s1e22": "tt0670368",
+    "s2e1": "tt0670349",
+    "s2e2": "tt0670279",
+    "s2e3": "tt0670272",
+    "s2e4": "tt0670306",
+    "s2e5": "tt0670267",
+    "s2e6": "tt0670259",
+    "s2e7": "tt0670385",
+    "s2e8": "tt0670263",
+    "s2e9": "tt0670372",
+    "s2e10": "tt0670300",
+    "s2e11": "tt0670379",
+    "s2e12": "tt0670309",
+    "s2e13": "tt0670345",
+    "s2e14": "tt0670361",
+    "s2e15": "tt0670262",
+    "s2e16": "tt0670270",
+    "s2e17": "tt0670380",
+    "s2e18": "tt0670261",
+    "s2e19": "tt0670258",
+    "s2e20": "tt0670304",
+    "s2e21": "tt0670357",
+    "s2e22": "tt0670358",
+    "s3e1": "tt0670362",
+    "s3e2": "tt0670298",
+    "s3e3": "tt0670353",
+    "s3e4": null,
+    "s3e5": "tt0670326",
+    "s3e6": "tt0670297",
+    "s3e7": "tt0670342",
+    "s3e8": "tt0670332",
+    "s3e9": "tt0670295",
+    "s3e10": "tt0670269",
+    "s3e11": "tt0670312",
+    "s3e12": "tt0670273",
+    "s3e13": "tt0670268",
+    "s3e14": null,
+    "s3e15": null,
+    "s3e16": "tt0670311",
+    "s3e17": "tt0670325",
+    "s3e18": "tt0670324",
+    "s3e19": "tt0670344",
+    "s3e20": null,
+    "s3e21": null,
+    "s3e22": null,
+    "s3e23": null,
+    "s3e24": null,
+    "s3e25": null,
+    "s4e1": null,
+    "s4e2": null,
+    "s4e3": "tt0670303",
+    "s4e4": null,
+    "s4e5": "tt0670284",
+    "s4e6": "tt0670315",
+    "s4e7": null,
+    "s4e8": null,
+    "s4e9": "tt0670378",
+    "s4e10": null,
+    "s4e11": null,
+    "s4e12": "tt0670277",
+    "s4e13": "tt0670339",
+    "s4e14": "tt0670333",
+    "s4e15": "tt0670307",
+    "s4e16": "tt0670313",
+    "s4e17": "tt0670334",
+    "s4e18": "tt0670377",
+    "s4e19": "tt0670296",
+    "s4e20": null,
+    "s4e22": null,
+    "s4e23": null,
+    "s4e24": null,
+    "s5e1": "tt0670327",
+    "s5e2": "tt0670352",
+    "s5e3": null,
+    "s5e4": null,
+    "s5e5": null,
+    "s5e6": "tt0670288",
+    "s5e7": null,
+    "s5e8": "tt0670323",
+    "s5e9": null,
+    "s5e10": null,
+    "s5e11": "tt0670350",
+    "s5e12": null,
+    "s5e13": null,
+    "s5e14": "tt0670360",
+    "s5e15": "tt0670384",
+    "s5e16": "tt0670340",
+    "s5e17": null,
+    "s5e18": "tt0670276",
+    "s5e19": null,
+    "s5e20": "tt0670373",
+    "s5e21": null,
+    "s5e22": null,
+    "s5e23": null,
+    "s5e24": null,
+    "s5e25": null,
+    "s6e1": null,
+    "s6e2": null,
+    "s6e3": null,
+    "s6e4": "tt0670389",
+    "s6e5": "tt0670370",
+    "s6e6": "tt0670375",
+    "s6e7": "tt0670381",
+    "s6e8": "tt0670281",
+    "s6e9": "tt0670374",
+    "s6e10": "tt0670274",
+    "s6e11": "tt0670283",
+    "s6e12": null,
+    "s6e13": null,
+    "s6e14": "tt0670336",
+    "s6e15": "tt0670382",
+    "s6e16": "tt0670264",
+    "s6e17": null,
+    "s6e18": "tt0670376",
+    "s6e19": null,
+    "s6e20": null,
+    "s6e21": null,
+    "s6e22": null,
+    "s6e23": null
+  }
+}

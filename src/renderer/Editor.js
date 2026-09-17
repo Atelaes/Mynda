@@ -8,6 +8,7 @@ const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const hashObject = require('object-hash');
 const OmdbHelper = require('../tagging/OmdbHelper.js');
+const TaggingEvidence = require('../tagging/TaggingEvidence');
 const {parseBoxOffice, formatBoxOffice} = require('../library/BoxOffice.js');
 const {
   library,
@@ -160,6 +161,7 @@ class MynEditor extends MynOpenablePane {
       this.state.changed.add('seriesImdbID');
     }
 
+    if (update.id !== 'batch') update = TaggingEvidence.markUserEdit(update,suppliedChanges);
     this._isMounted && this.setState({video : update});
 
     // just for debugging:
@@ -561,6 +563,11 @@ class MynEditor extends MynOpenablePane {
           // replaceMediaBatch() will merge every prepared video into the
           // freshest media array and commit that array with one library write.
           let temp = _.cloneDeep(video);
+          const identityChanges = {};
+          for (const field of ['imdbID','seriesImdbID']) {
+            if (this.state.changed.has(field)) identityChanges[field] = temp[field];
+          }
+          temp = TaggingEvidence.markUserEdit(temp,identityChanges);
           temp.seriesImdbID = temp.kind === 'show' &&
             typeof temp.seriesImdbID === 'string' ? temp.seriesImdbID : '';
           temp.autotag_tried = false; // reset this flag whenever a video is saved
@@ -840,6 +847,8 @@ class MynEditor extends MynOpenablePane {
 class MynEditorSearch extends React.Component {
   constructor(props) {
     super(props)
+    this._proposals = new Map();
+    this._nextProposal = 0;
 
     this.state = {
       results: null,
@@ -900,29 +909,26 @@ class MynEditorSearch extends React.Component {
     }
 
     this.setState({searching:true});
-    let resultsObject = await OmdbHelper.search(this.props.video);
+    this._proposals.clear();
+    const selection = editorSelectionKey(this.props.video,this.props.batch);
+    const resultsObject = await OmdbHelper.resolve(this.props.video);
+    if (selection !== editorSelectionKey(this.props.video,this.props.batch)) return;
     this.setState({searching:false});
     //console.log(results);
     let results;
-    if (resultsObject.success) {
-      results = resultsObject.data;
-      if (!Array.isArray(results)) {
-        results = [
-          {
-            Poster: results.artwork,
-            Title: results.title,
-            Type: results.kind === 'show' ? 'episode' : (results.type || results.kind),
-            Year: results.year,
-            imdbID: results.imdbID
-          }
-        ];
-      }
-    } else if (resultsObject.choiceType === 'series' && Array.isArray(resultsObject.choices) && resultsObject.choices.length > 0) {
-      // OmdbHelper does not decide whether ambiguity is fatal. Automatic
-      // tagging leaves these choices unresolved, while the editor lets the
-      // user select the intended series and then retrieves that exact episode.
+    if (resultsObject.status === 'candidate') {
+      // Keep the unmodified proposal. Previewing a choice must neither apply
+      // metadata nor download artwork, and selecting it need not fetch it again.
+      const token = String(++this._nextProposal);
+      this._proposals.set(token,resultsObject);
+      results = [{...resultsObject.candidate.record,myndaProposalID:token}];
+    } else if (resultsObject.status === 'ambiguous' && resultsObject.choices.length) {
       results = resultsObject.choices;
     } else {
+      if (resultsObject.status === 'service-error') {
+        alert('The catalog could not complete this request. Please try again.');
+        return;
+      }
       alert('No results found! For shows, check the series, season, and episode. For other videos, try editing the title and year, or enter the IMDb ID for an exact match.');
       return;
     }
@@ -944,7 +950,9 @@ class MynEditorSearch extends React.Component {
       return;
     }
 
-    let movies = displayableResults.map((movie) => {
+    let movies = displayableResults.map((record) => {
+      // Only serializable row data travels through the confirmation dialog.
+      const movie = {...record,myndaInputID:this.props.video.id};
 
       if (!isValidURL(movie.Poster)) {
         movie.Poster = this.props.placeholderImage;
@@ -987,36 +995,49 @@ class MynEditorSearch extends React.Component {
     }
   }
 
-  retrieveResult(movie) {
+  async retrieveResult(movie) {
+    if (movie.myndaInputID && movie.myndaInputID !== this.props.video.id) return;
+    const proposal = movie.myndaProposalID && this._proposals.get(movie.myndaProposalID);
+    if (movie.myndaProposalID && !proposal) return;
+    if (proposal && JSON.stringify(proposal.context.originalInput) !==
+        JSON.stringify(TaggingEvidence.snapshot(this.props.video))) {
+      this.clearSearch();
+      alert('The video changed after this search. Search again before choosing a result.');
+      return;
+    }
     // clear the search results
     this.clearSearch();
 
     // A series choice identifies which show owns the already-known season and
     // episode. Ordinary movie/episode result rows continue to be retrieved by
     // their own IMDb ID as before.
-    let searchTarget = movie.myndaChoiceType === 'series' ? this.props.video : movie;
-    let searchOptions = movie.myndaChoiceType === 'series' ? {seriesImdbID: movie.imdbID} : {};
-    OmdbHelper.search(searchTarget, searchOptions).then(responseObject => {
-      if (!responseObject.success) {
-        alert(movie.myndaChoiceType === 'series' ?
-          'OMDb could not find this episode in the selected series.' :
-          'OMDb could not retrieve the selected result.');
-        editorLog.warn('Could not retrieve the selected OMDb result', {
-          choiceType: movie.myndaChoiceType || 'result',
-          imdbID: movie.imdbID,
-          error: responseObject.data
-        });
-        return;
-      } else {
-        this.props.handleChange(responseObject.data);
-      }
-    })
+    let searchTarget = movie.myndaChoiceType === 'series' ? this.props.video :
+      {...this.props.video,imdbID:movie.imdbID};
+    let searchOptions = movie.myndaChoiceType === 'series' ?
+      {seriesImdbID:movie.imdbID,seriesSelectionSource:'user'} : {imdbIDSource:'user'};
+    const responseObject = proposal ?
+      await OmdbHelper.applyMatch(proposal,{recordSelectionSource:'user'}) :
+      await OmdbHelper.tag(searchTarget,searchOptions);
+    if (responseObject.status !== 'matched') {
+      alert(movie.myndaChoiceType === 'series' ?
+        'OMDb could not find this episode in the selected series.' :
+        'OMDb could not retrieve the selected result.');
+      editorLog.warn('Could not retrieve the selected OMDb result', {
+        choiceType: movie.myndaChoiceType || 'result',
+        imdbID: movie.imdbID,
+        error:responseObject.reason
+      });
+      return;
+    } else {
+      this.props.handleChange(responseObject.video);
+    }
   }
 
   componentDidUpdate(previousProps) {
     const previousSelection = editorSelectionKey(previousProps.video, previousProps.batch);
     const currentSelection = editorSelectionKey(this.props.video, this.props.batch);
     if (previousSelection !== currentSelection && (this.state.results || this.state.searching)) {
+      this._proposals.clear();
       // Search rows belong to one concrete video. Never carry them into a
       // different video—or into a batch where selecting one row would apply a
       // single title's metadata to every selected item.

@@ -1,0 +1,221 @@
+{
+  "provenance": "Original local titles and candidate titles recorded in the fix82 library; all 36 unverified-title cases for The Blacklist and Quantum Leap, including six with additional wording differences.",
+  "pairs": [
+    {
+      "series": "Quantum Leap",
+      "local": "Genesis",
+      "catalog": "Genesis: Part 1 - September 13, 1956",
+      "id": "tt0098151"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Jimmy",
+      "catalog": "Jimmy - October 14, 1964",
+      "id": "tt0681131"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Freedom",
+      "catalog": "Freedom - November 22, 1970",
+      "id": "tt0681117"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "The Boogieman",
+      "catalog": "The Boogieman - October 31, 1964",
+      "id": "tt0681174"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "The Great Spontini Line",
+      "catalog": "The Great Spontini - May 9, 1974",
+      "id": "tt0681177"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Runaway",
+      "catalog": "Runaway - July 4, 1964",
+      "id": "tt0681162"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "8 and a Half Months",
+      "catalog": "8\u00bd Months - November 15, 1955",
+      "id": "tt0681096"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Hurricane",
+      "catalog": "Hurricane - August 17, 1969",
+      "id": "tt0681129"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Justice",
+      "catalog": "Justice - May 11, 1965",
+      "id": "tt0681132"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Raped",
+      "catalog": "Raped - June 20, 1980",
+      "id": "tt0681157"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Dreams",
+      "catalog": "Dreams - February 28, 1979",
+      "id": "tt0681116"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Unchained",
+      "catalog": "Unchained - November 2, 1956",
+      "id": "tt0681190"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Roberto",
+      "catalog": "Roberto! - January 27, 1982",
+      "id": "tt0681161"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Trilogy 1 One Little Heart",
+      "catalog": "Trilogy: Part 1 - August 8, 1955",
+      "id": "tt0681187"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Trilogy 2 For Your Love",
+      "catalog": "Trilogy: Part 2 - June 14, 1966",
+      "id": "tt0681188"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Trilogy 3 The Last Door",
+      "catalog": "Trilogy: Part 3 - July 28, 1978",
+      "id": "tt0681189"
+    },
+    {
+      "series": "Quantum Leap",
+      "local": "Liberation",
+      "catalog": "Liberation - October 16, 1968",
+      "id": "tt0681140"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Freelancer",
+      "catalog": "The Freelancer (No. 145)",
+      "id": "tt3173404"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "Wujing",
+      "catalog": "Wujing (No. 84)",
+      "id": "tt3173406"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Stewmaker",
+      "catalog": "The Stewmaker (No. 161)",
+      "id": "tt3173408"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Courier",
+      "catalog": "The Courier (No. 85)",
+      "id": "tt3173410"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Alchemist",
+      "catalog": "The Alchemist (No. 101)",
+      "id": "tt3276456"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Judge",
+      "catalog": "The Judge (No. 57)",
+      "id": "tt3276462"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "Ivan",
+      "catalog": "Ivan (No. 88)",
+      "id": "tt3276466"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Kingmaker",
+      "catalog": "The Kingmaker (No. 42)",
+      "id": "tt3276472"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "Berlin",
+      "catalog": "Berlin (No. 8)",
+      "id": "tt3276474"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Front",
+      "catalog": "The Front (No. 74)",
+      "id": "tt4054174"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Scimitar",
+      "catalog": "The Scimitar (No. 22)",
+      "id": "tt4094332"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Decembrist",
+      "catalog": "The Decembrist (No. 12)",
+      "id": "tt4156774"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Major",
+      "catalog": "The Major (No. 75)",
+      "id": "tt4472210"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "Karakurt",
+      "catalog": "Karakurt (No. 55)",
+      "id": "tt4578448"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Djinn",
+      "catalog": "The Djinn (No. 43)",
+      "id": "tt5015108"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Director",
+      "catalog": "The Director (No. 24)",
+      "id": "tt5135540"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Vehm",
+      "catalog": "The Vehm (No. 132)",
+      "id": "tt5182070"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "Drexel",
+      "catalog": "Drexel (No. 113)",
+      "id": "tt5182076"
+    },
+    {
+      "series": "The Blacklist",
+      "local": "The Caretaker",
+      "catalog": "The Caretaker (No. 78)",
+      "id": "tt5182078"
+    }
+  ]
+}

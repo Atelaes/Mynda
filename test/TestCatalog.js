@@ -2,6 +2,58 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/SeriesEvidence.integration.test.js',title:'Incomplete catalog evidence and release collections',
+    protects:'recorded parent observations, positive season counts, inferred seasons, bounded candidates, release suffixes and numbering origins'},
+  {category:'integration',file:'test/EpisodeTitleAnnotations.integration.test.js',title:'Episode title annotations and correction boundaries',
+    protects:'recorded annotation pairs, original title evidence, exact corrections, duplicate cores, parts and fuzzy sanity'},
+  {category:'integration',file:'test/SeriesStructure.integration.test.js',title:'Series structure and numbered episode acceptance',
+    protects:'two-season lower-bound counts, single-season upper bounds, cross-season contradictions, duplicates, catalog gaps and request budgets'},
+  {category:'integration',file:'test/SeriesCollection.integration.test.js',title:'Series collection identity and local episode order',
+    protects:'cross-season identity, explicit conflicts, independent witnesses, repeated series prefixes, final retry outcomes and shuffled processing'},
+  {category:'component',file:'test/TaggingEditor.component.test.js',title:'Tagging editor provenance',
+    protects:'manual identity authorship, retained automatic evidence, one application per confirmed preview and stale selection rejection'},
+  {category:'integration',file:'test/TaggingArchitecture.integration.test.js',title:'Tagging architectural contracts',
+    protects:'final acceptance ownership, shared budgets, durable identity provenance, run boundaries and exhaustive small-batch permutations'},
+  {category:'integration',file:'test/TaggingPrecision.integration.test.js',title:'Tagging precision and evidence provenance',
+    protects:'short titles, independent sibling evidence, order conflicts, ambiguity, cancellation and movie title expansion'},
+  {category:'unit',file:'test/CatalogClient.unit.test.js',title:'Catalog request reuse',
+    protects:'concurrent reuse, transient failure eviction, session scope and deduplicated episode probes'},
+  {
+      "category": "unit",
+      "file": "test/SeriesSearch.unit.test.js",
+      "title": "Conservative series discovery queries",
+      "protects": "full-title identity, reviewed aliases, cleanup, query caps and explicit region constraints"
+  },
+  {
+      "category": "integration",
+      "file": "test/OmdbSeries.integration.test.js",
+      "title": "OMDb series discovery and batch reuse",
+      "protects": "new discovery queries, preserved episode checks, bounded pagination, batch query sharing and retryable errors"
+  },
+  {
+      "category": "integration",
+      "file": "test/HistoricalTagging.integration.test.js",
+      "title": "Individual historical tagging regressions",
+      "protects": "1921 recorded searches and 63 individual numbering corrections from the project history"
+  },
+  {
+      "category": "integration",
+      "file": "test/HistoricalMovies.integration.test.js",
+      "title": "Individual fix03\u2013fix05 movie discoveries",
+      "protects": "73 individual movie improvements from the saved before/after libraries and corrected catalog IDs"
+  },
+  {
+      "category": "integration",
+      "file": "test/OmdbHistoricalBehaviors.integration.test.js",
+      "title": "Historical tagging workflows",
+      "protects": "named artwork fallbacks, failed-download caching, series-ID handoff, explicit IDs and batch choices"
+  },
+  {
+    category: 'integration',
+    file: 'test/AutoTagRecovery.integration.test.js',
+    title: 'Automatic series recovery and save accounting',
+    protects: 'directory-scoped sibling evidence, single bounded retry, final save order, cancellation, and per-file statistics'
+  },
   {
     category: 'integration',
     file: 'test/SourceLayout.integration.test.js',

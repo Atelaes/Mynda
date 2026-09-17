@@ -1,0 +1,122 @@
+[
+  {
+    "series": "Elfen Lied",
+    "seriesID": "tt0480489",
+    "title": "Encounter",
+    "episodeID": "tt0909536",
+    "season": "1",
+    "episode": "1"
+  },
+  {
+    "series": "The Wire",
+    "seriesID": "tt0306414",
+    "title": "Sentencing",
+    "episodeID": "tt0749441",
+    "season": 1,
+    "episode": 13
+  },
+  {
+    "series": "Dexter",
+    "seriesID": "tt0773262",
+    "title": "Popping Cherry",
+    "episodeID": "tt0828745",
+    "season": 1,
+    "episode": 3
+  },
+  {
+    "series": "Adventure Time",
+    "seriesID": "tt1305826",
+    "title": "It Came from the Nightosphere",
+    "episodeID": "tt1748406",
+    "season": "2",
+    "episode": "1"
+  },
+  {
+    "series": "The West Wing",
+    "seriesID": "tt0200276",
+    "title": "Evidence of Things Not Seen",
+    "episodeID": "tt0745618",
+    "season": "4",
+    "episode": "20"
+  },
+  {
+    "series": "The White Lotus",
+    "seriesID": "tt13406094",
+    "title": "Departures",
+    "episodeID": "tt13868058",
+    "season": "1",
+    "episode": "6"
+  },
+  {
+    "series": "The Prisoner",
+    "seriesID": "tt0061287",
+    "title": "A. B. and C.",
+    "episodeID": "tt0679173",
+    "season": "1",
+    "episode": "2"
+  },
+  {
+    "series": "Twin Peaks",
+    "seriesID": "tt0098936",
+    "title": "Laura's Secret Diary",
+    "episodeID": "tt0734823",
+    "season": "2",
+    "episode": "4"
+  },
+  {
+    "series": "Vikings",
+    "seriesID": "tt2306299",
+    "title": "Trial",
+    "episodeID": "tt2245920",
+    "season": "1",
+    "episode": "4"
+  },
+  {
+    "series": "11.22.63",
+    "seriesID": "tt2879552",
+    "title": "Other Voices, Other Rooms",
+    "episodeID": "tt4587208",
+    "season": "1",
+    "episode": "3"
+  },
+  {
+    "series": "Kung Fu",
+    "seriesID": "tt0068093",
+    "title": "King of the Mountain",
+    "episodeID": "tt0623166",
+    "season": "1",
+    "episode": "1"
+  },
+  {
+    "series": "ER",
+    "seriesID": "tt0108757",
+    "title": "The Birthday Party",
+    "episodeID": "tt0568110",
+    "season": "1",
+    "episode": "17"
+  },
+  {
+    "series": "Heroes",
+    "seriesID": "tt0813715",
+    "title": "Chapter Nineteen '.07%'",
+    "episodeID": "tt0969430",
+    "season": "1",
+    "episode": "19"
+  },
+  {
+    "series": "Law & Order: Special Victims Unit",
+    "seriesID": "tt0203259",
+    "title": "Lime Chaser",
+    "episodeID": "tt27135026",
+    "season": "24",
+    "episode": "17"
+  },
+  {
+    "series": "Party of Five",
+    "seriesID": "tt0108894",
+    "title": "Homework",
+    "episodeID": "tt0670310",
+    "season": "1",
+    "episode": "2"
+  }
+]

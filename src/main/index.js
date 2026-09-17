@@ -47,6 +47,7 @@ const backendLog = Logger.child('Backend');
 const scanLog = Logger.child('WatchfolderScan');
 const metadataLog = Logger.child('Metadata');
 const autoTagLog = Logger.child('AutoTag');
+const {createAutoTagRunner} = require('../tagging/AutoTagRunner');
 const shareLog = Logger.child('Share');
 const videoExclusionLog = Logger.child('VideoExclusion');
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
@@ -61,11 +62,11 @@ let videoAddTimers = [];
 let appStartTime = new Date();
 let watchfolderScanRunning = false;
 let watchfolderScanQueued = false;
-let autoTagRunning = false;
+const autoTagState = {running:false, cancelRequested:false, cancellationDecision:null, scope:'library'};
 let autoTagRequestPending = false;
-let autoTagCancelRequested = false;
-let autoTagCancellationDecision = null;
-let autoTagScope = 'library';
+
+
+
 
 function confirmationDialogIsDisabled(dialogName) {
   return Boolean(
@@ -152,7 +153,7 @@ const shareService = new ShareService({
   checkDiskSpace: checkDiskSpace,
   sendProgress: sendShareProgress,
   conflictingOperationActive: () =>
-    watchfolderScanRunning || autoTagRunning || autoTagRequestPending
+    watchfolderScanRunning || autoTagState.running || autoTagRequestPending
 });
 
 app.whenReady().then(start);
@@ -1587,15 +1588,7 @@ function sameSeriesShowBatch(videos) {
   };
 }
 
-function prepareSuccessfulAutoTagResult(video) {
-  // A successful video has already had its automatic attempt even when the
-  // user prefers to leave it in New for manual review.
-  video.autotag_tried = true;
-  if (library.settings.preferences.remove_autotagged_from_new) {
-    video.new = false;
-  }
-  return video;
-}
+
 
 async function requestAutoTag() {
   if (shareService.isBusy()) {
@@ -1622,7 +1615,7 @@ async function requestAutoTag() {
     return;
   }
 
-  if (autoTagRunning || autoTagRequestPending) {
+  if (autoTagState.running || autoTagRequestPending) {
     await dialog.showMessageBox({
       type: 'info',
       buttons: ['OK'],
@@ -1755,7 +1748,7 @@ async function requestSelectedAutoTag(videoIDs) {
     return;
   }
 
-  if (autoTagRunning || autoTagRequestPending) {
+  if (autoTagState.running || autoTagRequestPending) {
     await dialog.showMessageBox({
       type: 'info',
       buttons: ['OK'],
@@ -1833,21 +1826,21 @@ async function requestSelectedAutoTag(videoIDs) {
 }
 
 function requestAutoTagCancellation() {
-  if (!autoTagRunning || autoTagCancelRequested) {
+  if (!autoTagState.running || autoTagState.cancelRequested) {
     return Promise.resolve(false);
   }
-  if (autoTagCancellationDecision) {
-    return autoTagCancellationDecision;
+  if (autoTagState.cancellationDecision) {
+    return autoTagState.cancellationDecision;
   }
 
   const confirmationPreference = 'MynAutoTag-confirm-cancel';
   const cancelAutoTag = () => {
-    if (!autoTagRunning) {
+    if (!autoTagState.running) {
       autoTagLog.info('Automatic tagging finished before cancellation was requested');
       return false;
     }
 
-    autoTagCancelRequested = true;
+    autoTagState.cancelRequested = true;
     autoTagLog.info('Automatic tagging cancellation requested by user');
     win.webContents.send('status-update', {action: 'autotag', cancelRequested: true});
     return true;
@@ -1857,7 +1850,7 @@ function requestAutoTagCancellation() {
     return Promise.resolve(cancelAutoTag());
   }
 
-  autoTagCancellationDecision = dialog.showMessageBox({
+  autoTagState.cancellationDecision = dialog.showMessageBox({
     type: 'warning',
     buttons: ['Continue', 'Cancel'],
     defaultId: 0,
@@ -1865,7 +1858,7 @@ function requestAutoTagCancellation() {
     title: 'Cancel Auto-Tag',
     message: 'Cancel auto-tagging?',
     checkboxLabel: `Don't show this message again`,
-    detail: autoTagScope === 'selected' ?
+    detail: autoTagState.scope === 'selected' ?
       'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Unprocessed selected videos will be left unchanged; select them and use Auto-Tag Selected again if you want to continue.' :
       'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Videos that have not been processed will remain eligible for the next Auto-Tag run, which will pick up where it left off.'
   }).then(result => {
@@ -1884,299 +1877,20 @@ function requestAutoTagCancellation() {
     });
     return false;
   }).finally(() => {
-    autoTagCancellationDecision = null;
+    autoTagState.cancellationDecision = null;
   });
 
-  return autoTagCancellationDecision;
+  return autoTagState.cancellationDecision;
 }
 
 async function autoTag(options = {}) {
-  if (autoTagRunning) return;
-
-  options = options || {};
-  autoTagRunning = true;
-  autoTagCancelRequested = false;
-  autoTagScope = options.scope === 'selected' ? 'selected' : 'library';
-  win.webContents.send('status-update', {action: 'autotag'});
-  let newMedia = Array.isArray(options.videos) ?
-    options.videos.map(video => _.cloneDeep(video)) : getAutoTagCandidates();
-  const seriesBatch = options.seriesBatch || null;
-  let sharedSeriesImdbID = seriesBatch && validSeriesImdbID(seriesBatch.storedSeriesImdbID) ?
-    seriesBatch.storedSeriesImdbID.trim() : '';
-  if (sharedSeriesImdbID) {
-    newMedia.forEach(video => { video.seriesImdbID = sharedSeriesImdbID; });
-  }
-  let autoStats = {totalVideos: newMedia.length};
-  let autoLog = [];
-  let batchSave = []; // we'll batch several videos at a time in this array before saving to the library
-  // A title-verified adjacent-season match can make later episodes of the same
-  // series try that offset first. This map is scoped to one Auto-Tag run and is
-  // only a request-order hint; OmdbHelper still verifies every episode title.
-  let seasonOffsetHints = new Map();
-  let processedVideos = 0;
-  let seriesSelectionCanceled = false;
-  let seriesPreflightFailure = null;
-
-  autoTagLog.info('Automatic tagging batch started', {
-    totalVideos: newMedia.length,
-    scope: autoTagScope,
-    sameSeriesShowBatch: Boolean(seriesBatch),
-    series: seriesBatch && seriesBatch.series,
-    storedSeriesImdbID: sharedSeriesImdbID || undefined,
-    conflictingStoredSeriesIDs: Boolean(seriesBatch && seriesBatch.conflictingStoredSeriesIDs)
-  });
-
-  try {
-    // A homogeneous show batch must have one authoritative parent ID before
-    // any episode can enter a save batch. This looks across the full selection
-    // for a usable representative, so even ten or more incomplete episodes at
-    // the beginning cannot be flushed with stale/conflicting IDs before a later
-    // episode resolves the series.
-    if (seriesBatch && !sharedSeriesImdbID) {
-      autoTagLog.info('Selected automatic tagging series preflight started', {
-        totalVideos: newMedia.length,
-        series: seriesBatch.series,
-        conflictingStoredSeriesIDs: seriesBatch.conflictingStoredSeriesIDs,
-        storedSeriesIDs: seriesBatch.storedSeriesIDs
-      });
-
-      let preflightResult;
-      try {
-        preflightResult = await OmdbHelper.resolveSeriesForBatch(newMedia);
-      } catch(err) {
-        preflightResult = {success: false, failure: 'Error', data: err};
-      }
-
-      if (preflightResult && preflightResult.success &&
-          validSeriesImdbID(preflightResult.data)) {
-        sharedSeriesImdbID = preflightResult.data.trim();
-      } else if (preflightResult && preflightResult.choiceType === 'series' &&
-                 Array.isArray(preflightResult.choices) && preflightResult.choices.length > 0) {
-        const selectedSeries = await chooseSeriesForSelectedBatch(
-          seriesBatch, preflightResult.choices, newMedia.length
-        );
-        if (selectedSeries) {
-          sharedSeriesImdbID = selectedSeries.imdbID.trim();
-        } else {
-          seriesSelectionCanceled = true;
-        }
-      } else {
-        seriesPreflightFailure = Object.assign({}, preflightResult || {}, {
-          success: false,
-          failure: preflightResult && preflightResult.failure ?
-            preflightResult.failure : 'Series resolution failed'
-        });
-      }
-
-      if (sharedSeriesImdbID) {
-        newMedia.forEach(video => { video.seriesImdbID = sharedSeriesImdbID; });
-        autoTagLog.info('Selected automatic tagging series preflight finished', {
-          totalVideos: newMedia.length,
-          series: seriesBatch.series,
-          seriesImdbID: sharedSeriesImdbID
-        });
-      } else if (seriesSelectionCanceled) {
-        autoTagLog.info('Selected automatic tagging stopped at the preflight series choice', {
-          totalVideos: newMedia.length,
-          series: seriesBatch.series
-        });
-      } else {
-        autoTagLog.warn('Selected automatic tagging stopped because series preflight failed', {
-          totalVideos: newMedia.length,
-          series: seriesBatch.series,
-          failure: seriesPreflightFailure.failure,
-          permanentFailure: Boolean(seriesPreflightFailure.permanentFailure)
-        });
-      }
-    }
-
-    // entire library loop
-    for (let i=0; !seriesSelectionCanceled && !seriesPreflightFailure && i<newMedia.length; i++) {
-      // If a cancellation confirmation is open, do not begin another video
-      // until the user chooses whether to stop or continue.
-      if (autoTagCancellationDecision) {
-        await autoTagCancellationDecision;
-      }
-
-      // Cancellation is cooperative: finish and save the current video, then
-      // stop before beginning another one.
-      if (autoTagCancelRequested) break;
-
-      // tell the user what number we're on
-      win.webContents.send('status-update', {action: 'autotag', numCurrent: i+1, numTotal: newMedia.length});
-
-      // create new video object
-      let newVideo = newMedia[i];
-      autoTagLog.debug('Automatic tagging started for video', {
-        position: i+1,
-        totalVideos: newMedia.length,
-        id: newVideo.id,
-        filename: newVideo.filename,
-        title: newVideo.title,
-        kind: newVideo.kind,
-        year: newVideo.year,
-        series: newVideo.series,
-        seriesImdbID: newVideo.seriesImdbID,
-        season: newVideo.season,
-        episode: newVideo.episode,
-        imdbID: newVideo.imdbID
-      });
-
-      // get search results
-      let disposition = '';
-      let searchOptions = {seasonOffsetHints: seasonOffsetHints};
-      if (sharedSeriesImdbID) {
-        searchOptions.seriesImdbID = sharedSeriesImdbID;
-      }
-      let resultsObject = await OmdbHelper.search(newVideo, searchOptions);
-
-      // The preflight has already established this value for homogeneous show
-      // batches. Retain this guard so an exact episode response can normalize
-      // and reaffirm the persisted ID without changing mixed-batch behavior.
-      if (seriesBatch && resultsObject && resultsObject.success &&
-          !Array.isArray(resultsObject.data) && resultsObject.data &&
-          validSeriesImdbID(resultsObject.data.seriesImdbID)) {
-        sharedSeriesImdbID = resultsObject.data.seriesImdbID.trim();
-        newMedia.forEach(video => { video.seriesImdbID = sharedSeriesImdbID; });
-        resultsObject.data.seriesImdbID = sharedSeriesImdbID;
-      }
-
-      // check results
-      if (resultsObject.success) {
-        let results = resultsObject.data;
-        // A result array represents choices for the editor, not permission for
-        // unattended code to pick whichever OMDb happened to list first. The
-        // helper now resolves a uniquely validated movie itself and returns a
-        // video object; any remaining array is genuinely ambiguous. Record the
-        // attempt and leave the video in New for the user to choose manually.
-        if (Array.isArray(results)) {
-          newVideo.autotag_tried = true;
-          batchSave.push(newVideo);
-          disposition = results.length > 0 ? 'Ambiguous results' : 'No results';
-        } else {
-          // we got just a single result, so save it
-          results = prepareSuccessfulAutoTagResult(results);
-          batchSave.push(results);
-          // library.replace(`media.id=${newVideo.id}`, results);
-          disposition = 'Success';
-        }
-      } else if (resultsObject.failure === 'No results' || resultsObject.permanentFailure) {
-        // we got no results, but we still want to save the video object so we can set autotag_tried to true
-        //This means we've tried and failed in a predicted manner, let's not try again.
-        newVideo.autotag_tried = true;
-        batchSave.push(newVideo);
-        // library.replace(`media.id=${newVideo.id}`, newVideo);
-        disposition = resultsObject.failure;
-      } else {
-        // some other failure mode, do not save
-        disposition = resultsObject.failure;
-      }
-
-      // if we've accumulated enough videos to save, save them
-      if (batchSave.length >= 10) {
-        const completedBatch = batchSave;
-        batchSave = []; // start a fresh batch while retaining this one for the awaited save
-        await saveBatch(completedBatch);
-      }
-
-      // some debug logging
-      autoStats[disposition] = autoStats[disposition] ? autoStats[disposition] + 1 : 1;
-      autoLog.push(`${newVideo.title}: ${disposition}`);
-
-      let resultLog = {
-        id: newVideo.id,
-        filename: newVideo.filename,
-        title: newVideo.title,
-        disposition: disposition,
-        failure: resultsObject.failure,
-        failureData: resultsObject.success ? undefined : resultsObject.data,
-        permanentFailure: Boolean(resultsObject.permanentFailure)
-      };
-      if (disposition === 'Success') {
-        autoTagLog.debug('Automatic tagging finished for video', resultLog);
-      } else if (!resultsObject.success &&
-                 !['No results', 'Not enough data', 'Ambiguous results', 'Ambiguous series', 'Episode mismatch'].includes(resultsObject.failure)) {
-        autoTagLog.error('Automatic tagging failed for video', resultLog);
-      } else {
-        autoTagLog.warn('Automatic tagging did not tag video', resultLog);
-      }
-
-      processedVideos = i + 1;
-    } // end library loop
-
-    // save any leftovers at the end, including a completed video that was in
-    // progress when the user requested cancellation
-    if (batchSave.length > 0) {
-      await saveBatch(batchSave);
-    }
-
-    // A Library operation's callback fires after the local atomic write and
-    // IPC send. Wait for the renderer to confirm the final mirror operation as
-    // well, so the status banner cannot disappear while older Auto-Tag data is
-    // still capable of overwriting a subsequent editor reset.
-    autoTagLog.debug('Waiting for automatic tagging saves to synchronize', {
-      processedVideos: processedVideos
-    });
-    await library.whenIdle();
-    autoTagLog.debug('Automatic tagging saves synchronized', {
-      processedVideos: processedVideos
-    });
-
-    autoStats.processedVideos = processedVideos;
-    autoStats.remainingVideos = newMedia.length - processedVideos;
-    if (sharedSeriesImdbID) autoStats.seriesImdbID = sharedSeriesImdbID;
-    autoLog.sort();
-
-    const canceled = autoTagCancelRequested;
-    let completionStatus;
-    if (seriesSelectionCanceled) {
-      completionStatus = 'series-selection-canceled';
-      autoTagLog.info('Automatic tagging batch stopped without a series selection', {
-        scope: autoTagScope,
-        statistics: autoStats
-      });
-    } else if (seriesPreflightFailure) {
-      completionStatus = 'series-preflight-failed';
-      autoTagLog.warn('Automatic tagging batch stopped before processing because series preflight failed', {
-        scope: autoTagScope,
-        failure: seriesPreflightFailure.failure,
-        permanentFailure: Boolean(seriesPreflightFailure.permanentFailure),
-        statistics: autoStats
-      });
-    } else if (canceled) {
-      completionStatus = 'canceled';
-      autoTagLog.info('Automatic tagging batch canceled by user', {
-        scope: autoTagScope,
-        statistics: autoStats
-      });
-    } else {
-      completionStatus = 'finished';
-      autoTagLog.info('Automatic tagging batch finished', {
-        scope: autoTagScope,
-        statistics: autoStats
-      });
-    }
-    autoTagLog.debug('Automatic tagging batch diagnostics', {
-      scope: autoTagScope,
-      status: completionStatus,
-      statistics: autoStats,
-      videoResults: autoLog
-    });
-    return {
-      statistics: autoStats,
-      canceled: canceled,
-      seriesSelectionCanceled: seriesSelectionCanceled,
-      seriesPreflightFailure: seriesPreflightFailure
-    };
-  } finally {
-    autoTagRunning = false;
-    autoTagCancelRequested = false;
-    autoTagScope = 'library';
-
-    // clear the user notification whether the batch completed, was canceled,
-    // or stopped because of an unexpected error
-    win.webContents.send('status-update', {action: ''});
-  }
+  return createAutoTagRunner({
+    state: autoTagState, catalog: OmdbHelper, log: autoTagLog,
+    getCandidates: getAutoTagCandidates, save: saveBatch,
+    notifyStatus: status => win.webContents.send('status-update', status),
+    chooseSeries: chooseSeriesForSelectedBatch, preferences: library.settings.preferences,
+    whenIdle: () => library.whenIdle()
+  })(options);
 }
 
 function saveBatch(batch) {
@@ -2403,7 +2117,7 @@ ipcMain.on('scan-watchfolders', () => {
     return;
   }
 
-  if (autoTagRunning || autoTagRequestPending) {
+  if (autoTagState.running || autoTagRequestPending) {
     scanLog.info('Manual watchfolder scan request rejected while Auto-Tag is active');
     dialog.showMessageBox({
       type: 'info',
@@ -2468,7 +2182,7 @@ ipcMain.on('reset-from-filename', (event, requestedResponseChannel, videos) => {
   // flag now remains true until the renderer has confirmed the final write, so
   // refusing this conflicting action closes the window in which an older
   // Auto-Tag snapshot could land after—and undo—the user's reset.
-  if (autoTagRunning) {
+  if (autoTagState.running) {
     backendLog.warn('Rejected filename reset while automatic tagging was still active', {
       videoCount: sourceVideos.length
     });

@@ -1,0 +1,3168 @@
+{
+  "provenance": "Local tags and structural catalog observations recorded in the fix82 library and mynda-info.2.log on 2026-09-17. Volume paths shortened to /Shows/. These are parent-identity observations, not complete episode responses or a live catalog replay. Extras and clips retained so count exclusions are exercised. Additional input cases contain Band of Brothers and Dr Death local tags; Dr Death witnesses are saved accepted matches, without newly synthesized provider responses.",
+  "cases": [
+    {
+      "series": "Stranger Things",
+      "sourceLogs": [
+        {
+          "file": "mynda-info.2.log",
+          "line": 159
+        },
+        {
+          "file": "mynda-info.2.log",
+          "line": 160
+        }
+      ],
+      "expectedParent": "tt4574334",
+      "members": [
+        {
+          "id": "f51d2301f2eb3f6762037318167edd97eab3f980310790bf60206feca798ae78",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E01.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E01.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2852.864
+          },
+          "dvd": false
+        },
+        {
+          "id": "f8a994be1b457f796eec21e886696afc729aad74f51e5dca87fac5586d26c1db",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E02.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E02.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3264.011
+          },
+          "dvd": false
+        },
+        {
+          "id": "4254603403d00b49e33b325eb3ca581579bc2c783f61c85b593e97ab1ab55b90",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E03.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E03.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3051.264
+          },
+          "dvd": false
+        },
+        {
+          "id": "09eae7b659247398c449cf391be9c101e6acc74e49634be207eea4323b92e29d",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E04.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E04.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2967.173
+          },
+          "dvd": false
+        },
+        {
+          "id": "45c7ad74e19e33994516f795e647cbf12169e7f3478ac8f722d4f004c46218c7",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E05.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E05.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3122.336
+          },
+          "dvd": false
+        },
+        {
+          "id": "7ca5e471fb5d06f8f3196a38a31fcad807ea57ffa1d4eb3e7951e5ba1ada59d6",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E06.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E06.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2747.168
+          },
+          "dvd": false
+        },
+        {
+          "id": "1a4ab3f36bc19e024cb108bb052a767e6e24370ba80fdccc0584d00483651152",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E07.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E07.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2465.472
+          },
+          "dvd": false
+        },
+        {
+          "id": "085bbd79aa736b4dcd094c808a840fedd3762e34cf5b8a516c8918199c93937f",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S01.2160p.UHD.BluRay.x265-DEPTH[rartv]/Stranger.Things.S01E08.2160p.UHD.BluRay.x265-DEPTH.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S01E08.2160p.UHD.BluRay.x265-DEPTH",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "1",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3228.192
+          },
+          "dvd": false
+        },
+        {
+          "id": "6d6cd13c835e50eef3512584268494b3b1d9b68ac5a4d6119e0b277e93c92615",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E01.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E01.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2815.48
+          },
+          "dvd": false
+        },
+        {
+          "id": "14ace947d6faeb5314f154362885f1f4f745c1977c8a8bb551a414a61617d4fa",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E02.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E02.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3286.951
+          },
+          "dvd": false
+        },
+        {
+          "id": "f317658a0de79324f008c69de5eaccd866c917282f6b214e66ad38ffe1375368",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E03.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E03.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2984.69
+          },
+          "dvd": false
+        },
+        {
+          "id": "a8e711d714ce49802c03ed52b1f59e6d9c698e140a121ae4153e4967e5393487",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E04.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E04.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2705.495
+          },
+          "dvd": false
+        },
+        {
+          "id": "f67877939291bee15b98454985aad34496f1bc12688043a9541eda897074a2cd",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E05.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E05.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3411.367
+          },
+          "dvd": false
+        },
+        {
+          "id": "72bf9a6b38e6feac6d2bd3e3c4dba59d9eb690150e6e34ba4ce33376483abbb2",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E06.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E06.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3036.867
+          },
+          "dvd": false
+        },
+        {
+          "id": "b38d7e42cb0657fc1794e28ab7d355f22b94f0817469b0877e21884d8d05a812",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E07.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E07.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2663.077
+          },
+          "dvd": false
+        },
+        {
+          "id": "fa65848aefbcddfa893026318d316048d4b279f7b01adf78ff8ee380095057eb",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E08.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E08.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2796.335
+          },
+          "dvd": false
+        },
+        {
+          "id": "d9d5d8606765c76a34e047bf73b36092dc6d8433a39513d0cf030f0ae934f087",
+          "filename": "/Shows/Stranger Things/Stranger.Things.S02.2160p.UHD.BluRay.x265-SCOTLUHD[rartv]/Stranger.Things.S02E09.2160p.UHD.BluRay.x265-SCOTLUHD.mkv",
+          "kind": "show",
+          "title": "Stranger.Things.S02E09.2160p.UHD.BluRay.x265-SCOTLUHD",
+          "series": "Stranger Things",
+          "year": "",
+          "season": "2",
+          "episode": "9",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3654.151
+          },
+          "dvd": false
+        }
+      ],
+      "observations": [
+        {
+          "seriesID": "tt1460534",
+          "title": "Stranger Things",
+          "year": "2008\u20132009",
+          "totalSeasons": 1,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "listed",
+              "positions": [
+                2
+              ],
+              "count": null,
+              "maxEpisode": 2,
+              "reason": "incomplete season list"
+            }
+          ]
+        },
+        {
+          "seriesID": "tt4574334",
+          "title": "Stranger Things",
+          "year": "2016\u20132025",
+          "totalSeasons": 5,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8
+              ],
+              "count": 8,
+              "maxEpisode": 8,
+              "reason": "contiguous season list"
+            },
+            {
+              "season": 2,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+              ],
+              "count": 9,
+              "maxEpisode": 9,
+              "reason": "contiguous season list"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "series": "Euphoria",
+      "sourceLogs": [
+        {
+          "file": "mynda-info.2.log",
+          "line": 158
+        }
+      ],
+      "expectedParent": "tt8772296",
+      "members": [
+        {
+          "id": "41b502fa39e900d4df6012df52dc328777648122019e00ab7cc5426cecd7dbbe",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E01.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E01",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3233.23
+          },
+          "dvd": false
+        },
+        {
+          "id": "7810193c0d983b10ead4e57a17d226dddd0177f81c0f9b2946ac24722455278b",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E02.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E02",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3713.71
+          },
+          "dvd": false
+        },
+        {
+          "id": "c1f6386fb2a094e7220cbe8649c47bdee3c239614dc14da61c64f1192ee44174",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E03.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E03",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3507.504
+          },
+          "dvd": false
+        },
+        {
+          "id": "bd58f378f3dcb2c46fc7f09c37f923a07e2ba3c66a63fee82d5112ec454af3b8",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E04.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E04",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3423.42
+          },
+          "dvd": false
+        },
+        {
+          "id": "5715c38a7feec5a64ddb15cdbf959974a1a9e6d02866d13099fab641249c198f",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E05.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E05",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3277.274
+          },
+          "dvd": false
+        },
+        {
+          "id": "9a28f997dc41dd43b35f31f4d69586a9253c16c0acb089156425eaa40c5510dc",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E06.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E06",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3127.124
+          },
+          "dvd": false
+        },
+        {
+          "id": "7a137d661b437239db1771bf832a40278216aa1c4bbbaf56e35482b8258122e0",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E07.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E07",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3701.698
+          },
+          "dvd": false
+        },
+        {
+          "id": "de53c2966635eb6189d276ff4cb55761c6a25cae56021b1f4a40fd42b3e1cdb4",
+          "filename": "/Shows/Euphoria/Euphoria Season 1 Mp4 1080p/Euphoria S01E08.mp4",
+          "kind": "show",
+          "title": "Euphoria S01E08",
+          "series": "Euphoria",
+          "year": "",
+          "season": "1",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3969.966
+          },
+          "dvd": false
+        },
+        {
+          "id": "7aa1dc62dc9eb7a89d16476d9992908490a0dc0f443cf277755ff39c2d1ed62b",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E01.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E01",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3675.1715
+          },
+          "dvd": false
+        },
+        {
+          "id": "d749681f3faa7682284c415918c8e999346ba2834bc712a758f9f67b502bf244",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E02.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E02",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3424.9215
+          },
+          "dvd": false
+        },
+        {
+          "id": "d81bb25f5d668e82801a1fe3a9a88e4f75eb18b8476ec852fc1df99c9444fa5f",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E03.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E03",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3602.0985
+          },
+          "dvd": false
+        },
+        {
+          "id": "ef994d1187644432b703c4b037f21374e44cb14f3790da278af7d1410993b8c9",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E04.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E04",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3718.381333
+          },
+          "dvd": false
+        },
+        {
+          "id": "0fef7f603e70058a6603c0c18981a408c7693ce8e61a16386458064b8c79a211",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E05.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E05",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3241.238
+          },
+          "dvd": false
+        },
+        {
+          "id": "a19ac63c564b1d2a8c3c6f8f91bc3840960c1e109e79cbe439d93df7d1b4cd54",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E06.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E06",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3603.6
+          },
+          "dvd": false
+        },
+        {
+          "id": "43056e6960e24686cfab3d2500800be3ce36596e38716c3c0a37b05a63e2dc11",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E07.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E07",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3522.519
+          },
+          "dvd": false
+        },
+        {
+          "id": "c31b44868e77324afd4e41d49959dcd60723e99246f723499190f713623067e1",
+          "filename": "/Shows/Euphoria/Euphoria Season 2 Mp4 1080p/Euphoria S02E08.mp4",
+          "kind": "show",
+          "title": "Euphoria S02E08",
+          "series": "Euphoria",
+          "year": "",
+          "season": "2",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3705.034667
+          },
+          "dvd": false
+        }
+      ],
+      "observations": [
+        {
+          "seriesID": "tt2896496",
+          "title": "Euphoria",
+          "year": "2012\u20132013",
+          "totalSeasons": 1,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                8
+              ],
+              "count": null,
+              "maxEpisode": 8,
+              "reason": "incomplete season list"
+            }
+          ]
+        },
+        {
+          "seriesID": "tt4799162",
+          "title": "Euphoria",
+          "year": "2015\u2013",
+          "totalSeasons": null,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "unknown",
+              "reason": "missing or mismatched season list",
+              "positions": [],
+              "count": null,
+              "maxEpisode": null
+            },
+            {
+              "season": 2,
+              "status": "unknown",
+              "reason": "missing or mismatched season list",
+              "positions": [],
+              "count": null,
+              "maxEpisode": null
+            }
+          ]
+        },
+        {
+          "seriesID": "tt8772296",
+          "title": "Euphoria",
+          "year": "2019\u20132026",
+          "totalSeasons": 3,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "count": 10,
+              "maxEpisode": 10,
+              "reason": "contiguous season list"
+            },
+            {
+              "season": 2,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8
+              ],
+              "count": 8,
+              "maxEpisode": 8,
+              "reason": "contiguous season list"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "series": "Twin Peaks",
+      "sourceLogs": [
+        {
+          "file": "mynda-info.2.log",
+          "line": 161
+        }
+      ],
+      "expectedParent": "tt0098936",
+      "members": [
+        {
+          "id": "818ad24dedab08b47c2d78848d2c86b125bfaca5d2088df2ad4d435bb8b6d487",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/1-900 promo spot.avi",
+          "kind": "show",
+          "title": "1-900 promo spot",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 34.968267
+          },
+          "dvd": false
+        },
+        {
+          "id": "ab779b8ebdf6600454b5405ee799f5d1496d00e7f7f3f90ca6abb186a9710d23",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 1.avi",
+          "kind": "show",
+          "title": "message 1",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 168.501667
+          },
+          "dvd": false
+        },
+        {
+          "id": "cf2737f5b181699dd2bc574be33a8a2c83e68b1c55a7ecd280738fe2d3eb1a10",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 2.avi",
+          "kind": "show",
+          "title": "message 2",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 164.3642
+          },
+          "dvd": false
+        },
+        {
+          "id": "1f7c24303a7c3f3a8a2c218f3456161ba2bcec728db843a1584703b4797c8fe0",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 3.avi",
+          "kind": "show",
+          "title": "message 3",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 170.737233
+          },
+          "dvd": false
+        },
+        {
+          "id": "5b7ac445533bc4577541b5128aba7cf14f7d771a0b6ee0459789aa5e157d256d",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 4.avi",
+          "kind": "show",
+          "title": "message 4",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 165.231733
+          },
+          "dvd": false
+        },
+        {
+          "id": "e59dec4f28af6176550dcb174c8af1e429a8c7fb6c3deee8514a18c548d2103e",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 5.avi",
+          "kind": "show",
+          "title": "message 5",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 168.8687
+          },
+          "dvd": false
+        },
+        {
+          "id": "336a541d8812f4589cb96714e1502b41963915725cc4ace2c4bcc1cbaae32e5f",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 6.avi",
+          "kind": "show",
+          "title": "message 6",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 163.730233
+          },
+          "dvd": false
+        },
+        {
+          "id": "e8b4861557201bbdaf249df3a33a05cce73553ec93e3e4ea7537071c6850d542",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 7.avi",
+          "kind": "show",
+          "title": "message 7",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 172.639133
+          },
+          "dvd": false
+        },
+        {
+          "id": "64e4e1e3df672514b9a65f47604ee2beb4ef5ebeefdc3c3015cb526c71527520",
+          "filename": "/Shows/Twin Peaks/special features/1-900 hotline/message 8.avi",
+          "kind": "show",
+          "title": "message 8",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 171.8717
+          },
+          "dvd": false
+        },
+        {
+          "id": "3e0148c85ee0151534ab78b30a12de72e8a9d3bc9f73f2f243b07282453ecafd",
+          "filename": "/Shows/Twin Peaks/special features/deleted scenes/27 going on 6.avi",
+          "kind": "show",
+          "title": "27 going on 6",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 149.39925
+          },
+          "dvd": false
+        },
+        {
+          "id": "a6c8fe8da3ce33596ce303c492c7d95796032486c09a3b11f5772869f5eb915a",
+          "filename": "/Shows/Twin Peaks/special features/deleted scenes/jerry's wandering eye.avi",
+          "kind": "show",
+          "title": "jerry's wandering eye",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 50.258542
+          },
+          "dvd": false
+        },
+        {
+          "id": "f0174e25e7b935f4eaa7b4bee1ef8c6769e93b2fb623a81f01cba6e0ad2a1613",
+          "filename": "/Shows/Twin Peaks/special features/deleted scenes/lucy, andy and donuts.avi",
+          "kind": "show",
+          "title": "lucy, andy and donuts",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 48.673625
+          },
+          "dvd": false
+        },
+        {
+          "id": "da7dd25125c8994c11518302882e4e03733f51236471d7b4aaeefc8bb341fbe7",
+          "filename": "/Shows/Twin Peaks/special features/deleted scenes/something about johnny.avi",
+          "kind": "show",
+          "title": "something about johnny",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 95.178417
+          },
+          "dvd": false
+        },
+        {
+          "id": "e34bc18b75708394d81d70291a3658784c8ab4131ebc356ffedd6182e66e0041",
+          "filename": "/Shows/Twin Peaks/special features/georgia coffee commercials/a mystery of 'g'.avi",
+          "kind": "show",
+          "title": "a mystery of 'g'",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 48.381667
+          },
+          "dvd": false
+        },
+        {
+          "id": "27f8c95b2471a0832576fbb7746a9484e6cdfebcd8bf39ff8f7e9ab6c7b77daa",
+          "filename": "/Shows/Twin Peaks/special features/georgia coffee commercials/cherry pie.avi",
+          "kind": "show",
+          "title": "cherry pie",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 46.046
+          },
+          "dvd": false
+        },
+        {
+          "id": "de5b6bb445225c4db9efff2c6bdd46b525536e7bb0d355f32f30ceedb083537f",
+          "filename": "/Shows/Twin Peaks/special features/georgia coffee commercials/lost.avi",
+          "kind": "show",
+          "title": "lost",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 44.878167
+          },
+          "dvd": false
+        },
+        {
+          "id": "89571fbab727f0a17b517476fe304828b65659dad604e8cc5a2c4f4d6b33bba0",
+          "filename": "/Shows/Twin Peaks/special features/georgia coffee commercials/the rescue.avi",
+          "kind": "show",
+          "title": "the rescue",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 47.881167
+          },
+          "dvd": false
+        },
+        {
+          "id": "dcf1b9834a74da721bbb91d12460134b7410deba76ca58a045212c406a5f6ebf",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/double r diner.avi",
+          "kind": "show",
+          "title": "double r diner",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 46.212833
+          },
+          "dvd": false
+        },
+        {
+          "id": "9b31ba6998427fbc6b3379802e977c29c90f7837b62d21ad020181cbefbca27b",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/laura's log.avi",
+          "kind": "show",
+          "title": "laura's log",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 63.81375
+          },
+          "dvd": false
+        },
+        {
+          "id": "86b75e8a29a47fe5f2ad09953256847171a3cf9becfcf763cf1d5c829b8ba4dc",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/packard lodge.avi",
+          "kind": "show",
+          "title": "packard lodge",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 75.158417
+          },
+          "dvd": false
+        },
+        {
+          "id": "c87ecbec5f94ad06a5bb429c04192cde67e5574d561566fa660d23a696d657e1",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/packard saw mill - sheriff station.avi",
+          "kind": "show",
+          "title": "packard saw mill - sheriff station",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 52.969583
+          },
+          "dvd": false
+        },
+        {
+          "id": "f6fb80750ddd86214f255b9973d8e9fc9e064a49152641ff8b4f8b886a70a5dd",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/ronette's bridge.avi",
+          "kind": "show",
+          "title": "ronette's bridge",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 60.852458
+          },
+          "dvd": false
+        },
+        {
+          "id": "f18ebb6e079a44e5bc7c040d285379975ae946cc5f5831bd45a1a3723405dd40",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/the great northern.avi",
+          "kind": "show",
+          "title": "the great northern",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 86.669917
+          },
+          "dvd": false
+        },
+        {
+          "id": "659a4d9a3ca5c497dddf0a81c97193150c5e1ac396bcb146db08999911adbcae",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/the roadhouse.avi",
+          "kind": "show",
+          "title": "the roadhouse",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 34.951583
+          },
+          "dvd": false
+        },
+        {
+          "id": "2321b43c175b566652967b5eca72f7ba57973c07b03f7dd4248a50fd4614e426",
+          "filename": "/Shows/Twin Peaks/special features/interactive map/town sign.avi",
+          "kind": "show",
+          "title": "town sign",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 34.117417
+          },
+          "dvd": false
+        },
+        {
+          "id": "9720af8b7faa22cb60aedc2e8611fea3f8f6b51b6166fd3c5673b7aff8a1d9f2",
+          "filename": "/Shows/Twin Peaks/special features/lucy bumpers/cup o' joe.avi",
+          "kind": "show",
+          "title": "cup o' joe",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 7.5075
+          },
+          "dvd": false
+        },
+        {
+          "id": "9d1d5b2a7934b747ef4aa8ae12cf0cf308ecf028b6631044a8538c4ebef993c1",
+          "filename": "/Shows/Twin Peaks/special features/lucy bumpers/donut time 1.avi",
+          "kind": "show",
+          "title": "donut time 1",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 7.574233
+          },
+          "dvd": false
+        },
+        {
+          "id": "3c6060984dc2cf90630eb6740b2aba8f9f00f4f05bfa8d18b49d56ebf37dcb06",
+          "filename": "/Shows/Twin Peaks/special features/lucy bumpers/donut time 2.avi",
+          "kind": "show",
+          "title": "donut time 2",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 7.941267
+          },
+          "dvd": false
+        },
+        {
+          "id": "b1fa43805cd72ad14e666266225561d7817f752defc6844447039812c24d3773",
+          "filename": "/Shows/Twin Peaks/special features/lucy bumpers/douglas-firs.avi",
+          "kind": "show",
+          "title": "douglas-firs",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 7.941267
+          },
+          "dvd": false
+        },
+        {
+          "id": "43f3b05d7914efb58638fa4776f7467c679d08f64ff4562a6d5873bd05d8afdc",
+          "filename": "/Shows/Twin Peaks/special features/lucy bumpers/get the sheriff.avi",
+          "kind": "show",
+          "title": "get the sheriff",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 7.5075
+          },
+          "dvd": false
+        },
+        {
+          "id": "9594abecae31069c3d600055006125a58b9c12c54ae01ded95dc0cbae01b5695",
+          "filename": "/Shows/Twin Peaks/special features/lucy bumpers/stop sawing logs.avi",
+          "kind": "show",
+          "title": "stop sawing logs",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 7.574233
+          },
+          "dvd": false
+        },
+        {
+          "id": "f044921d6d7529735ea2b9e12d4c80084cab1318cdcaf09786977d1ec4815a77",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/a show like this.avi",
+          "kind": "show",
+          "title": "a show like this",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 34.034
+          },
+          "dvd": false
+        },
+        {
+          "id": "09f745687665d26553efc51a3a02e894d1db03c89399d2bd1ed66ff48b7dfe67",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/coming april 8th.avi",
+          "kind": "show",
+          "title": "coming april 8th",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 33.867167
+          },
+          "dvd": false
+        },
+        {
+          "id": "d7955917ca657c51f8ce2f0e38b5ca84015b3b5896e09b14026e634c302581ce",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/holiday greeting.avi",
+          "kind": "show",
+          "title": "holiday greeting",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 15.181833
+          },
+          "dvd": false
+        },
+        {
+          "id": "2f52451f0ec2ec01202bdaa1e1a25f3b912f7d2b249498f5740820f7beab278e",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/if you miss it.avi",
+          "kind": "show",
+          "title": "if you miss it",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 23.656967
+          },
+          "dvd": false
+        },
+        {
+          "id": "0ad6ccd3df6d7ef69109d70d786f19cdc68e5bfe5a44487990ff89e61e694134",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/lumber truck.avi",
+          "kind": "show",
+          "title": "lumber truck",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 24.024
+          },
+          "dvd": false
+        },
+        {
+          "id": "126ec6357012192875a15d39e4d3a1df437d8cd809192fa72ffbdd6871d4006c",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/next.avi",
+          "kind": "show",
+          "title": "next",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 51.4514
+          },
+          "dvd": false
+        },
+        {
+          "id": "c31ad4d978e754739a3f8ed44cf565ca70f9f2bff49c09f009f92f203ab10752",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/only one place.avi",
+          "kind": "show",
+          "title": "only one place",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 14.014
+          },
+          "dvd": false
+        },
+        {
+          "id": "8352fe8862e75ec662f6cbdd0bcadbc268d8cda1b08dcbb6bb33442afa9d0d0d",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/patriot greeting.avi",
+          "kind": "show",
+          "title": "patriot greeting",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 40.206833
+          },
+          "dvd": false
+        },
+        {
+          "id": "3e20a46cdab581a1f0b63c581f293d582c7851581c682a741a1ba6da209fb504",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/t-shirt ad.avi",
+          "kind": "show",
+          "title": "t-shirt ad",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 34.1341
+          },
+          "dvd": false
+        },
+        {
+          "id": "359787a8a197e6bda87d3ba8ef6f5f41cb9d7cd1fc54473385cd90051daa0716",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/tape recorder.avi",
+          "kind": "show",
+          "title": "tape recorder",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 23.898875
+          },
+          "dvd": false
+        },
+        {
+          "id": "230d36e91b69571c214dba902444915408e40431dc1a2649916cca2ec5e52d0d",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/there's no place like home.avi",
+          "kind": "show",
+          "title": "there's no place like home",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 34.617917
+          },
+          "dvd": false
+        },
+        {
+          "id": "52ea85ea025fac9837abb81f4173e715fae7fee4412d86d9af4205a9aa0386f2",
+          "filename": "/Shows/Twin Peaks/special features/on-air promos-spots/what they're trying to say.avi",
+          "kind": "show",
+          "title": "what they're trying to say",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 24.3243
+          },
+          "dvd": false
+        },
+        {
+          "id": "0937c9775253207db4183f993640206d0f5702433f4c8c218d076ce8c6814227",
+          "filename": "/Shows/Twin Peaks/special features/saturday night live/monologue with kyle maclachlan.avi",
+          "kind": "show",
+          "title": "monologue with kyle maclachlan",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 269.102167
+          },
+          "dvd": false
+        },
+        {
+          "id": "8ac7bd3714d1bde26ab7aadd1e73ac3b726f6b75775c1868c5801d994c84ade1",
+          "filename": "/Shows/Twin Peaks/special features/saturday night live/twin peaks sketch.avi",
+          "kind": "show",
+          "title": "twin peaks sketch",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 548.281067
+          },
+          "dvd": false
+        },
+        {
+          "id": "0650f72f62c7ff0c818aef2eff0b2c626ae181e83de912c80bb9eebe4f2056fa",
+          "filename": "/Shows/Twin Peaks/special features/'falling' music video.avi",
+          "kind": "show",
+          "title": "'falling' music video",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 261.327733
+          },
+          "dvd": false
+        },
+        {
+          "id": "70b3a6ede644e75caaa2638a26ee9f0520e78a5bf6d619f9a708f7c78aa3a50d",
+          "filename": "/Shows/Twin Peaks/special features/a slice of lynch.avi",
+          "kind": "show",
+          "title": "a slice of lynch",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 1801.2995
+          },
+          "dvd": false
+        },
+        {
+          "id": "7994dd1c33af5d94a8bf85140e62a1ad105715cd16d54f9f51ae4800f306d30e",
+          "filename": "/Shows/Twin Peaks/special features/other image galleries.mov",
+          "kind": "show",
+          "title": "other image galleries",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 1871.175
+          },
+          "dvd": false
+        },
+        {
+          "id": "6dc2fba19dae573edcf8fbb992a21c07ee2aff2cafa88ca4d77b87f3405121c4",
+          "filename": "/Shows/Twin Peaks/special features/pilot (international version).avi",
+          "kind": "show",
+          "title": "pilot (international version)",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 5442.270167
+          },
+          "dvd": false
+        },
+        {
+          "id": "26e77dee60b330415ccca80f4e21ec00b2d77f7e544d88cbb73c696c07ac9f35",
+          "filename": "/Shows/Twin Peaks/special features/pilot alternate ending.avi",
+          "kind": "show",
+          "title": "pilot alternate ending",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 1331.496833
+          },
+          "dvd": false
+        },
+        {
+          "id": "64ac8188407819b916935a1b833ced1162f8b34d30d3d1dbda8128d16660725f",
+          "filename": "/Shows/Twin Peaks/special features/production documents.mov",
+          "kind": "show",
+          "title": "production documents",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 225.678333
+          },
+          "dvd": false
+        },
+        {
+          "id": "dd61d75728b0433bee7c8d0cd99b34a25a1fe3cef0a8880676982c9b9e650d76",
+          "filename": "/Shows/Twin Peaks/special features/return to twin peaks.avi",
+          "kind": "show",
+          "title": "return to twin peaks",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 1182.9818
+          },
+          "dvd": false
+        },
+        {
+          "id": "aac9dbcdd005c05ddcfdcfe60a96e0dc3764431799ce3d3ec5199001da80a68f",
+          "filename": "/Shows/Twin Peaks/special features/secrets from another place- creating twin peaks.avi",
+          "kind": "show",
+          "title": "secrets from another place- creating twin peaks",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "extras",
+          "episode": "",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 6357.8515
+          },
+          "dvd": false
+        },
+        {
+          "id": "82d27633bf906d24e0a3a8c7427cd1a0a8851e8f3f5a860f76afe856fdd4c351",
+          "filename": "/Shows/Twin Peaks/s01e00 pilot (u.s. version).avi",
+          "kind": "show",
+          "title": "Pilot (U.S. Version)",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "0",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 5642.970667
+          },
+          "dvd": false
+        },
+        {
+          "id": "be568f87bfb99111ad3f334c43159f7b4c640a1c4493190b5e837eeb333fa5df",
+          "filename": "/Shows/Twin Peaks/s01e00 pilot loglady.avi",
+          "kind": "show",
+          "title": "Pilot Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "0",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 78.078
+          },
+          "dvd": false
+        },
+        {
+          "id": "ab2451b84bb4dd12465ebd01dd695f6d5cbe6b562f321b55d833b542ead82321",
+          "filename": "/Shows/Twin Peaks/s01e01.avi",
+          "kind": "show",
+          "title": "s01e01",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2787.242792
+          },
+          "dvd": false
+        },
+        {
+          "id": "a953d2b4c8d8f89f58bd6dbc5281f1b4c837966ae1e65f6c7786ec2058725b68",
+          "filename": "/Shows/Twin Peaks/s01e01loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 41.5415
+          },
+          "dvd": false
+        },
+        {
+          "id": "0e5457a99260783047b105c037dee9933522ec56123eb222ed60869fe628800d",
+          "filename": "/Shows/Twin Peaks/s01e02.avi",
+          "kind": "show",
+          "title": "s01e02",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2893.64075
+          },
+          "dvd": false
+        },
+        {
+          "id": "1dad74b638b13cceda6340fc3f41ab10682afbd7637e168bf67f9e456515880e",
+          "filename": "/Shows/Twin Peaks/s01e02loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 45.879167
+          },
+          "dvd": false
+        },
+        {
+          "id": "b9e3b75bf22b2ce48dfccfeda6f1f6c7af3ae39661156eb260cc8024c66f334b",
+          "filename": "/Shows/Twin Peaks/s01e03.avi",
+          "kind": "show",
+          "title": "s01e03",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2815.06225
+          },
+          "dvd": false
+        },
+        {
+          "id": "d524db535f5c200ffc864c330b0dbbfc3a8b04fb9e11cefc3cea6bf5229d6172",
+          "filename": "/Shows/Twin Peaks/s01e03loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 61.194467
+          },
+          "dvd": false
+        },
+        {
+          "id": "d7fa8753f62de7bdc2632859e2979dd3f52bd6570d2de6799c4cfa963917d8bd",
+          "filename": "/Shows/Twin Peaks/s01e04.avi",
+          "kind": "show",
+          "title": "s01e04",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2817.356208
+          },
+          "dvd": false
+        },
+        {
+          "id": "8052065aee8de09ce3a49c29ab208e1e0492e7075fe199c3eb597359abedc7e7",
+          "filename": "/Shows/Twin Peaks/s01e04loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 42.042
+          },
+          "dvd": false
+        },
+        {
+          "id": "559653d5da1a3724bff40399e34fc3eebf6fb3864b7e0ebe2ac12d592a2b433c",
+          "filename": "/Shows/Twin Peaks/s01e05.avi",
+          "kind": "show",
+          "title": "s01e05",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2784.990542
+          },
+          "dvd": false
+        },
+        {
+          "id": "590efc79b5ca8b57fcd575b5733640bef789b11ac4d74a01c12c64871d4bc657",
+          "filename": "/Shows/Twin Peaks/s01e05loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 39.372667
+          },
+          "dvd": false
+        },
+        {
+          "id": "94f69b13c8146aba49d5f6e5286d25ebc3cd85640c77d7cb408fa60054b76853",
+          "filename": "/Shows/Twin Peaks/s01e06.avi",
+          "kind": "show",
+          "title": "s01e06",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2814.937125
+          },
+          "dvd": false
+        },
+        {
+          "id": "34a506efd5f488e515ba4f11090526873ce0eb1d7eda46925dd1bceeba75e033",
+          "filename": "/Shows/Twin Peaks/s01e06loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 46.713333
+          },
+          "dvd": false
+        },
+        {
+          "id": "5b3923075a1db47e54f354c462add14cff7e5ebfe40e00cfd59da57acb72c479",
+          "filename": "/Shows/Twin Peaks/s01e07.avi",
+          "kind": "show",
+          "title": "s01e07",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2804.802
+          },
+          "dvd": false
+        },
+        {
+          "id": "e6532ca159578e1f64bdf0438356e23334111e47d297afcddd7fa0c9935d63a3",
+          "filename": "/Shows/Twin Peaks/s01e07loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "1",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 42.709333
+          },
+          "dvd": false
+        },
+        {
+          "id": "70f1108bb1833bbdd9ff25eecdfdbb90a7af8fc8dd612eb0c467686135503102",
+          "filename": "/Shows/Twin Peaks/s02e01.avi",
+          "kind": "show",
+          "title": "s02e01",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 5650.978667
+          },
+          "dvd": false
+        },
+        {
+          "id": "49ad892e16642570bef0ca22fb1b0cd94c398718471ed61281f531e75b150e82",
+          "filename": "/Shows/Twin Peaks/s02e01loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 108.6085
+          },
+          "dvd": false
+        },
+        {
+          "id": "b4bb2e1313908879033f82371d429b19abda9d6a1020764967dcc6d776dcac14",
+          "filename": "/Shows/Twin Peaks/s02e02.avi",
+          "kind": "show",
+          "title": "s02e02",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2812.55975
+          },
+          "dvd": false
+        },
+        {
+          "id": "67810e00d9ab1e33a1d2eabccbabb461fa3006473d338c7d3282c6c2adfd17a8",
+          "filename": "/Shows/Twin Peaks/s02e02loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 53.5535
+          },
+          "dvd": false
+        },
+        {
+          "id": "8542871eaf8e3854fd4d00b1a215aa915f0ef32938c206117267c7100e5f811c",
+          "filename": "/Shows/Twin Peaks/s02e03.avi",
+          "kind": "show",
+          "title": "s02e03",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2823.57075
+          },
+          "dvd": false
+        },
+        {
+          "id": "c65cba67f4823edff9a58e96947cceb8f2f300f13fc061dd2304c8adf28c68fe",
+          "filename": "/Shows/Twin Peaks/s02e03loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 38.204833
+          },
+          "dvd": false
+        },
+        {
+          "id": "c9cb999de2b3e6fd300e1ff40ff893b3ee898b1b5b23f78de60f39abacd88b34",
+          "filename": "/Shows/Twin Peaks/s02e04.avi",
+          "kind": "show",
+          "title": "s02e04",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2815.854708
+          },
+          "dvd": false
+        },
+        {
+          "id": "599d2c1d3dee2468d8d53e5441d8e9d1f2e2546bc862c4c214db3ba4c3214c62",
+          "filename": "/Shows/Twin Peaks/s02e04loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 58.224833
+          },
+          "dvd": false
+        },
+        {
+          "id": "ad8e3ea75943b068a415b0f78f268c61eb544dd06e3b62e1ed4ccd60639a09e6",
+          "filename": "/Shows/Twin Peaks/s02e05.avi",
+          "kind": "show",
+          "title": "s02e05",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2825.739583
+          },
+          "dvd": false
+        },
+        {
+          "id": "cec20b87e7c59373eac60f85bb83151feb61c3f37cd283399fe5b293ca26511b",
+          "filename": "/Shows/Twin Peaks/s02e05loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 29.029
+          },
+          "dvd": false
+        },
+        {
+          "id": "cb09b08f95140a222466360411c4dac3cca7b1a85ee15b5081736eb659d7cc80",
+          "filename": "/Shows/Twin Peaks/s02e06.avi",
+          "kind": "show",
+          "title": "s02e06",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2842.297792
+          },
+          "dvd": false
+        },
+        {
+          "id": "a29693b7a9376cdbf088fd30ddb283973a075e9453665a5fecd2aefd95ba90a6",
+          "filename": "/Shows/Twin Peaks/s02e06loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 50.884167
+          },
+          "dvd": false
+        },
+        {
+          "id": "fb906e6682db1e458bab0a88262ac2d653d1a541ac41ad8c803a6d59ddbeed76",
+          "filename": "/Shows/Twin Peaks/s02e07.avi",
+          "kind": "show",
+          "title": "s02e07",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2844.842
+          },
+          "dvd": false
+        },
+        {
+          "id": "06f3c2e76651bd18e970a5210d578c09103494acb248b30d2ccb53e0a1338752",
+          "filename": "/Shows/Twin Peaks/s02e07loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 43.209833
+          },
+          "dvd": false
+        },
+        {
+          "id": "c1582e0d2987ec14e9d719fa42b13e27b055ce75ae1b37bf3a4b18db7b591721",
+          "filename": "/Shows/Twin Peaks/s02e08.avi",
+          "kind": "show",
+          "title": "s02e08",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2837.709875
+          },
+          "dvd": false
+        },
+        {
+          "id": "ba74ae934b28dca522fb296b2ffce0d04c77c2f6c35dc50a186198cf7eea4dac",
+          "filename": "/Shows/Twin Peaks/s02e08loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 67.067
+          },
+          "dvd": false
+        },
+        {
+          "id": "cb67d471be53bff9e2fa3fea0bc5b438669982d74c09046e380dc4ffecc803d9",
+          "filename": "/Shows/Twin Peaks/s02e09.avi",
+          "kind": "show",
+          "title": "s02e09",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "9",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2805.010542
+          },
+          "dvd": false
+        },
+        {
+          "id": "550ed6350685c871dcb4df6c764161578951454ab342ac13cc3959404c120005",
+          "filename": "/Shows/Twin Peaks/s02e09loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "9",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 42.876167
+          },
+          "dvd": false
+        },
+        {
+          "id": "472ea2d002b699170e8b0166077991707ba9c3ab3a3889199854536165dca190",
+          "filename": "/Shows/Twin Peaks/s02e10.avi",
+          "kind": "show",
+          "title": "s02e10",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "10",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2839.127958
+          },
+          "dvd": false
+        },
+        {
+          "id": "2b13c29509da8140b382ae0fc5f7e3f2b5622e2ed0443bf57b00d394f93fba6a",
+          "filename": "/Shows/Twin Peaks/s02e10loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "10",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 50.216833
+          },
+          "dvd": false
+        },
+        {
+          "id": "4410eacc99f715385475f728d10908beda9ef86c1ee0c6a9cbc00d11ee18c134",
+          "filename": "/Shows/Twin Peaks/s02e11.avi",
+          "kind": "show",
+          "title": "s02e11",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "11",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2840.712875
+          },
+          "dvd": false
+        },
+        {
+          "id": "8f961e32db6ddea8f582119937e5c2b654e9cf06511b84a9a7436069dae0ce45",
+          "filename": "/Shows/Twin Peaks/s02e11loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "11",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 57.223833
+          },
+          "dvd": false
+        },
+        {
+          "id": "81ef9402fe992c0538b6b513b42893b795bcdb7759e7addc5767a8712ab64e17",
+          "filename": "/Shows/Twin Peaks/s02e12.avi",
+          "kind": "show",
+          "title": "s02e12",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "12",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2786.158375
+          },
+          "dvd": false
+        },
+        {
+          "id": "8d639c320d43a0c7ba7847306e83762c235a2c04315adfd0f25526521aa4d376",
+          "filename": "/Shows/Twin Peaks/s02e12loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "12",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 40.206833
+          },
+          "dvd": false
+        },
+        {
+          "id": "bf7878ed91e01d4596abdbc475b3b773fcd1fec4a8b0c541057014efdc6b9cde",
+          "filename": "/Shows/Twin Peaks/s02e13.avi",
+          "kind": "show",
+          "title": "s02e13",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "13",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2812.976833
+          },
+          "dvd": false
+        },
+        {
+          "id": "5bcaae0cffa7f335fec946ff623d98f2e37b564293ff681dc49ffa78d99d38d5",
+          "filename": "/Shows/Twin Peaks/s02e13loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "13",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 64.397667
+          },
+          "dvd": false
+        },
+        {
+          "id": "9e65963f23c156d29f0affda256c7f3401ad3256e2290870413ccae7404997ab",
+          "filename": "/Shows/Twin Peaks/s02e14.avi",
+          "kind": "show",
+          "title": "s02e14",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "14",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2768.640875
+          },
+          "dvd": false
+        },
+        {
+          "id": "f6978c2bfd6e60cc7081c43e47031cf7cec1fa4487ede386f91f9058cf7cc7bb",
+          "filename": "/Shows/Twin Peaks/s02e14loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "14",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 33.033
+          },
+          "dvd": false
+        },
+        {
+          "id": "e40d9b269667019eb52279e9c78e2db269e062b0b7e7cd5f2f6aeb99224ef592",
+          "filename": "/Shows/Twin Peaks/s02e15.avi",
+          "kind": "show",
+          "title": "s02e15",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "15",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2803.509042
+          },
+          "dvd": false
+        },
+        {
+          "id": "d22c565c0e149e62df1f3161eec9bf4922787498c5a9bb71e91259269f5a453a",
+          "filename": "/Shows/Twin Peaks/s02e15loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "15",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 43.376667
+          },
+          "dvd": false
+        },
+        {
+          "id": "8a69cafbaeca61190dfe6558feae313df07365525169d09e218b192653d95f00",
+          "filename": "/Shows/Twin Peaks/s02e16.avi",
+          "kind": "show",
+          "title": "s02e16",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "16",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2837.459625
+          },
+          "dvd": false
+        },
+        {
+          "id": "77faaaf7c5a3330068359eacaff36febd7cc70dffe002f2af0e1dbc8cf2f9793",
+          "filename": "/Shows/Twin Peaks/s02e16loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "16",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 62.395667
+          },
+          "dvd": false
+        },
+        {
+          "id": "d474bbc14a441f89a3ccbe257897b17c6612f70d727cdd0cd9e5c57f0f198a96",
+          "filename": "/Shows/Twin Peaks/s02e17.avi",
+          "kind": "show",
+          "title": "s02e17",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "17",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2757.50475
+          },
+          "dvd": false
+        },
+        {
+          "id": "506980c713633d4ac1eddf351f29ceda433d072b36df5a08b9f7ff5d5ce780f0",
+          "filename": "/Shows/Twin Peaks/s02e17loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "17",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 56.122733
+          },
+          "dvd": false
+        },
+        {
+          "id": "bc9ff5438bcefbf85aac713e3d6fdc29ec6fcf5da21f5bd5cd430340ebc251d6",
+          "filename": "/Shows/Twin Peaks/s02e18.avi",
+          "kind": "show",
+          "title": "s02e18",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "18",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2808.013542
+          },
+          "dvd": false
+        },
+        {
+          "id": "19c1e2216f14c407fd5b62dde170f1bb8743bb8ce6881fa27839311492dff039",
+          "filename": "/Shows/Twin Peaks/s02e18loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "18",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 49.382667
+          },
+          "dvd": false
+        },
+        {
+          "id": "6cb56ce0437e700540b94ffc905fb34d07b565ff05e8b463eafa857d821e42e3",
+          "filename": "/Shows/Twin Peaks/s02e19.avi",
+          "kind": "show",
+          "title": "s02e19",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "19",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2816.188375
+          },
+          "dvd": false
+        },
+        {
+          "id": "ed373c221a8c1686ef00a1dc8a6852c34a356fd4db87ec2002de808f0cbb60ea",
+          "filename": "/Shows/Twin Peaks/s02e19loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "19",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 62.062
+          },
+          "dvd": false
+        },
+        {
+          "id": "070e9b0b12c7c1a53d998faf0b83f8e09fcf689f2ca0a5a7a828596bb0b9ca6c",
+          "filename": "/Shows/Twin Peaks/s02e20.avi",
+          "kind": "show",
+          "title": "s02e20",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "20",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2805.594458
+          },
+          "dvd": false
+        },
+        {
+          "id": "5c5a68098f6de026862e23ae0a08ca62ac8fe612bf087762d0c9339a94368d21",
+          "filename": "/Shows/Twin Peaks/s02e20loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "20",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 42.042
+          },
+          "dvd": false
+        },
+        {
+          "id": "b2b8e8af18a9b3b4eef98f8a6c641d88ab2b83ad4ceb3f18ca7d4715cfd2eb5b",
+          "filename": "/Shows/Twin Peaks/s02e21.avi",
+          "kind": "show",
+          "title": "s02e21",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "21",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2780.694583
+          },
+          "dvd": false
+        },
+        {
+          "id": "5acb58f52f0863dc349cbbbcdbe0672ecbf093dda7e4472c212557846019aebe",
+          "filename": "/Shows/Twin Peaks/s02e21loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "21",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 80.08
+          },
+          "dvd": false
+        },
+        {
+          "id": "21b554cff1e3dfbf759c564f6b15fd0940470de5df08188100dc9c59c1eb8665",
+          "filename": "/Shows/Twin Peaks/s02e22.avi",
+          "kind": "show",
+          "title": "s02e22",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "22",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3029.443083
+          },
+          "dvd": false
+        },
+        {
+          "id": "c8d39c663a69fd9e2f67ee38de150e1feaa34a70d021461be571f329295c7131",
+          "filename": "/Shows/Twin Peaks/s02e22loglady.avi",
+          "kind": "show",
+          "title": "Loglady",
+          "series": "Twin Peaks",
+          "year": "",
+          "season": "2",
+          "episode": "22",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 61.895167
+          },
+          "dvd": false
+        }
+      ],
+      "observations": [
+        {
+          "seriesID": "tt0098936",
+          "title": "Twin Peaks",
+          "year": "1990\u20131991",
+          "totalSeasons": 2,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8
+              ],
+              "count": 8,
+              "maxEpisode": 8,
+              "reason": "contiguous season list"
+            },
+            {
+              "season": 2,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22
+              ],
+              "count": 22,
+              "maxEpisode": 22,
+              "reason": "contiguous season list"
+            }
+          ]
+        },
+        {
+          "seriesID": "tt27449259",
+          "title": "Twin Peaks",
+          "year": "1989\u2013",
+          "totalSeasons": null,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "unknown",
+              "reason": "missing or mismatched season list",
+              "positions": [],
+              "count": null,
+              "maxEpisode": null
+            },
+            {
+              "season": 2,
+              "status": "unknown",
+              "reason": "missing or mismatched season list",
+              "positions": [],
+              "count": null,
+              "maxEpisode": null
+            }
+          ]
+        },
+        {
+          "seriesID": "tt4093826",
+          "title": "Twin Peaks",
+          "year": "2017",
+          "totalSeasons": 1,
+          "seasons": [
+            {
+              "season": 1,
+              "status": "listed",
+              "positions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18
+              ],
+              "count": 18,
+              "maxEpisode": 18,
+              "reason": "contiguous season list"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "inputCases": [
+    {
+      "series": "Band of Brothers",
+      "members": [
+        {
+          "id": "b737bf2a50c271bb3f61cf0cdda253bacab77485f4f1c3f86f33251c12feb1ba",
+          "filename": "/Shows/Band of Brothers/bob.ep01.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep01.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 4391.4331
+          }
+        },
+        {
+          "id": "75acc3e14bc8926af061477a26ec6a02f58f63abba3e9c3db61e91791add8441",
+          "filename": "/Shows/Band of Brothers/bob.ep02.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep02.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3120.036703
+          }
+        },
+        {
+          "id": "93d81d879a2665863fa21ea11f9c7f22b23fcdd08793f0b1a554479423010f08",
+          "filename": "/Shows/Band of Brothers/bob.ep03.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep03.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3919.502836
+          }
+        },
+        {
+          "id": "4b9f758cf3c4fbd3d58f8a41320b8f9b7acdaa6f1a9c6eabe81748d499d5bd30",
+          "filename": "/Shows/Band of Brothers/bob.ep04.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep04.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3581.790123
+          }
+        },
+        {
+          "id": "754dbb7dd9880a4a032b60ec5d1a3e08da9cef9535b67e02055de0ec8a551fca",
+          "filename": "/Shows/Band of Brothers/bob.ep05.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep05.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3340.09009
+          }
+        },
+        {
+          "id": "68f742f045d01aab01fc3f185378ed0d1b6da6ffa5ac6d7bf50a72b76604eba7",
+          "filename": "/Shows/Band of Brothers/bob.ep06.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep06.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 4030.780781
+          }
+        },
+        {
+          "id": "0a5dc4c73cb44f9229b92bb863003eb953631600a76e11661b001c6d158d3f27",
+          "filename": "/Shows/Band of Brothers/bob.ep07.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep07.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 4368.493493
+          }
+        },
+        {
+          "id": "8580c44fe77b88b06a036e64ff7c2307246433eacb0c2bd32d7a073bfd3caef6",
+          "filename": "/Shows/Band of Brothers/bob.ep08.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep08.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3537.746079
+          }
+        },
+        {
+          "id": "75220f1b487d43f1b13b210229cbcc0eaecb8ebc313a9fe9b13bfa5f411e5a9b",
+          "filename": "/Shows/Band of Brothers/bob.ep09.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep09.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "9",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3489.73974
+          }
+        },
+        {
+          "id": "71e6c1c2d1d295336f56a02b68cd8342cf78ac96e7ac34b16c71ff82c7c130ba",
+          "filename": "/Shows/Band of Brothers/bob.ep10.dvdrip.xvid-deity.avi",
+          "kind": "show",
+          "title": "bob.ep10.dvdrip.xvid-deity",
+          "series": "Band of Brothers",
+          "year": "",
+          "season": "",
+          "episode": "10",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3736.277945
+          }
+        }
+      ],
+      "savedMatches": []
+    },
+    {
+      "series": "Dr Death",
+      "members": [
+        {
+          "id": "7c25ed39f9cf1dad1ef4ea0d1fb4db89f7f91e5814827aa09e2a2df3288aef48",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E01.Diplos.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "Diplos",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2687.872
+          }
+        },
+        {
+          "id": "84323bcd1a7283b621c48a419c9a4675441d904263ad54880cbff5491d48167a",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E02.Aint.No.Bum.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "Aint No Bum",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2826.72
+          }
+        },
+        {
+          "id": "50412b5d93539f05a9aab681810ab63aded8439397f3ec9370642e4771b0b041",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E03.Dock.Ellis.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "Dock Ellis",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2861.472
+          }
+        },
+        {
+          "id": "dbd89c44a3f4296e99ec983dbe249e45bb35846ac266cc80a02608fd4dd9af36",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E04.An.Occurrence.at.Randall.Kirbys.Sink.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "An Occurrence at Randall Kirbys Sink",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2937.888
+          }
+        },
+        {
+          "id": "cec2de3aa0d404183cae660050c70b0222a5b5775c8f62b52cc9abc27180f004",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E05.The.and.in.the.Bed.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "The and in the Bed",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2796.928
+          }
+        },
+        {
+          "id": "796c555941cad29e968d4305d480e7200faaf33fc4c1cb59025cad4b64d6ee10",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E06.Occams.Razor.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "Occams Razor",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2977.952
+          }
+        },
+        {
+          "id": "965a9df68449a78ba8137e979ab475599d6ce80a4926e65f683cbf1b4127a11a",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E07.Feet.of.Clay.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "Feet of Clay",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3209.344
+          }
+        },
+        {
+          "id": "f4bcd35f3b49a697554d89f694e277ea0000862bed6d1414f8c74998611dd6b0",
+          "filename": "/Shows/Dr Death/Dr.Death.S01.1080p.PCOK.WEBRip.DDP5.1.x264-AGLET[rartv]/Dr.Death.S01E08.Hardwood.Floors.1080p.PCOK.WEB-DL.DDP5.1.H.264-AGLET.mkv",
+          "kind": "show",
+          "title": "Hardwood Floors",
+          "series": "Dr Death",
+          "year": "",
+          "season": "1",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3811.552
+          }
+        },
+        {
+          "id": "8ce8fa036b4bc5ec3ddd57fc168eb40230da8e3238082e9374feb7c9ce85470e",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E01.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E01.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "1",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2851.932417
+          }
+        },
+        {
+          "id": "78ba339483f6062887cf7324abe61fbda4bc48d5b422cb5199395b10fb2bb820",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E02.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E02.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "2",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2777.566458
+          }
+        },
+        {
+          "id": "59d378724861cb554a0b1bb0ff641b2da105566d7d62e5dc83fff116c4255d4a",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E03.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E03.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "3",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2848.846
+          }
+        },
+        {
+          "id": "17e5a54109d2819027d9f66db8ab42383936cdbfa1cb1504367be8994e99ea11",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E04.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E04.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "4",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2864.820292
+          }
+        },
+        {
+          "id": "9a380db0e2c210c5058a54cb62a6a4274837565011d394892659d0abb6532a13",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E05.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E05.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "5",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2978.016708
+          }
+        },
+        {
+          "id": "a223047a786c653d0ff839d5d57962bb4e7c0d81a0bd12408820177fe22ac4e1",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E06.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E06.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "6",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2916.705458
+          }
+        },
+        {
+          "id": "34088a24cd78a8a2d48b973424e3b9402e032a083153b0bc2985d28d106c48f8",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E07.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E07.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "7",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 2592.631708
+          }
+        },
+        {
+          "id": "ef0f66b5a7fe0159732a8ecdcf4384a34a33e83891589e71faf8b146faadd746",
+          "filename": "/Shows/Dr Death/Dr.Death.S02.1080p.WEBRip.x265-KONTRAST/Dr.Death.S02E08.1080p.WEBRip.x265-KONTRAST.mp4",
+          "kind": "show",
+          "title": "Dr.Death.S02E08.1080p.WEBRip.x265-KONTRAST",
+          "series": "Dr Death",
+          "year": "",
+          "season": "2",
+          "episode": "8",
+          "imdbID": "",
+          "seriesImdbID": "",
+          "metadata": {
+            "duration": 3416.955208
+          }
+        }
+      ],
+      "savedMatches": [
+        {
+          "inputID": "7c25ed39f9cf1dad1ef4ea0d1fb4db89f7f91e5814827aa09e2a2df3288aef48",
+          "tagged": {
+            "kind": "show",
+            "title": "Diplos",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "1",
+            "imdbID": "tt10840292",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "84323bcd1a7283b621c48a419c9a4675441d904263ad54880cbff5491d48167a",
+          "tagged": {
+            "kind": "show",
+            "title": "Ain't No Bum",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "2",
+            "imdbID": "tt11896736",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "50412b5d93539f05a9aab681810ab63aded8439397f3ec9370642e4771b0b041",
+          "tagged": {
+            "kind": "show",
+            "title": "Dock Ellis",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "3",
+            "imdbID": "tt13186454",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "dbd89c44a3f4296e99ec983dbe249e45bb35846ac266cc80a02608fd4dd9af36",
+          "tagged": {
+            "kind": "show",
+            "title": "An Occurrence at Randall Kirby's Sink",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "4",
+            "imdbID": "tt13186458",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "cec2de3aa0d404183cae660050c70b0222a5b5775c8f62b52cc9abc27180f004",
+          "tagged": {
+            "kind": "show",
+            "title": "The $?!& in the Bed",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "5",
+            "imdbID": "tt13186462",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "796c555941cad29e968d4305d480e7200faaf33fc4c1cb59025cad4b64d6ee10",
+          "tagged": {
+            "kind": "show",
+            "title": "Occam's Razor",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "6",
+            "imdbID": "tt13186464",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "965a9df68449a78ba8137e979ab475599d6ce80a4926e65f683cbf1b4127a11a",
+          "tagged": {
+            "kind": "show",
+            "title": "Feet of Clay",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "7",
+            "imdbID": "tt13186466",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        },
+        {
+          "inputID": "f4bcd35f3b49a697554d89f694e277ea0000862bed6d1414f8c74998611dd6b0",
+          "tagged": {
+            "kind": "show",
+            "title": "Hardwood Floors",
+            "year": "2021",
+            "series": "Dr Death",
+            "season": "1",
+            "episode": "8",
+            "imdbID": "tt13186468",
+            "seriesImdbID": "tt9179552"
+          },
+          "parentBasis": "verified-episode-title"
+        }
+      ]
+    }
+  ]
+}

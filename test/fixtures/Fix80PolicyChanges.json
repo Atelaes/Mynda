@@ -1,0 +1,111 @@
+{
+  "description": "Explicit precision policy changes to preserved historical fixtures. Original recordings and expected IDs remain intact. These are review expectations, never application allowlists.",
+  "history": [
+    {
+      "caseNumber": 1128,
+      "label": "Stranger Things: Chapter Three: Holly, Jolly",
+      "expectedFailure": "Ambiguous series",
+      "explanation": "Number-only release; one remake endpoint being absent does not prove the other parent."
+    },
+    {
+      "caseNumber": 1142,
+      "label": "Stranger Things: Chapter Four: Will the Wise",
+      "expectedFailure": "Ambiguous series",
+      "explanation": "Number-only release; one remake endpoint being absent does not prove the other parent."
+    },
+    {
+      "caseNumber": 1441,
+      "label": "Twin Peaks: Episode #2.1",
+      "expectedFailure": "Ambiguous series",
+      "explanation": "Still withheld, now at parent ambiguity rather than the later episode-title check."
+    },
+    {
+      "caseNumber": 1500,
+      "label": "Wizards of Waverly Place: The Crazy 10 Minute Sale",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "Ten versus 10 is not yet represented as verified title equivalence; require review instead of accepting inconclusive words."
+    },
+    {
+      "caseNumber": 1532,
+      "label": "11.22.63: The Truth",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "The series-prefixed one-word title currently has only partial agreement; require review. Fix81 verifies the exact remaining title after the complete series prefix; the recorded expected IMDb ID must now match.",
+      "resolvedBy": "repeated-series-prefix"
+    },
+    {
+      "caseNumber": 1555,
+      "label": "Kung Fu: The Brujo",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "El versus The is an unverified alternate wording; require review."
+    },
+    {
+      "caseNumber": 1619,
+      "label": "E.R.: Doctor Carter, I Presume",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "Dr versus Doctor is not verified by the current episode normalizer; require review."
+    },
+    {
+      "caseNumber": 1811,
+      "label": "Heroes: Chapter Three 'Acceptance'",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "Ink must not retain the recorded Acceptance ID. The historical fixture lacks the correct neighboring Ink record."
+    },
+    {
+      "caseNumber": 1907,
+      "label": "Party of Five: Handicaps",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "The series-prefixed one-word title currently has only partial agreement; require review. Fix81 verifies the exact remaining title after the complete series prefix; the recorded expected IMDb ID must now match.",
+      "resolvedBy": "repeated-series-prefix"
+    },
+    {
+      "caseNumber": 1919,
+      "label": "Party of Five: Moving On",
+      "expectedFailure": "Episode mismatch",
+      "policyReason": "unverified-episode-title",
+      "explanation": "The series-prefixed title currently has only partial agreement; require review. Fix81 verifies the exact remaining title after the complete series prefix; the recorded expected IMDb ID must now match.",
+      "resolvedBy": "repeated-series-prefix"
+    }
+  ],
+  "reviewedTitles": [
+    {
+      "localTitle": "07.15 - The More You Moe, the Moe You Know",
+      "omdbTitle": "The More You Moe",
+      "policyReason": "unverified-episode-title",
+      "explanation": "Partial wording is not independently verified by a recorded alias or exact title."
+    },
+    {
+      "localTitle": "Election",
+      "omdbTitle": "Election Day",
+      "policyReason": "unverified-episode-title",
+      "explanation": "Partial wording is not independently verified by a recorded alias or exact title."
+    },
+    {
+      "localTitle": "Toxic Work Environment",
+      "omdbTitle": "Toxic Workplace",
+      "policyReason": "unverified-episode-title",
+      "explanation": "Partial wording is not independently verified by a recorded alias or exact title."
+    }
+  ],
+  "miniseries": [
+    {
+      "title": "11.22.63 The Truth",
+      "episodeID": "tt5432602",
+      "policyReason": "unverified-episode-title",
+      "resolvedBy": "repeated-series-prefix"
+    }
+  ],
+  "doctorWho": [
+    {
+      "title": "The Celestial Toymaker Pt 1 [missing]",
+      "episodeID": "tt0562897",
+      "policyReason": "unverified-episode-title",
+      "explanation": "The serial name and part alone do not verify the different catalog subtitle."
+    }
+  ]
+}

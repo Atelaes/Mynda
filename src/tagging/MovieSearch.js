@@ -1,4 +1,5 @@
 const path = require('path');
+const {fold} = require('./TitleNormalization');
 
 // Movie filenames commonly append a release description after the real title.
 // Once one of these tokens appears, everything after it is useful to a media
@@ -23,11 +24,7 @@ const ARABIC_SEQUEL_NUMBERS = {
 };
 
 function removeDiacritics(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/œ/gi, 'oe')
-    .replace(/æ/gi, 'ae');
+  return fold(value).replace(/œ/gi,'oe').replace(/æ/gi,'ae');
 }
 
 // This comparison form deliberately ignores punctuation, capitalization, and

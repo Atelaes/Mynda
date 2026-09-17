@@ -1,0 +1,1466 @@
+{
+  "description": "Individual new/corrected movie matches between saved fix03, fix04 and fix05 libraries. Input tags and final IMDb identities are historical. Tests supply controlled catalog records; rounded local duration is a test value, not a claimed OMDb response.",
+  "cases": [
+    {
+      "label": "3:10 to Yuma",
+      "video": {
+        "title": "310.to.Yuma.2007.1080p.BrRip.x264.BOKUTOX.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "310 to Yuma (2007) [1080p]",
+        "310.to.Yuma.2007.1080p.BrRip.x264.BOKUTOX.YIFY.mp4"
+      ],
+      "duration": 7350.63,
+      "expected": {
+        "title": "3:10 to Yuma",
+        "year": "2007",
+        "imdbID": "tt0381849"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "A Knight's Tale",
+      "video": {
+        "title": "A Knights Tale 2001 (1080p x265 Joy)",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "A Knight's Tale",
+        "A Knights Tale 2001 (1080p x265 Joy).m4v"
+      ],
+      "duration": 7928.92,
+      "expected": {
+        "title": "A Knight's Tale",
+        "year": "2001",
+        "imdbID": "tt0183790"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "All the President's Men",
+      "video": {
+        "title": "All the Presidents Men",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "All the Presidents Men",
+        "All the Presidents Men.mp4"
+      ],
+      "duration": 8301.87,
+      "expected": {
+        "title": "All the President's Men",
+        "year": "1976",
+        "imdbID": "tt0074119"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Winter Light",
+      "video": {
+        "title": "Winter Light",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Bergman - Winter Light - MakingOff.org",
+        "Winter Light.avi"
+      ],
+      "duration": 4875.17,
+      "expected": {
+        "title": "Winter Light",
+        "year": "1963",
+        "imdbID": "tt0057358"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Black Hawk Down",
+      "video": {
+        "title": "Black.Hawk.Down.2001.REMASTERED.EXTENDED.720p.BluRay.999MB.HQ.x265.10bit-GalaxyRG",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Black.Hawk.Down.2001.REMASTERED.EXTENDED.720p.BluRay.999MB.HQ.x265.10bit-GalaxyRG[TGx]",
+        "Black.Hawk.Down.2001.REMASTERED.EXTENDED.720p.BluRay.999MB.HQ.x265.10bit-GalaxyRG.mkv"
+      ],
+      "duration": 9110.65,
+      "expected": {
+        "title": "Black Hawk Down",
+        "year": "2002",
+        "imdbID": "tt0265086"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Breakfast at Tiffany's",
+      "video": {
+        "title": "Breakfast.At.Tiffanys.1961.720p.BRRip.x264-x0r",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Breakfast.At.Tiffanys.1961.720p.BRRip.x264-x0r",
+        "Breakfast.At.Tiffanys.1961.720p.BRRip.x264-x0r.mkv"
+      ],
+      "duration": 6905.9,
+      "expected": {
+        "title": "Breakfast at Tiffany's",
+        "year": "1961",
+        "imdbID": "tt0054698"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Catch Me If You Can",
+      "video": {
+        "title": "Catch Me If You Can",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Catch Me If You Can",
+        "Catch Me If You Can.mp4"
+      ],
+      "duration": 8443.1,
+      "expected": {
+        "title": "Catch Me If You Can",
+        "year": "2002",
+        "imdbID": "tt0264464"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Con Air",
+      "video": {
+        "title": "ConAir.1997.720p.BrRip.x264.BOKUTOX.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Con Air",
+        "ConAir.1997.720p.BrRip.x264.BOKUTOX.YIFY.mp4"
+      ],
+      "duration": 6925,
+      "expected": {
+        "title": "Con Air",
+        "year": "1997",
+        "imdbID": "tt0118880"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "2 Fast 2 Furious",
+      "video": {
+        "title": "FATF - 02 - 2 Fast 2 Furious",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "FATF - 02 - 2 Fast 2 Furious",
+        "FATF - 02 - 2 Fast 2 Furious.mp4"
+      ],
+      "duration": 6455.94,
+      "expected": {
+        "title": "2 Fast 2 Furious",
+        "year": "2003",
+        "imdbID": "tt0322259"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Fast & Furious",
+      "video": {
+        "title": "FATF - 04 - Fast and Furious",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "FATF - 04 - Fast and Furious",
+        "FATF - 04 - Fast and Furious.mp4"
+      ],
+      "duration": 6405.48,
+      "expected": {
+        "title": "Fast & Furious",
+        "year": "2009",
+        "imdbID": "tt1013752"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Fast Five",
+      "video": {
+        "title": "FATF - 05 - Fast Five",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "FATF - 05 - Fast Five",
+        "FATF - 05 - Fast Five.mp4"
+      ],
+      "duration": 7821.35,
+      "expected": {
+        "title": "Fast Five",
+        "year": "2011",
+        "imdbID": "tt1596343"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Fate of the Furious",
+      "video": {
+        "title": "The Fate of the Furious",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movie and Sample",
+        "The Fate of the Furious.mkv"
+      ],
+      "duration": 8158.38,
+      "expected": {
+        "title": "The Fate of the Furious",
+        "year": "2017",
+        "imdbID": "tt4630562"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "La Dolce Vita",
+      "video": {
+        "title": "La Dolce Vita ",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Federico Fellini's La Dolce Vita (1960) - RESTORED 1080p x265 HEVC - ITA (ENG SUBS) [BRSHNKV]",
+        "La Dolce Vita .mp4"
+      ],
+      "duration": 10547.26,
+      "expected": {
+        "title": "La Dolce Vita",
+        "year": "1960",
+        "imdbID": "tt0053779"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "First Man",
+      "video": {
+        "title": "First Man",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movie and Sample",
+        "First Man.mkv"
+      ],
+      "duration": 8459.94,
+      "expected": {
+        "title": "First Man",
+        "year": "2018",
+        "imdbID": "tt1213641"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ghost in the Shell 2.0",
+      "video": {
+        "title": "1b. Ghost in the Shell 2.0 (2008 - 1080p DUAL Audio)",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "GHOST in the SHELL (1995-2015) - 3 Movies, COMPLETE Stand Alone Complex SERIES, Arise OVAs - 1080p DUAL Audio x264",
+        "1b. Ghost in the Shell 2.0 (2008 - 1080p DUAL Audio).mkv"
+      ],
+      "duration": 5002,
+      "expected": {
+        "title": "Ghost in the Shell 2.0",
+        "year": "2008",
+        "imdbID": "tt1260502"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Guardians of the Galaxy",
+      "video": {
+        "title": "Guardians of the Galaxy",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Guardians of the Galaxy",
+        "Guardians of the Galaxy.mp4"
+      ],
+      "duration": 7251.29,
+      "expected": {
+        "title": "Guardians of the Galaxy",
+        "year": "2014",
+        "imdbID": "tt2015381"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Harry Potter and the Sorcerer's Stone",
+      "video": {
+        "title": "Harry.Potter.and.the.Sorcerers.Stone.2001.1080p.BrRip.x264.YIFY ( FIRST TRY)",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Harry Potter and the Sorcerers Stone (2001) [1080p]",
+        "Harry.Potter.and.the.Sorcerers.Stone.2001.1080p.BrRip.x264.YIFY ( FIRST TRY).mp4"
+      ],
+      "duration": 9141.7,
+      "expected": {
+        "title": "Harry Potter and the Sorcerer's Stone",
+        "year": "2001",
+        "imdbID": "tt0241527"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "It's a Wonderful Life",
+      "video": {
+        "title": "its.a.wonderful.life.1946.2160p.uhd.bluray.x265-aviator",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Its.a.Wonderful.Life.1946.2160p.UHD.BluRay.x265-AViATOR",
+        "its.a.wonderful.life.1946.2160p.uhd.bluray.x265-aviator.mkv"
+      ],
+      "duration": 7832.48,
+      "expected": {
+        "title": "It's a Wonderful Life",
+        "year": "1946",
+        "imdbID": "tt0038650"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ivan's Childhood",
+      "video": {
+        "title": "Ivans.Childhood.1962.(Russian-War).1080p.BRRip.x264-Classics",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Ivans.Childhood.1962.(Russian-War).1080p.BRRip.x264-Classics",
+        "Ivans.Childhood.1962.(Russian-War).1080p.BRRip.x264-Classics.mkv"
+      ],
+      "duration": 5713.17,
+      "expected": {
+        "title": "Ivan's Childhood",
+        "year": "1962",
+        "imdbID": "tt0056111"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Jack Reacher",
+      "video": {
+        "title": "Jack Reacher",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Jack Reacher",
+        "Jack Reacher.mp4"
+      ],
+      "duration": 7824.45,
+      "expected": {
+        "title": "Jack Reacher",
+        "year": "2012",
+        "imdbID": "tt0790724"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Jennifer's Body",
+      "video": {
+        "title": "Jennifer's.Body.UNRATED.2009.1080p.BrRip.x264.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Jennifers Body UNRATED (2009) [1080p]",
+        "Jennifer's.Body.UNRATED.2009.1080p.BrRip.x264.YIFY.mp4"
+      ],
+      "duration": 6449.67,
+      "expected": {
+        "title": "Jennifer's Body",
+        "year": "2009",
+        "imdbID": "tt1131734"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "John Wick",
+      "video": {
+        "title": "John Wick",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "John Wick",
+        "John Wick.mkv"
+      ],
+      "duration": 6072.96,
+      "expected": {
+        "title": "John Wick",
+        "year": "2014",
+        "imdbID": "tt2911666"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "K-19: The Widowmaker",
+      "video": {
+        "title": "K19 The Widowmaker (2002) 1080p BluRay H264 DolbyD 5.1 + nickarad",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "K19 The Widowmaker (2002) [Liam Neeson] 1080p BluRay H264 DolbyD 5.1 + nickarad",
+        "K19 The Widowmaker (2002) 1080p BluRay H264 DolbyD 5.1 + nickarad.mp4"
+      ],
+      "duration": 8285.12,
+      "expected": {
+        "title": "K-19: The Widowmaker",
+        "year": "2002",
+        "imdbID": "tt0267626"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "K-19: The Widowmaker",
+      "video": {
+        "title": "K19.The.Widow.Maker.(2002.DVD-Rip.DivX.ENG)-cybervince",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "K19.The.Widow.Maker.(2002.DVD-Rip.DivX.ENG)-cybervince",
+        "K19.The.Widow.Maker.(2002.DVD-Rip.DivX.ENG)-cybervince.avi"
+      ],
+      "duration": 7945,
+      "expected": {
+        "title": "K-19: The Widowmaker",
+        "year": "2002",
+        "imdbID": "tt0267626"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "L'Age d'Or",
+      "video": {
+        "title": "L.Age.D.Or.1930.720p.BluRay.x264-CiNEFiLE",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "L.Age.D.Or.1930.720p.BluRay.x264-CiNEFiLE",
+        "L.Age.D.Or.1930.720p.BluRay.x264-CiNEFiLE.mkv"
+      ],
+      "duration": 3757.44,
+      "expected": {
+        "title": "L'Age d'Or",
+        "year": "1930",
+        "imdbID": "tt0021577"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Legally Blonde",
+      "video": {
+        "title": "Legally Blonde",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Legally Blonde",
+        "Legally Blonde.mp4"
+      ],
+      "duration": 5760.55,
+      "expected": {
+        "title": "Legally Blonde",
+        "year": "2001",
+        "imdbID": "tt0250494"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Les Misérables",
+      "video": {
+        "title": "Les.Misérables.2012.1080p.BrRip.x264.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Les Misérables (2012) [1080p]",
+        "Les.Misérables.2012.1080p.BrRip.x264.YIFY.mp4"
+      ],
+      "duration": 9474.45,
+      "expected": {
+        "title": "Les Misérables",
+        "year": "2012",
+        "imdbID": "tt1707386"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Logan's Run",
+      "video": {
+        "title": "Logans.Run.1976.720p.BRRip.x264-x0r",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Logans.Run.1976.720p.BRRip.x264-x0r",
+        "Logans.Run.1976.720p.BRRip.x264-x0r.mkv"
+      ],
+      "duration": 7111.62,
+      "expected": {
+        "title": "Logan's Run",
+        "year": "1976",
+        "imdbID": "tt0074812"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Miller's Crossing",
+      "video": {
+        "title": "Millers Crossing (1990) 720p BluRay x265 HEVC SUJAIDR",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Millers Crossing (1990) 720p BluRay x265 HEVC SUJAIDR",
+        "Millers Crossing (1990) 720p BluRay x265 HEVC SUJAIDR.mkv"
+      ],
+      "duration": 6891.93,
+      "expected": {
+        "title": "Miller's Crossing",
+        "year": "1990",
+        "imdbID": "tt0100150"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ocean's Eleven",
+      "video": {
+        "title": "Oceans.Eleven.2001.1080p.BluRay.H264.AAC-RARBG",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Oceans Eleven (2001)",
+        "Oceans.Eleven.2001.1080p.BluRay.H264.AAC-RARBG.mp4"
+      ],
+      "duration": 6994.29,
+      "expected": {
+        "title": "Ocean's Eleven",
+        "year": "2001",
+        "imdbID": "tt0240772"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ocean's Thirteen",
+      "video": {
+        "title": "Oceans Thirteen 2007 1080p x264",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Oceans Thirteen (2007) 1080p x264 DD5.1 EN NL Subs [Asian Torrenz]",
+        "Oceans Thirteen 2007 1080p x264.mkv"
+      ],
+      "duration": 7329.25,
+      "expected": {
+        "title": "Ocean's Thirteen",
+        "year": "2007",
+        "imdbID": "tt0496806"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ocean's Twelve",
+      "video": {
+        "title": "[ www.UsaBit.com ] - Oceans Twelve (2004) BluRay 720p 900MB Ganool",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Oceans Twelve",
+        "[ www.UsaBit.com ] - Oceans Twelve (2004) BluRay 720p 900MB Ganool.mkv"
+      ],
+      "duration": 7518.17,
+      "expected": {
+        "title": "Ocean's Twelve",
+        "year": "2004",
+        "imdbID": "tt0349903"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ocean's Twelve",
+      "video": {
+        "title": "Oceans Twelve 2004 1080p x264",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Oceans Twelve (2004) 1080p x264 DD5.1 EN NL Subs [Asian Torrenz]",
+        "Oceans Twelve 2004 1080p x264.mkv"
+      ],
+      "duration": 7518.08,
+      "expected": {
+        "title": "Ocean's Twelve",
+        "year": "2004",
+        "imdbID": "tt0349903"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Olympus Has Fallen",
+      "video": {
+        "title": "Olympus Has Fallen",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Olympus Has Fallen",
+        "Olympus Has Fallen.mp4"
+      ],
+      "duration": 7149.12,
+      "expected": {
+        "title": "Olympus Has Fallen",
+        "year": "2013",
+        "imdbID": "tt2302755"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Pirates of the Caribbean: At World's End",
+      "video": {
+        "title": "Pirates.Of.The.Caribbean.At.Worlds.End.2007.2160p.REMUX.Dolby.Vision.And.HDR10.ENG.HINDI.ITA.LATINO.DDP5.1.DV.x265.MP4-BEN.THE.MEN",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Pirates.Of.The.Caribbean.At.Worlds.End.2007.2160p.REMUX.Dolby.Vision.And.HDR10.ENG.HINDI.ITA.LATINO.DDP5.1.DV.x265.MP4-BEN.THE.MEN",
+        "Pirates.Of.The.Caribbean.At.Worlds.End.2007.2160p.REMUX.Dolby.Vision.And.HDR10.ENG.HINDI.ITA.LATINO.DDP5.1.DV.x265.MP4-BEN.THE.MEN.mp4"
+      ],
+      "duration": 10168.74,
+      "expected": {
+        "title": "Pirates of the Caribbean: At World's End",
+        "year": "2007",
+        "imdbID": "tt0449088"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Reservoir Dogs",
+      "video": {
+        "title": "Reservoir Dogs",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Reservoir Dogs",
+        "Reservoir Dogs.mp4"
+      ],
+      "duration": 5958.04,
+      "expected": {
+        "title": "Reservoir Dogs",
+        "year": "1992",
+        "imdbID": "tt0105236"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Rosemary's Baby",
+      "video": {
+        "title": "Rosemarys.Baby.1968.1080p.BRrip.x264.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Rosemarys Baby (1968) [1080p]",
+        "Rosemarys.Baby.1968.1080p.BRrip.x264.YIFY.mp4"
+      ],
+      "duration": 8218.92,
+      "expected": {
+        "title": "Rosemary's Baby",
+        "year": "1968",
+        "imdbID": "tt0063522"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Rush Hour",
+      "video": {
+        "title": "Rush.Hour.1.1998.720p.BRrip.x264.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Rush Hour",
+        "Rush.Hour.1.1998.720p.BRrip.x264.YIFY.mp4"
+      ],
+      "duration": 5868.03,
+      "expected": {
+        "title": "Rush Hour",
+        "year": "1998",
+        "imdbID": "tt0120812"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Saving Private Ryan",
+      "video": {
+        "title": "Saving Private Ryan",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Saving Private Ryan",
+        "Saving Private Ryan.mp4"
+      ],
+      "duration": 10101.17,
+      "expected": {
+        "title": "Saving Private Ryan",
+        "year": "1998",
+        "imdbID": "tt0120815"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "She's All That",
+      "video": {
+        "title": "Shes.All.That.1999.720p.BRRip.x264-x0r",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Shes.All.That.1999.720p.BRRip.x264-x0r",
+        "Shes.All.That.1999.720p.BRRip.x264-x0r.mkv"
+      ],
+      "duration": 5739.55,
+      "expected": {
+        "title": "She's All That",
+        "year": "1999",
+        "imdbID": "tt0160862"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Spider-Man: No Way Home",
+      "video": {
+        "title": "SpiderMan No Way Home 2021 1080p HD-TS V3 Line Audio x264 AAC",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Spiderman - No Way Home",
+        "SpiderMan No Way Home 2021 1080p HD-TS V3 Line Audio x264 AAC.mkv"
+      ],
+      "duration": 8456.13,
+      "expected": {
+        "title": "Spider-Man: No Way Home",
+        "year": "2021",
+        "imdbID": "tt10872600"
+      },
+      "previousWrongImdbID": "tt0117194"
+    },
+    {
+      "label": "The Dark Knight",
+      "video": {
+        "title": "The Dark Knight",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The Dark Knight",
+        "The Dark Knight.mp4"
+      ],
+      "duration": 9133.46,
+      "expected": {
+        "title": "The Dark Knight",
+        "year": "2008",
+        "imdbID": "tt0468569"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Hitchhiker's Guide to the Galaxy",
+      "video": {
+        "title": "The Hitchhikers Guide to the Galaxy 2005 720p BRRip x264 -MgB",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The Hitchhikers Guide to the Galaxy 2005 720p BRRip x264 -MgB",
+        "The Hitchhikers Guide to the Galaxy 2005 720p BRRip x264 -MgB.mkv"
+      ],
+      "duration": 6523.04,
+      "expected": {
+        "title": "The Hitchhiker's Guide to the Galaxy",
+        "year": "2005",
+        "imdbID": "tt0371724"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Emperor's New Groove",
+      "video": {
+        "title": "japhson-groove-1080p",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The.Emperors.New.Groove.2000.1080p.BluRay.X264-Japhson [PublicHD]",
+        "japhson-groove-1080p.mkv"
+      ],
+      "duration": 4715.73,
+      "expected": {
+        "title": "The Emperor's New Groove",
+        "year": "2000",
+        "imdbID": "tt0120917"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The King's Speech",
+      "video": {
+        "title": "The.Kings.Speech.2010.1080p.BluRay.x264.anoXmous_",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The.Kings.Speech.2010.1080p.BluRay.x264.anoXmous",
+        "The.Kings.Speech.2010.1080p.BluRay.x264.anoXmous_.mp4"
+      ],
+      "duration": 7108.2,
+      "expected": {
+        "title": "The King's Speech",
+        "year": "2010",
+        "imdbID": "tt1504320"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Man from U.N.C.L.E.",
+      "video": {
+        "title": "The.Man.from.U.N.C.L.E.2015.720p.BRRip.x264.AAC-ETRG",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The.Man.from.U.N.C.L.E.2015.720p.BRRip.x264.AAC-ETRG",
+        "The.Man.from.U.N.C.L.E.2015.720p.BRRip.x264.AAC-ETRG.mp4"
+      ],
+      "duration": 6989.93,
+      "expected": {
+        "title": "The Man from U.N.C.L.E.",
+        "year": "2015",
+        "imdbID": "tt1638355"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Serpent's Egg",
+      "video": {
+        "title": "The.Serpents.Egg.1977.1080p.BluRay.H264.AAC-RARBG",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The.Serpents.Egg.1977.1080p.BluRay.H264.AAC-RARBG",
+        "The.Serpents.Egg.1977.1080p.BluRay.H264.AAC-RARBG.mp4"
+      ],
+      "duration": 7188.35,
+      "expected": {
+        "title": "The Serpent's Egg",
+        "year": "1977",
+        "imdbID": "tt0076686"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Time Traveler's Wife",
+      "video": {
+        "title": "The.Time.Travelers.Wife.2009.720p.BluRay.x264.anoXmous_",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "The.Time.Travelers.Wife.2009.720p.BluRay.x264.anoXmous",
+        "The.Time.Travelers.Wife.2009.720p.BluRay.x264.anoXmous_.mp4"
+      ],
+      "duration": 6446.14,
+      "expected": {
+        "title": "The Time Traveler's Wife",
+        "year": "2009",
+        "imdbID": "tt0452694"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Three Kings",
+      "video": {
+        "title": "Three Kings",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Three Kings",
+        "Three Kings.mkv"
+      ],
+      "duration": 6887.21,
+      "expected": {
+        "title": "Three Kings",
+        "year": "1999",
+        "imdbID": "tt0120188"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Training Day",
+      "video": {
+        "title": "Training Day",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Training Day",
+        "Training Day.mp4"
+      ],
+      "duration": 7322.77,
+      "expected": {
+        "title": "Training Day",
+        "year": "2001",
+        "imdbID": "tt0139654"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Troll Hunter",
+      "video": {
+        "title": "Trollhunter 720p",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "TrollHunter (2010)  BRRiP 720p x264 DD5.1 EN NL NOR Subs",
+        "Trollhunter 720p.mkv"
+      ],
+      "duration": 6222.21,
+      "expected": {
+        "title": "Troll Hunter",
+        "year": "2010",
+        "imdbID": "tt1740707"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Troll Hunter",
+      "video": {
+        "title": "TrollHunter.2010.NORWEGIAN.1080p.BluRay.H264.AAC-VXT",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "TrollHunter.2010.NORWEGIAN.1080p.BluRay.H264.AAC-VXT",
+        "TrollHunter.2010.NORWEGIAN.1080p.BluRay.H264.AAC-VXT.mp4"
+      ],
+      "duration": 6206.34,
+      "expected": {
+        "title": "Troll Hunter",
+        "year": "2010",
+        "imdbID": "tt1740707"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "U.S. Marshals",
+      "video": {
+        "title": "U.S.Marshals.1998.1080p.BrRip.x264.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "U.S. Marshals (1998) [1080p]",
+        "U.S.Marshals.1998.1080p.BrRip.x264.YIFY.mp4"
+      ],
+      "duration": 7866.86,
+      "expected": {
+        "title": "U.S. Marshals",
+        "year": "1998",
+        "imdbID": "tt0120873"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "You've Got Mail",
+      "video": {
+        "title": "Youve.Got.Mail.1998.1080p.BrRip.x264.YIFY",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Youve Got Mail",
+        "Youve.Got.Mail.1998.1080p.BrRip.x264.YIFY.mp4"
+      ],
+      "duration": 7164.22,
+      "expected": {
+        "title": "You've Got Mail",
+        "year": "1998",
+        "imdbID": "tt0128853"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Ocean's Eleven",
+      "video": {
+        "title": "Oceans.Eleven.1960.720p.BRRip.x264-x0r",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "[ www.torrenting.me ] - Oceans.Eleven.1960.720p.BRRip.x264-x0r",
+        "Oceans.Eleven.1960.720p.BRRip.x264-x0r.mkv"
+      ],
+      "duration": 7648.7,
+      "expected": {
+        "title": "Ocean's Eleven",
+        "year": "1960",
+        "imdbID": "tt0054135"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Batman Begins",
+      "video": {
+        "title": "Batman Begins",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Batman Begins.mp4"
+      ],
+      "duration": 8401.28,
+      "expected": {
+        "title": "Batman Begins",
+        "year": "2005",
+        "imdbID": "tt0372784"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Black Panther",
+      "video": {
+        "title": "Black Panther (cam)",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Black Panther (cam).mkv"
+      ],
+      "duration": 7466.84,
+      "expected": {
+        "title": "Black Panther",
+        "year": "2018",
+        "imdbID": "tt1825683"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Dog Day Afternoon",
+      "video": {
+        "title": "Dog Day Afternoon",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Dog Day Afternoon.avi"
+      ],
+      "duration": 7799.71,
+      "expected": {
+        "title": "Dog Day Afternoon",
+        "year": "1975",
+        "imdbID": "tt0072890"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Furious 7",
+      "video": {
+        "title": "FATF - 07 - Furious 7",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "FATF - 07 - Furious 7.mp4"
+      ],
+      "duration": 8394.92,
+      "expected": {
+        "title": "Furious 7",
+        "year": "2015",
+        "imdbID": "tt2820852"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "In the Line of Fire",
+      "video": {
+        "title": "In The Line Of Fire",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "In The Line Of Fire.mkv"
+      ],
+      "duration": 7716.72,
+      "expected": {
+        "title": "In the Line of Fire",
+        "year": "1993",
+        "imdbID": "tt0107206"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Independence Day",
+      "video": {
+        "title": "Independence Day",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Independence Day.mkv"
+      ],
+      "duration": 8687.87,
+      "expected": {
+        "title": "Independence Day",
+        "year": "1996",
+        "imdbID": "tt0116629"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Iron Man 2",
+      "video": {
+        "title": "Iron Man 2",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Iron Man 2.mkv"
+      ],
+      "duration": 7158.06,
+      "expected": {
+        "title": "Iron Man 2",
+        "year": "2010",
+        "imdbID": "tt1228705"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Notting Hill",
+      "video": {
+        "title": "Notting Hill",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Notting Hill.avi"
+      ],
+      "duration": 7133.81,
+      "expected": {
+        "title": "Notting Hill",
+        "year": "1999",
+        "imdbID": "tt0125439"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Predator",
+      "video": {
+        "title": "Predator",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Predator.mkv"
+      ],
+      "duration": 6395.52,
+      "expected": {
+        "title": "Predator",
+        "year": "1987",
+        "imdbID": "tt0093773"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "First Blood",
+      "video": {
+        "title": "Rambo - 01 - First Blood",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Rambo - 01 - First Blood.avi"
+      ],
+      "duration": 5589.63,
+      "expected": {
+        "title": "First Blood",
+        "year": "1982",
+        "imdbID": "tt0083944"
+      },
+      "previousWrongImdbID": null,
+      "inputEvidence": "Recorded First Blood search after the earlier incorrect sequel tags were cleared; the earlier fix03 snapshot still had an authoritative, wrong IMDb ID."
+    },
+    {
+      "label": "Revenge of the Nerds III: The Next Generation",
+      "video": {
+        "title": "Revenge of the Nerds III: The Next Generation",
+        "kind": "movie",
+        "year": "1992",
+        "imdbID": "tt0105251"
+      },
+      "filenameParts": [
+        "Movies",
+        "Revenge Of The Nerds 3 - The Next Generation.avi"
+      ],
+      "duration": 5563.4,
+      "expected": {
+        "title": "Revenge of the Nerds III: The Next Generation",
+        "year": "1992",
+        "imdbID": "tt0105251"
+      },
+      "previousWrongImdbID": ""
+    },
+    {
+      "label": "Revenge of the Nerds",
+      "video": {
+        "title": "Revenge Of The Nerds",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Revenge Of The Nerds.avi"
+      ],
+      "duration": 5408.61,
+      "expected": {
+        "title": "Revenge of the Nerds",
+        "year": "1984",
+        "imdbID": "tt0088000"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Silence of the Lambs",
+      "video": {
+        "title": "Silence of the Lambs",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Silence of the Lambs.avi"
+      ],
+      "duration": 7112.31,
+      "expected": {
+        "title": "The Silence of the Lambs",
+        "year": "1991",
+        "imdbID": "tt0102926"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Spider-Man: Homecoming",
+      "video": {
+        "title": "Spider-Man Homecoming",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Spider-Man Homecoming.avi"
+      ],
+      "duration": 8006.84,
+      "expected": {
+        "title": "Spider-Man: Homecoming",
+        "year": "2017",
+        "imdbID": "tt2250912"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Emperor's New Groove",
+      "video": {
+        "title": "The Emperors New Groove",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "The Emperors New Groove.avi"
+      ],
+      "duration": 4511.92,
+      "expected": {
+        "title": "The Emperor's New Groove",
+        "year": "2000",
+        "imdbID": "tt0120917"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Hunger Games",
+      "video": {
+        "title": "The Hunger Games - 01",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "The Hunger Games - 01.mkv"
+      ],
+      "duration": 8553.4,
+      "expected": {
+        "title": "The Hunger Games",
+        "year": "2012",
+        "imdbID": "tt1392170"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "The Mighty Ducks",
+      "video": {
+        "title": "The Mighty Ducks",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "The Mighty Ducks.mkv"
+      ],
+      "duration": 6214.38,
+      "expected": {
+        "title": "The Mighty Ducks",
+        "year": "1992",
+        "imdbID": "tt0104868"
+      },
+      "previousWrongImdbID": null
+    },
+    {
+      "label": "Weird Science",
+      "video": {
+        "title": "Weird Science",
+        "kind": "movie",
+        "year": "",
+        "imdbID": ""
+      },
+      "filenameParts": [
+        "Movies",
+        "Weird Science.mp4"
+      ],
+      "duration": 5610.05,
+      "expected": {
+        "title": "Weird Science",
+        "year": "1985",
+        "imdbID": "tt0090305"
+      },
+      "previousWrongImdbID": null
+    }
+  ]
+}
