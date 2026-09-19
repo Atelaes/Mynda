@@ -423,9 +423,17 @@ function eraseTempImages() {
 }
 
 async function createWindow() {
+  const iconFilename = process.platform === 'darwin' ? 'mynda-icon-mac.png' : 'mynda-icon.png';
+  const appIcon = path.join(app.getAppPath(), 'images', iconFilename);
+  // Packaged macOS apps use their embedded ICNS. Source launches otherwise
+  // inherit Electron's Dock icon; Windows/Linux use the window icon below.
+  if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
+    app.dock.setIcon(appIcon);
+  }
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    icon: appIcon,
     //frame: false,
     webPreferences: {
         nodeIntegration: true,
@@ -434,7 +442,9 @@ async function createWindow() {
     }
   })
 
-  win.webContents.openDevTools();
+  if (!app.isPackaged) {
+    win.webContents.openDevTools();
+  }
   await win.loadFile(path.join(app.getAppPath(), 'src', 'renderer', 'index.html'));
   // win.loadFile('src/legacy/player.html');
 }

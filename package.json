@@ -92,11 +92,17 @@
       "!SOURCE_LAYOUT.md"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/mynda.ico"
     },
     "linux": {
       "target": "AppImage",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "icon": "build/icons"
+    },
+    "icon": "images/mynda-icon.png",
+    "mac": {
+      "icon": "build/mynda.icns"
     }
   }
 }
