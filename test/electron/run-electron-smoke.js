@@ -13,8 +13,9 @@ const {
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 const useAsar = process.argv.includes('--asar');
+const libraryJourney = process.argv.includes('--library');
 const suite = createSuite(
-  `Real Electron startup and Settings interaction${useAsar ? ' from ASAR' : ''}`,
+  `${libraryJourney ? 'Real Electron library save and restart workflows' : 'Real Electron startup and Settings interaction'}${useAsar ? ' from ASAR' : ''}`,
   'end-to-end',
   'Launches a disposable Mynda copy with an isolated user-data directory; a window briefly appears.'
 );
@@ -51,7 +52,7 @@ function linkProjectDirectoryIfPresent(name, appDirectory) {
   );
 }
 
-function launchElectron(executable, appDirectory, userData) {
+function launchElectron(executable, appDirectory, userData, phase) {
   return new Promise((resolve, reject) => {
     const args = [];
     if (process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0) {
@@ -63,6 +64,7 @@ function launchElectron(executable, appDirectory, userData) {
       cwd: path.dirname(appDirectory),
       env: Object.assign({}, process.env, {
         MYNDA_E2E_USER_DATA: userData,
+        MYNDA_E2E_PHASE: phase || '',
         MYNDA_E2E_TIMEOUT_MS: '45000',
         ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
       }),
@@ -76,7 +78,7 @@ function launchElectron(executable, appDirectory, userData) {
       settled = true;
       try { child.kill(); } catch(err) {}
       reject(new Error(`Electron smoke-test runner timed out.\n${tail(stdout)}\n${tail(stderr)}`));
-    }, 60000);
+    }, libraryJourney ? 100000 : 60000);
 
     child.stdout.on('data', data => { stdout = tail(stdout + data.toString(), 100000); });
     child.stderr.on('data', data => { stderr = tail(stderr + data.toString(), 100000); });
@@ -119,7 +121,8 @@ function launchElectron(executable, appDirectory, userData) {
   });
 }
 
-suite.test('starts Mynda, opens Settings, commits a renderer edit, and flushes a deferred save on close', async () => {
+suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch saves, plays, changes settings, and verifies restart' :
+  'starts Mynda, opens Settings, commits a renderer edit, and flushes a deferred save on close', async () => {
   const nodeModules = path.join(projectRoot, 'node_modules');
   assert(fs.existsSync(nodeModules), 'node_modules is missing; run npm install before the Electron test');
 
@@ -144,11 +147,18 @@ suite.test('starts Mynda, opens Settings, commits a renderer edit, and flushes a
     copyDirectory(path.join(projectRoot, 'src'), path.join(appDirectory, 'src'), include);
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
     fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
+    if (libraryJourney) {
+      for (const file of ['LibraryJourneyBootstrap.js','LibraryJourneyRenderer.js','LibraryJourneyPreload.js','LibraryJourneyFixtures.js']) {
+        fs.copyFileSync(path.join(__dirname,file),path.join(appDirectory,file));
+      }
+      fs.mkdirSync(userData,{recursive:true});
+      fs.writeFileSync(path.join(userData,'.mynda-test-library'),'Disposable library workflow fixture');
+    }
     fs.writeFileSync(path.join(appDirectory, 'omdb.js'), "module.exports = {key: 'test-only-key'};\n");
     fs.writeFileSync(path.join(appDirectory, 'package.json'), JSON.stringify({
       name: 'mynda-electron-smoke',
       version: '1.0.0',
-      main: 'SmokeBootstrap.js'
+      main: libraryJourney ? 'LibraryJourneyBootstrap.js' : 'SmokeBootstrap.js'
     }, null, 2));
     // With ASAR, dependencies are shared from the disposable parent directory.
     // The archive itself contains only app source/assets and the test bootstrap.
@@ -165,6 +175,22 @@ suite.test('starts Mynda, opens Settings, commits a renderer edit, and flushes a
 
     const target = useAsar ? `${appDirectory}.asar` : appDirectory;
     if (useAsar) await asar.createPackage(appDirectory, target);
+    if (libraryJourney) {
+      const fixtures=require('./LibraryJourneyFixtures');
+      const exercise=await launchElectron(electronExecutable,target,userData,'exercise');
+      for (const key of ['rating','scanConcurrentEdit','tagConflict','batch','playback','settingsStaged','gracefulClose']) {
+        assert.strictEqual(exercise[key],true,`Incomplete library workflow: ${key}`);
+      }
+      fixtures.assertSaved(JSON.parse(fs.readFileSync(path.join(userData,'Library/library.json'),'utf8')));
+      // A new process must read the saved file and show the same values. Reusing
+      // a Library instance or reloading only the renderer cannot prove restart.
+      const restart=await launchElectron(electronExecutable,target,userData,'restart');
+      assert.strictEqual(restart.restartVerified,true);
+      assert.strictEqual(restart.gracefulClose,true);
+      fixtures.assertSaved(JSON.parse(fs.readFileSync(path.join(userData,'Library/library.json'),'utf8')));
+      console.log('        Verified editor rating, concurrent scan/edit, Auto-Tag conflict, batch scope, settings flush, playback history and resume after a new process.');
+      return;
+    }
     const result = await launchElectron(electronExecutable, target, userData);
     assert.strictEqual(result.libraryCreated, true);
     const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));

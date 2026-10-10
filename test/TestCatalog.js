@@ -332,5 +332,15 @@ module.exports = [
     args: ['--asar'],
     title: 'Real Electron startup from ASAR',
     protects: 'the same UI/assets journey from an actual source-and-assets archive; separate from the full bundled-media packaging test'
+  },
+  {
+    category:'end-to-end',file:'test/electron/run-electron-smoke.js',args:['--library'],
+    title:'Library saves through the native UI and restart',
+    protects:'rating, scan/edit concurrency, Auto-Tag conflict, batch scope, deferred preferences, playback history and restart durability'
+  },
+  {
+    category:'end-to-end',file:'test/electron/run-electron-smoke.js',args:['--library','--asar'],
+    title:'Library save workflows from ASAR',
+    protects:'the complete library save/restart journey from an archived application with controlled external service/player fixtures'
   }
 ];

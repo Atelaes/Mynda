@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-Use `npm run test:list` for the current catalog and each test run's final summary for suite and case totals. The catalog includes fast tests and two Electron end-to-end suites (source and ASAR). Before media-tool setup, `npm run test:core` excludes the two fast suites that require native media tools. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
+Use `npm run test:list` for the current catalog and each test run's final summary for suite and case totals. The catalog includes fast tests and four Electron end-to-end suites: startup/assets and library-save workflows, each in source and ASAR form. Before media-tool setup, `npm run test:core` excludes the two fast suites that require native media tools. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
 
 ## The first commands to learn
 
@@ -29,7 +29,7 @@ The complete command set is:
 | `npm run test:integration` | Integration tests | While changing storage, IPC-facing models, logs, or Share |
 | `npm run test:component` | React component tests | While changing renderer state or UI components |
 | `npm run test:renderer` | Same as `test:component` | A more memorable alias |
-| `npm run test:electron` | Real Electron end-to-end smoke test | After Electron, React, Babel, or startup changes |
+| `npm run test:electron` | Real Electron startup/assets and library-save/restart workflows, from source and ASAR | After Electron, React, Babel, startup, or library-save changes |
 | `npm run test:all` | Fast tests plus Electron | Before committing an upgrade or preparing a release |
 | `npm run media:prepare` | Builds and stages the current machine's pinned native media sidecars | Once on each packaging platform, or after changing their versions |
 | `npm run media:status` | Shows the resolved path and source of FFmpeg, FFprobe, and MPV | To detect a staged, packaged, override, system, or missing tool |
@@ -38,6 +38,26 @@ The complete command set is:
 | `npm run test:package` | Fast tests, strict media verification, unpacked production build, then packaged decode/probe/graphical-MPV checks with an empty `PATH` | Before a release; briefly opens MPV and writes under `dist/` |
 
 The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
+
+The library workflow suites open a separate app with three synthetic videos and a temporary watchfolder. They perform the following through the real rendered controls and application IPC, then close and start a **new Electron process** against that same temporary library:
+
+| Workflow | Automated assertion |
+|---|---|
+| Editor rating | A four-star edit is committed and reappears in the editor after restart; catalog ratings remain unchanged. |
+| Scan and editing | The real scanner pauses at a fixture metadata probe. An editor save completes before the probe is released, an unsaved draft survives the resulting refresh, and both user edits and new technical metadata persist. |
+| Auto-Tag and editing | The real Auto-Tag runner pauses at a fixture catalog response. A manual title correction wins, the late result records a conflict, and the video remains retryable. |
+| Batch editing | Two selected videos receive the intended field change; their other fields and an unselected third video remain intact. |
+| Settings and closing | Two actual preference checkboxes change in one turn; immediate window closure flushes both before their normal debounce expires. The restarted UI shows both values. |
+| Playback history and resume | Controlled MPV events drive the real Player component; its actual Recently Played timer fires, position and seek events save, and the restarted player receives the saved resume position. |
+
+Metadata probes, catalog responses, and the external MPV process are fixtures, so these save tests require no real media collection, service credentials, quota, or player installation. They do not certify actual decoding, sound, or live catalog availability; `test:media` and `test:package` exercise real native media tools separately. Everything else in this journey, including React controls, the scan/tag runners, both Library processes, file writes, and application close/restart, is real. Unexpected dialogs fail noninteractively. The tests launch several disposable windows, and report the failing workflow stage if one does not complete.
+
+To run just these new journeys:
+
+```bash
+node test/electron/run-electron-smoke.js --library
+node test/electron/run-electron-smoke.js --library --asar
+```
 
 To run one test file while working on a failure:
 
@@ -53,7 +73,7 @@ Scans and Auto-Tag do filesystem/network work outside the commit queue. They sub
 
 Closing flushes already-requested editor saves, deferred settings changes, and playback positions, then drains ready backend commits. It does not wait for an entire scan or catalog lookup and does not automatically save an unsubmitted editor draft. If completion cannot be confirmed, the user can wait, cancel closing, or explicitly quit without saving. A single-instance lock prevents two normal app launches from writing the same library.
 
-The focused suites above run under both `npm run test:core` and `npm test`; persistence/protocol fixtures use disposable files and controlled IPC. Before release, also run `npm run test:electron` on each supported native platform. On a copy of a real library, start a scan or Auto-Tag, save an editor change while it runs, verify the change appears promptly and survives restart, and close immediately after a settings or playback update. Native dialogs, filesystem performance, and actual Electron rendering still require this platform check.
+The focused non-GUI suites above run under both `npm run test:core` and `npm test`; persistence/protocol fixtures use disposable files and controlled IPC. Run `npm run test:electron` to automate the normal rating, concurrent-edit, batch, preference, history, and restart checks described above. Before release, run it on each supported native platform. Real drive availability, large-library performance, native dialog behavior, and audiovisual playback remain useful checks with representative user data.
 
 ## What the categories mean
 
@@ -374,6 +394,6 @@ See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) for the folder map and one-time `npm ru
 
 `npm run test:paths` runs the focused import/resource/ASAR integration suite. It checks real paths and exact capitalization, including CSS imports, font files, placeholder images, rating logos, themes, and both JavaScript entry points.
 
-`npm run test:electron` now opens two disposable applications in sequence: first the source copy, then a copy in an ASAR archive. Both launch from outside the application directory and check the interface, Settings, images, fonts, theme stylesheets, and theme icon variables. `npm run test:electron:asar` runs only the archived-source check. `test:all` includes both.
+`npm run test:electron` runs source and ASAR startup checks followed by source and ASAR library-save/restart journeys. All launch from outside the application directory. The startup checks cover the interface, Settings, images, fonts, theme stylesheets, and theme icon variables; the save journeys cover the workflows above. `npm run test:electron:asar` runs only the original archived-source startup check. `test:all` includes all four suites.
 
 The ASAR journey deliberately shares installed npm dependencies from the temporary parent directory. It verifies source/resource paths inside an archive; `npm run test:package` separately assembles the complete native application and checks its bundled media dependencies.
