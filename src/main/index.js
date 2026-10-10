@@ -31,6 +31,7 @@ const LibraryExport = require('../library/LibraryExport.js');
 const ShareService = require('../sharing/ShareService.js');
 const ShareManifest = require('../sharing/ShareManifest.js');
 const loadReactDeveloperTools = require('./ReactDevTools.js');
+const {installExternalContentPolicy} = require('./ExternalContent.js');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
@@ -45,6 +46,10 @@ let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const backendLog = Logger.child('Backend');
+const externalContent = installExternalContentPolicy({
+  ipcMain, shell: electron.shell, log: backendLog,
+  rendererPath: path.join(app.getAppPath(), 'src', 'renderer', 'index.html')
+});
 const scanLog = Logger.child('WatchfolderScan');
 const metadataLog = Logger.child('Metadata');
 const autoTagLog = Logger.child('AutoTag');
@@ -441,9 +446,15 @@ async function createWindow() {
     webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
-        enableRemoteModule: true
+        enableRemoteModule: true,
+        webviewTag: false,
+        nodeIntegrationInSubFrames: false,
+        nodeIntegrationInWorker: false,
+        webSecurity: true,
+        allowRunningInsecureContent: false
     }
   })
+  externalContent.protectWindow(win);
   if (!libraryClose) libraryClose = require('./LibraryClose.js').installLibraryClose({
     app,ipcMain,dialog,library,getWindow:()=>win,log:backendLog
   });

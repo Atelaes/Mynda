@@ -2,6 +2,16 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {
+    category: 'component', file: 'test/ExternalLink.component.test.js',
+    title: 'External links in catalog results and reports',
+    protects: 'shared browser-link component, approved IPC, keyboard/mouse activation and malformed catalog IDs'
+  },
+  {
+    category: 'unit', file: 'test/ExternalContent.unit.test.js',
+    title: 'External links and Electron content permissions',
+    protects: 'approved browser destinations, trusted main-frame IPC, blocked navigation/popups/embeds and denied permissions'
+  },
   {category:'unit',file:'test/ElectronSmokeLifecycle.unit.test.js',title:'Electron smoke-test lifecycle',
     protects:'noninteractive failure teardown, preserved result output, graceful-close ordering and saved-data verification'},
   {category:'integration',file:'test/LibraryTransactions.integration.test.js',title:'Single-writer library transactions',
@@ -324,7 +334,7 @@ module.exports = [
     category: 'end-to-end',
     file: 'test/electron/run-electron-smoke.js',
     title: 'Real Electron startup',
-    protects: 'main/renderer boot from another working directory, first-launch storage, panes, Settings, styles, themes, fonts, and icons'
+    protects: 'startup/assets, Settings, renderer saves, approved browser links, blocked navigation/popups/frames and denied permissions'
   },
   {
     category: 'end-to-end',

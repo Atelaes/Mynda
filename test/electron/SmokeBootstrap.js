@@ -4,8 +4,11 @@
 const fs = require('fs');
 const path = require('path');
 const {pathToFileURL} = require('url');
-const {app, dialog} = require('electron');
+const {app, dialog, shell, BrowserWindow} = require('electron');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
+const {inspectExternalContent} = require('./ExternalContentJourney.js');
+const browserLinks = [];
+shell.openExternal = async url => { browserLinks.push(url); };
 
 const RESULT_PREFIX = 'MYNDA_ELECTRON_SMOKE_RESULT:';
 const userData = process.env.MYNDA_E2E_USER_DATA;
@@ -132,6 +135,9 @@ async function inspectMainWindow(window) {
       return;
     }
 
+    activeStage='external-content';
+    const externalContent = await inspectExternalContent({app, BrowserWindow, window, opened:browserLinks});
+
     activeStage='open-settings';
     await window.webContents.executeJavaScript(
       `document.getElementById('settings-button').click(); true`
@@ -232,6 +238,7 @@ async function inspectMainWindow(window) {
         settingsClosed,
         libraryCreated,
         assets,
+        externalContent,
         rendererSave,
         shutdownSave,
         saveConfirmed:true,
@@ -298,4 +305,4 @@ process.on('unhandledRejection', error => {
   finish(false, {stage: 'unhandled-rejection', error: error && error.stack ? error.stack : String(error)});
 });
 
-require('./src/main/index.js');
+require(path.join(app.getAppPath(), 'src', 'main', 'index.js'));

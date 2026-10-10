@@ -57,7 +57,7 @@ function auditReferences(root) {
     const clean = decodeURIComponent(reference.split(/[?#]/)[0]);
     check(owner, reference, path.resolve(path.dirname(base), clean), 'resource');
   }
-  function inspectJavaScript(owner, source, effectiveOwner = owner) {
+  function inspectJavaScript(owner, source) {
     let ast;
     try {
       ast = babel.parseSync(source, {babelrc: false, configFile: false, parserOpts: {plugins: ['jsx']}});
@@ -73,15 +73,10 @@ function auditReferences(root) {
         const reference = node.arguments[0].value;
         if (!reference.startsWith('.')) return;
         try {
-          // The smoke bootstrap and its test-only lifecycle helper are copied
-          // together to the disposable root; application imports still resolve
-          // from that root. Validate the helper's actual checked-in spelling.
-          const moduleOwner = owner === path.join(root,'test','electron','SmokeBootstrap.js') &&
-            reference === './SmokeLifecycle.js' ? owner : effectiveOwner;
-          const target = Module.createRequire(moduleOwner).resolve(reference);
+          const target = Module.createRequire(owner).resolve(reference);
           check(owner, reference, target, 'module');
         } catch (error) {
-          const requested = path.resolve(path.dirname(effectiveOwner), reference);
+          const requested = path.resolve(path.dirname(owner), reference);
           // omdb.js is deliberately supplied by each developer and is ignored
           // by Git. A clean checkout may omit it; its two imports must still
           // point to the project root. The archive/Electron tests supply a fake
@@ -105,10 +100,7 @@ function auditReferences(root) {
       if (!/\.(?:js|html|css)$/.test(owner)) continue;
       const source = fs.readFileSync(owner, 'utf8');
       if (owner.endsWith('.js')) {
-        // The E2E bootstrap is copied to the disposable app root before use.
-        const effective = owner === path.join(root, 'test', 'electron', 'SmokeBootstrap.js') ?
-          path.join(root, 'SmokeBootstrap.js') : owner;
-        inspectJavaScript(owner, source, effective);
+        inspectJavaScript(owner, source);
       } else if (owner.endsWith('.html')) {
         const html = source.replace(/<!--[\s\S]*?-->/g, '');
         for (const match of html.matchAll(/\b(?:src|href)\s*=\s*(['"])(.*?)\1/g)) checkUrl(owner, match[2]);

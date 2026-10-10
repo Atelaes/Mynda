@@ -1,19 +1,12 @@
 const React = require('react');
 const {MynParagraphFolder} = require('./SharedComponents.js');
 const {buildTaggingReport} = require('../tagging/TaggingReport.js');
-const {shell} = require('electron');
+const {ImdbLink} = require('./ExternalLink.js');
 
 function LinkedReportText({text}) {
   return String(text).split(/(\btt\d+\b)/).map((part,index)=>{
     if (!/^tt\d+$/.test(part)) return part;
-    const url=`https://www.imdb.com/title/${part}/`;
-    const open=async event=>{
-      if (event.type === 'auxclick' && event.button !== 1) return;
-      event.preventDefault();event.stopPropagation();
-      try { await shell.openExternal(url); }
-      catch(error) { alert('Could not open IMDb in your browser.'); }
-    };
-    return <a key={index} href={url} onClick={open} onAuxClick={open}>{part}</a>;
+    return <ImdbLink key={index} imdbID={part}>{part}</ImdbLink>;
   });
 }
 

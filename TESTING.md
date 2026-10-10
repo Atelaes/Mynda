@@ -39,6 +39,8 @@ The complete command set is:
 
 The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
 
+The startup suites also activate real IMDb links, verify that the main process approves their browser destinations, and reject unsafe URL requests. They attempt a popup, page navigation and an embedded frame, and check that geolocation permission is denied. Only `shell.openExternal` is replaced with a recorder: the tests do not open your browser or fetch IMDb. Chromium's guards, React events and IPC are real.
+
 The library workflow suites open a separate app with three synthetic videos and a temporary watchfolder. They perform the following through the real rendered controls and application IPC, then close and start a **new Electron process** against that same temporary library:
 
 | Workflow | Automated assertion |
@@ -75,6 +77,16 @@ Closing flushes already-requested editor saves, deferred settings changes, and p
 
 The focused non-GUI suites above run under both `npm run test:core` and `npm test`; persistence/protocol fixtures use disposable files and controlled IPC. Run `npm run test:electron` to automate the normal rating, concurrent-edit, batch, preference, history, and restart checks described above. Before release, run it on each supported native platform. Real drive availability, large-library performance, native dialog behavior, and audiovisual playback remain useful checks with representative user data.
 
+## External-content boundary
+
+The editor's catalog results and autotag report share `ExternalLink.js`. Supported links open in the user's default browser through `external:open`; the main process checks the exact registered application window, its main frame and application-file URL before invoking the operating system. `ExternalLinks.js` defines the approved destinations. Currently these are HTTPS IMDb title pages only. New provider links must extend that explicit policy and its tests; arbitrary URLs from catalog data are not passed to the OS. Invalid identifiers remain plain text, and a failed browser launch produces a user-visible message.
+
+`ExternalContent.js` installs the policy before the application page loads. It blocks page-driven navigation, redirects, both Electron 12 and newer popup paths, and webview attachment. Navigation and popups are never automatically forwarded to the browser. Both permission checks and permission requests deny access by default; the web UI does not need hardware, location or browser protocol permissions. MPV remains a separate native process. The page's initial CSP blocks embedded frames/objects, base-URL changes and form navigation without blocking the existing local and downloaded artwork.
+
+This is the first, bounded security step. Renderer Node access and `remote` still exist, and this policy cannot contain a renderer that already executes arbitrary Node code. The planned preload migration, broader privileged-IPC validation, Electron upgrade, isolation/sandboxing and stricter script CSP are still required. The unit tests exercise hostile URLs, callers and permissions; component tests cover both link locations; native tests check the actual Electron enforcement in source and ASAR launches.
+
+Platform baseline reported on 2026-10-10: the library save/restart Electron journeys passed on the user's Mac, and the Windows build process works. An Ubuntu build has not yet been tested. These results precede the external-content changes; run `npm test` and `npm run test:electron` again after applying them.
+
 ## What the categories mean
 
 The categories describe the size of the boundary under test—not whether a test is important.
@@ -93,6 +105,8 @@ A “test double” is simply a small, predictable substitute for something outs
 
 | Suite | Category | What it protects |
 |---|---|---|
+| `ExternalContent.unit.test.js` | Unit | Approved URLs, exact main-frame callers, canonical application paths, blocked navigation/popups/webviews and denied browser permissions |
+| `ExternalLink.component.test.js` | Component | Catalog-result links, shared browser-opening IPC, invalid IDs, keyboard/mouse activation and launch-failure messages |
 | Tagging architectural contracts | Integration | Final policy ownership, shared budgets, provenance, cache lifetime and exhaustive small-batch permutations |
 | Tagging editor provenance | Component | User ID authorship, one application per preview and stale selection rejection |
 | `TaggingPrecision.integration.test.js` | Integration | Short titles, original evidence, order-independent decisions, same-season support, cancellation, coverage mismatches and movie title expansion |

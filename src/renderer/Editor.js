@@ -11,6 +11,7 @@ const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const OmdbHelper = require('../tagging/OmdbHelper.js');
 const TaggingEvidence = require('../tagging/TaggingEvidence');
 const {MynAutotagReport} = require('./AutotagReport.js');
+const {ImdbLink} = require('./ExternalLink.js');
 const {parseBoxOffice, formatBoxOffice} = require('../library/BoxOffice.js');
 const {
   library,
@@ -986,7 +987,7 @@ class MynEditorSearch extends React.Component {
           <td className='artwork'><img src={movie.Poster} /></td>
           <td className='title'>{movie.Title}</td>
           <td className='year'>{movie.Year}</td>
-          <td><a href={`https://www.imdb.com/title/${movie.imdbID}`} target='_blank' onClick={(e) => {e.stopPropagation()}}>IMDb</a></td>
+          <td><ImdbLink imdbID={movie.imdbID}>IMDb</ImdbLink></td>
         </tr>
       );
     });

@@ -18,7 +18,11 @@ function startupRequire(request) {
     return options=>require('@babel/register')({...options,cache:true});
   }
   if (request==='./Renderer.js') {
+    const links=loadFreshWithMocks(require.resolve('../../src/renderer/ExternalLink.js'),{
+      electron:{ipcRenderer:{invoke:async()=>({ok:true})}}
+    });
     const {MynAutotagReport}=loadFreshWithMocks(reportFile,{
+      './ExternalLink.js':links,
       react:React,electron:{shell:{openExternal:async()=>{}}},
       '../tagging/TaggingReport.js':{buildTaggingReport},
       './SharedComponents.js':{MynParagraphFolder:({paragraph})=>paragraph}

@@ -147,6 +147,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     copyDirectory(path.join(projectRoot, 'src'), path.join(appDirectory, 'src'), include);
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
     fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
+    fs.copyFileSync(path.join(__dirname, 'ExternalContentJourney.js'), path.join(appDirectory, 'ExternalContentJourney.js'));
     if (libraryJourney) {
       for (const file of ['LibraryJourneyBootstrap.js','LibraryJourneyRenderer.js','LibraryJourneyPreload.js','LibraryJourneyFixtures.js']) {
         fs.copyFileSync(path.join(__dirname,file),path.join(appDirectory,file));
@@ -192,6 +193,9 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
       return;
     }
     const result = await launchElectron(electronExecutable, target, userData);
+    for (const key of ['browserLinks', 'blockedNavigation', 'blockedPopup', 'deniedPermissions', 'blockedFrame']) {
+      assert.strictEqual(result.externalContent[key], true, `Incomplete external-content check: ${key}`);
+    }
     assert.strictEqual(result.libraryCreated, true);
     const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
     assert.strictEqual(savedLibrary.videoIdScheme, 2, 'First launch must persist the new video ID scheme');

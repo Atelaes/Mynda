@@ -8,8 +8,11 @@ const shared = loadFreshWithMocks(path.join(__dirname,'../src/renderer/SharedCom
   electron:{ipcRenderer:{}},'./RendererRuntime.js':{}
 });
 const opened=[];
+const ipcRenderer={invoke:async(channel,url)=>{
+  assert.strictEqual(channel,'external:open');opened.push(url);return {ok:true};
+}};
 const {MynAutotagReport,LinkedReportText} = loadFreshWithMocks(path.join(__dirname,'../src/renderer/AutotagReport.js'),{
-  './SharedComponents.js':shared,electron:{shell:{openExternal:async url=>{opened.push(url);}}}
+  './SharedComponents.js':shared,electron:{ipcRenderer}
 });
 const {MynEditor,MynEditorEdit} = loadFreshWithMocks(path.join(__dirname,'../src/renderer/Editor.js'),{
   electron:{ipcRenderer:{}},'../tagging/OmdbHelper.js':{},'./RendererRuntime.js':{},
@@ -21,6 +24,7 @@ const suite = createSuite('Editor autotag report','component',
 const video={id:'a',title:'Current title',taggingDecision:{status:'unmatched',reason:{code:'no-results'},
   evidence:{original:{title:'<script>saved title</script>',filename:'/Shows/long filename.mkv'}}}};
 const html=element=>ReactDOMServer.renderToStaticMarkup(element);
+const unwrap=element=>typeof element.type==='function' ? unwrap(element.type(element.props)) : element;
 
 suite.test('renders a collapsed MynParagraphFolder with a native accessible button',()=>{
   const element=MynAutotagReport({video});
@@ -76,7 +80,7 @@ suite.test('hides reports for batch editing, never-attempted videos and a hidden
 });
 suite.test('IMDb IDs are links and a click opens only the canonical IMDb page externally',async()=>{
   const pieces=LinkedReportText({text:'Candidate tt1234567, series tt7654321'});
-  const links=pieces.filter(p=>p && p.type==='a');
+  const links=pieces.filter(p=>p && p.props && p.props.imdbID).map(unwrap);
   assert.strictEqual(links.length,2);
   assert.strictEqual(links[0].props.href,'https://www.imdb.com/title/tt1234567/');
   let prevented=0,stopped=0;
@@ -85,7 +89,7 @@ suite.test('IMDb IDs are links and a click opens only the canonical IMDb page ex
   assert.strictEqual(prevented,1);assert.strictEqual(stopped,1);
 });
 suite.test('middle-click opens IMDb, right-click retains the ordinary link context menu',async()=>{
-  const link=LinkedReportText({text:'tt1234567'})[1];
+  const link=unwrap(LinkedReportText({text:'tt1234567'})[1]);
   const e={type:'auxclick',button:1,preventDefault(){},stopPropagation(){}};
   await link.props.onAuxClick(e);assert.strictEqual(opened.pop(),'https://www.imdb.com/title/tt1234567/');
   await link.props.onAuxClick({...e,button:2,preventDefault(){throw Error('Right click intercepted');}});
