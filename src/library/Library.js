@@ -1,6 +1,7 @@
 
 'use strict';
 const electron = require('electron');
+const fs = require('fs');
 const path = require('path');
 const {fileURLToPath} = require('url');
 const {v4: uuidv4} = require('uuid');
@@ -140,8 +141,14 @@ class Library {
     const sender = event && event.sender;
     let valid = false;
     try {
-      valid = Boolean(sender && typeof sender.getURL === 'function' &&
-        path.resolve(fileURLToPath(sender.getURL())) === path.resolve(__dirname, '../renderer/index.html'));
+      if (sender && typeof sender.getURL === 'function') {
+        const actual = path.resolve(fileURLToPath(sender.getURL()));
+        const expected = path.resolve(__dirname, '../renderer/index.html');
+        // CommonJS resolves directory symlinks, but loadFile keeps the launch
+        // path. macOS /var and /private/var can therefore name this same file.
+        // Electron's fs also canonicalizes paths within an ASAR archive.
+        valid = actual === expected || fs.realpathSync(actual) === fs.realpathSync(expected);
+      }
     } catch (_) {}
     if (!valid || (event.senderFrame && sender.mainFrame && event.senderFrame !== sender.mainFrame)) {
       throw Operations.failure('LIBRARY_UNAUTHORIZED', 'Library access is limited to the application window.');

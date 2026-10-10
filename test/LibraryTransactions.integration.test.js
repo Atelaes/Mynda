@@ -638,6 +638,73 @@ suite.test('remote documents and child frames cannot read or write the library',
     assert.strictEqual(f.policy.writes, 0);
   }));
 
+suite.test('the trusted renderer can load and save through a directory symlink or junction', () =>
+  withTemporaryDirectory('transaction-ipc-trusted-path-alias', async directory => {
+    const rendererDirectory = path.resolve(__dirname, '../src/renderer');
+    const aliasDirectory = path.join(directory, 'Mynda renderer alias');
+    fs.symlinkSync(rendererDirectory, aliasDirectory, process.platform === 'win32' ? 'junction' : 'dir');
+    const aliasFile = path.join(aliasDirectory, 'index.html');
+    assert.notStrictEqual(path.resolve(aliasFile), path.join(rendererDirectory, 'index.html'));
+    assert.strictEqual(fs.realpathSync(aliasFile), fs.realpathSync(path.join(rendererDirectory, 'index.html')));
+    const f = pairedLibrary(directory, [videoFixture({id: videoID(1)})]);
+    const client = f.createRenderer();
+    client.sender.getURL = () => pathToFileURL(aliasFile).href;
+    client.sender.mainFrame.url = client.sender.getURL();
+    await f.flush();
+    await client.renderer.ready;
+    assert.deepStrictEqual(client.renderer.getSaveObject(), f.disk());
+    const save = operation(client.renderer, 'replace', 'settings.preferences.exclude_samples_from_library', false);
+    await f.flush();
+    assertCommitted(save);
+    assert.strictEqual(f.disk().settings.preferences.exclude_samples_from_library, false);
+    assert.deepStrictEqual(client.renderer.getSaveObject(), f.disk());
+    assert(f.history.some(message => message.channel === 'library:snapshot'));
+    assert(f.history.some(message => message.channel === 'library:commit'));
+    assert.deepStrictEqual(client.diskCalls, []);
+  }));
+
+suite.test('canonical renderer path checks still reject unrelated files, their aliases, remote URLs and child frames', () =>
+  withTemporaryDirectory('transaction-ipc-untrusted-path-alias', async directory => {
+    const rendererDirectory = path.resolve(__dirname, '../src/renderer');
+    const trustedAlias = path.join(directory, 'trusted-alias');
+    fs.symlinkSync(rendererDirectory, trustedAlias, process.platform === 'win32' ? 'junction' : 'dir');
+    const unrelatedDirectory = path.join(directory, 'unrelated');
+    fs.mkdirSync(unrelatedDirectory);
+    const unrelatedFile = path.join(unrelatedDirectory, 'index.html');
+    fs.writeFileSync(unrelatedFile, '<!doctype html><title>Unrelated index.html</title>');
+    const untrustedAlias = path.join(directory, 'untrusted-alias');
+    let aliasFile;
+    if (process.platform === 'win32') {
+      // Directory junctions exercise canonical-file rejection without requiring
+      // Windows administrator/developer-mode privileges for file symlinks.
+      fs.symlinkSync(unrelatedDirectory, untrustedAlias, 'junction');
+      aliasFile = path.join(untrustedAlias, 'index.html');
+    } else {
+      fs.mkdirSync(untrustedAlias);
+      aliasFile = path.join(untrustedAlias, 'index.html');
+      fs.symlinkSync(unrelatedFile, aliasFile, 'file');
+    }
+    assert.strictEqual(fs.realpathSync(aliasFile), fs.realpathSync(unrelatedFile));
+    const f = pairedLibrary(directory);
+    const client = f.createRenderer();
+    await f.flush();
+    const before = f.disk();
+    const urls = [pathToFileURL(unrelatedFile).href, pathToFileURL(aliasFile).href,
+      'https://example.invalid/index.html', pathToFileURL(path.join(trustedAlias, 'index.html')).href];
+    for (const [index, url] of urls.entries()) {
+      const mainFrame = {url};
+      const sender = {...client.sender, mainFrame, getURL: () => url};
+      const event = {sender, senderFrame: index === urls.length - 1 ? {url} : mainFrame};
+      await assert.rejects(async () => f.handlers.get('library:snapshot')(event),
+        error => error.code === 'LIBRARY_UNAUTHORIZED');
+      const response = await f.handlers.get('library:commit')(event, {requestId: `untrusted-alias-${index}`,
+        operations: [{opType: 'replace', address: 'settings.preferences.exclude_samples_from_library', entry: false}]});
+      assert.strictEqual(response.error && response.error.code, 'LIBRARY_UNAUTHORIZED');
+    }
+    assert.deepStrictEqual(f.disk(), before);
+    assert.strictEqual(f.policy.writes, 0);
+  }));
+
 suite.test('queued array-index edits retain their selected record when an earlier removal shifts indices', () =>
   withTemporaryDirectory('transaction-stable-selectors', async directory => {
     const f = pairedLibrary(directory, [1, 2, 3].map(n => videoFixture({id: videoID(n), title: `Video ${n}`})));

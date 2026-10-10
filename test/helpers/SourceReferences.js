@@ -73,7 +73,12 @@ function auditReferences(root) {
         const reference = node.arguments[0].value;
         if (!reference.startsWith('.')) return;
         try {
-          const target = Module.createRequire(effectiveOwner).resolve(reference);
+          // The smoke bootstrap and its test-only lifecycle helper are copied
+          // together to the disposable root; application imports still resolve
+          // from that root. Validate the helper's actual checked-in spelling.
+          const moduleOwner = owner === path.join(root,'test','electron','SmokeBootstrap.js') &&
+            reference === './SmokeLifecycle.js' ? owner : effectiveOwner;
+          const target = Module.createRequire(moduleOwner).resolve(reference);
           check(owner, reference, target, 'module');
         } catch (error) {
           const requested = path.resolve(path.dirname(effectiveOwner), reference);

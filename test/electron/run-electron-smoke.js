@@ -119,7 +119,7 @@ function launchElectron(executable, appDirectory, userData) {
   });
 }
 
-suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings', async () => {
+suite.test('starts Mynda, opens Settings, commits a renderer edit, and flushes a deferred save on close', async () => {
   const nodeModules = path.join(projectRoot, 'node_modules');
   assert(fs.existsSync(nodeModules), 'node_modules is missing; run npm install before the Electron test');
 
@@ -143,6 +143,7 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
       require('../../package.json').build.files).createFilter() : null;
     copyDirectory(path.join(projectRoot, 'src'), path.join(appDirectory, 'src'), include);
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
+    fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
     fs.writeFileSync(path.join(appDirectory, 'omdb.js'), "module.exports = {key: 'test-only-key'};\n");
     fs.writeFileSync(path.join(appDirectory, 'package.json'), JSON.stringify({
       name: 'mynda-electron-smoke',
@@ -168,6 +169,10 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
     assert.strictEqual(result.libraryCreated, true);
     const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
     assert.strictEqual(savedLibrary.videoIdScheme, 2, 'First launch must persist the new video ID scheme');
+    assert.strictEqual(result.saveConfirmed,true,'The renderer edit must be acknowledged and persisted');
+    assert.strictEqual(result.gracefulClose,true,'The real close handshake must finish before the success result');
+    assert.strictEqual(savedLibrary.settings.preferences.exclude_samples_from_library,result.rendererSave.value);
+    assert.strictEqual(savedLibrary.settings.preferences.exclude_trailers_from_library,result.shutdownSave.value);
     assert.strictEqual(result.settingsClosed, true);
     assert.strictEqual(result.initial.grid, true);
     assert.strictEqual(result.settings.libraryTab, true);
@@ -177,6 +182,7 @@ suite.test('starts Mynda, renders its shell, opens Settings, and closes Settings
     assert.strictEqual(result.libraryStats.duplicates, true);
     assert.strictEqual(result.assets.ok, true);
     console.log(`        Loaded ${result.assets.images} images, ${result.assets.fonts} font families, both themes, and theme icons${useAsar ? ' from ASAR' : ''}.`);
+    console.log('        Confirmed a renderer edit and a deferred close-time save in the isolated library file.');
   } finally {
     removeDirectory(temporaryRoot);
   }

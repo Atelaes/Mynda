@@ -37,7 +37,7 @@ The complete command set is:
 | `npm run test:media` | Strict staged FFmpeg/FFprobe checks plus real node-mpv → MPV graphical video over JSON IPC | After preparing or changing media dependencies; briefly opens MPV |
 | `npm run test:package` | Fast tests, strict media verification, unpacked production build, then packaged decode/probe/graphical-MPV checks with an empty `PATH` | Before a release; briefly opens MPV and writes under `dist/` |
 
-The Electron test briefly opens Mynda and its DevTools. That is expected. It verifies startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. It exits automatically.
+The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
 
 To run one test file while working on a failure:
 
@@ -122,6 +122,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | `AutoTagConcurrentEdits.integration.test.js` | Integration | Manual edits during catalog lookups and retry baselines after the run's own successful saves |
 | `LibraryClose.unit.test.js` | Unit | Window/app close coordination, validated renderer acknowledgments, timeouts, wait/cancel/discard choices, and ready-commit draining |
 | `SingleInstance.unit.test.js` | Unit | Acquiring the application lock before library startup and focusing an existing window |
+| `ElectronSmokeLifecycle.unit.test.js` | Unit | Noninteractive failure teardown, result preservation, graceful-close ordering, and verification of close-time saves |
 | `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
 | `ShareManifest.integration.test.js` | Integration | Manifest/ID compatibility, safe paths, atomic files, Windows flush permissions, and preservation after a failed flush |
@@ -129,7 +130,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | `RendererComponents.component.test.js` | Component | Status language, notification cleanup, navigation, recently-played controls, resolution cells/tooltips, shared statistics, and bucket sorting |
 | `SettingsLibrary.component.test.js` | Component | Library export requests, aligned viewing/kind/series/resolution totals, independent per-video duplicate folders, rescan guidance, and file-manager actions |
 | `Mynda.component.test.js` | Component | Ratings, playlist filtering, search, recent history, scan IPC, view state, and root pane composition |
-| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, and Library-statistics interaction |
+| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, Library-statistics interaction, renderer saves, and graceful-close persistence, in source and ASAR runs |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
 

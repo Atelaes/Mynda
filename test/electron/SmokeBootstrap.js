@@ -1,16 +1,17 @@
 // This file runs as the temporary Electron app's main process. The parent
-// runner sets userData before src/main/index.js constructs either Library instance,
+// runner sets userData before src/main/index.js constructs the Library store,
 // so the smoke test cannot read or overwrite the user's real library.
 const fs = require('fs');
 const path = require('path');
 const {pathToFileURL} = require('url');
-const {app, BrowserWindow} = require('electron');
+const {app, dialog} = require('electron');
+const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
 
 const RESULT_PREFIX = 'MYNDA_ELECTRON_SMOKE_RESULT:';
 const userData = process.env.MYNDA_E2E_USER_DATA;
 const timeoutMs = Number(process.env.MYNDA_E2E_TIMEOUT_MS) || 45000;
-let finished = false;
 let mainWindowFound = false;
+let activeStage='window-timeout';
 const rendererConsole = [];
 
 if (!userData) {
@@ -29,16 +30,16 @@ function rendererDiagnostics() {
   return rendererConsole.slice(-25);
 }
 
-function finish(ok, details) {
-  if (finished) return;
-  finished = true;
-  clearTimeout(overallTimeout);
-  const result = Object.assign({ok}, details || {});
-  process.stdout.write(`${RESULT_PREFIX}${JSON.stringify(result)}\n`);
-  try {
-    BrowserWindow.getAllWindows().forEach(window => window.destroy());
-  } catch(err) {}
-  setTimeout(() => app.exit(ok ? 0 : 1), 20);
+const finish=createSmokeTerminator({app,
+  clearDeadline:()=>clearTimeout(overallTimeout),
+  // A synchronous write retains the failure result before terminating the
+  // isolated process, even if its renderer or normal shutdown path is broken.
+  writeResult:result=>fs.writeSync(process.stdout.fd || 1,`${RESULT_PREFIX}${JSON.stringify(result)}\n`)
+});
+rejectUnexpectedDialogs(dialog,finish);
+
+function rendererLibrary() {
+  return `require(${JSON.stringify(path.join(app.getAppPath(),'src','renderer','RendererRuntime.js'))}).library`;
 }
 
 async function inspectAssets(window) {
@@ -94,7 +95,14 @@ async function inspectAssets(window) {
 
 async function inspectMainWindow(window) {
   try {
-    await delay(300);
+    activeStage='initial-render';
+    // did-finish-load does not imply that the asynchronous library snapshot or
+    // React startup has finished. Await the actual client initialization.
+    await window.webContents.executeJavaScript(`(async()=>{
+      await ${rendererLibrary()}.ready;
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      return true;
+    })()`);
     const initial = await window.webContents.executeJavaScript(`(() => ({
       title: document.title,
       rootChildren: document.getElementById('root') ? document.getElementById('root').children.length : 0,
@@ -117,12 +125,14 @@ async function inspectMainWindow(window) {
 
     let assets;
     try {
+      activeStage='renderer-assets';
       assets = await inspectAssets(window);
     } catch (error) {
       finish(false, {stage: 'renderer-assets', initial, error: error.message, rendererConsole: rendererDiagnostics()});
       return;
     }
 
+    activeStage='open-settings';
     await window.webContents.executeJavaScript(
       `document.getElementById('settings-button').click(); true`
     );
@@ -140,6 +150,7 @@ async function inspectMainWindow(window) {
       return;
     }
 
+    activeStage='library-statistics';
     await window.webContents.executeJavaScript(
       `document.getElementById('settings-tab-library').click(); true`
     );
@@ -163,6 +174,7 @@ async function inspectMainWindow(window) {
       return;
     }
 
+    activeStage='close-settings';
     await window.webContents.executeJavaScript(
       `document.querySelector('#settings-pane .openable-close-btn').click(); true`
     );
@@ -183,18 +195,52 @@ async function inspectMainWindow(window) {
       return;
     }
 
-    finish(true, {
-      stage: 'complete',
-      initial,
-      settings,
-      libraryStats,
-      settingsClosed,
-      libraryCreated,
-      assets
-    });
+    activeStage='renderer-save';
+    const rendererSave=await window.webContents.executeJavaScript(`(async()=>{
+      const library=${rendererLibrary()};
+      const value=!library.settings.preferences.exclude_samples_from_library;
+      await library.replace('settings.preferences.exclude_samples_from_library',value);
+      return {value,confirmed:library.settings.preferences.exclude_samples_from_library===value,path:library.path};
+    })()`);
+    const libraryPath=path.join(userData,'Library','library.json');
+    const readSaved=()=>JSON.parse(fs.readFileSync(libraryPath,'utf8'));
+    if (!rendererSave.confirmed || path.resolve(rendererSave.path)!==path.resolve(libraryPath) ||
+        readSaved().settings.preferences.exclude_samples_from_library!==rendererSave.value) {
+      throw new Error('The renderer save was not confirmed in the isolated library file.');
+    }
+
+    // Register an actual deferred renderer save. It must be flushed by the
+    // production graceful-close handshake before the window may close.
+    const shutdownSave=await window.webContents.executeJavaScript(`(()=>{
+      const library=${rendererLibrary()};
+      const value=!library.settings.preferences.exclude_trailers_from_library;
+      library.onBeforeClose(()=>library.replace('settings.preferences.exclude_trailers_from_library',value));
+      return {value};
+    })()`);
+    activeStage='graceful-close';
+    closeAndVerify(window,()=>{
+      const saved=readSaved();
+      if (saved.settings.preferences.exclude_samples_from_library!==rendererSave.value ||
+          saved.settings.preferences.exclude_trailers_from_library!==shutdownSave.value) {
+        throw new Error('Closing the app lost a confirmed edit or failed to flush its deferred renderer save.');
+      }
+      return {
+        stage: 'complete',
+        initial,
+        settings,
+        libraryStats,
+        settingsClosed,
+        libraryCreated,
+        assets,
+        rendererSave,
+        shutdownSave,
+        saveConfirmed:true,
+        gracefulClose:true
+      };
+    },finish);
   } catch(err) {
     finish(false, {
-      stage: 'inspection-exception',
+      stage: activeStage,
       error: err && err.stack ? err.stack : String(err),
       rendererConsole: rendererDiagnostics()
     });
@@ -203,7 +249,7 @@ async function inspectMainWindow(window) {
 
 const overallTimeout = setTimeout(() => {
   finish(false, {
-    stage: mainWindowFound ? 'renderer-timeout' : 'window-timeout',
+    stage: activeStage,
     error: `Mynda did not finish the Electron smoke test within ${timeoutMs} ms`
   });
 }, timeoutMs);
@@ -230,6 +276,7 @@ app.on('browser-window-created', (event, window) => {
     }
   });
   window.webContents.on('render-process-gone', (goneEvent, details) => {
+    if (activeStage==='graceful-close' && details.reason==='clean-exit') return;
     if (mainWindowFound) finish(false, {
       stage: 'render-process-gone',
       details,

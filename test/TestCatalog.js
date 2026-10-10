@@ -2,6 +2,8 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'unit',file:'test/ElectronSmokeLifecycle.unit.test.js',title:'Electron smoke-test lifecycle',
+    protects:'noninteractive failure teardown, preserved result output, graceful-close ordering and saved-data verification'},
   {category:'integration',file:'test/LibraryTransactions.integration.test.js',title:'Single-writer library transactions',
     protects:'overlapping process edits, confirmed state, disk failures, stale identity conflicts, atomic moves, user priority and revision recovery'},
   {category:'unit',file:'test/SingleInstance.unit.test.js',title:'Library single-instance startup',
