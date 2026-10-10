@@ -1,6 +1,5 @@
 const React = require('react');
-const {ipcRenderer} = require('electron');
-const {OPEN_EXTERNAL_CHANNEL, approvedExternalURL, imdbTitleURL} = require('../platform/ExternalLinks');
+const {approvedExternalURL, imdbTitleURL} = require('../platform/ExternalLinks');
 
 function ExternalLink({url, children}) {
   const destination = approvedExternalURL(url);
@@ -10,7 +9,7 @@ function ExternalLink({url, children}) {
     event.preventDefault();
     event.stopPropagation();
     try {
-      const result = await ipcRenderer.invoke(OPEN_EXTERNAL_CHANNEL, destination);
+      const result = await window.mynda.external.open(destination);
       if (!result || result.ok !== true) throw new Error('External link was not opened');
     } catch (_) {
       alert('Mynda could not open this link in your default browser.');

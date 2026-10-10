@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const {pathToFileURL} = require('url');
 const {app, dialog, shell, BrowserWindow} = require('electron');
+const {browserDriver, wait} = require('./BrowserDriver');
+const {videos, ids} = require('./LibraryJourneyFixtures');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
 const {inspectExternalContent,observePermissionRequests} = require('./ExternalContentJourney.js');
 const browserLinks = [];
@@ -17,6 +19,7 @@ const userData = process.env.MYNDA_E2E_USER_DATA;
 const timeoutMs = Number(process.env.MYNDA_E2E_TIMEOUT_MS) || 45000;
 let mainWindowFound = false;
 let activeStage='window-timeout';
+let library;
 const rendererConsole = [];
 
 if (!userData) {
@@ -43,9 +46,25 @@ const finish=createSmokeTerminator({app,
 });
 rejectUnexpectedDialogs(dialog,finish);
 
-function rendererLibrary() {
-  return `require(${JSON.stringify(path.join(app.getAppPath(),'src','renderer','RendererRuntime.js'))}).library`;
-}
+// A single local fixture gives the real bundled editor a saved tagging report.
+// All setup stays in main; the renderer has only production capabilities.
+const libraryFile = require.resolve(path.join(app.getAppPath(), 'src/library/Library.js'));
+const RealLibrary = require(libraryFile);
+require.cache[libraryFile].exports = class extends RealLibrary {
+  constructor(...args) {
+    super(...args); library = this;
+    const directory = path.join(userData, 'media');
+    fs.mkdirSync(directory, {recursive:true});
+    const video = videos(directory)[0];
+    fs.writeFileSync(video.filename, 'Mynda save journey fixture 0');
+    video.imdbID = 'tt1234567'; video.autotag_tried = true;
+    video.taggingEvidence = {kind:'movie', imdbID:'tt1234567', catalogTitle:'Alpha',
+      seriesID:'tt7654321', original:{title:'Alpha', series:'Fixture series'}};
+    const data = JSON.parse(JSON.stringify(this.getSaveObject()));
+    data.media = [video]; data.settings.watchfolders = [{path:directory, kind:'movie'}];
+    this.applyLibraryData(data); this.save();
+  }
+};
 
 async function inspectAssets(window) {
   const imageDirectory = path.join(app.getAppPath(), 'images');
@@ -101,13 +120,10 @@ async function inspectAssets(window) {
 async function inspectMainWindow(window) {
   try {
     activeStage='initial-render';
-    // did-finish-load does not imply that the asynchronous library snapshot or
-    // React startup has finished. Await the actual client initialization.
-    await window.webContents.executeJavaScript(`(async()=>{
-      await ${rendererLibrary()}.ready;
-      await new Promise(resolve=>requestAnimationFrame(resolve));
-      return true;
-    })()`);
+    const ui = browserDriver(window);
+    // did-finish-load does not imply the snapshot and React startup finished.
+    await ui.start();
+    await wait(() => ui.exists(ui.row(ids[0])), 'initial library snapshot');
     const initial = await window.webContents.executeJavaScript(`(() => ({
       title: document.title,
       rootChildren: document.getElementById('root') ? document.getElementById('root').children.length : 0,
@@ -139,7 +155,7 @@ async function inspectMainWindow(window) {
 
     activeStage='external-content';
     const externalContent = await inspectExternalContent({app, BrowserWindow, window,
-      opened:browserLinks, permissionDecisions});
+      opened:browserLinks, permissionDecisions, videoId:ids[0]});
 
     activeStage='open-settings';
     await window.webContents.executeJavaScript(
@@ -205,27 +221,28 @@ async function inspectMainWindow(window) {
     }
 
     activeStage='renderer-save';
-    const rendererSave=await window.webContents.executeJavaScript(`(async()=>{
-      const library=${rendererLibrary()};
-      const value=!library.settings.preferences.exclude_samples_from_library;
-      await library.replace('settings.preferences.exclude_samples_from_library',value);
-      return {value,confirmed:library.settings.preferences.exclude_samples_from_library===value,path:library.path};
-    })()`);
+    await ui.settings();
+    const rendererSave=await ui.inspect(() => {
+      const input=document.querySelectorAll('#settings-prefs-libraryexclusions input')[0];
+      input.click(); return {value:input.checked};
+    });
     const libraryPath=path.join(userData,'Library','library.json');
     const readSaved=()=>JSON.parse(fs.readFileSync(libraryPath,'utf8'));
-    if (!rendererSave.confirmed || path.resolve(rendererSave.path)!==path.resolve(libraryPath) ||
-        readSaved().settings.preferences.exclude_samples_from_library!==rendererSave.value) {
-      throw new Error('The renderer save was not confirmed in the isolated library file.');
+    await wait(() => library.settings.preferences.exclude_samples_from_library===rendererSave.value &&
+      readSaved().settings.preferences.exclude_samples_from_library===rendererSave.value,
+      'confirmed renderer settings edit');
+    const replica=await ui.inspect(() => window.mynda.library.snapshot());
+    if (replica.data.settings.preferences.exclude_samples_from_library!==rendererSave.value) {
+      throw new Error('The committed settings edit was not available through the isolated bridge.');
     }
+    rendererSave.confirmed=true;
 
-    // Register an actual deferred renderer save. It must be flushed by the
-    // production graceful-close handshake before the window may close.
-    const shutdownSave=await window.webContents.executeJavaScript(`(()=>{
-      const library=${rendererLibrary()};
-      const value=!library.settings.preferences.exclude_trailers_from_library;
-      library.onBeforeClose(()=>library.replace('settings.preferences.exclude_trailers_from_library',value));
-      return {value};
-    })()`);
+    // Leave the genuine Settings debounce pending, then close immediately.
+    // The production close hook must flush it without an injected test hook.
+    const shutdownSave=await ui.inspect(() => {
+      const input=document.querySelectorAll('#settings-prefs-libraryexclusions input')[1];
+      input.click(); return {value:input.checked};
+    });
     activeStage='graceful-close';
     closeAndVerify(window,()=>{
       const saved=readSaved();

@@ -1,6 +1,5 @@
 // Reusable renderer UI shared by the major feature component groups.
 const React = require('react');
-const {ipcRenderer} = require('electron');
 const {v4: uuidv4} = require('uuid');
 const {
   frontendLog,
@@ -16,13 +15,10 @@ class MynNotify extends React.Component {
       on: false
     }
 
-    ipcRenderer.on('status-update', (event, status) => this.statusUpdate(status));
-
     // Renderer-owned jobs, currently batch video saves, arrive here. The
     // listener exists for the lifetime of this notification component and is
     // removed if React ever unmounts it.
     this.handleLocalStatusUpdate = (event) => this.statusUpdate(event.detail);
-    window.addEventListener(LOCAL_STATUS_UPDATE_EVENT, this.handleLocalStatusUpdate);
 
     this.render = this.render.bind(this);
     this.statusUpdate = this.statusUpdate.bind(this);
@@ -162,10 +158,13 @@ class MynNotify extends React.Component {
   }
 
   componentDidMount() {
-    // this.statusUpdate({action:['export','add','metadata','autotag','check'][Math.round(Math.random()*4)], numCurrent:1, numTotal:85});
+    window.addEventListener(LOCAL_STATUS_UPDATE_EVENT, this.handleLocalStatusUpdate);
+    this._removeStatus = window.mynda.events.onStatus(status => this.statusUpdate(status));
   }
 
   componentWillUnmount() {
+    if (this._removeStatus) this._removeStatus();
+    clearTimeout(this.ellipsisAnimation);
     window.removeEventListener(LOCAL_STATUS_UPDATE_EVENT, this.handleLocalStatusUpdate);
   }
 
@@ -469,7 +468,7 @@ class MynOpenablePane extends React.Component {
     this.render = this.render.bind(this);
   }
 
-  closePane(id,confirm,msg,cb) {
+  async closePane(id,confirm,msg,cb) {
     try {
       // in case confirm is a function instead of just a boolean
       confirm = confirm();
@@ -480,9 +479,10 @@ class MynOpenablePane extends React.Component {
     // but that can be overridden by the user preference to override the confirmation dialog,
     // hence the rest of the conditional here
     if (confirm && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs[`Myn${id.replace(/-pane$/,'').replace(/^\w/,(l)=>(l.toUpperCase()))}-confirm-exit`])) {
-      ipcRenderer.once('MynOpenablePane-confirm-exit', (event, response, data, checked) => {
-        let id = data.id;
-        let cb = data.cb;
+      try {
+        const {response, checkboxChecked: checked} = await window.mynda.dialogs.confirmPaneExit({
+          id, message: msg || 'Are you sure you want to exit?'
+        });
         // if the user checked the checkbox to override the confirmation dialog,
         // set that preference in the settings
         if (checked && response === 0) {
@@ -504,17 +504,9 @@ class MynOpenablePane extends React.Component {
         } else {
           frontendLog.debug('Pane exit canceled by user', {paneID: id});
         }
-      });
-
-      ipcRenderer.send(
-        'generic-confirm',
-        'MynOpenablePane-confirm-exit',
-        {
-          message: msg || 'Are you sure you want to exit?',
-          checkboxLabel: `Don't show this dialog again`
-        },
-        {id:id,cb:cb}
-      );
+      } catch (error) {
+        frontendLog.error('Could not confirm closing the pane', {paneID: id, error});
+      }
     } else {
       try {
         cb();

@@ -40,16 +40,13 @@ class Boundary extends React.Component {
 }
 
 const runtimeLibrary = libraryFixture();
-runtimeLibrary.recentRequests = [];
-runtimeLibrary.recordPlayed = function recordPlayed(id, callback, options) {
-  this.recentRequests.push({id, callback, options});
-};
 runtimeLibrary.replaceCalls = [];
 runtimeLibrary.replace = function replace(address, value) {
   this.replaceCalls.push({address, value});
 };
 
-global.savedPing = {};
+const savedPing = {};
+global.window = {mynda: {scan: {start: async () => { ipcRenderer.sent.push({channel: 'scan-watchfolders', args: []}); }}}};
 const {Mynda} = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'renderer', 'Mynda.js'),
   {
@@ -58,7 +55,8 @@ const {Mynda} = loadFreshWithMocks(
       library: runtimeLibrary,
       frontendLog: logger,
       libraryViewLog: logger,
-      playerLog: logger
+      playerLog: logger,
+      savedPing
     },
     './SharedComponents.js': {ErrorBoundary: Boundary, MynNotify: placeholder('notify')},
     './Navigation.js': {MynNav: placeholder('navigation')},
@@ -156,24 +154,19 @@ suite.test('searches multiple words across titles, genres, cast, and tags', () =
   assert.deepStrictEqual(instance.searchFilter('unfindable'), []);
 });
 
-suite.test('requests an authoritative recent-video update and displays only committed notifications', () => {
+suite.test('displays recently watched updates only after backend commit notifications', () => {
   const instance = instanceFor();
   const before = Array.from({length: 10}, (unused, index) => `video-${index}`);
   instance.state.recentlyWatched = before;
   instance.componentDidMount();
-  runtimeLibrary.recentRequests = [];
-  instance.logPlayed('video-5');
   assert.strictEqual(instance.state.recentlyWatched, before);
-  assert.strictEqual(runtimeLibrary.recentRequests.length, 1);
-  assert.strictEqual(runtimeLibrary.recentRequests[0].id, 'video-5');
-  assert.strictEqual(runtimeLibrary.recentRequests[0].options.limit, 10);
   assert.strictEqual(runtimeLibrary.replaceCalls.length, 0);
   runtimeLibrary.recently_watched = ['video-5', 'video-0'];
   savedPing.saved('recently_watched');
   assert.deepStrictEqual(instance.state.recentlyWatched, ['video-5', 'video-0']);
 });
 
-suite.test('sends scans over IPC and rejects invalid temporary playlist views', () => {
+suite.test('starts scans through the named bridge and rejects invalid temporary playlist views', () => {
   const instance = instanceFor();
   ipcRenderer.sent.length = 0;
   instance.scanWatchfolders();

@@ -15,7 +15,7 @@ const suite = createSuite(
   'Combines ReadWrite with real files in a disposable Electron user-data directory.'
 );
 
-function loadReadWrite(directory, renderer = false) {
+function loadReadWrite(directory) {
   const app = {getPath: name => {
     assert.strictEqual(name, 'userData');
     return directory;
@@ -23,7 +23,7 @@ function loadReadWrite(directory, renderer = false) {
   return loadFreshWithMocks(
     path.join(__dirname, '..', 'src', 'platform', 'ReadWrite.js'),
     {
-      'electron': renderer ? {remote: {app}} : {app},
+      'electron': {app},
       './Logger.js': quietLogger
     }
   );
@@ -43,11 +43,11 @@ suite.test('creates a missing file from defaults in the main process', () => wit
   }
 ));
 
-suite.test('loads existing data through Electron remote in the renderer', () => withTemporaryDirectory(
-  'readwrite-renderer',
+suite.test('loads existing data through the main-process configuration store', () => withTemporaryDirectory(
+  'readwrite-existing',
   directory => {
     fs.writeFileSync(path.join(directory, 'preferences.json'), JSON.stringify({theme: 'light'}));
-    const ReadWrite = loadReadWrite(directory, true);
+    const ReadWrite = loadReadWrite(directory);
     const store = new ReadWrite({
       configName: 'preferences', extension: 'json', defaults: {theme: 'dark'}
     });

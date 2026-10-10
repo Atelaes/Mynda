@@ -74,7 +74,7 @@ function installExternalContentPolicy({ipcMain, shell, rendererPath, log}) {
     }
   }
 
-  return {protectWindow};
+  return {protectWindow, isTrustedSender:trustedSender};
 }
 
 module.exports = {installExternalContentPolicy, isApplicationPage};

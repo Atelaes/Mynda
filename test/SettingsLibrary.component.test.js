@@ -28,6 +28,13 @@ const ipcRenderer = {
     return {ok: true, value: {canceled: false, filePath: '/exports/Mynda Library.json'}};
   }
 };
+global.window = {mynda: {
+  library: {export: () => ipcRenderer.invoke('library:export')},
+  files: {
+    revealVideo: async request => { shownFiles.push({kind: 'video', ...request}); },
+    revealExport: async path => { shownFiles.push({kind: 'export', path}); }
+  }
+}};
 const settingsLog = {
   debug() {},
   info(message, data) { logged.push({level: 'info', message, data}); },
@@ -48,7 +55,7 @@ const sharedComponents = loadFreshWithMocks(
 );
 const {MynParagraphFolder} = sharedComponents;
 
-const {MynSettingsLibrary} = loadFreshWithMocks(
+const {MynSettingsLibrary, MynSettings, MynSettingsFolders, MynSettingsPlaylists, MynSettingsShare} = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'renderer', 'Settings.js'),
   {
     'electron': {
@@ -273,14 +280,19 @@ suite.test('handles an empty duplicate list and an untitled video without losing
   assert(ReactDOMServer.renderToStaticMarkup(instance.render()).includes('1 duplicate file across 1 video'));
 });
 
-suite.test('shows either a video object or duplicate path in the system file manager', () => {
+suite.test('reveals library files by ID and exports through distinct named operations', async () => {
   shownFiles.length = 0;
   const instance = component();
   let stopped = false;
-  instance.showFile('/duplicates/Alien.mkv', {stopPropagation() { stopped = true; }});
-  instance.showFile({filename: '/library/Alien.mkv'});
+  await instance.showFile({videoID: 'alien', duplicatePath: '/duplicates/Alien.mkv'}, {stopPropagation() { stopped = true; }});
+  await instance.showFile({videoID: 'alien'});
+  await instance.showFile('/exports/Mynda Library.json');
   assert.strictEqual(stopped, true);
-  assert.deepStrictEqual(shownFiles, ['/duplicates/Alien.mkv', '/library/Alien.mkv']);
+  assert.deepStrictEqual(shownFiles, [
+    {kind: 'video', videoID: 'alien', duplicatePath: '/duplicates/Alien.mkv'},
+    {kind: 'video', videoID: 'alien'},
+    {kind: 'export', path: '/exports/Mynda Library.json'}
+  ]);
 });
 
 suite.test('invokes the backend export and reports the completed destination', async () => {
@@ -296,6 +308,66 @@ suite.test('invokes the backend export and reports the completed destination', a
   const html = ReactDOMServer.renderToStaticMarkup(instance.render());
   assert(html.includes('Library exported successfully.'));
   assert(html.includes('/exports/Mynda Library.json'));
+});
+
+suite.test('folder-picker cancellation preserves the current selection', async () => {
+  const folders = new MynSettingsFolders({folders: [], kinds: []});
+  const selected = [];
+  folders.changeTargetFolder = value => selected.push(value);
+  window.mynda.watchfolders = {choose: async () => null};
+  await folders.folderSelect();
+  assert.deepStrictEqual(selected, []);
+  window.mynda.watchfolders.choose = async () => '/Chosen/Movies';
+  await folders.folderSelect();
+  assert.deepStrictEqual(selected, ['/Chosen/Movies']);
+});
+
+suite.test('playlist confirmation responses cannot delete another pending playlist', async () => {
+  const pending = [], removed = [];
+  window.mynda.dialogs = {confirmPlaylistDelete: request => new Promise(resolve => pending.push({request, resolve}))};
+  const playlists = new MynSettingsPlaylists({playlists: []});
+  playlists.removePlaylist = id => removed.push(id);
+  const first = playlists.deletePlaylist({id: 'first', name: 'First'});
+  const second = playlists.deletePlaylist({id: 'second', name: 'Second'});
+  assert.deepStrictEqual(pending.map(item => item.request), [
+    {id: 'first', name: 'First'}, {id: 'second', name: 'Second'}
+  ]);
+  pending[1].resolve({response: 0, checkboxChecked: false});
+  await second;
+  pending[0].resolve({response: 1, checkboxChecked: false});
+  await first;
+  assert.deepStrictEqual(removed, ['second']);
+});
+
+suite.test('Settings releases both watchfolder subscriptions when unmounted', () => {
+  const subscribed = [], removed = [];
+  window.mynda.watchfolders = {
+    onAdded: callback => { subscribed.push(callback); return () => removed.push('added'); },
+    onRemoved: callback => { subscribed.push(callback); return () => removed.push('removed'); }
+  };
+  const settings = new MynSettings({settings: {preferences: {}}});
+  assert.strictEqual(subscribed.length, 0);
+  settings.componentDidMount();
+  assert.strictEqual(subscribed.length, 2);
+  settings.componentWillUnmount();
+  assert.deepStrictEqual(removed, ['added', 'removed']);
+});
+
+suite.test('Share progress uses payload-only subscription and removes it on unmount', async () => {
+  let listener, removed = false;
+  window.mynda.share = {
+    onProgress: callback => { listener = callback; return () => { removed = true; }; },
+    getState: async () => ({ok: true, value: {busy: false}})
+  };
+  const share = synchronousState(new MynSettingsShare({settings: {used: {kinds: []}}, videos: []}));
+  share.componentDidMount();
+  await Promise.resolve();
+  listener({busy: true, phase: 'fulfill', cancelRequested: true});
+  assert.strictEqual(share.state.busy, true);
+  assert.strictEqual(share.state.busyPhase, 'fulfill');
+  assert.strictEqual(share.state.cancelRequested, true);
+  share.componentWillUnmount();
+  assert.strictEqual(removed, true);
 });
 
 runSuite(suite);

@@ -2,10 +2,9 @@ const Response = require('./CatalogResponse');
 const {requestFailure} = Response;
 const {summarizeError, summarizeOMDbResponse} = require('./TaggingDiagnostics');
 
-function createArtworkService({log, pollOMDB, createURLParts, electron, ipcRenderer, dl, fs, path}) {
+function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, dl, fs, path}) {
   const seriesArtworkCache = new Map();
   const failedArtworkURLs = new Set();
-  let nextArtworkDownloadNumber = 0;
   function usablePosterURL(poster) {
     if (typeof poster !== 'string') {
       return null;
@@ -187,7 +186,7 @@ function createArtworkService({log, pollOMDB, createURLParts, electron, ipcRende
       log.debug('Preparing OMDb artwork download', {searchID: context.searchID, sourceFilename: fileName});
       fileName = fileName.replace(/[\*\."/\\\[\]:;\|,]/g, '') + fileExt;
       log.debug('Prepared local OMDb artwork filename', {searchID: context.searchID, localFilename: fileName});
-      let filePath = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork', fileName);
+      let filePath = path.join(artworkDirectory, fileName);
       if (fs.existsSync(filePath)) {
         log.debug('Reusing existing OMDb artwork file', {
           searchID: context.searchID,
@@ -196,62 +195,31 @@ function createArtworkService({log, pollOMDB, createURLParts, electron, ipcRende
         return resolve(filePath);
       }
 
-      if (electron.app) {
-        dl.download(url,filePath, (args) => {
-          try {
-            // if successful, we'll receive an object with the path at "path"
-            if (args && Object.prototype.hasOwnProperty.call(args, 'path')) {
-              log.debug('OMDb artwork download finished', {
-                searchID: context.searchID,
-                artworkSource: context.artworkSource,
-                destination: args.path
-              });
-              resolve(args.path);
-            } else {
-              reject({
-                message: args && args.message ? args.message : String(args || 'Download returned no path'),
-                status: args && args.status,
-                statusText: args && args.statusText
-              });
-            }
-          } catch(error) {
-            reject({
-              message: error && error.message ? error.message : String(error),
-              status: error && error.response && error.response.status,
-              statusText: error && error.response && error.response.statusText
-            });
-          }
-        });
-      } else {
-        // Every renderer download gets a private, one-use reply channel. The old
-        // shared "downloaded" listener remained active forever and allowed one
-        // download completion to resolve every outstanding artwork request.
-        let responseChannel = `downloaded-omdb-${process.pid}-${++nextArtworkDownloadNumber}`;
-        let handleDownload = (event, response) => {
-          if (response && response.success) {
-            let destination = response.message || filePath;
+      dl.download(url,filePath, (args) => {
+        try {
+          // if successful, we'll receive an object with the path at "path"
+          if (args && Object.prototype.hasOwnProperty.call(args, 'path')) {
             log.debug('OMDb artwork download finished', {
               searchID: context.searchID,
               artworkSource: context.artworkSource,
-              destination: destination
+              destination: args.path
             });
-            resolve(destination);
+            resolve(args.path);
           } else {
             reject({
-              message: response && response.message ? response.message : 'Download failed',
-              status: response && response.status,
-              statusText: response && response.statusText
+              message: args && args.message ? args.message : String(args || 'Download returned no path'),
+              status: args && args.status,
+              statusText: args && args.statusText
             });
           }
-        };
-        ipcRenderer.once(responseChannel, handleDownload);
-        try {
-          ipcRenderer.send('download', url, filePath, responseChannel);
-        } catch(err) {
-          ipcRenderer.removeListener(responseChannel, handleDownload);
-          reject(err);
+        } catch(error) {
+          reject({
+            message: error && error.message ? error.message : String(error),
+            status: error && error.response && error.response.status,
+            statusText: error && error.response && error.response.statusText
+          });
         }
-      }
+      });
     });
   }
   return {downloadArtworkWithSeriesFallback};

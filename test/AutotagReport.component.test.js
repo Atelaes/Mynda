@@ -8,11 +8,9 @@ const shared = loadFreshWithMocks(path.join(__dirname,'../src/renderer/SharedCom
   electron:{ipcRenderer:{}},'./RendererRuntime.js':{}
 });
 const opened=[];
-const ipcRenderer={invoke:async(channel,url)=>{
-  assert.strictEqual(channel,'external:open');opened.push(url);return {ok:true};
-}};
+global.window={mynda:{external:{open:async url=>{opened.push(url);return {ok:true};}}}};
 const {MynAutotagReport,LinkedReportText} = loadFreshWithMocks(path.join(__dirname,'../src/renderer/AutotagReport.js'),{
-  './SharedComponents.js':shared,electron:{ipcRenderer}
+  './SharedComponents.js':shared
 });
 const {MynEditor,MynEditorEdit} = loadFreshWithMocks(path.join(__dirname,'../src/renderer/Editor.js'),{
   electron:{ipcRenderer:{}},'../tagging/OmdbHelper.js':{},'./RendererRuntime.js':{},

@@ -1,6 +1,5 @@
 // Settings pane and its major settings views.
 const React = require('react');
-const {ipcRenderer, shell} = require('electron');
 const _ = require('lodash');
 const {reportSaveFailure} = require('./LibraryEdits.js');
 const {v4: uuidv4} = require('uuid');
@@ -49,16 +48,16 @@ class MynSettings extends MynOpenablePane {
       timer: null
     }
 
-    ipcRenderer.on('settings-watchfolder-added', (event, folderObj) => {
+    this.handleWatchfolderAdded = folderObj => {
       settingsLog.info('Watchfolder added', {
         path: folderObj && folderObj.path,
         kind: folderObj && folderObj.kind
       });
       // update everything
       this.setStateViewsFromProps(() => this.setView(this.state.settingViewName));
-    });
+    };
 
-    ipcRenderer.on('settings-watchfolder-remove', (event, path, removed) => {
+    this.handleWatchfolderRemoved = (path, removed) => {
       if (removed) {
         settingsLog.info('Watchfolder removed', {path: path});
         // update everything
@@ -66,7 +65,7 @@ class MynSettings extends MynOpenablePane {
       } else {
         settingsLog.warn('Watchfolder removal was not completed', {path: path});
       }
-    });
+    };
   }
 
   setStateViewsFromProps(callback) {
@@ -137,6 +136,8 @@ class MynSettings extends MynOpenablePane {
     // Closing the app/settings owner must not abandon an already staged edit.
     this.flushSettings().catch(() => {});
     if (this._removeCloseHook) this._removeCloseHook();
+    if (this._removeWatchfolderAdded) this._removeWatchfolderAdded();
+    if (this._removeWatchfolderRemoved) this._removeWatchfolderRemoved();
   }
 
   setView(view,event,index) {
@@ -209,6 +210,8 @@ class MynSettings extends MynOpenablePane {
   }
 
   componentDidMount(props) {
+    this._removeWatchfolderAdded = window.mynda.watchfolders.onAdded(this.handleWatchfolderAdded);
+    this._removeWatchfolderRemoved = window.mynda.watchfolders.onRemoved(this.handleWatchfolderRemoved);
     // create the views
     // and set the initial view to the 'folders' tab
     // --------
@@ -291,13 +294,17 @@ class MynSettingsFolders extends React.Component {
     return options;
   }
 
-  editRemove(path, index) {
+  async editRemove(path, index) {
     settingsLog.debug('Watchfolder removal requested', {
       path: path,
       index: index
     });
 
-    ipcRenderer.send('settings-watchfolder-remove', path);
+    try {
+      await window.mynda.watchfolders.remove(path);
+    } catch (error) {
+      reportSaveFailure(error, settingsLog, 'remove the watchfolder');
+    }
   }
 
   // edit the default kind of an existing watchfolder
@@ -335,12 +342,16 @@ class MynSettingsFolders extends React.Component {
     }
   }
 
-  submitFolderToServer() {
+  async submitFolderToServer() {
     let folderAddress = document.getElementById("settings-folders-choose-path").value;
     let defaultKind = document.getElementById("settings-folders-choose-kind").value;
     let submitObject = {address: folderAddress, kind: defaultKind};
     // console.log(submitObject);
-    ipcRenderer.send('settings-watchfolder-add', submitObject);
+    try {
+      await window.mynda.watchfolders.add(submitObject);
+    } catch (error) {
+      reportSaveFailure(error, settingsLog, 'add the watchfolder');
+    }
   }
 
   displayFolders() {
@@ -368,11 +379,13 @@ class MynSettingsFolders extends React.Component {
     return folders;
   }
 
-  folderSelect() {
-    ipcRenderer.once('settings-folder-selected', (event, args) => {
-      this.changeTargetFolder(args);
-    });
-    ipcRenderer.send('settings-folder-select');
+  async folderSelect() {
+    try {
+      const folder = await window.mynda.watchfolders.choose();
+      if (folder) this.changeTargetFolder(folder);
+    } catch (error) {
+      settingsLog.error('Could not choose a watchfolder', {error});
+    }
   }
 
   componentDidMount() {
@@ -458,20 +471,6 @@ class MynSettingsPlaylists extends React.Component {
       valid : filterValidity
     }
 
-    ipcRenderer.on('MynSettingsPlaylists-confirm-delete-playlist', (event, response, id, checked) => {
-      if (response === 0) { // yes
-        if (checked) {
-          disableConfirmationDialog(
-            'MynSettingsPlaylists-confirm-delete-playlist',
-            settingsLog
-          );
-        }
-        this.removePlaylist(id);
-      } else {
-        settingsLog.debug('Playlist deletion canceled by user', {playlistID: id});
-      }
-    });
-
     this.updateValue = this.updateValue.bind(this);
     this.reportValid = this.reportValid.bind(this);
     this.showEditPlaylist = this.showEditPlaylist.bind(this);
@@ -550,23 +549,26 @@ class MynSettingsPlaylists extends React.Component {
     });
   }
 
-  deletePlaylist(playlist) {
+  async deletePlaylist(playlist) {
     const confirmationPreference = 'MynSettingsPlaylists-confirm-delete-playlist';
     if (confirmationDialogIsDisabled(confirmationPreference)) {
       this.removePlaylist(playlist.id);
       return;
     }
 
-    let playlistName = playlist.name != '' ? `the '${playlist.name}' playlist` : 'this playlist'
-    ipcRenderer.send(
-      'generic-confirm',
-      confirmationPreference,
-      {
-        message: `Are you sure you want to delete ${playlistName}?`,
-        checkboxLabel: `Don't show this message again`
-      },
-      playlist.id
-    );
+    try {
+      const {response, checkboxChecked} = await window.mynda.dialogs.confirmPlaylistDelete({
+        id: playlist.id, name: playlist.name
+      });
+      if (response === 0) {
+        if (checkboxChecked) disableConfirmationDialog(confirmationPreference, settingsLog);
+        this.removePlaylist(playlist.id);
+      } else {
+        settingsLog.debug('Playlist deletion canceled by user', {playlistID: playlist.id});
+      }
+    } catch (error) {
+      settingsLog.error('Could not confirm playlist deletion', {playlistID: playlist.id, error});
+    }
   }
 
   addPlaylist() {
@@ -1314,10 +1316,10 @@ class MynSettingsShare extends React.Component {
   }
 
   componentDidMount() {
-    ipcRenderer.on('share-progress', this.handleShareProgress);
-    ipcRenderer.invoke('share:get-state').then(response => {
+    this._removeShareProgress = window.mynda.share.onProgress(this.handleShareProgress);
+    window.mynda.share.getState().then(response => {
       if (response && response.ok && response.value) {
-        this.handleShareProgress(null, response.value);
+        this.handleShareProgress(response.value);
       }
     }).catch(err => {
       settingsLog.warn('Could not retrieve current Share state', {error: err});
@@ -1325,10 +1327,10 @@ class MynSettingsShare extends React.Component {
   }
 
   componentWillUnmount() {
-    ipcRenderer.removeListener('share-progress', this.handleShareProgress);
+    if (this._removeShareProgress) this._removeShareProgress();
   }
 
-  handleShareProgress(event, progress) {
+  handleShareProgress(progress) {
     progress = progress || {};
     this.setState({
       busy: Boolean(progress.busy),
@@ -1338,9 +1340,9 @@ class MynSettingsShare extends React.Component {
     });
   }
 
-  async invokeShare(channel, options) {
+  async invokeShare(operation, options) {
     try {
-      const response = await ipcRenderer.invoke(channel, options || {});
+      const response = await operation(options || {});
       if (!response || response.ok !== true) {
         const error = response && response.error || {};
         const thrown = new Error(error.message || 'Mynda could not complete the Share operation.');
@@ -1352,7 +1354,7 @@ class MynSettingsShare extends React.Component {
     } catch(err) {
       const correctableShareError = typeof err.code === 'string' &&
         /^(?:SHARE_|NO_SHARE_|INVALID_IMPORT_|IMPORT_|MISSING_IMPORT_|SOURCE_KIND_|UNKNOWN_SOURCE_|FULFILLMENT_|PARTIAL_DVD_)/.test(err.code);
-      const logData = {channel: channel, error: err};
+      const logData = {error: err};
       if (correctableShareError) {
         settingsLog.warn('Share action was not completed in the renderer', logData);
       } else {
@@ -1389,7 +1391,7 @@ class MynSettingsShare extends React.Component {
   async folderSelect() {
     this.clearShareMessage();
     try {
-      const result = await this.invokeShare('share:choose-directory');
+      const result = await this.invokeShare(window.mynda.share.chooseDirectory);
       if (result && result.directory) {
         this.clearLoadedShare(result.directory);
       }
@@ -1420,7 +1422,7 @@ class MynSettingsShare extends React.Component {
       return null;
     }
     try {
-      const inspection = await this.invokeShare('share:inspect', {
+      const inspection = await this.invokeShare(window.mynda.share.inspect, {
         directory: this.state.shareDirectory
       });
       const mappings = this.mappingsFromInspection(inspection);
@@ -1466,7 +1468,7 @@ class MynSettingsShare extends React.Component {
       return;
     }
     try {
-      const result = await this.invokeShare('share:create-request', {
+      const result = await this.invokeShare(window.mynda.share.createRequest, {
         directory: this.state.shareDirectory,
         requestedKinds: this.state.selectedRequestKinds,
         includeDvds: this.state.includeDvds,
@@ -1519,7 +1521,7 @@ class MynSettingsShare extends React.Component {
   async prepareFulfillment() {
     this.clearShareMessage({fulfillmentPlan: null});
     try {
-      const plan = await this.invokeShare('share:plan-fulfillment', {
+      const plan = await this.invokeShare(window.mynda.share.planFulfillment, {
         directory: this.state.shareDirectory,
         kindMappings: this.fulfillmentMappingArray(),
         includeDvds: this.state.fulfillmentIncludeDvds
@@ -1540,7 +1542,7 @@ class MynSettingsShare extends React.Component {
     if (!plan) return;
     this.clearShareMessage();
     try {
-      const result = await this.invokeShare('share:fulfill-request', {token: plan.token});
+      const result = await this.invokeShare(window.mynda.share.fulfillRequest, {token: plan.token});
       await this.loadShare({
         message: result.canceled ?
           `Share fulfillment canceled after packaging ${result.packagedVideos} video${result.packagedVideos === 1 ? '' : 's'}. It can be resumed later.` :
@@ -1596,7 +1598,7 @@ class MynSettingsShare extends React.Component {
   async prepareImport() {
     this.clearShareMessage({importPlan: null});
     try {
-      const plan = await this.invokeShare('share:plan-import', {
+      const plan = await this.invokeShare(window.mynda.share.planImport, {
         directory: this.state.shareDirectory,
         kindMappings: this.importMappingArray()
       });
@@ -1616,7 +1618,7 @@ class MynSettingsShare extends React.Component {
     if (!plan) return;
     this.clearShareMessage();
     try {
-      const result = await this.invokeShare('share:import', {token: plan.token});
+      const result = await this.invokeShare(window.mynda.share.import, {token: plan.token});
       this.setState({
         importPlan: null,
         message: result.canceled ?
@@ -1634,7 +1636,7 @@ class MynSettingsShare extends React.Component {
   async cancelShare() {
     this.clearShareMessage();
     try {
-      const result = await this.invokeShare('share:cancel');
+      const result = await this.invokeShare(window.mynda.share.cancel);
       if (result.cancelRequested) {
         this.setState({cancelRequested: true, message: 'Canceling after the current filesystem operation stops safely…', messageType: 'warning'});
       }
@@ -1931,15 +1933,18 @@ class MynSettingsLibrary extends React.Component {
     this.showFile = this.showFile.bind(this);
   }
 
-  showFile(target, event) {
+  async showFile(target, event) {
     if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
-    const filename = typeof target === 'string' ? target : target && target.filename;
-    if (!filename) return;
+    if (!target) return;
     try {
-      shell.showItemInFolder(filename);
+      if (typeof target === 'string') {
+        await window.mynda.files.revealExport(target);
+      } else {
+        await window.mynda.files.revealVideo(target);
+      }
     } catch(err) {
       settingsLog.error('Could not show a library file in the system file manager', {
-        filename: filename,
+        target,
         error: err && err.stack ? err.stack : String(err)
       });
     }
@@ -1955,7 +1960,7 @@ class MynSettingsLibrary extends React.Component {
     });
 
     try {
-      const response = await ipcRenderer.invoke('library:export');
+      const response = await window.mynda.library.export();
       if (!response || response.ok !== true) {
         const error = response && response.error ? response.error : {};
         throw Object.assign(
@@ -2008,7 +2013,7 @@ class MynSettingsLibrary extends React.Component {
           <span className='duplicate-label'>Library&nbsp;copy:</span>
           <div className='duplicate-original-path'>
             <span className='library-path'>{video.filename}</span>
-            <button onClick={event => this.showFile(video.filename, event)}>Show in {fileManager}</button>
+            <button onClick={event => this.showFile({videoID: video.id}, event)}>Show in {fileManager}</button>
           </div>
         </div>
         <span className='duplicate-label'>Duplicate&nbsp;{entry.paths.length === 1 ? 'file' : 'files'}:</span>
@@ -2016,7 +2021,7 @@ class MynSettingsLibrary extends React.Component {
           {entry.paths.map(duplicatePath => (
             <li key={duplicatePath}>
               <span className='library-path'>{duplicatePath}</span>
-              <button onClick={event => this.showFile(duplicatePath, event)}>Show in {fileManager}</button>
+              <button onClick={event => this.showFile({videoID: video.id, duplicatePath}, event)}>Show in {fileManager}</button>
             </li>
           ))}
         </ul>

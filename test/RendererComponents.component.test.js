@@ -21,6 +21,7 @@ require('@babel/register')({
 
 const windowListeners = new Map();
 global.window = {
+  mynda: {app: {platform: process.platform}},
   addEventListener: (name, listener) => windowListeners.set(name, listener),
   removeEventListener: (name, listener) => {
     if (windowListeners.get(name) === listener) windowListeners.delete(name);
@@ -28,10 +29,20 @@ global.window = {
 };
 
 const ipcRenderer = new EventEmitter();
+window.mynda.events = {
+  onStatus(callback) {
+    ipcRenderer.on('status-update', callback);
+    return () => ipcRenderer.removeListener('status-update', callback);
+  },
+  onVideosAdded(callback) {
+    ipcRenderer.on('videos_added', callback);
+    return () => ipcRenderer.removeListener('videos_added', callback);
+  }
+};
 const runtimeLibrary = {media: []};
 const quietLog = {debug() {}, info() {}, warn() {}, error() {}};
 
-const {MynNotify} = loadFreshWithMocks(
+const {MynNotify, MynOpenablePane} = loadFreshWithMocks(
   path.join(__dirname, '..', 'src', 'renderer', 'SharedComponents.js'),
   {
     'electron': {ipcRenderer},
@@ -138,7 +149,9 @@ suite.test('formats scan, batch-save, metadata, and Share progress', () => {
 
 suite.test('renders the active notification banner and unregisters its window listener', () => {
   const notify = new MynNotify({});
+  notify.componentDidMount();
   assert(windowListeners.has('mynda-local-status-update'));
+  assert.strictEqual(ipcRenderer.listenerCount('status-update'), 1);
   notify.state = {
     on: true,
     statusMessage: 'Saving 2 of 4 videos',
@@ -150,6 +163,47 @@ suite.test('renders the active notification banner and unregisters its window li
   assert(html.includes('>..</div>'));
   notify.componentWillUnmount();
   assert.strictEqual(windowListeners.has('mynda-local-status-update'), false);
+  assert.strictEqual(ipcRenderer.listenerCount('status-update'), 0);
+});
+
+suite.test('navigation subscribes only while mounted and releases the backend listener', () => {
+  const nav = new MynNav({});
+  nav.setState = patch => Object.assign(nav.state, patch);
+  assert.strictEqual(ipcRenderer.listenerCount('videos_added'), 0);
+  nav.componentDidMount();
+  ipcRenderer.emit('videos_added', 7);
+  assert.strictEqual(nav.state.numVidsAdded, 7);
+  nav.componentWillUnmount();
+  assert.strictEqual(ipcRenderer.listenerCount('videos_added'), 0);
+  ipcRenderer.emit('videos_added', 12);
+  assert.strictEqual(nav.state.numVidsAdded, 7);
+});
+
+suite.test('simultaneous pane confirmations retain their own callbacks and cancellation results', async () => {
+  const requests = [], hidden = [], callbacks = [];
+  window.mynda.dialogs = {confirmPaneExit: request => new Promise(resolve => requests.push({request, resolve}))};
+  const pane = new MynOpenablePane({settings: {preferences: {}}, hideFunction: id => hidden.push(id)});
+  const first = pane.closePane('editor-pane', true, 'Discard first?', () => callbacks.push('first'));
+  const second = pane.closePane('settings-pane', true, 'Discard second?', () => callbacks.push('second'));
+  assert.deepStrictEqual(requests.map(item => item.request), [
+    {id: 'editor-pane', message: 'Discard first?'},
+    {id: 'settings-pane', message: 'Discard second?'}
+  ]);
+  requests[1].resolve({response: 0, checkboxChecked: false});
+  await second;
+  assert.deepStrictEqual(hidden, ['settings-pane']);
+  requests[0].resolve({response: 1, checkboxChecked: false});
+  await first;
+  assert.deepStrictEqual(hidden, ['settings-pane']);
+  assert.deepStrictEqual(callbacks, ['second']);
+});
+
+suite.test('a failed pane confirmation leaves the unsaved pane open', async () => {
+  window.mynda.dialogs = {confirmPaneExit: async () => { throw Error('dialog unavailable'); }};
+  let closed = false;
+  const pane = new MynOpenablePane({settings: {preferences: {}}, hideFunction: () => { closed = true; }});
+  await pane.closePane('editor-pane', true, 'Discard?', () => { closed = true; });
+  assert.strictEqual(closed, false);
 });
 
 function navigationHtml() {

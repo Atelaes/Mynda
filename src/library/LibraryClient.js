@@ -1,13 +1,14 @@
 'use strict';
 const _ = require('lodash');
 const {v4: uuidv4} = require('uuid');
-const Operations = require('./LibraryOperations');
-const commands = require('./LibraryCommands');
+const Operations = require('./LibraryProtocol');
+const commands = require('./LibraryClientCommands');
 
 class LibraryClient {
-  constructor({ipcRenderer, log, initialData}) {
+  constructor({api, log, initialData, onSaved}) {
     this.env = 'browser';
-    this.ipc = ipcRenderer;
+    this.api = api;
+    this.onSaved = onSaved;
     this.log = log;
     this._data = Operations.deepFreeze(_.cloneDeep(initialData));
     for (const key of Object.keys(initialData)) Object.defineProperty(this, key, {enumerable: true, get: () => this._data[key]});
@@ -21,11 +22,11 @@ class LibraryClient {
     this.delivery = Promise.resolve();
     this.resync = null;
     this.closing = false;
-    this.ipc.on('library:committed', (_event, message) => {
+    this.api.onCommitted(message => {
       this.receive(message).catch(error => this.log.error('Could not synchronize library', {error}));
     });
-    this.ipc.on('library:close-canceled', () => { this.closing = false; this.closeToken = null; });
-    this.ipc.on('library:prepare-close', (_event, request) => {
+    this.api.onCloseCanceled(() => { this.closing = false; this.closeToken = null; });
+    this.api.onPrepareClose(request => {
       this.prepareForClose(request).catch(error => this.log.error('Could not prepare library shutdown', {error}));
     });
     this.ready = this.refresh();
@@ -33,7 +34,7 @@ class LibraryClient {
   }
   refresh() {
     if (this.resync) return this.resync;
-    this.resync = Promise.resolve().then(() => this.ipc.invoke('library:snapshot')).then(snapshot => {
+    this.resync = Promise.resolve().then(() => this.api.snapshot()).then(snapshot => {
       if (snapshot.error) throw Object.assign(new Error(snapshot.error.message), snapshot.error);
       if (snapshot.session !== this.session || snapshot.revision >= this.revision) {
         this._data = Operations.deepFreeze(_.cloneDeep(snapshot.data));
@@ -59,7 +60,7 @@ class LibraryClient {
       this.closing = true;
     } catch (error) { failure = {message: error.message, code: error.code}; }
     if (this.closeToken !== request.token) return;
-    await this.ipc.invoke('library:close-ready', {token: request.token, error: failure});
+    await this.api.closeReady({token: request.token, error: failure});
   }
   receive(message) {
     const delivery = this.delivery.then(() => this.acceptMessage(message));
@@ -83,7 +84,7 @@ class LibraryClient {
   notify(addresses) {
     for (const address of addresses) {
       try {
-        if (typeof savedPing !== 'undefined' && savedPing && typeof savedPing.saved === 'function') savedPing.saved(address);
+        if (this.onSaved) this.onSaved(address);
         for (const listener of this.listeners) listener(address);
       } catch (error) { this.log.error('Library display refresh failed after commit', {error}); }
     }
@@ -103,7 +104,7 @@ class LibraryClient {
       if (preparationError) throw preparationError;
       let response;
       try {
-        response = await this.ipc.invoke('library:commit', {requestId, operations: prepared,
+        response = await this.api.commit({requestId, operations: prepared,
           options: {updateUsedLists: Boolean(options.updateUsedLists)}});
       } catch (cause) {
         throw Operations.failure('LIBRARY_COMMIT_UNKNOWN', 'Mynda could not confirm this save. Reopen the library before retrying; the backend may already have saved it.', {cause});

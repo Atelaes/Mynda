@@ -4,20 +4,26 @@ const {assert,createSuite,runSuite}=require('./helpers/TestHarness');
 const {loadFreshWithMocks}=require('./helpers/ModuleMocks');
 const {show}=require('./helpers/OmdbFixtures');
 const Evidence=require('../src/tagging/TaggingEvidence');
+const {createEditorService}=require('../src/main/EditorService');
 require('@babel/register')({presets:[require.resolve('@babel/preset-react')],extensions:['.js'],ignore:[/node_modules/],cache:false});
 const suite=createSuite('Tagging editor provenance','component',
   'Exercises the real editor change and catalog-choice handlers; identity authorship survives the UI boundary.');
 const quiet={debug(){},info(){},warn(){},error(){}};
 let request,changed,proposal,applied=0,lookups=0;
-const {MynEditor,MynEditorSearch}=loadFreshWithMocks(path.join(__dirname,'../src/renderer/Editor.js'),{
-  electron:{ipcRenderer:{}},
-  '../tagging/OmdbHelper.js':{
+const backendLibrary = {media: []};
+const service = createEditorService({library: backendLibrary, app: {getPath: () => '/tmp/mynda-editor-component'},
+  catalog: {
     resolve:async()=>{lookups++;return proposal;},
     applyMatch:async(candidate,options)=>{applied++;request={candidate,options};return {status:'matched',video:candidate.candidate.video};},
     tag:async(video,options)=>{
       request={video,options};return {status:'matched',video:{...video,taggingEvidence:{test:'applied'}}};
     }
-  },
+  }
+});
+global.window = {mynda: {editor: {search: draft => service.search(draft, 1),
+  select: input => service.select(input, 1)}}};
+global.alert = () => {};
+const {MynEditor,MynEditorSearch}=loadFreshWithMocks(path.join(__dirname,'../src/renderer/Editor.js'),{
   './RendererRuntime.js':{editorLog:quiet,artworkLog:quiet,library:{media:[]}},
   './SharedComponents.js':{MynOpenablePane:React.Component},
   './EditorFields.js':{}
@@ -53,9 +59,12 @@ suite.test('applying an accepted record clears the previous failure in the edito
 });
 suite.test('an explicit record choice keeps the file input and marks the selection as user supplied',async()=>{
   const original=show();
+  backendLibrary.media = [original];
   const instance=new MynEditorSearch({video:original,handleChange:video=>{changed=video;}});
   instance.clearSearch=()=>{};
-  await instance.retrieveResult({imdbID:'tt444',Title:'Chosen Record'});
+  proposal = {status:'ambiguous', choices:[{imdbID:'tt444',Title:'Chosen Record'}]};
+  const result = await service.search(original, 1);
+  await instance.retrieveResult(result.choices[0]);
   assert.strictEqual(request.video.filename,original.filename);
   assert.strictEqual(request.video.title,original.title);
   assert.strictEqual(request.video.imdbID,'tt444');
@@ -64,14 +73,19 @@ suite.test('an explicit record choice keeps the file input and marks the selecti
 });
 suite.test('a series choice is passed as a parent, with explicit user provenance',async()=>{
   const original=show();
+  backendLibrary.media = [original];
   const instance=new MynEditorSearch({video:original,handleChange:()=>{}});
   instance.clearSearch=()=>{};
-  await instance.retrieveResult({myndaChoiceType:'series',imdbID:'tt555'});
-  assert.strictEqual(request.video,original);
+  proposal = {status:'ambiguous', choices:[{myndaChoiceType:'series',imdbID:'tt555'}]};
+  const result = await service.search(original, 1);
+  await instance.retrieveResult(result.choices[0]);
+  assert.deepStrictEqual(request.video,original);
   assert.deepStrictEqual(request.options,{seriesImdbID:'tt555',seriesSelectionSource:'user'});
 });
 suite.test('previewing a candidate performs no application; confirming reuses the proposal',async()=>{
   const original=show();
+  backendLibrary.media = [original];
+  lookups = 0; applied = 0;
   proposal={status:'candidate',context:{originalInput:Evidence.snapshot(original)},
     candidate:{video:original,record:{Title:'Arrival',imdbID:'tt666',Type:'episode',Poster:'N/A'}}};
   const instance=new MynEditorSearch({video:original,handleChange:()=>{}});
@@ -88,7 +102,8 @@ suite.test('previewing a candidate performs no application; confirming reuses th
   await instance.retrieveResult(JSON.parse(JSON.stringify(row)));
   assert.strictEqual(applied,1);
   assert.strictEqual(lookups,1);
-  assert.strictEqual(request.candidate,proposal);
+  assert.strictEqual(request.candidate.context,proposal.context);
+  assert.deepStrictEqual(request.candidate.candidate.record,proposal.candidate.record);
   assert.strictEqual(request.options.recordSelectionSource,'user');
 });
 suite.test('a late confirmation cannot apply a choice to another video',async()=>{
@@ -96,5 +111,37 @@ suite.test('a late confirmation cannot apply a choice to another video',async()=
   const before=applied;
   await instance.retrieveResult({imdbID:'tt666',myndaInputID:'previous'});
   assert.strictEqual(applied,before);
+});
+suite.test('a metadata response preserves draft edits and user ratings made while it was loading', async () => {
+  const original = show({ratings: {user: 3}, tags: ['before']});
+  const priorSelect = window.mynda.editor.select;
+  let finish, changes;
+  window.mynda.editor.select = () => new Promise(resolve => { finish = resolve; });
+  try {
+    const instance = new MynEditorSearch({video: original, handleChange: value => { changes = value; }});
+    instance.clearSearch = () => {};
+    const loading = instance.retrieveResult({myndaProposalID: 'test-choice'});
+    instance.props = {...instance.props, video: {...original, tags: ['my latest tag'], ratings: {user: 5}}};
+    finish({status: 'matched', video: {...original, title: 'Catalog title', tags: ['catalog genre'], ratings: {user: 3, imdb: 8}}});
+    await loading;
+    assert.strictEqual(changes.title, 'Catalog title');
+    assert.strictEqual(changes.tags, undefined);
+    assert.deepStrictEqual(changes.ratings, {user: 5, imdb: 8});
+  } finally { window.mynda.editor.select = priorSelect; }
+});
+suite.test('a changed identity while metadata loads requires a fresh search', async () => {
+  const original = show();
+  const priorSelect = window.mynda.editor.select;
+  let finish, changes;
+  window.mynda.editor.select = () => new Promise(resolve => { finish = resolve; });
+  try {
+    const instance = new MynEditorSearch({video: original, handleChange: value => { changes = value; }});
+    instance.clearSearch = () => {};
+    const loading = instance.retrieveResult({myndaProposalID: 'test-choice'});
+    instance.props = {...instance.props, video: {...original, episode: 9}};
+    finish({status: 'matched', video: {...original, imdbID: 'tt123'}});
+    await loading;
+    assert.strictEqual(changes, undefined);
+  } finally { window.mynda.editor.select = priorSelect; }
 });
 runSuite(suite);

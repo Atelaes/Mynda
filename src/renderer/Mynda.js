@@ -1,6 +1,5 @@
 // Root renderer component and application-level state coordination.
 const React = require('react');
-const {ipcRenderer} = require('electron');
 const _ = require('lodash');
 const {reportSaveFailure} = require('./LibraryEdits.js');
 const {
@@ -11,7 +10,8 @@ const {
   library,
   frontendLog,
   libraryViewLog,
-  playerLog
+  playerLog,
+  savedPing
 } = require('./RendererRuntime.js');
 const {batchNewState, batchRatingsState, validateVideo} = require('./RendererUtils.js');
 const {
@@ -79,7 +79,6 @@ class Mynda extends React.Component {
     this.registerTableScroller = this.registerTableScroller.bind(this);
     this.reportSortedManifest = this.reportSortedManifest.bind(this);
     this.scrollToVideo = this.scrollToVideo.bind(this);
-    this.logPlayed = this.logPlayed.bind(this);
     this.scanWatchfolders = this.scanWatchfolders.bind(this);
     this.componentDidMount = this.componentDidMount.bind(this);
     // this.showSettings = this.showSettings.bind(this);
@@ -849,16 +848,9 @@ class Mynda extends React.Component {
     this.showOpenablePane('playerPane');
   }
 
-  // store the 5 most recently played videos
-  logPlayed(id) {
-    library.recordPlayed(id, error => {
-      if (error) reportSaveFailure(error, playerLog, 'save recently watched videos');
-    }, {limit: 10});
-  }
-
-  scanWatchfolders() {
+  async scanWatchfolders() {
     try {
-      ipcRenderer.send('scan-watchfolders');
+      await window.mynda.scan.start();
     } catch(err) {
       frontendLog.error('Could not request a watchfolder scan', {
         error: err && err.stack ? err.stack : String(err)
@@ -1157,7 +1149,6 @@ class Mynda extends React.Component {
         <MynPlayer
           show={this.state.show.playerPane}
           video={this.state.detailVideo}
-          logPlayed={this.logPlayed}
           hideFunction={() => {this.hideOpenablePane('playerPane')}}
         />
       </div>

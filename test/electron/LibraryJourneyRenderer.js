@@ -1,154 +1,111 @@
-const assert=require('assert');
-const path=require('path');
-const {ipcRenderer,remote}=require('electron');
-const {ids,expected,assertSaved}=require('./LibraryJourneyFixtures');
-const library=require(path.join(remote.app.getAppPath(),'src/renderer/RendererRuntime.js')).library;
-const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let background='';
-ipcRenderer.on('status-update',(_event,status)=>{background=status.action || '';});
+// Runs in the main test process. UI actions use the isolated browser DOM;
+// external fixtures and authoritative library observations stay in main.
+const assert = require('assert');
+const {ids, expected, assertSaved} = require('./LibraryJourneyFixtures');
+const {browserDriver, wait} = require('./BrowserDriver');
 
-async function wait(check,label,timeout=10000) {
-  const start=Date.now();
-  while(!check()) {
-    if(Date.now()-start>timeout) throw new Error('Timed out waiting for '+label);
-    await sleep(25);
-  }
-}
-function element(selector) {
-  const found=document.querySelector(selector);
-  assert(found,'Missing UI control: '+selector);return found;
-}
-function click(selector,options={}) {
-  const target=element(selector);
-  target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:1,...options}));
-}
-function type(selector,value) {
-  const target=element(selector);
-  const prototype=target.tagName==='TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(prototype,'value').set.call(target,value);
-  target.dispatchEvent(new Event('input',{bubbles:true}));
-}
-const row=id=>`tr[vid_id="${id}"]`;
-async function selectOnly(id) {
-  await wait(()=>document.querySelector(row(id)),'fixture row');
-  const selected=[...document.querySelectorAll('tr.movie-row.selected')];
-  if(selected.length!==1 || selected[0].getAttribute('vid_id')!==id) click(row(id));
-  await wait(()=>document.querySelectorAll('tr.movie-row.selected').length===1 &&
-    element(row(id)).classList.contains('selected'),'single selection');
-}
-async function edit(id) {
-  await selectOnly(id);click('#edit-button');
-  await wait(()=>document.querySelector('#edit-container .edit-field-title'),'editor');
-}
-async function save(check) {
-  click('#edit-container .save-btn');
-  await wait(check,'confirmed editor save');
-  await wait(()=>element('#edit-container .save-btn').value==='Save','editor acknowledgment');
-}
-async function closeEditor() {
-  click('#editor-pane .openable-close-btn');
-  await wait(()=>!document.querySelector('#edit-container'),'closed editor');
-}
-async function settings() {
-  click('#settings-button');
-  await wait(()=>document.querySelector('#settings-tab-preferences'),'settings tabs');
-  click('#settings-tab-preferences');
-  await wait(()=>document.querySelectorAll('#settings-prefs-libraryexclusions input').length===2,'preference controls');
-}
-const first=()=>library.media.find(video=>video.id===ids[0]);
-const stage=value=>ipcRenderer.send('journey:stage',value);
-
-async function run(phase) {
-  await library.ready;
+async function run({window, phase, library, playback, startupReady, armScan,
+  scanStarted, releaseScan, tagStarted, releaseTag, background, stage}) {
+  const ui = browserDriver(window);
+  await ui.start();
   stage('initial-scan');
-  await ipcRenderer.invoke('journey:startup-ready');
-  await wait(()=>document.querySelector('#grid-container') && document.querySelector(row(ids[0])),'initial UI');
-  if(phase==='restart') {
+  await startupReady;
+  await wait(() => ui.exists(ui.row(ids[0])), 'initial fixture UI');
+  const first = () => library.media.find(video => video.id === ids[0]);
+
+  if (phase === 'restart') {
     stage('restart-values');
     assertSaved(library.getSaveObject());
-    await edit(ids[0]);
-    assert.strictEqual(element('#edit-container .edit-field-title').value,expected.title);
-    assert.strictEqual(element('#edit-field-description').value,expected.description);
-    assert.strictEqual(document.querySelectorAll('#edit-container .rating .star.filled').length,expected.rating);
-    await closeEditor();
-    await settings();
-    assert([...document.querySelectorAll('#settings-prefs-libraryexclusions input')].every(input=>!input.checked));
-    click('#settings-pane .openable-close-btn');
-    click(row(ids[0]),{detail:2});
+    await ui.edit(ids[0]);
+    const values = await ui.inspect(() => ({
+      title:document.querySelector('#edit-container .edit-field-title').value,
+      description:document.querySelector('#edit-field-description').value,
+      rating:document.querySelectorAll('#edit-container .rating .star.filled').length
+    }));
+    assert.deepStrictEqual(values, {title:expected.title, description:expected.description, rating:expected.rating});
+    await ui.closeEditor();
+    await ui.settings();
+    assert(await ui.inspect(() => [...document.querySelectorAll('#settings-prefs-libraryexclusions input')]
+      .every(input => !input.checked)));
+    await ui.click('#settings-pane .openable-close-btn');
+    await ui.click(ui.row(ids[0]), {detail:2});
     stage('restart-resume');
-    await wait(()=>window.__myndaJourneyPlayback.resumes.length>0,'resume command after restart');
-    assert.strictEqual(window.__myndaJourneyPlayback.resumes[0],expected.position);
-    return {phase,restartVerified:true};
+    await wait(() => playback.resumes.length > 0, 'resume command after restart');
+    await wait(() => ui.exists('#player-pane .playing-message'), 'resumed fixture playback');
+    assert.strictEqual(playback.resumes[0], expected.position);
+    return {phase, restartVerified:true};
   }
 
-  // A real editor rating save; wait for the committed replica, not a DOM-only change.
   stage('editor-rating');
-  await edit(ids[0]);
-  click('#edit-container .rating .star:nth-child(4)');
-  await save(()=>first().ratings.user===expected.rating);
-  await closeEditor();
+  await ui.edit(ids[0]);
+  await ui.click('#edit-container .rating .star:nth-child(4)');
+  await ui.save(() => first().ratings.user === expected.rating);
+  await ui.closeEditor();
 
-  // Pause the real scanner at its external metadata probe, outside the commit
-  // queue. A renderer edit must finish before the test releases that probe.
+  // Hold the scanner outside the commit queue: a real editor save must finish
+  // before the external metadata fixture is released.
   stage('scan-and-editor');
-  await ipcRenderer.invoke('journey:arm-scan');
-  click('#scan-button');
-  await ipcRenderer.invoke('journey:scan-started');
-  await edit(ids[0]);
-  type('#edit-field-description','Saved before the scan finishes');
-  await save(()=>first().description==='Saved before the scan finishes');
-  type('#edit-field-description',expected.description);
-  await ipcRenderer.invoke('journey:release-scan');
-  await wait(()=>first().metadata.width===3840,'completed metadata scan');
-  assert.strictEqual(element('#edit-field-description').value,expected.description);
-  await save(()=>first().description===expected.description);
-  await closeEditor();
-  await wait(()=>background==='','completed scan status');
+  await armScan();
+  await ui.click('#scan-button');
+  await scanStarted;
+  await ui.edit(ids[0]);
+  await ui.type('#edit-field-description', 'Saved before the scan finishes');
+  await ui.save(() => first().description === 'Saved before the scan finishes');
+  await ui.type('#edit-field-description', expected.description);
+  releaseScan();
+  await wait(() => first().metadata.width === 3840, 'completed metadata scan');
+  assert.strictEqual(await ui.inspect(() => document.querySelector('#edit-field-description').value), expected.description);
+  await ui.save(() => first().description === expected.description);
+  await ui.closeEditor();
+  await wait(() => background() === '', 'completed scan status');
 
-  // Real Auto-Tag entry, runner and save path; a fixture holds the catalog
-  // response while the user changes identity, so the late result must lose.
   stage('autotag-and-editor');
-  click('.playlist-bar .autotag');
-  await ipcRenderer.invoke('journey:tag-started');
-  await edit(ids[0]);
-  type('#edit-container .edit-field-title',expected.title);
-  await save(()=>first().title===expected.title);
-  await ipcRenderer.invoke('journey:release-tag');
-  await wait(()=>first().taggingDecision && first().taggingDecision.reason.code==='changed-during-lookup','catalog conflict report');
-  assert.strictEqual(element('#edit-container .edit-field-title').value,expected.title);
-  await closeEditor();
+  await ui.click('.playlist-bar .autotag');
+  await tagStarted;
+  await ui.edit(ids[0]);
+  await ui.type('#edit-container .edit-field-title', expected.title);
+  await ui.save(() => first().title === expected.title);
+  releaseTag();
+  await wait(() => first().taggingDecision && first().taggingDecision.reason.code === 'changed-during-lookup',
+    'catalog conflict report');
+  assert.strictEqual(await ui.inspect(() => document.querySelector('#edit-container .edit-field-title').value), expected.title);
+  await ui.closeEditor();
 
   stage('batch-editor');
-  await selectOnly(ids[0]);
-  click(row(ids[1]),{ctrlKey:process.platform!=='darwin',metaKey:process.platform==='darwin'});
-  await wait(()=>document.querySelectorAll('tr.movie-row.selected').length===2,'batch selection');
-  click('#edit-button');
-  await wait(()=>document.querySelector('#edit-batch-notification'),'batch editor');
-  type('#edit-container .edit-field-country',expected.country);
-  await save(()=>library.media.filter(video=>[ids[0],ids[1]].includes(video.id)).every(video=>video.country===expected.country));
-  assert.strictEqual(library.media.find(video=>video.id===ids[2]).country,'Original country 2');
-  await closeEditor();
+  await ui.selectOnly(ids[0]);
+  await ui.click(ui.row(ids[1]), {ctrlKey:process.platform !== 'darwin', metaKey:process.platform === 'darwin'});
+  await wait(async () => (await ui.selected()).length === 2, 'batch selection');
+  await ui.click('#edit-button');
+  await wait(() => ui.exists('#edit-batch-notification'), 'batch editor');
+  await ui.type('#edit-container .edit-field-country', expected.country);
+  await ui.save(() => library.media.filter(video => [ids[0], ids[1]].includes(video.id))
+    .every(video => video.country === expected.country));
+  assert.strictEqual(library.media.find(video => video.id === ids[2]).country, 'Original country 2');
+  await ui.closeEditor();
 
   stage('playback-history');
-  await selectOnly(ids[0]);
-  click(row(ids[0]),{detail:2});
-  await wait(()=>document.querySelector('#player-pane .playing-message'),'started fixture playback');
-  // Exercise the production ten-second Recently Played timer.
-  await wait(()=>library.recently_watched[0]===ids[0],'Recently Played timer',15000);
-  const player=window.__myndaJourneyPlayback.player;
-  player.emit('timeposition',310);
-  player.emit('seek',{end:expected.position});
-  player.emit('stopped');
-  await wait(()=>first().position===expected.position,'playback position commit');
-  click('#player-pane .openable-close-btn');
+  await ui.selectOnly(ids[0]);
+  await ui.click(ui.row(ids[0]), {detail:2});
+  await wait(() => ui.exists('#player-pane .playing-message'), 'started fixture playback');
+  await wait(() => library.recently_watched[0] === ids[0], 'Recently Played timer', 15000);
+  playback.player.emit('timeposition', 310);
+  playback.player.emit('seek', {end:expected.position});
+  playback.player.emit('stopped');
+  await wait(() => first().position === expected.position, 'playback position commit');
+  const stoppedPlayer = playback.player;
+  await ui.click('#player-pane .openable-close-btn');
+  await wait(() => playback.stops.includes(stoppedPlayer), 'backend player cleanup');
+  assert.strictEqual(stoppedPlayer.listenerCount('timeposition'), 0, 'Closed players must not keep saving positions');
 
-  // Close immediately after two genuine checkbox changes; the Settings close
-  // hook must flush both controls without waiting for the debounce timer.
+  // The real Settings close hook must flush two freshly changed controls.
   stage('settings-before-close');
-  await settings();
-  const controls=document.querySelectorAll('#settings-prefs-libraryexclusions input');
-  controls[0].click();controls[1].click();
-  assert([...controls].every(input=>!input.checked));
-  return {phase,rating:true,scanConcurrentEdit:true,tagConflict:true,batch:true,playback:true,settingsStaged:true};
+  await ui.settings();
+  assert(await ui.inspect(() => {
+    const controls = document.querySelectorAll('#settings-prefs-libraryexclusions input');
+    controls[0].click(); controls[1].click();
+    return [...controls].every(input => !input.checked);
+  }));
+  return {phase, rating:true, scanConcurrentEdit:true, tagConflict:true, batch:true, playback:true, settingsStaged:true};
 }
-module.exports={run};
+
+module.exports = {run};

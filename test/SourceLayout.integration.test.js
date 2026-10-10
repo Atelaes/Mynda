@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
+const {webcrypto} = require('crypto');
 const asar = require('asar');
 const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
 const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness.js');
@@ -7,6 +9,7 @@ const {filesUnder, assertExactPath, auditReferences} = require('./helpers/Source
 const manifest = require('../scripts/source-reorganization.json');
 const MediaTools = require('../src/media/MediaTools.js');
 const devTools = require('../src/main/ReactDevTools.js');
+const {buildRenderer, OUTPUT_PATH, PRELOAD_PATH} = require('../scripts/build-renderer.js');
 
 const root = path.resolve(__dirname, '..');
 const config = require('../package.json');
@@ -14,7 +17,13 @@ const suite = createSuite('Source imports, assets, and packaged layout', 'integr
   'Resolves real imports with exact capitalization, follows styles/images/fonts, and checks a real ASAR archive using the builder file rules.');
 let audit;
 
-suite.test('resolves all relative imports and resource references in source, scripts, and tests', () => {
+suite.test('resolves all relative imports and resource references in source, scripts, and tests', async () => {
+  const build = await buildRenderer({mode: 'production'});
+  const inputs = Object.keys(build.metafile.inputs);
+  assert(inputs.includes('src/renderer/Renderer.js'));
+  assert(!inputs.some(name => /(?:^|\/)omdb\.js$/.test(name)), 'The API key must not be bundled into the renderer');
+  assert(!inputs.some(name => /^src\/(?:main|media|scanning)\//.test(name) && /(?:Service|Process|Tools)\.js$/.test(name)),
+    'Backend process services must not be bundled into the renderer');
   audit = auditReferences(root);
   assert.deepStrictEqual(audit.errors, [], audit.errors.join('\n'));
   assert(audit.references.some(entry => entry.target.endsWith('ShowDetection.js')));
@@ -29,6 +38,25 @@ suite.test('contains every relocated file and no superseded source locations', (
     assert(!fs.existsSync(path.join(root, entry.from)),
       `${entry.from} is left over from fix76. Run npm run source:cleanup after extracting fix77.`);
   }
+});
+
+suite.test('the real compiled browser entry initializes without Node or dynamic code generation', async () => {
+  let requestedSnapshot = false;
+  // This covers loading the complete production dependency graph, not DOM
+  // rendering. The native Electron suites own rendering and user workflows.
+  const context = vm.createContext({setTimeout, clearTimeout, console, URL, crypto: webcrypto,
+    mynda: {app: {platform: 'darwin'}, logs: {write: async () => {}}, library: {
+      onCommitted() {}, onCloseCanceled() {}, onPrepareClose() {},
+      snapshot() { requestedSnapshot = true; return new Promise(() => {}); }
+    }}
+  }, {codeGeneration: {strings: false, wasm: false}});
+  vm.runInContext('window = globalThis; self = globalThis;', context);
+  vm.runInContext(fs.readFileSync(path.join(root, OUTPUT_PATH), 'utf8'), context);
+  await Promise.resolve();
+  assert(requestedSnapshot, 'The browser entry must reach its library initialization');
+  assert.strictEqual(typeof context.require, 'undefined');
+  assert.strictEqual(typeof context.process, 'undefined');
+  assert.strictEqual(typeof context.Buffer, 'undefined');
 });
 
 suite.test('keeps the default media stage and developer extension rooted at the project', () => {
@@ -68,6 +96,12 @@ suite.test('packages relocated modules, themes, fonts, and images at their refer
     included.push('package.json', 'omdb.js');
     await asar.createPackage(stage, archive);
     const packaged = new Set(asar.listPackage(archive).map(name => name.replace(/^[/\\]/, '').replace(/\\/g, '/')));
+    assert(packaged.has(OUTPUT_PATH), 'ASAR omitted the compiled renderer');
+    assert(packaged.has(PRELOAD_PATH), 'ASAR omitted the sandboxed preload');
+    for (const filename of [OUTPUT_PATH, PRELOAD_PATH]) {
+      assert(asar.extractFile(archive, filename).equals(fs.readFileSync(path.join(root, filename))),
+        `ASAR changed the compiled artifact: ${filename}`);
+    }
     for (const filename of included) assert(packaged.has(filename), `ASAR omitted ${filename}`);
     for (const entry of (audit || auditReferences(root)).references) {
       if (!entry.owner.startsWith(`src${path.sep}`) || entry.owner.startsWith(`src${path.sep}legacy${path.sep}`)) continue;

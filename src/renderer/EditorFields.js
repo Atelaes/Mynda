@@ -1,8 +1,6 @@
 // Reusable field and widget components used by the editor, settings, and library views.
 const React = require('react');
-const {ipcRenderer} = require('electron');
 const _ = require('lodash');
-const fs = require('fs');
 const {v4: uuidv4} = require('uuid');
 const {
   editorLog,
@@ -13,7 +11,6 @@ const {
 const {isValidURL, findNearestOfClass} = require('./RendererUtils.js');
 const {MynOverflowTextMarquee} = require('./SharedComponents.js');
 
-let nextEditorArtworkDownloadNumber = 0;
 
 class MynEdit extends React.Component {
   constructor(props) {
@@ -410,23 +407,8 @@ class MynEditArtwork extends MynEdit {
     this.input = React.createRef();
     this.dlMsg = React.createRef();
     this.container = React.createRef();
-    this.downloadResponseChannel = null;
-    this.downloadResponseHandler = null;
+    this._artworkRequest = 0;
     this.downloadStatusTimer = null;
-
-    this.handleArtworkSelected = (event, image) => {
-      if (image) {
-        this.update(image);
-      } else {
-        artworkLog.debug('Artwork file selection canceled or returned no file');
-      }
-    };
-    ipcRenderer.on('editor-artwork-selected', this.handleArtworkSelected);
-
-    // ipcRenderer.on('cancel-download', (event, cancelFunc, string) => {
-    //   this.setState({cancelDownload: cancelFunc});
-    //   console.log(string);
-    // });
   }
 
   handleInput(event) {
@@ -460,11 +442,8 @@ class MynEditArtwork extends MynEdit {
   }
 
   removeDownloadListener() {
-    if (this.downloadResponseChannel && this.downloadResponseHandler) {
-      ipcRenderer.removeListener(this.downloadResponseChannel, this.downloadResponseHandler);
-    }
-    this.downloadResponseChannel = null;
-    this.downloadResponseHandler = null;
+    // Invalidate an outstanding bridge response on Revert or unmount.
+    this._artworkRequest++;
   }
 
   clearDownloadStatusTimer() {
@@ -494,79 +473,36 @@ class MynEditArtwork extends MynEdit {
     }
   }
 
-  download(url, fallbackArtwork) {
-    this.removeDownloadListener();
-    if (!this._isMounted) {
-      return;
-    }
-
-    // hide the input element and display message while downloading
-    this.showDownloadStatus('Downloading', true);
-
-    let responseChannel = `downloaded-editor-artwork-${process.pid}-${++nextEditorArtworkDownloadNumber}`;
-    let restorePreviousArtwork = typeof fallbackArtwork !== 'undefined';
-    let handleFailure = response => {
-      let status = response && response.status;
-      artworkLog.error('Could not download editor artwork', {
-        status: status,
-        error: response && response.message ? response.message : response
-      });
-      this.showDownloadStatus(
-        status ? `Download failed (${status})` : 'Download failed',
-        false,
-        4000
-      );
-
-      if (restorePreviousArtwork) {
-        // Never restore another remote URL: that would immediately trigger the
-        // same download again. Keep the previous local file, or clear artwork.
-        let safeFallback = fallbackArtwork && !isValidURL(fallbackArtwork) ? fallbackArtwork : '';
-        if (this.props.movie.artwork !== safeFallback) {
-          this.update(safeFallback);
-        }
-      }
-    };
-    let handleDownload = (event, response) => {
-      if (this.downloadResponseChannel !== responseChannel) {
-        return;
-      }
-      this.downloadResponseChannel = null;
-      this.downloadResponseHandler = null;
-      if (response && response.success) {
-        this.showDownloadStatus('', false);
-        this.update(response.message);
-        artworkLog.info('Editor artwork downloaded', {
-          destination: response.message
-        });
-      } else {
-        handleFailure(response);
-      }
-    };
-    this.downloadResponseChannel = responseChannel;
-    this.downloadResponseHandler = handleDownload;
-    ipcRenderer.once(responseChannel, handleDownload);
-
-    try {
-      ipcRenderer.send('download', url, undefined, responseChannel);
-    } catch(err) {
-      this.removeDownloadListener();
-      handleFailure({message: err && err.message ? err.message : err});
+  async download(url, fallbackArtwork) {
+    const request = ++this._artworkRequest;
+    const videoID = this.props.movie && this.props.movie.id;
+    this.showDownloadStatus('Downloading...', true);
+    let response;
+    try { response = await window.mynda.editor.downloadArtwork(url); }
+    catch (error) { response = {success: false, message: error.message || String(error)}; }
+    if (!this._isMounted || request !== this._artworkRequest || videoID !== this.props.movie.id) return;
+    if (response && response.success) {
+      this.showDownloadStatus('', false);
+      this.update(response.message);
+    } else {
+      artworkLog.error('Could not download editor artwork', {error: response && response.message});
+      this.showDownloadStatus('Download failed', false, 4000);
+      if (fallbackArtwork !== undefined) this.update(fallbackArtwork && !isValidURL(fallbackArtwork) ? fallbackArtwork : '');
     }
   }
 
-  handleLocalFile(path) {
-    this._isMounted && fs.readFile(path, (err, data) => {
-      if (err) {
-        this.update(this.state.placeholderImage);
-        artworkLog.error('Could not read local editor artwork', {
-          path: path,
-          error: err
-        });
-        return;
+  async handleLocalFile(path) {
+    const request = ++this._artworkRequest;
+    const videoID = this.props.movie && this.props.movie.id;
+    try {
+      const accepted = await window.mynda.editor.inspectArtwork(path);
+      if (accepted && this._isMounted && request === this._artworkRequest && videoID === this.props.movie.id) this.update(accepted);
+    } catch (error) {
+      if (this._isMounted && request === this._artworkRequest) {
+        artworkLog.error('Could not read local editor artwork', {path, error});
+        this.showDownloadStatus(error.message || 'Could not read this image', false, 4000);
       }
-      this.update(path);
-      artworkLog.debug('Local editor artwork accepted', {path: path});
-    });
+    }
   }
 
   update(path) {
@@ -575,9 +511,14 @@ class MynEditArtwork extends MynEdit {
     this.props.update({'artwork':path});
   }
 
-  handleBrowse(event) {
-    ipcRenderer.send('editor-artwork-select');
+  async handleBrowse(event) {
     event.preventDefault();
+    const request = ++this._artworkRequest;
+    const videoID = this.props.movie && this.props.movie.id;
+    try {
+      const image = await window.mynda.editor.chooseArtwork();
+      if (image && this._isMounted && request === this._artworkRequest && videoID === this.props.movie.id) this.update(image);
+    } catch (error) { alert(`Mynda could not choose this image: ${error.message || error}`); }
   }
 
   handleRevert() {
@@ -604,7 +545,11 @@ class MynEditArtwork extends MynEdit {
   }
 
   componentDidUpdate(oldProps) {
-    // console.log("artwork component updated");
+    if (oldProps.movie.id !== this.props.movie.id) {
+      this.removeDownloadListener();
+      this.showDownloadStatus('', false);
+      this.setState({original: this.props.movie.artwork, value: ''});
+    }
 
     // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
     // then we want to download it, and point the movie metadata to the downloaded local file instead
@@ -621,7 +566,7 @@ class MynEditArtwork extends MynEdit {
     // const container = this.container.current;
 
     // set listener for drag and drop functionality
-    document.addEventListener('drop', (event) => {
+    this._handleDrop = (event) => {
         event.preventDefault();
         // event.stopPropagation();
 
@@ -656,26 +601,17 @@ class MynEditArtwork extends MynEdit {
         } catch(err) {
           artworkLog.error('Could not process dropped artwork', {error: err});
         }
-    });
-
-    document.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    document.addEventListener('dragenter', (event) => {
-      // console.log('File is in the Drop Space');
-    });
-
-    document.addEventListener('dragleave', (event) => {
-      // console.log('File has left the Drop Space');
-    });
+    };
+    this._handleDragOver = event => { event.preventDefault(); event.stopPropagation(); };
+    document.addEventListener('drop', this._handleDrop);
+    document.addEventListener('dragover', this._handleDragOver);
   }
 
   componentWillUnmount() {
     this.removeDownloadListener();
     this.clearDownloadStatusTimer();
-    ipcRenderer.removeListener('editor-artwork-selected', this.handleArtworkSelected);
+    document.removeEventListener('drop', this._handleDrop);
+    document.removeEventListener('dragover', this._handleDragOver);
     this._isMounted = false;
   }
 
@@ -1038,39 +974,27 @@ class MynEditListWidget extends MynEditWidget {
     this.props.update(this.props.property,list);
   }
 
-  deleteItem(index, skipDialog) {
+  async deleteItem(index, skipDialog) {
     const confirmationPreference = this.props.deleteConfirmationPreference;
-    const confirmationChannel = confirmationPreference || 'MynEditListWidget-confirm-delete-item';
     const dialogDisabled = typeof this.props.deleteConfirmationDisabled === 'boolean' ?
       this.props.deleteConfirmationDisabled :
       confirmationPreference && confirmationDialogIsDisabled(confirmationPreference);
 
     if (this.props.deleteDialog && !skipDialog && !dialogDisabled) {
-      ipcRenderer.once(confirmationChannel, (event, response, index, checked) => {
-        if (response === 0) { // yes
-          if (checked && confirmationPreference) {
+      const item = this.state.list[index];
+      const objectID = this.props.object && this.props.object.id;
+      try {
+        const result = await window.mynda.editor.confirm({kind: 'remove-list-item', item,
+          description: this.props.deleteDialog, checkbox: Boolean(confirmationPreference)});
+        if (result.response === 0 && this.state.list[index] === item &&
+            objectID === (this.props.object && this.props.object.id)) {
+          if (result.checkboxChecked && confirmationPreference) {
             disableConfirmationDialog(confirmationPreference, editorLog);
-            if (typeof this.props.onDeleteConfirmationDisabled === 'function') {
-              this.props.onDeleteConfirmationDisabled();
-            }
+            if (typeof this.props.onDeleteConfirmationDisabled === 'function') this.props.onDeleteConfirmationDisabled();
           }
-          // delete item (pass 'true' so as not to prompt another dialog)
           this.deleteItem(index, true);
-        } else {
-          editorLog.debug('Editor list-item deletion canceled by user', {
-            property: this.props.property,
-            index: index
-          });
         }
-      });
-
-      const options = {
-        message: `Are you sure you want to remove '${this.state.list[index]}'? ${this.props.deleteDialog}`
-      };
-      if (confirmationPreference) {
-        options.checkboxLabel = `Don't show this message again`;
-      }
-      ipcRenderer.send('generic-confirm', confirmationChannel, options, index);
+      } catch (error) { alert(`Mynda could not confirm this removal: ${error.message || error}`); }
       return;
     }
 
@@ -1245,93 +1169,40 @@ class MynEditInlineAddListWidget extends MynEditListWidget {
 
 class MynEditSubtitles extends MynEditListWidget {
   constructor(props) {
-    super(props)
+    super(props);
+    // File existence is checked asynchronously by the backend when adding.
+    this.validator = {test: value => typeof value === 'string' && value.trim() !== ''};
+    this.validatorTip = 'Enter a subtitle file path';
+    this._validationRequest = 0;
+    this.addToListUpdate = (property, list) => this.updateList(list);
+  }
 
+  async updateList(list) {
+    const request = ++this._validationRequest;
+    const videoID = this.props.object && this.props.object.id;
+    const previous = this.state.list || [];
+    const added = list.filter(value => !previous.includes(value));
+    if (!added.length) return super.updateList(Array.from(new Set(list)));
+    try {
+      const {accepted, rejected} = await window.mynda.editor.validateSubtitles(added);
+      if (request !== this._validationRequest || videoID !== (this.props.object && this.props.object.id)) return;
+      super.updateList(Array.from(new Set(list.filter(value => previous.includes(value) || accepted.includes(value)))));
+      if (rejected.length) alert(`The following subtitle files could not be found or were not supported:\n${rejected.join('\n')}`);
+    } catch (error) { alert(`Mynda could not check these subtitles: ${error.message || error}`); }
+  }
 
-    this.validator = {
-      test: (val) => (val && val !== '' && fs.existsSync(val))
-    }
-
-    this.validatorTip = 'File does not exist';
-
-    // this.input = React.createRef();
-
-    this.handleSubtitleSelected = (event, subs) => {
-      if (subs) {
-        let update = [...this.props.object[this.props.property], ...subs];
-        this.updateList(update);
-      } else {
-        editorLog.debug('Subtitle file selection canceled or returned no files');
+  async browse() {
+    const videoID = this.props.object && this.props.object.id;
+    try {
+      const paths = await window.mynda.editor.chooseSubtitles();
+      if (videoID === (this.props.object && this.props.object.id) && paths.length) {
+        await this.updateList([...(this.state.list || []), ...paths]);
       }
-    };
-
-    this.render = this.render.bind(this);
-    this.addToListUpdate = this.addToListUpdate.bind(this);
+    } catch (error) { alert(`Mynda could not choose subtitles: ${error.message || error}`); }
   }
 
-  // update(property,list) {
-  //   if (input.value !== '' && fs.existsSync(input.value)) {
-  //     let update = [...this.props.video.subtitles, input.value]
-  //     this.props.update('subtitles',update);
-  //   }
-  // }
-
-  // override updateList from MynEditListWidget to check if the file exists;
-  // we're also using the validator function passed to MynEditAddToList
-  // to do an existence check as the user types a file name,
-  // because that gives visual feedback before the user tries to add the file;
-  // (note: MynEditAddToList has its own updateList function, which is also called
-  // when the user adds an item, which may be confusing: MynEditAddToList's own
-  // updateList function , but we're passing THIS updateList
-  // function to MynEditAddToList as its props.update function (well, through
-  // this.addToListUpdate which just fixes the parameters), which it runs when the
-  // user clicks to add; we do that so we can reuse this logic, mainly to prevent
-  // the user from adding a duplicate, though it also checks for existence again)
-  //
-  // so to summarize: this function runs when the user clicks 'open' from the
-  // browse dialog window, and when the user clicks the add (+) button next to the
-  // text input field (if there is valid input in it)
-  updateList(list) {
-    // console.log('NEW UPDATELIST')
-    let added = list.filter(el => !this.state.list.includes(el));
-    let rejected = [];
-    added.map(sub => {
-      if (typeof sub !== 'string' || !fs.existsSync(sub)) {
-        rejected.push(sub);
-      }
-    })
-
-    // filter nonexistent files and get rid of duplicates
-    list = Array.from(new Set(list.filter(el => !rejected.includes(el))));
-
-    if (rejected.length > 0) {
-      alert(`The following subtitle files could not be found:\n${rejected.map(el=>'\n'+el)}`);
-    }
-
-    this.setState({ list : list });
-    this.props.update(this.props.property,list);
-  }
-
-  // passed to MynEditAddToList as its props.update function,
-  // all we do is take the list parameter and call updateList
-  // with it, since that function doesn't take the property parameter
-  addToListUpdate(property,list) {
-    this.updateList(list);
-  }
-
-  emptyList() {
-    this.updateList([]);
-  }
-
-  componentDidMount() {
-    super.componentDidMount();
-    ipcRenderer.on('editor-subtitle-selected', this.handleSubtitleSelected);
-  }
-
-  componentWillUnmount() {
-    ipcRenderer.removeListener('editor-subtitle-selected', this.handleSubtitleSelected);
-  }
-
+  emptyList() { this.updateList([]); }
+  componentWillUnmount() { this._validationRequest++; }
 
   render() {
     return (
@@ -1339,11 +1210,9 @@ class MynEditSubtitles extends MynEditListWidget {
         {this.displayList()}
         <li className='list-widget-add-with-browse'>
           <MynEditAddToList object={this.props.object} property={this.props.property} update={this.addToListUpdate} options={this.props.options} storeTransform={this.props.storeTransform} displayTransform={this.props.displayTransform} inline="inline" validator={this.validator} validatorTip={this.validatorTip} />
-          <button type="button" className='list-widget-browse editor-inline-button' onClick={() => ipcRenderer.send('editor-subtitle-select')}><div className='icon-container'></div></button>
+          <button type="button" className='list-widget-browse editor-inline-button' onClick={() => this.browse()}><div className='icon-container'></div></button>
         </li>
-        <li>
-          <button type="button" className='' onClick={() => this.emptyList()}>Clear All Subtitles</button>
-        </li>
+        <li><button type="button" onClick={() => this.emptyList()}>Clear All Subtitles</button></li>
       </ul>
     );
   }

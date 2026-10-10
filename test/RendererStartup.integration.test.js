@@ -1,38 +1,85 @@
-const fs=require('fs'),path=require('path'),{spawnSync}=require('child_process');
-const {assert,createSuite,runSuite,withTemporaryDirectory}=require('./helpers/TestHarness');
-const root=path.resolve(__dirname,'..');
-const suite=createSuite('Renderer startup after an update','integration',
-  'Real Babel compilation across launches, unchanged ZIP timestamps, and saved-report IMDb links.');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness');
+const {buildRenderer} = require('../scripts/build-renderer');
+const {loadFreshWithMocks} = require('./helpers/ModuleMocks');
+const root = path.resolve(__dirname, '..');
+const suite = createSuite('Browser renderer build and update safety', 'integration',
+  'Fresh JSX compilation without Node, rejected privileged imports, and release build ordering.');
 
-suite.test('a source overlay replaces cached plain-text reports even when its timestamp is unchanged',async()=>{
-  await withTemporaryDirectory('renderer-update',directory=>{
-    const reportFile=path.join(directory,'AutotagReport.js');
-    const legacyReport="const React=require('react');\n"+
-      "exports.MynAutotagReport=({video})=><p>{video.taggingEvidence.imdbID} {video.taggingEvidence.seriesID}</p>;\n";
-    const timestamp=new Date('2020-01-01T00:00:00Z');
-    const writeReport=source=>{fs.writeFileSync(reportFile,source);fs.utimesSync(reportFile,timestamp,timestamp);};
-    const cacheFile=path.join(directory,'babel-cache.json');
-    const launch=mode=>{
-      const env={...process.env,BABEL_CACHE_PATH:cacheFile};delete env.BABEL_DISABLE_CACHE;
-      const child=spawnSync(process.execPath,[path.join(__dirname,'helpers/RendererStartupProbe.js'),
-        path.join(root,'src/renderer/index.html'),reportFile,mode],{cwd:directory,env,encoding:'utf8',timeout:20000});
-      assert.ifError(child.error);assert.strictEqual(child.status,0,child.stderr);
-      return JSON.parse(child.stdout).markup;
+suite.test('same-timestamp source updates replace the runnable browser bundle without a runtime compiler', async () => {
+  await withTemporaryDirectory('renderer-update', async directory => {
+    const entryPoint = path.join(directory, 'entry.js');
+    const outfile = path.join(directory, 'renderer.js');
+    const timestamp = new Date('2020-01-01T00:00:00Z');
+    const write = tag => {
+      fs.writeFileSync(entryPoint, `const React = require(${JSON.stringify(require.resolve('react'))});\n` +
+        `const element = <${tag}>Updated report</${tag}>; globalThis.fixtureResult = element.type;\n`);
+      fs.utimesSync(entryPoint, timestamp, timestamp);
     };
-    writeReport(legacyReport);
-    const before=launch('legacy-cache');
-    assert(before.includes('tt7654321'));assert(!before.includes('<a'));
-    assert(fs.existsSync(cacheFile),'The negative control must actually warm the disk cache');
-    writeReport(fs.readFileSync(path.join(root,'src/renderer/AutotagReport.js'),'utf8'));
-    assert.strictEqual(launch('legacy-cache'),before,'Reproduce the stale renderer from a same-timestamp overlay');
-    const updated=launch('current');
-    for (const id of ['tt7654321','tt1234567']) assert.match(updated,
-      new RegExp('<a[^>]+href="https://www\\.imdb\\.com/title/'+id+'/"[^>]*>'+id+'</a>'));
-    // A second replacement with identical mtime must also be loaded, without
-    // needing a manually bumped release number or clearing a user's files.
-    writeReport(legacyReport.replace('<p>','<strong>').replace('</p>','</strong>'));
-    assert.match(launch('current'),/^<strong>/);
+    const launch = async () => {
+      await buildRenderer({entryPoint, outfile});
+      const context = vm.createContext({}, {codeGeneration: {strings: false, wasm: false}});
+      vm.runInContext(fs.readFileSync(outfile, 'utf8'), context);
+      assert.strictEqual(typeof context.require, 'undefined');
+      assert.strictEqual(typeof context.process, 'undefined');
+      return context.fixtureResult;
+    };
+    write('p');
+    assert.strictEqual(await launch(), 'p');
+    write('strong');
+    assert.strictEqual(await launch(), 'strong');
+    write('article');
+    assert.strictEqual(await launch(), 'article');
   });
+});
+
+suite.test('privileged renderer imports fail compilation instead of becoming browser shims', async () => {
+  await withTemporaryDirectory('renderer-boundary', async directory => {
+    const entryPoint = path.join(directory, 'entry.js');
+    const outfile = path.join(directory, 'renderer.js');
+    for (const request of ['electron', 'fs', 'node:fs', 'child_process', 'path']) {
+      fs.writeFileSync(entryPoint, `globalThis.test = require(${JSON.stringify(request)});`);
+      await assert.rejects(buildRenderer({entryPoint, outfile}), /isolated renderer cannot import/);
+    }
+    assert.strictEqual(fs.existsSync(outfile), false);
+  });
+});
+
+suite.test('a failed rebuild leaves the last complete bundle intact', async () => {
+  await withTemporaryDirectory('renderer-failed-build', async directory => {
+    const entryPoint = path.join(directory, 'entry.js');
+    const outfile = path.join(directory, 'renderer.js');
+    fs.writeFileSync(entryPoint, 'globalThis.fixtureResult = 1;');
+    await buildRenderer({entryPoint, outfile});
+    const complete = fs.readFileSync(outfile);
+    fs.writeFileSync(entryPoint, 'const unfinished = ;');
+    await assert.rejects(buildRenderer({entryPoint, outfile}));
+    assert(fs.readFileSync(outfile).equals(complete));
+  });
+});
+
+suite.test('the production packaging hook awaits the bundle before media verification', async () => {
+  const calls = [];
+  const hook = loadFreshWithMocks(require.resolve('../scripts/before-build'), {
+    './build-renderer.js': {buildRenderer: async options => { calls.push(options.mode); }},
+    './verify-media-tools.js': async context => { calls.push(context.fixture); return true; }
+  });
+  assert.strictEqual(await hook({fixture: 'media'}), true);
+  assert.deepStrictEqual(calls, ['production', 'media']);
+});
+
+suite.test('the page permits only external local scripts and no renderer network requests', () => {
+  const html = fs.readFileSync(path.join(root, 'src/renderer/index.html'), 'utf8');
+  const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  assert.strictEqual(scriptTags.length, 1);
+  assert.match(scriptTags[0][1], /src="generated\/renderer\.js"/);
+  assert.strictEqual(scriptTags[0][2].trim(), '');
+  const policy = /http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)[1];
+  assert.match(policy, /(?:^|; )script-src 'self'(?:;|$)/);
+  assert.match(policy, /(?:^|; )connect-src 'none'(?:;|$)/);
+  assert(!policy.includes('unsafe-eval'));
 });
 
 runSuite(suite);

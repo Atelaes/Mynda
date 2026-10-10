@@ -29,8 +29,9 @@ The complete command set is:
 | `npm run test:integration` | Integration tests | While changing storage, IPC-facing models, logs, or Share |
 | `npm run test:component` | React component tests | While changing renderer state or UI components |
 | `npm run test:renderer` | Same as `test:component` | A more memorable alias |
-| `npm run test:electron` | Real Electron startup/assets and library-save/restart workflows, from source and ASAR | After Electron, React, Babel, startup, or library-save changes |
+| `npm run test:electron` | Real Electron startup/assets and library-save/restart workflows, from source and ASAR | After Electron, React, preload, bundle, or library-save changes |
 | `npm run test:all` | Fast tests plus Electron | Before committing an upgrade or preparing a release |
+| `npm run build:renderer` | Compiles the browser renderer and sandboxed preload | To check browser-only dependencies without launching Electron |
 | `npm run media:prepare` | Builds and stages the current machine's pinned native media sidecars | Once on each packaging platform, or after changing their versions |
 | `npm run media:status` | Shows the resolved path and source of FFmpeg, FFprobe, and MPV | To detect a staged, packaged, override, system, or missing tool |
 | `npm run media:verify` | Checks license flags, versions, architecture, DVD/video support, and native dependency closure | Before diagnosing a media build or package failure |
@@ -39,7 +40,7 @@ The complete command set is:
 
 The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
 
-The startup suites also activate real IMDb links, verify that the main process approves their browser destinations, and reject unsafe URL requests. They attempt a popup, page navigation and an embedded frame, and make a real geolocation request. That request must return `PERMISSION_DENIED`, and the test must observe Mynda's production handler denying it for the tested renderer. An OS-only denial, unavailable location or timeout fails. A test observer forwards the installed handler's answers unchanged; `shell.openExternal` is replaced with a recorder so the tests do not open your browser or fetch IMDb. Chromium's guards, React events and IPC are real.
+The startup suites check the actual window preferences, absence of renderer Node/Electron globals and generic bridge messaging, frozen capability groups, and blocking of inline scripts and `eval`. They also activate real IMDb links, verify that the main process approves their browser destinations, and reject unsafe URL requests. They attempt a popup, page navigation and an embedded frame, and make a real geolocation request. That request must return `PERMISSION_DENIED`, and the test must observe Mynda's production handler denying it for the tested renderer. An OS-only denial, unavailable location or timeout fails. A test observer forwards the installed handler's answers unchanged; `shell.openExternal` is replaced with a recorder so the tests do not open your browser or fetch IMDb. Chromium's guards, React events and IPC are real.
 
 Do not use `navigator.permissions.query()` to verify this policy on Electron 12.0.5. Its [permission manager](https://github.com/electron/electron/blob/v12.0.5/shell/browser/electron_permission_manager.cc) hard-codes `GetPermissionStatus` and `GetPermissionStatusForFrame` to `GRANTED`, independently of the request handler. The original startup assertion therefore failed in both source and ASAR runs on macOS. The corrected test checks the actual request and application decision instead.
 
@@ -52,9 +53,9 @@ The library workflow suites open a separate app with three synthetic videos and 
 | Auto-Tag and editing | The real Auto-Tag runner pauses at a fixture catalog response. A manual title correction wins, the late result records a conflict, and the video remains retryable. |
 | Batch editing | Two selected videos receive the intended field change; their other fields and an unselected third video remain intact. |
 | Settings and closing | Two actual preference checkboxes change in one turn; immediate window closure flushes both before their normal debounce expires. The restarted UI shows both values. |
-| Playback history and resume | Controlled MPV events drive the real Player component; its actual Recently Played timer fires, position and seek events save, and the restarted player receives the saved resume position. |
+| Playback history and resume | Controlled MPV events drive the main-process playback service and rendered Player pane; its actual Recently Played timer fires, position and seek events save, and restarted playback receives the saved resume position. |
 
-Metadata probes, catalog responses, and the external MPV process are fixtures, so these save tests require no real media collection, service credentials, quota, or player installation. They do not certify actual decoding, sound, or live catalog availability; `test:media` and `test:package` exercise real native media tools separately. Everything else in this journey, including React controls, the scan/tag runners, both Library processes, file writes, and application close/restart, is real. Unexpected dialogs fail noninteractively. The tests launch several disposable windows, and report the failing workflow stage if one does not complete.
+Metadata probes, catalog responses, and the external MPV process are fixtures, so these save tests require no real media collection, service credentials, quota, or player installation. They do not certify actual decoding, sound, or live catalog availability; `test:media` and `test:package` exercise real native media tools separately. The fixtures are installed only in the main test process. The app uses its production sandboxed preload and compiled renderer; there is no custom test preload, renderer `require()`, test IPC channel, or injected React component. The main-side browser driver operates DOM controls, and authoritative library checks remain in main. Everything else in this journey, including React controls, the scan/tag runners, playback service, library client/backend, file writes, and application close/restart, is real. Unexpected dialogs fail noninteractively. The tests launch several disposable windows, and report the failing workflow stage if one does not complete.
 
 To run just these new journeys:
 
@@ -69,6 +70,14 @@ To run one test file while working on a failure:
 node test/MovieSearch.unit.test.js
 ```
 
+## Renderer and preload builds
+
+Install dependencies with `npm install` after applying the isolation changes. Building requires Node 18 or later; the app itself still uses the pinned Electron 12.0.5 runtime. `npm start` compiles the browser renderer and sandbox preload before launching. `npm run build:renderer` rebuilds them without launching the app. The same compiler runs before each native test stages its disposable source/ASAR copy, including when its test file is invoked directly. The electron-builder hook always creates a production bundle before media verification, even if electron-builder is invoked directly.
+
+The generated `src/renderer/generated/renderer.js` targets Chromium 89. The preload's `src/preload/generated/preload.js` targets Node 14 and retains only its permitted Electron import. Both generated files are included in packages and excluded from Git. Source and ASAR native tests exercise development and production renderer bundles respectively. Source maps stay local; production maps omit embedded source contents.
+
+The renderer build fails on any Node builtin or Electron import; no filesystem/process shims are installed. It always compiles current source bytes, so source overlays with unchanged timestamps cannot revive Babel's old persistent cache. Runtime JSX compilation is removed. Browser-build regression tests execute an updated JSX fixture without `require`, `process`, or string code generation, reject privileged imports, retain the previous complete bundle on compilation errors, and verify production build ordering. Source-layout tests also compile the real entry point and verify byte-for-byte renderer/preload inclusion in an actual ASAR archive.
+
 ## Library save architecture and checks
 
 The backend owns the committed library and its only ordinary disk writer. The renderer loads a confirmed, immutable snapshot over IPC, submits commands, and applies revisioned commits. A save succeeds only after the candidate was written atomically and the renderer has incorporated its result. Failed writes leave the previous committed state intact. The JSON format, backup retention, recovery, and export behavior remain compatible.
@@ -81,13 +90,13 @@ The focused non-GUI suites above run under both `npm run test:core` and `npm tes
 
 ## External-content boundary
 
-The editor's catalog results and autotag report share `ExternalLink.js`. Supported links open in the user's default browser through `external:open`; the main process checks the exact registered application window, its main frame and application-file URL before invoking the operating system. `ExternalLinks.js` defines the approved destinations. Currently these are HTTPS IMDb title pages only. New provider links must extend that explicit policy and its tests; arbitrary URLs from catalog data are not passed to the OS. Invalid identifiers remain plain text, and a failed browser launch produces a user-visible message.
+The editor's catalog results and autotag report share `ExternalLink.js`. Supported links open in the user's default browser through `window.mynda.external.open()` and the private `external:open` channel; the main process checks the exact registered application window, its main frame and application-file URL before invoking the operating system. `ExternalLinks.js` defines the approved destinations. Currently these are HTTPS IMDb title pages only. New provider links must extend that explicit policy and its tests; arbitrary URLs from catalog data are not passed to the OS. Invalid identifiers remain plain text, and a failed browser launch produces a user-visible message.
 
-`ExternalContent.js` installs the policy before the application page loads. It blocks page-driven navigation, redirects, both Electron 12 and newer popup paths, and webview attachment. Navigation and popups are never automatically forwarded to the browser. Both permission checks and permission requests deny access by default; the web UI does not need hardware, location or browser protocol permissions. MPV remains a separate native process. The page's initial CSP blocks embedded frames/objects, base-URL changes and form navigation without blocking the existing local and downloaded artwork.
+`ExternalContent.js` installs the policy before the application page loads. It blocks page-driven navigation, redirects, both Electron 12 and newer popup paths, and webview attachment. Navigation and popups are never automatically forwarded to the browser. Both permission checks and permission requests deny access by default; the web UI does not need hardware, location or browser protocol permissions. MPV remains a separate native process. The page's CSP permits only local external scripts, blocks inline scripts and `eval`, forbids renderer network requests, embedded frames/objects, workers, base-URL changes and form navigation, and retains the styles, fonts and artwork used by the interface.
 
-This is the first, bounded security step. Renderer Node access and `remote` still exist, and this policy cannot contain a renderer that already executes arbitrary Node code. The planned preload migration, broader privileged-IPC validation, Electron upgrade, isolation/sandboxing and stricter script CSP are still required. The unit tests exercise hostile URLs, callers and permissions; component tests cover both link locations; native tests check the actual Electron enforcement in source and ASAR launches.
+The application window now disables Node integration and `remote`, enables context isolation and the Chromium sandbox, and loads a bundled preload exposing only `window.mynda` capabilities. The main process independently checks the registered main-frame caller and validates operation data. Library mutations have their own renderer-edit policy, and file/process operations belong to backend services. This migration does not upgrade the pinned Electron runtime; an Electron upgrade and platform validation remain separate release work. Unit tests exercise hostile URLs, callers, malformed requests, unauthorized file access and permissions; component tests cover the UI; native tests are designed to check actual Electron enforcement in source and ASAR launches.
 
-Platform baseline reported on 2026-10-10: after the external-content changes, all 68 fast suites (2,799 cases) and both library save/restart Electron journeys passed on the user's Mac. The two startup suites failed at the permission-status assertion described above; the corrected native checks need to be rerun. The Windows build process was verified before these changes. An Ubuntu build has not yet been tested.
+Validation status for the isolation migration: native Electron execution is unverified. The automated editing environment aborts even a minimal Electron application before the UI can run, so its source/ASAR journeys are not reported as passing. Run `npm test`, `npm run test:electron`, and `npm run test:package` on the supported native machines before accepting the migration. The earlier baseline is limited to the user's Mac fast tests and library save/restart journeys before renderer isolation, plus a Windows build before these changes. The earlier Mac startup failures were the permission-status assertion described above. They do not verify this migration; an Ubuntu build has not yet been tested.
 
 ## What the categories mean
 
@@ -107,67 +116,87 @@ A “test double” is simply a small, predictable substitute for something outs
 
 | Suite | Category | What it protects |
 |---|---|---|
-| `ExternalContent.unit.test.js` | Unit | Approved URLs, exact main-frame callers, canonical application paths, blocked navigation/popups/webviews and denied browser permissions |
-| `ElectronPermissions.unit.test.js` | Unit | Permission-test observer preserves production decisions; OS-only denial, wrong caller, grant, timeout and unavailable location cannot pass |
-| `ExternalLink.component.test.js` | Component | Catalog-result links, shared browser-opening IPC, invalid IDs, keyboard/mouse activation and launch-failure messages |
-| Tagging architectural contracts | Integration | Final policy ownership, shared budgets, provenance, cache lifetime and exhaustive small-batch permutations |
-| Tagging editor provenance | Component | User ID authorship, one application per preview and stale selection rejection |
-| `TaggingPrecision.integration.test.js` | Integration | Short titles, original evidence, order-independent decisions, same-season support, cancellation, coverage mismatches and movie title expansion |
-| `CatalogClient.unit.test.js` | Unit | Concurrent request reuse, retryable failures, run isolation and duplicate-probe suppression |
-| `AutoTagRecovery.integration.test.js` | Integration | Directory-scoped sibling evidence, bounded retries, shared discovery session, save order, cancellation, and per-file statistics |
-| `SourceLayout.integration.test.js` | Integration | Exact import capitalization, renderer resources, relocated themes/fonts, default executable roots, and actual ASAR source/asset contents |
-| `SourceReorganization.integration.test.js` | Integration | Verified old-file backups, incomplete overlays, unexpected edits, Windows line endings, and safe cleanup reruns |
-| `PlaylistFilter.test.js` | Unit | Safe playlist expressions, allowed syntax, runtime errors, caching, and security limits |
-| `TableSelection.test.js` | Unit | Single, toggle, range, cross-table, offscreen, and ordered row selection |
-| `ReactDevTools.test.js` | Unit | Development extension path/loading, packaged-app skip, and graceful failures |
-| `BoxOffice.unit.test.js` | Unit | Fixed-USD parsing, bad input, full and compact formatting, locale conventions, and no currency conversion |
-| `LibraryDuplicates.unit.test.js` | Unit | Duplicate-path normalization, complete-scan reconciliation, and unavailable-watchfolder retention |
-| `LibraryStats.unit.test.js` | Unit | Seen/unseen totals, exact visible-title series grouping, resolution tiers, percentages, and global duplicate totals |
-| `VideoResolution.unit.test.js` | Unit | Shared labels/ranks, exact bucket cutoffs, crops, anamorphic ratios, portrait video, extreme panoramas, and unknown metadata |
-| `PackageConfig.unit.test.js` | Unit | Production file boundaries, media staging, strict package commands, and retirement of the HLS player |
-| `MediaTools.unit.test.js` | Unit | Target-platform paths on either host, Windows environment-key casing, overrides, bundled-path classification, and development fallbacks |
-| `MediaToolPolicy.unit.test.js` | Unit | LGPL-only standalone FFmpeg flags, nonfree rejection, and required MPV DVD/video capabilities on macOS, Windows, and Linux |
-| `MediaBundleVerifier.unit.test.js` | Unit | Pinned source policy, graphical MPV, architecture, exclusion of `libdvdcss`, and platform verification dispatch |
-| `MediaBundleInspection.unit.test.js` | Unit | Windows PE imports, Linux ELF dependencies/RUNPATHs, architecture, closure, and prohibited libraries |
-| `MediaPlatformPreparation.unit.test.js` | Unit | Native preparation dispatch, source pins, Windows UCRT64 policy, and the Ubuntu Linux baseline |
-| `MediaMetadata.unit.test.js` | Unit | Video-stream selection, cover-art rejection, aspect ratios, safe fallback merging, one-time legacy rechecks, durations, and writable scratch output |
-| `MovieSearch.unit.test.js` | Unit | Filename parsing, title variants, result scoring, ambiguity, and confidence |
-| `EpisodeMatch.unit.test.js` | Unit | Both libraries' title corpus, forgiving acceptance versus strict corrections, runtime thresholds, optional probe caching and failures |
-| `ShowDetection.unit.test.js` | Unit | The actual shared scan/reset parser, dedicated extras, mixed folders, season-zero specials, and release-title conventions |
-| `OmdbEpisodes.integration.test.js` | Integration | Actual OMDb orchestration with controlled responses: current tags, folder-year hints, series validation, title/runtime vetoes, corrections, cache safety and exact-ID behavior |
-| `SeriesSearch.unit.test.js` | Unit | Series annotations, reviewed aliases, full-title identity, spacing/ligatures, request caps, and explicit regional constraints |
-| `OmdbSeries.integration.test.js` | Integration | Actual fallback discovery, pagination, episode safeguards, batch request reuse, and retryable failures |
-| `HistoricalTagging.integration.test.js` | Integration | 1,921 individual historical searches and 63 logged numbering corrections, with expected IMDb identities and explicit rejection of old wrong matches |
-| `HistoricalMovies.integration.test.js` | Integration | All 73 new/corrected movie matches recovered from the fix03–fix05 before/after libraries |
-| `OmdbHistoricalBehaviors.integration.test.js` | Integration | Named artwork fallbacks, failed-download caching, batch representatives, series-ID handoff, edited labels, title variants, and authoritative IMDb IDs |
-| `SubtitleMatcher.unit.test.js` | Unit | Sidecar matching, episode evidence, ambiguity, folder boundaries, and manual provenance |
-| `VideoExclusion.unit.test.js` | Unit | Sample/trailer detection, preferences, metadata probing, and conservative retention |
-| `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, early EOF, process errors, timeouts, and cleanup |
-| `RendererUtils.unit.test.js` | Unit | Batch-edit states, metadata repair without inventing IDs, portable artwork URLs, desktop labels, DOM ancestry, and object diffs |
-| `Player.unit.test.js` | Unit | Playback-attempt logs, missing drives/files/watchfolders, launch avoidance, concise MPV errors, command timeouts, socket cleanup, DVD load events, and process exits |
-| `MpvProcess.unit.test.js` | Unit | Native IPC paths, macOS Vulkan, Windows Direct3D 11, Linux context selection, sidecar launch isolation, JSON IPC, lifecycle, and diagnostics |
-| `MediaBuildCache.integration.test.js` | Integration | Actual temporary files with simulated Windows locks: checkpoint integrity, copy/rename retries, old-bundle preservation, interrupted replacement recovery, and build ownership |
-| `ContentFingerprint.integration.test.js` | Integration | Fixed SHA-256 protocol vectors, sample boundaries, copied files/DVDs, complete control files, cache checks, cancellation, and sampled-hash limitations |
-| `VideoIdMigration.integration.test.js` | Integration | Separate conversion, exact original preservation, metadata/history and filter remapping, unavailable media, conflicts, resume, and real CLI installation safeguards |
-| `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
-| `MediaMetadata.integration.test.js` | Integration | Real FFprobe and FFmpeg fallback on generated videos with embedded covers, genuine MJPEG video, unavailable files, and scratch cleanup |
-| `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
-| `Library.integration.test.js` | Integration | First launch, schema/version guards, add/replace/remove, commit completion, scanner-owned fields, exports, and recovery decisions |
-| `LibraryTransactions.integration.test.js` | Integration | Real store/client persistence, concurrent edits, conflicts, disk failures, request deduplication, reloads, revision gaps, immutable snapshots, priority, and close preparation |
-| `LibraryEditing.component.test.js` | Component | Editor drafts, selection and artwork races, atomic batch edits, inline patches, playback coalescing, settings debounce, and pending-save close hooks |
-| `LibraryScanOperations.unit.test.js` | Unit | Scan upserts, inactive reactivation, stale filename observations, user-edit preservation, subtitle provenance, and watchfolder removal |
-| `AutoTagConcurrentEdits.integration.test.js` | Integration | Manual edits during catalog lookups and retry baselines after the run's own successful saves |
-| `LibraryClose.unit.test.js` | Unit | Window/app close coordination, validated renderer acknowledgments, timeouts, wait/cancel/discard choices, and ready-commit draining |
-| `SingleInstance.unit.test.js` | Unit | Acquiring the application lock before library startup and focusing an existing window |
-| `ElectronSmokeLifecycle.unit.test.js` | Unit | Noninteractive failure teardown, result preservation, graceful-close ordering, and verification of close-time saves |
-| `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
-| `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
-| `ShareManifest.integration.test.js` | Integration | Manifest/ID compatibility, safe paths, atomic files, Windows flush permissions, and preservation after a failed flush |
-| `ShareService.integration.test.js` | Integration | Request → fulfillment → import, content identity, conflicts, Windows flush permissions, cleanup after disk failure, cancellation, and expiration |
-| `RendererComponents.component.test.js` | Component | Status language, notification cleanup, navigation, recently-played controls, resolution cells/tooltips, shared statistics, and bucket sorting |
-| `SettingsLibrary.component.test.js` | Component | Library export requests, aligned viewing/kind/series/resolution totals, independent per-video duplicate folders, rescan guidance, and file-manager actions |
-| `Mynda.component.test.js` | Component | Ratings, playlist filtering, search, recent history, scan IPC, view state, and root pane composition |
-| `electron/run-electron-smoke.js` | End-to-end | Real Electron main/renderer boot, first render, scheme-2 library creation, Library-statistics interaction, renderer saves, and graceful-close persistence, in source and ASAR runs |
+| `MainBridge.integration.test.js` | Integration | real main composition, isolated window options, complete handler registration and privileged caller checks |
+| `EditorArtworkDownload.unit.test.js` | Unit | HTTP protocols, size/time/redirect bounds, native redirect approval and temporary-file cleanup |
+| `DesktopService.unit.test.js` | Unit | native directory grants, owner-bound Share plans, watchfolder saves and exported-file reveal |
+| `RendererBridge.unit.test.js` | Unit | fixed capability surface, trusted senders, plain bounded payloads, stripped Electron events and isolated subscriptions |
+| `LibraryRendererPolicy.unit.test.js` | Unit | scanner fields, filesystem grants, watchfolder boundaries and malformed library operations |
+| `EditorService.unit.test.js` | Unit | canonical video identity, owner-scoped catalog proposals and validated artwork/subtitle operations |
+| `PlaybackService.unit.test.js` | Unit | authoritative media selection, process lifetime, position conflicts and confirmed playback saves |
+| `Player.component.test.js` | Component | named playback requests, notifications, close flush and out-of-order state |
+| `ExternalLink.component.test.js` | Component | shared browser-link component, approved IPC, keyboard/mouse activation and malformed catalog IDs |
+| `ExternalContent.unit.test.js` | Unit | approved browser destinations, trusted main-frame IPC, blocked navigation/popups/embeds and denied permissions |
+| `ElectronSmokeLifecycle.unit.test.js` | Unit | noninteractive failure teardown, preserved result output, graceful-close ordering and saved-data verification |
+| `ElectronPermissions.unit.test.js` | Unit | unchanged forwarding of production permission decisions and rejection of OS-only denials or lookup failures |
+| `LibraryTransactions.integration.test.js` | Integration | overlapping process edits, confirmed state, disk failures, stale identity conflicts, atomic moves, user priority and revision recovery |
+| `SingleInstance.unit.test.js` | Unit | early process locking, secondary-instance exit, window focus and packaged smoke isolation |
+| `LibraryClose.unit.test.js` | Unit | renderer flush, outstanding commits, close cancellation, explicit discard and bounded shutdown waits |
+| `LibraryScanOperations.unit.test.js` | Unit | fresh-record merging, active/inactive moves, watchfolder ownership and stale scan results |
+| `AutoTagConcurrentEdits.integration.test.js` | Integration | lookup baselines, late manual changes, coherent conflict skips and accurate saved-result accounting |
+| `LibraryEditing.component.test.js` | Component | draft retention, delayed and failed saves, batch field diffs, settings transactions and playback-only patches |
+| `AutoTagStorage.integration.test.js` | Integration | disk-full and permission errors, atomic-write rollback, retry eligibility, queues and visible failure dialogs |
+| `RendererStartup.integration.test.js` | Integration | same-timestamp source updates, browser execution without Node/eval, forbidden imports, CSP and packaging compilation order |
+| `SiblingNumbering.integration.test.js` | Integration | independent exact witnesses, release scope, conflicting offsets, saved evidence, shuffled order and shared episode lookup fallback |
+| `TaggingReport.unit.test.js` | Unit | historical decisions, provenance, numbering, runtime, bounded candidates and safe error explanations |
+| `AutotagReport.component.test.js` | Component | saved-video binding, collapsible selectable reports, keyboard semantics, stale edits and navigation |
+| `SeriesEvidence.integration.test.js` | Integration | recorded parent observations, positive season counts, inferred seasons, bounded candidates, release suffixes and numbering origins |
+| `EpisodeTitleAnnotations.integration.test.js` | Integration | recorded annotation pairs, original title evidence, exact corrections, duplicate cores, parts and fuzzy sanity |
+| `SeriesStructure.integration.test.js` | Integration | two-season lower-bound counts, single-season upper bounds, cross-season contradictions, duplicates, catalog gaps and request budgets |
+| `SeriesCollection.integration.test.js` | Integration | cross-season identity, explicit conflicts, independent witnesses, repeated series prefixes, final retry outcomes and shuffled processing |
+| `TaggingEditor.component.test.js` | Component | manual identity authorship, retained automatic evidence, one application per confirmed preview and stale selection rejection |
+| `TaggingArchitecture.integration.test.js` | Integration | final acceptance ownership, shared budgets, durable identity provenance, run boundaries and exhaustive small-batch permutations |
+| `TaggingPrecision.integration.test.js` | Integration | short titles, independent sibling evidence, order conflicts, ambiguity, cancellation and movie title expansion |
+| `CatalogClient.unit.test.js` | Unit | concurrent reuse, transient failure eviction, session scope and deduplicated episode probes |
+| `SeriesSearch.unit.test.js` | Unit | full-title identity, reviewed aliases, cleanup, query caps and explicit region constraints |
+| `OmdbSeries.integration.test.js` | Integration | new discovery queries, preserved episode checks, bounded pagination, batch query sharing and retryable errors |
+| `HistoricalTagging.integration.test.js` | Integration | 1921 recorded searches and 63 individual numbering corrections from the project history |
+| `HistoricalMovies.integration.test.js` | Integration | 73 individual movie improvements from the saved before/after libraries and corrected catalog IDs |
+| `OmdbHistoricalBehaviors.integration.test.js` | Integration | named artwork fallbacks, failed-download caching, series-ID handoff, explicit IDs and batch choices |
+| `AutoTagRecovery.integration.test.js` | Integration | directory-scoped sibling evidence, single bounded retry, final save order, cancellation, and per-file statistics |
+| `SourceLayout.integration.test.js` | Integration | case-correct module references, renderer resources, relocated themes/fonts, default media roots, and actual ASAR contents |
+| `SourceReorganization.integration.test.js` | Integration | verified backups, complete-overlay checks, edited-file preservation, Windows line endings, and repeatable cleanup |
+| `EpisodeMatch.unit.test.js` | Unit | 2657 reviewed title pairs, strict correction boundaries, broad runtime checks, and cached optional probes |
+| `ShowDetection.unit.test.js` | Unit | shared scan/reset parsing, dedicated extras, mixed folders, season-zero specials, and existing release conventions |
+| `OmdbEpisodes.integration.test.js` | Integration | current-tag precedence, optional folder years, recorded corrections, series validation/cache, runtime vetoes, and exact-ID overrides |
+| `PlaylistFilter.test.js` | Unit | playlist syntax, operators, security limits, cache, and runtime errors |
+| `TableSelection.test.js` | Unit | single, toggle, range, cross-table, and ordered selection behavior |
+| `ReactDevTools.test.js` | Unit | development-only extension loading, packaged skip, and failure handling |
+| `BoxOffice.unit.test.js` | Unit | fixed-USD input, invalid values, locale presentation, and compact thresholds |
+| `LibraryDuplicates.unit.test.js` | Unit | path normalization, scan reconciliation, and offline retention |
+| `LibraryStats.unit.test.js` | Unit | viewing totals, visible-title series grouping, resolution tiers, and global duplicates |
+| `VideoResolution.unit.test.js` | Unit | all bucket boundaries, crops, anamorphic ratios, portrait video, panoramas, and unknown metadata |
+| `PackageConfig.unit.test.js` | Unit | file boundaries, staged sidecars, strict package commands, and retired HLS code |
+| `MediaTools.unit.test.js` | Unit | packaged/staged sidecar paths, executable validation, and development fallbacks |
+| `MediaToolPolicy.unit.test.js` | Unit | LGPL-only FFmpeg flags, nonfree rejection, and required MPV DVD/native video support |
+| `MediaBundleVerifier.unit.test.js` | Unit | source pins, graphical MPV, libdvdcss exclusion, architecture, and native dependencies |
+| `MediaBundleInspection.unit.test.js` | Unit | PE/ELF architecture, dependency closure, app-relative loading, and prohibited libraries |
+| `MediaPlatformPreparation.unit.test.js` | Unit | native host dispatch, source pins, build baselines, and platform-specific recipes |
+| `MediaMetadata.unit.test.js` | Unit | playable video selection, cover-art rejection, aspect ratios, fallback merging, legacy rechecks, and scratch output |
+| `MovieSearch.unit.test.js` | Unit | filename parsing, search variants, candidate scoring, and confidence |
+| `SubtitleMatcher.unit.test.js` | Unit | sidecar assignment, ambiguity, folder boundaries, and manual provenance |
+| `VideoExclusion.unit.test.js` | Unit | candidate classification, preferences, probing, and conservative retention |
+| `VideoRuntimeVerifier.unit.test.js` | Unit | FFmpeg packet thresholds, errors, early EOF, and timeout cleanup |
+| `RendererUtils.unit.test.js` | Unit | batch edits, ratings, validation/repair, portable URLs/labels, DOM ancestry, and diffs |
+| `Player.unit.test.js` | Unit | attempt logging, media availability, concise errors, launch avoidance, timeouts, socket cleanup, DVD load events, and process exits |
+| `MpvProcess.unit.test.js` | Unit | native IPC paths, platform video selection, sidecar launch isolation, JSON IPC, and diagnostics |
+| `MediaBuildCache.integration.test.js` | Integration | verified checkpoints, locked-file retries, preserved compiler outputs, safe replacement, and interrupted publication recovery |
+| `ContentFingerprint.integration.test.js` | Integration | fixed hash vectors, distributed samples, file sizes, DVD normalization, cache validation, and read failures |
+| `VideoIdMigration.integration.test.js` | Integration | metadata/history preservation, cross-library IDs, resumable conversion, explicit archiving, collisions, and guarded installation |
+| `MediaDependencies.integration.test.js` | Integration | node-mpv JSON IPC startup, real graphical output, decoding/probing, and MPV DVD capability |
+| `MediaMetadata.integration.test.js` | Integration | actual FFprobe and FFmpeg fallback selection of videos with cover art, genuine MJPEG, and cleanup on failure |
+| `LibraryPersistence.integration.test.js` | Integration | validation, atomic saves, snapshots, retention, recovery, and damaged bytes |
+| `Library.integration.test.js` | Integration | first launch, migrations, operations, IPC boundary, idle waits, and recovery |
+| `Logger.integration.test.js` | Integration | file routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and shutdown |
+| `ReadWrite.integration.test.js` | Integration | defaults, main/renderer paths, persistence, and malformed-file replacement |
+| `ShareManifest.integration.test.js` | Integration | schema, checksums, inventory, hostile paths, error codes, and atomic files |
+| `ShareService.integration.test.js` | Integration | request, fulfillment, import, copies, conflicts, cancellation, and expiration |
+| `RendererComponents.component.test.js` | Component | progress language, listener cleanup, navigation, Play Next, resolution cells, dimension tooltips, and bucket sorting |
+| `SettingsLibrary.component.test.js` | Component | export IPC, aligned statistics, per-video duplicate folders, rescan guidance, and file-manager actions |
+| `Mynda.component.test.js` | Component | ratings, filtering, search, recent history, IPC, view state, and pane topology |
+| `electron/run-electron-smoke.js` | End-to-end | startup/assets, Settings, renderer saves, approved browser links, blocked navigation/popups/frames and denied permissions |
+| `electron/run-electron-smoke.js --asar` | End-to-end | the same UI/assets journey from an actual source-and-assets archive; separate from the full bundled-media packaging test |
+| `electron/run-electron-smoke.js --library` | End-to-end | rating, scan/edit concurrency, Auto-Tag conflict, batch scope, deferred preferences, playback history and restart durability |
+| `electron/run-electron-smoke.js --library --asar` | End-to-end | the complete library save/restart journey from an archived application with controlled external service/player fixtures |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
 
@@ -407,10 +436,10 @@ When reporting a failure, copy from the category header (such as `[INTEGRATION]`
 
 ## Source organization and renderer resources (fix77)
 
-See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) for the folder map and one-time `npm run source:cleanup` step after extracting fix77 over fix76. The fast suite now includes a source/resource path audit and cleanup safety checks. No media-tool rebuild or npm installation is needed for the reorganization.
+See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) for the current process boundaries, folder map, build outputs, and the historical one-time `npm run source:cleanup` procedure. The isolation migration requires `npm install`; it does not require a media-tool rebuild unless those tools changed independently.
 
-`npm run test:paths` runs the focused import/resource/ASAR integration suite. It checks real paths and exact capitalization, including CSS imports, font files, placeholder images, rating logos, themes, and both JavaScript entry points.
+`npm run test:paths` runs the focused import/resource/ASAR integration suite. It checks real paths and exact capitalization, including CSS imports, font files, placeholder images, rating logos, themes, and the browser/preload bundles. It also executes the real browser dependency initialization without Node globals or dynamic code generation.
 
-`npm run test:electron` runs source and ASAR startup checks followed by source and ASAR library-save/restart journeys. All launch from outside the application directory. The startup checks cover the interface, Settings, images, fonts, theme stylesheets, and theme icon variables; the save journeys cover the workflows above. `npm run test:electron:asar` runs only the original archived-source startup check. `test:all` includes all four suites.
+`npm run test:electron` runs source and ASAR startup checks followed by source and ASAR library-save/restart journeys. All launch from outside the application directory. The startup checks cover the interface, Settings, images, fonts, theme stylesheets, and theme icon variables; the save journeys cover the workflows above. `npm run test:electron:asar` runs only the production-bundle ASAR startup check. `test:all` includes all four suites.
 
 The ASAR journey deliberately shares installed npm dependencies from the temporary parent directory. It verifies source/resource paths inside an archive; `npm run test:package` separately assembles the complete native application and checks its bundled media dependencies.

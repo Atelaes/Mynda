@@ -1,7 +1,5 @@
 // Library tables, series grouping, details, and playlist-level controls.
 const React = require('react');
-const {ipcRenderer, shell} = require('electron');
-const os = require('os');
 const _ = require('lodash');
 const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const {formatBoxOffice, formatCompactBoxOffice} = require('../library/BoxOffice.js');
@@ -474,7 +472,7 @@ class MynPlaylistBar extends React.Component {
       autotagCancelRequested: false
     }
 
-    this.handleAutoTagStatus = (event, status) => {
+    this.handleAutoTagStatus = status => {
       if (status.action === 'autotag') {
         this.setState({
           autotagRunning: true,
@@ -490,19 +488,23 @@ class MynPlaylistBar extends React.Component {
   }
 
   autotag(e) {
-    ipcRenderer.send('autotag');
+    return window.mynda.tagging.start().catch(error => {
+      libraryViewLog.error('Could not start Auto-Tag', {error});
+    });
   }
 
   cancelAutotag(e) {
-    ipcRenderer.send('autotag-cancel');
+    return window.mynda.tagging.cancel().catch(error => {
+      libraryViewLog.error('Could not cancel Auto-Tag', {error});
+    });
   }
 
   componentDidMount() {
-    ipcRenderer.on('status-update', this.handleAutoTagStatus);
+    this._removeStatus = window.mynda.events.onStatus(this.handleAutoTagStatus);
   }
 
   componentWillUnmount() {
-    ipcRenderer.removeListener('status-update', this.handleAutoTagStatus);
+    if (this._removeStatus) this._removeStatus();
   }
 
   changeView(view) {
@@ -609,7 +611,7 @@ class MynLibTable extends React.Component {
   rowClick(id, rowID, index, e) {
     clearTimeout(this.clickTimer);
     const shift = e.shiftKey;
-    const toggle = os.platform() === 'darwin' ? e.metaKey : e.ctrlKey;
+    const toggle = window.mynda.app.platform === 'darwin' ? e.metaKey : e.ctrlKey;
 
     // single click, or click with mod keys: normal row selection
     if (e.detail === 1 || shift || toggle) {
@@ -1069,7 +1071,7 @@ class MynLibTableRow extends React.Component {
     return result;
   }
 
-  saveEdited(originalVid, ...args) {
+  async saveEdited(originalVid, ...args) {
     // console.log('save-edited!!!');
     let changes = {};
     if (args.length == 2 && typeof args[0] === "string") {
@@ -1082,7 +1084,7 @@ class MynLibTableRow extends React.Component {
     // console.log('changes == ' + JSON.stringify(changes));
 
 
-    const confirmSave = (event, response, changes, originalVid, skipDialog) => {
+    const confirmSave = ({response, checkboxChecked: skipDialog}) => {
       if (response === 0) { // yes
         // save video to library
         library.patchMediaBatch([videoEdit(originalVid, {...originalVid, ...changes})],
@@ -1103,8 +1105,13 @@ class MynLibTableRow extends React.Component {
 
     // user confirmation dialog
     if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibTable-confirm-inlineEdit']) {
-      ipcRenderer.once('save-video-confirm', confirmSave);
-      ipcRenderer.send('save-video-confirm', changes, originalVid, true); // pass 'true' to show the skip dialog checkbox
+      try {
+        confirmSave(await window.mynda.dialogs.confirmVideoEdit({
+          changes, videoID: originalVid.id, showSkipDialog: true
+        }));
+      } catch (error) {
+        reportSaveFailure(error, libraryViewLog, 'confirm the video edit');
+      }
     } else {
       // save changes without the confirmation dialog
       library.patchMediaBatch([videoEdit(originalVid, {...originalVid, ...changes})],
@@ -1246,8 +1253,12 @@ class MynDetails extends React.Component {
       error => reportSaveFailure(error, libraryViewLog));
   }
 
-  openInFinder() {
-    shell.showItemInFolder(this.props.video.filename);
+  async openInFinder() {
+    try {
+      await window.mynda.files.revealVideo({videoID: this.props.video.id});
+    } catch (error) {
+      libraryViewLog.error('Could not reveal the video in the file manager', {error});
+    }
   }
 
   componentDidUpdate(oldProps) {

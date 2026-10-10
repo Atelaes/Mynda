@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const {spawn} = require('child_process');
 const asar = require('asar');
+const {buildRenderer} = require('../../scripts/build-renderer.js');
 const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
 const {
   assert,
@@ -123,6 +124,7 @@ function launchElectron(executable, appDirectory, userData, phase) {
 
 suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch saves, plays, changes settings, and verifies restart' :
   'starts Mynda, opens Settings, commits a renderer edit, and flushes a deferred save on close', async () => {
+  await buildRenderer({mode: useAsar ? 'production' : 'development'});
   const nodeModules = path.join(projectRoot, 'node_modules');
   assert(fs.existsSync(nodeModules), 'node_modules is missing; run npm install before the Electron test');
 
@@ -148,8 +150,11 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
     fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
     fs.copyFileSync(path.join(__dirname, 'ExternalContentJourney.js'), path.join(appDirectory, 'ExternalContentJourney.js'));
+    fs.copyFileSync(path.join(__dirname, 'BrowserDriver.js'), path.join(appDirectory, 'BrowserDriver.js'));
+    fs.copyFileSync(path.join(__dirname, 'LibraryJourneyFixtures.js'), path.join(appDirectory, 'LibraryJourneyFixtures.js'));
+    fs.copyFileSync(path.join(__dirname, 'ScriptPolicyFixture.js'), path.join(appDirectory, 'src/renderer/ScriptPolicyFixture.js'));
     if (libraryJourney) {
-      for (const file of ['LibraryJourneyBootstrap.js','LibraryJourneyRenderer.js','LibraryJourneyPreload.js','LibraryJourneyFixtures.js']) {
+      for (const file of ['LibraryJourneyBootstrap.js','LibraryJourneyRenderer.js']) {
         fs.copyFileSync(path.join(__dirname,file),path.join(appDirectory,file));
       }
       fs.mkdirSync(userData,{recursive:true});
@@ -193,7 +198,8 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
       return;
     }
     const result = await launchElectron(electronExecutable, target, userData);
-    for (const key of ['browserLinks', 'blockedNavigation', 'blockedPopup', 'deniedPermissions', 'blockedFrame']) {
+    for (const key of ['browserLinks', 'blockedNavigation', 'blockedPopup', 'deniedPermissions', 'blockedFrame',
+      'isolatedRenderer', 'blockedScripts']) {
       assert.strictEqual(result.externalContent[key], true, `Incomplete external-content check: ${key}`);
     }
     assert.strictEqual(result.libraryCreated, true);

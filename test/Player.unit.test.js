@@ -1,47 +1,20 @@
 const path = require('path');
 const os = require('os');
 const {EventEmitter} = require('events');
-const React = require('react');
 const {
   assert,
   createSuite,
   runSuite,
   rejectsWithCode
 } = require('./helpers/TestHarness.js');
-const {loadFreshWithMocks} = require('./helpers/ModuleMocks.js');
 
-require('@babel/register')({
-  presets: [require.resolve('@babel/preset-react')],
-  extensions: ['.js'],
-  ignore: [/node_modules/],
-  cache: false
-});
-
-class TestPane extends React.Component {}
-let fakeMpvConstructions = 0;
-class FakeMpv {
-  constructor() {
-    fakeMpvConstructions += 1;
-  }
-}
+const Player = require('../src/main/PlaybackSupport');
+const {createPlaybackService} = require('../src/main/PlaybackService');
 const playerWarnings = [];
 const playerInfos = [];
-const Player = loadFreshWithMocks(
-  path.join(__dirname, '..', 'src', 'renderer', 'Player.js'),
-  {
-    'node-mpv': FakeMpv,
-    './RendererRuntime.js': {
-      library: {settings: {watchfolders: []}},
-      playerLog: {
-        debug() {},
-        info(message, detail) { playerInfos.push({message, detail}); },
-        warn(message, detail) { playerWarnings.push({message, detail}); },
-        error() {}
-      }
-    },
-    './SharedComponents.js': {MynOpenablePane: TestPane}
-  }
-);
+const playerLog = {debug() {}, error() {},
+  info(message, detail) {playerInfos.push({message, detail});},
+  warn(message, detail) {playerWarnings.push({message, detail});}};
 
 const suite = createSuite(
   'MPV playback safety helpers',
@@ -177,29 +150,21 @@ suite.test('keeps MPV diagnostics in logs while returning concise playback error
 });
 
 suite.test('does not construct MPV when the selected media path is unavailable', async () => {
-  const before = fakeMpvConstructions;
-  const player = new Player.MynPlayer({
-    video: {
-      id: 'missing-video',
-      title: 'Missing Video',
-      filename: path.join(os.tmpdir(), 'mynda-file-that-does-not-exist-fix63.mkv')
-    },
-    show: true,
-    hideFunction() {},
-    logPlayed() {}
-  });
-  player.setState = update => { player.state = Object.assign({}, player.state, update); };
-  await player.setUpVideo();
-  assert.strictEqual(fakeMpvConstructions, before);
+  let constructions = 0;
+  const video = {id: 'missing-video', title: 'Missing Video',
+    filename: path.join(os.tmpdir(), 'mynda-file-that-does-not-exist-fix63.mkv')};
+  const service = createPlaybackService({library: {media: [video], settings: {watchfolders: []}},
+    log: playerLog, Player: class {constructor() {constructions += 1;}}});
+  service.play(video.id);
+  await Promise.resolve();
+  assert.strictEqual(constructions, 0);
   assert.strictEqual(playerInfos[playerInfos.length - 1].message, 'Playback requested');
   assert.strictEqual(playerInfos[playerInfos.length - 1].detail.videoID, 'missing-video');
-  assert.strictEqual(
-    playerInfos[playerInfos.length - 1].detail.filename,
-    path.join(os.tmpdir(), 'mynda-file-that-does-not-exist-fix63.mkv')
-  );
-  assert(player.state.errorMessage.includes('moved, renamed, or deleted'));
-  assert.strictEqual(player.state.showLoadingIndicator, false);
+  assert.strictEqual(playerInfos[playerInfos.length - 1].detail.filename, video.filename);
+  assert(service.getState().errorMessage.includes('moved, renamed, or deleted'));
+  assert.strictEqual(service.getState().status, 'error');
   assert.strictEqual(playerWarnings[playerWarnings.length - 1].detail.reason, 'media-missing');
+  await service.stop();
 });
 
 suite.test('passes through prompt resolutions and rejections', async () => {

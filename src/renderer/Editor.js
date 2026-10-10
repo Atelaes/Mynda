@@ -1,14 +1,8 @@
 // Editor pane, OMDb search workflow, and the complete edit form.
 const React = require('react');
-const electron = require('electron');
-const {ipcRenderer} = require('electron');
 const _ = require('lodash');
-const fs = require('fs');
-const path = require('path');
-const {v4: uuidv4} = require('uuid');
 const hashObject = require('object-hash');
 const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
-const OmdbHelper = require('../tagging/OmdbHelper.js');
 const TaggingEvidence = require('../tagging/TaggingEvidence');
 const {MynAutotagReport} = require('./AutotagReport.js');
 const {ImdbLink} = require('./ExternalLink.js');
@@ -49,7 +43,6 @@ const {
   MynEditDateWidget
 } = require('./EditorFields.js');
 
-let nextFilenameResetNumber = 0;
 
 // ###### Editor: overlayed pane for editing video information (tagging) ###### //
 class MynEditor extends MynOpenablePane {
@@ -191,10 +184,9 @@ class MynEditor extends MynOpenablePane {
   }
 
   // Ask the main process to rerun the same conservative filename/folder
-  // detector used for brand-new videos. The native confirmation explains the
-  // wider reset (IMDb/catalog fields are cleared), and a private response
-  // channel prevents simultaneous editor actions from hearing one another.
-  requestResetFromFilename(event) {
+  // detector used for brand-new videos. Its named bridge request returns only
+  // this operation’s staged patches after the native confirmation.
+  async requestResetFromFilename(event) {
     if (event) event.preventDefault();
     if (this._saving) return;
     if (!this.state.video) return;
@@ -229,7 +221,6 @@ class MynEditor extends MynOpenablePane {
     if (!sourceVideos || sourceVideos.length === 0) return;
 
     const requestedSelectionKey = editorSelectionKey(this.state.video, this.props.batch);
-    const responseChannel = `reset-from-filename-${process.pid}-${++nextFilenameResetNumber}`;
     this.setState({resetFromFilenamePending: true});
     editorLog.info('Requesting filename-derived editor reset', {
       videoCount: sourceVideos.length,
@@ -355,15 +346,14 @@ class MynEditor extends MynOpenablePane {
       });
     };
 
-    ipcRenderer.once(responseChannel, handleResetResponse);
     try {
-      ipcRenderer.send('reset-from-filename', responseChannel, sourceVideos);
+      handleResetResponse(null, await window.mynda.editor.resetFromFilename(sourceVideos));
     } catch(err) {
-      ipcRenderer.removeListener(responseChannel, handleResetResponse);
       this.setState({resetFromFilenamePending: false});
       editorLog.error('Could not request filename-derived editor reset', {
         error: err && err.stack ? err.stack : String(err)
       });
+      alert(`Mynda could not reset the video information: ${err.message || err}`);
     }
   }
 
@@ -426,40 +416,14 @@ class MynEditor extends MynOpenablePane {
     // the user browsed to it or entered its path manually), or it may be
     // saved in a temp folder (in the case that it was downloaded from a URL)
     if (this._isMounted && typeof draftState.video.artwork === 'string' && draftState.video.artwork !== '') {
-      let fileExt;
       try {
-        fileExt = draftState.video.artwork.match(/.\w{3,4}$/)[0];
-      } catch(err) {
-        fileExt = '.jpg'; // just use .jpg as the extension if we can't find one, i guess?
-      }
-
-      const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
-      const oldArtworkPath = path.resolve(__dirname, draftState.video.artwork); // create the correct absolute path, in case it was a relative one
-      // if the file is not already in the Artwork folder,
-      // copy it there and update the reference to it in the video object
-      if (path.resolve(path.dirname(oldArtworkPath)) !== path.resolve(artworkFolder)) {
-        const newArtworkPath = path.join(artworkFolder, uuidv4() + fileExt);
-        try {
-          await new Promise((resolve, reject) => fs.copyFile(oldArtworkPath, newArtworkPath,
-            error => error ? reject(error) : resolve()));
-        } catch (error) {
-          this._saving = false;
-          this.setState({savePending: false});
-          this._saveFailure = error;
-          reportSaveFailure(error, artworkLog, 'save the artwork');
-          return false;
-        }
-        // this.handleChange({'artwork':newArtworkPath}); // <-- I think this was happening too slowly (part of the function is async), so the new path was not being saved
-        draftState.video.artwork = newArtworkPath;
-        artworkLog.debug('Editor artwork path updated', {
-          videoID: draftState.video.id,
-          artwork: draftState.video.artwork
-        });
-      } else {
-        artworkLog.debug('Editor artwork already uses the library artwork folder', {
-          videoID: draftState.video.id,
-          artwork: oldArtworkPath
-        });
+        draftState.video.artwork = await window.mynda.editor.prepareArtwork(draftState.video.artwork);
+      } catch (error) {
+        this._saving = false;
+        this.setState({savePending: false});
+        this._saveFailure = error;
+        reportSaveFailure(error, artworkLog, 'save the artwork');
+        return false;
       }
     }
 
@@ -872,7 +836,6 @@ class MynEditorSearch extends React.Component {
   constructor(props) {
     super(props)
     this._proposals = new Map();
-    this._nextProposal = 0;
 
     this.state = {
       results: null,
@@ -928,14 +891,21 @@ class MynEditorSearch extends React.Component {
         alert('No videos are selected for Auto-Tag.');
         return;
       }
-      ipcRenderer.send('autotag-selected', selectedIDs);
+      try { await window.mynda.tagging.startSelected(selectedIDs); }
+      catch (error) { alert(`Mynda could not start Auto-Tag: ${error.message || error}`); }
       return;
     }
 
     this.setState({searching:true});
     this._proposals.clear();
     const selection = editorSelectionKey(this.props.video,this.props.batch);
-    const resultsObject = await OmdbHelper.resolve(this.props.video);
+    let resultsObject;
+    try { resultsObject = await window.mynda.editor.search(this.props.video); }
+    catch (error) {
+      this.setState({searching: false});
+      alert(`The catalog could not complete this request: ${error.message || error}`);
+      return;
+    }
     if (selection !== editorSelectionKey(this.props.video,this.props.batch)) return;
     this.setState({searching:false});
     //console.log(results);
@@ -943,7 +913,7 @@ class MynEditorSearch extends React.Component {
     if (resultsObject.status === 'candidate') {
       // Keep the unmodified proposal. Previewing a choice must neither apply
       // metadata nor download artwork, and selecting it need not fetch it again.
-      const token = String(++this._nextProposal);
+      const token = resultsObject.proposalID;
       this._proposals.set(token,resultsObject);
       results = [{...resultsObject.candidate.record,myndaProposalID:token}];
     } else if (resultsObject.status === 'ambiguous' && resultsObject.choices.length) {
@@ -998,21 +968,17 @@ class MynEditorSearch extends React.Component {
     this.setState({results:null});
   }
 
-  chooseResult(movie) {
+  async chooseResult(movie) {
     // if the user hasn't previously selected the preference to override this confirmation dialog
     if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynEditorSearch-confirm-select']) {
       // we ask the user to confirm, because this will overwrite any metadata
       // the movie currently has (although the revert button will still work until
       // the user saves the changes)
-      ipcRenderer.send(
-        'generic-confirm',
-        'MynEditorSearch-confirm-select',
-        {
-          message: `Are you sure you want to choose ${movie.Title} (${movie.Year})? This will overwrite most of the existing information for this video.`,
-          checkboxLabel: `Don't show this dialog again`
-        },
-        movie
-      );
+      try {
+        const result = await window.mynda.editor.confirm({kind: 'select-result', title: movie.Title,
+          year: movie.Year, checkbox: true});
+        this.handleConfirmSelect(null, result.response, movie, result.checkboxChecked);
+      } catch (error) { alert(`Mynda could not confirm this selection: ${error.message || error}`); }
     } else {
       // skip the dialog
       this.retrieveResult(movie);
@@ -1022,7 +988,6 @@ class MynEditorSearch extends React.Component {
   async retrieveResult(movie) {
     if (movie.myndaInputID && movie.myndaInputID !== this.props.video.id) return;
     const proposal = movie.myndaProposalID && this._proposals.get(movie.myndaProposalID);
-    if (movie.myndaProposalID && !proposal) return;
     if (proposal && JSON.stringify(proposal.context.originalInput) !==
         JSON.stringify(TaggingEvidence.snapshot(this.props.video))) {
       this.clearSearch();
@@ -1032,16 +997,21 @@ class MynEditorSearch extends React.Component {
     // clear the search results
     this.clearSearch();
 
-    // A series choice identifies which show owns the already-known season and
-    // episode. Ordinary movie/episode result rows continue to be retrieved by
-    // their own IMDb ID as before.
-    let searchTarget = movie.myndaChoiceType === 'series' ? this.props.video :
-      {...this.props.video,imdbID:movie.imdbID};
-    let searchOptions = movie.myndaChoiceType === 'series' ?
-      {seriesImdbID:movie.imdbID,seriesSelectionSource:'user'} : {imdbIDSource:'user'};
-    const responseObject = proposal ?
-      await OmdbHelper.applyMatch(proposal,{recordSelectionSource:'user'}) :
-      await OmdbHelper.tag(searchTarget,searchOptions);
+    const submittedDraft = _.cloneDeep(this.props.video);
+    let responseObject;
+    try {
+      responseObject = await window.mynda.editor.select({draft: submittedDraft, choice: movie});
+    } catch (error) {
+      alert(`Mynda could not retrieve this result: ${error.message || error}`);
+      return;
+    }
+    // The request is asynchronous. Never put its response into another video
+    // or replace edits made while the backend was fetching metadata/artwork.
+    if (submittedDraft.id !== this.props.video.id) return;
+    if (!_.isEqual(TaggingEvidence.snapshot(submittedDraft), TaggingEvidence.snapshot(this.props.video))) {
+      alert('The video changed while this result was loading. Search again before choosing a result.');
+      return;
+    }
     if (responseObject.status !== 'matched') {
       alert(movie.myndaChoiceType === 'series' ?
         'OMDb could not find this episode in the selected series.' :
@@ -1053,7 +1023,21 @@ class MynEditorSearch extends React.Component {
       });
       return;
     } else {
-      this.props.handleChange(responseObject.video);
+      const changes = {};
+      for (const [field, value] of Object.entries(responseObject.video)) {
+        if (field === 'ratings' && _.isPlainObject(value)) {
+          const ratings = {...this.props.video.ratings};
+          for (const [source, rating] of Object.entries(value)) {
+            if (_.isEqual((this.props.video.ratings || {})[source], (submittedDraft.ratings || {})[source])) ratings[source] = rating;
+          }
+          if (!_.isEqual(ratings, this.props.video.ratings)) changes.ratings = ratings;
+          continue;
+        }
+        if (!_.isEqual(submittedDraft[field], value) && _.isEqual(this.props.video[field], submittedDraft[field])) {
+          changes[field] = value;
+        }
+      }
+      this.props.handleChange(changes);
     }
   }
 
@@ -1069,13 +1053,6 @@ class MynEditorSearch extends React.Component {
     }
   }
 
-  componentDidMount() {
-    ipcRenderer.on('MynEditorSearch-confirm-select', this.handleConfirmSelect);
-  }
-
-  componentWillUnmount() {
-    ipcRenderer.removeListener('MynEditorSearch-confirm-select', this.handleConfirmSelect);
-  }
 
   render() {
     const isBatch = this.props.video && this.props.video.id === 'batch';
@@ -1216,7 +1193,7 @@ class MynEditorEdit extends React.Component {
     };
   }
 
-  requestRevert(e) {
+  async requestRevert(e) {
     e.preventDefault();
 
     // whether the video has been changed since load or the last save
@@ -1230,14 +1207,13 @@ class MynEditorEdit extends React.Component {
     if (!saved && (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynEditorEdit-confirm-revert'])) {
       // we ask the user to confirm, because this will erase any metadata
       // that hasn't been saved
-      ipcRenderer.send(
-        'generic-confirm',
-        'MynEditorEdit-confirm-revert',
-        {
-          message: `Are you sure you want to revert to the saved values? You will lose any unsaved changes.`,
-          checkboxLabel: `Don't show this dialog again`
+      try {
+        const selection = editorSelectionKey(this.props.video, this.props.batch);
+        const result = await window.mynda.editor.confirm({kind: 'revert', checkbox: true});
+        if (selection === editorSelectionKey(this.props.video, this.props.batch)) {
+          this.handleConfirmRevert(null, result.response, null, result.checkboxChecked);
         }
-      );
+      } catch (error) { alert(`Mynda could not confirm reverting: ${error.message || error}`); }
     } else {
       // skip the dialog
       this.props.revertChanges();
@@ -1246,7 +1222,6 @@ class MynEditorEdit extends React.Component {
 
   componentDidMount() {
     this._isMounted = true;
-    ipcRenderer.on('MynEditorEdit-confirm-revert', this.handleConfirmRevert);
 
     // we're now doing the validating in MynEditor before it gets here, to avoid issues with the saveHash
     // validate the video in place (function fixes any broken values)
@@ -1258,7 +1233,6 @@ class MynEditorEdit extends React.Component {
   }
 
   componentWillUnmount() {
-    ipcRenderer.removeListener('MynEditorEdit-confirm-revert', this.handleConfirmRevert);
     this._isMounted = false;
   }
 

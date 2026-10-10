@@ -2,6 +2,8 @@
 // test never launches the user's browser or accesses an external website.
 const assert = require('assert');
 const path = require('path');
+const {pathToFileURL} = require('url');
+const {browserDriver, wait} = require('./BrowserDriver');
 
 // Install before production registers its handler. Observe and forward its
 // actual decision unchanged; an OS-level denial alone must not pass this test.
@@ -22,37 +24,50 @@ function assertGeolocationDenied(result, decisions, contentsId) {
   assert(requests.every(item => item.allowed === false), 'Mynda granted a location request');
 }
 
-async function inspectExternalContent({app, BrowserWindow, window, opened, permissionDecisions}) {
+async function inspectExternalContent({app, BrowserWindow, window, opened, permissionDecisions, videoId}) {
   const contents = window.webContents;
   const originalURL = contents.getURL();
-  const linkModule = path.join(app.getAppPath(), 'src/renderer/ExternalLink.js');
-  const reportModule = path.join(app.getAppPath(), 'src/renderer/AutotagReport.js');
+  const preferences = contents.getLastWebPreferences();
+  for (const [key, value] of Object.entries({nodeIntegration:false, contextIsolation:true,
+    enableRemoteModule:false, sandbox:true, webviewTag:false, nodeIntegrationInSubFrames:false,
+    nodeIntegrationInWorker:false, webSecurity:true, allowRunningInsecureContent:false})) {
+    assert.strictEqual(preferences[key], value, 'Unsafe window preference: ' + key);
+  }
+  const ui = browserDriver(window);
+  await ui.start();
+  const isolation = await ui.inspect(() => {
+    const bridge = window.mynda;
+    return {electron:typeof window.electron, remote:typeof window.remote,
+      invoke:typeof bridge.invoke, send:typeof bridge.send, on:typeof bridge.on,
+      ipc:typeof bridge.ipcRenderer, frozen:Object.isFrozen(bridge),
+      libraryFrozen:Object.isFrozen(bridge.library), externalFrozen:Object.isFrozen(bridge.external)};
+  });
+  assert.deepStrictEqual(isolation, {electron:'undefined', remote:'undefined', invoke:'undefined',
+    send:'undefined', on:'undefined', ipc:'undefined', frozen:true, libraryFrozen:true, externalFrozen:true});
+
+  // These are actual rendered report links, loaded through the normal library
+  // snapshot and bundled React UI. No renderer require() or component injection.
+  await ui.edit(videoId);
+  await ui.click('#edit-autotag-report .folder-heading');
   const before = opened.length;
   await contents.executeJavaScript(`(async () => {
-    const React = require('react'), ReactDOM = require('react-dom');
-    const {ImdbLink} = require(${JSON.stringify(linkModule)});
-    const {LinkedReportText} = require(${JSON.stringify(reportModule)});
-    const fixture = document.createElement('div'); document.body.appendChild(fixture);
-    ReactDOM.render(React.createElement('div', null,
-      React.createElement(ImdbLink, {imdbID:'tt1234567'}, 'IMDb'),
-      React.createElement(LinkedReportText, {text:'Report tt7654321'})), fixture);
-    const links = fixture.querySelectorAll('a');
-    if (links.length !== 2) throw new Error('Expected two real IMDb links');
-    links[0].click();
-    links[1].dispatchEvent(new MouseEvent('auxclick', {button:1,bubbles:true,cancelable:true}));
-    const ipc = require('electron').ipcRenderer;
+    const record = document.querySelector('#edit-autotag-report a[href="https://www.imdb.com/title/tt1234567/"]');
+    const series = document.querySelector('#edit-autotag-report a[href="https://www.imdb.com/title/tt7654321/"]');
+    if (!record || !series) throw new Error('Expected two real IMDb report links');
+    record.click();
+    series.dispatchEvent(new MouseEvent('auxclick', {button:1,bubbles:true,cancelable:true}));
     for (const url of ['file:///tmp/blocked', 'javascript:alert(1)', 'https://evil.invalid/',
       'https://www.imdb.com.evil.invalid/title/tt1234567/']) {
-      const result = await ipc.invoke('external:open', url);
+      const result = await window.mynda.external.open(url);
       if (result.ok !== false) throw new Error('Unsafe URL passed the main-process check');
     }
-    ReactDOM.unmountComponentAtNode(fixture); fixture.remove();
     return true;
   })()`);
-  // Both click IPC requests precede the awaited rejection requests above.
+  await wait(() => opened.length === before + 2, 'external browser link dispatch');
   assert.deepStrictEqual(opened.slice(before), [
     'https://www.imdb.com/title/tt1234567/', 'https://www.imdb.com/title/tt7654321/'
   ]);
+  await ui.closeEditor();
 
   const windowsBefore = BrowserWindow.getAllWindows().length;
   await contents.executeJavaScript(`window.open('https://www.imdb.com/title/tt1234567/'); true`);
@@ -98,7 +113,31 @@ async function inspectExternalContent({app, BrowserWindow, window, opened, permi
   })()`);
   assertGeolocationDenied(restrictions.permission, permissionDecisions.slice(permissionStart), contents.id);
   assert.strictEqual(restrictions.embeddedFrameBlocked, true);
-  return {browserLinks:true, blockedNavigation:true, blockedPopup:true, deniedPermissions:true, blockedFrame:true};
+  const scriptFixture = pathToFileURL(path.join(app.getAppPath(), 'src/renderer/ScriptPolicyFixture.js')).href;
+  const scripts = await ui.inspect(async fixtureURL => {
+    const evalBlocked = await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      const clean = () => {clearTimeout(timer); script.remove();};
+      const timer = setTimeout(() => {clean(); reject(new Error('Script policy fixture did not load'));}, 5000);
+      script.onload = () => {clean(); resolve(window.__myndaScriptPolicyResult && window.__myndaScriptPolicyResult.evalBlocked);};
+      script.onerror = () => {clean(); reject(new Error('Allowed script policy fixture could not load'));};
+      script.src = fixtureURL; document.body.appendChild(script);
+    });
+    const inlineBlocked = await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      const clean = () => {clearTimeout(timer); document.removeEventListener('securitypolicyviolation', violation); script.remove();};
+      const violation = event => {
+        if (event.effectiveDirective.startsWith('script-src') && event.blockedURI === 'inline') {clean(); resolve(true);}
+      };
+      const timer = setTimeout(() => {clean(); reject(new Error('Inline script was not blocked by CSP'));}, 5000);
+      document.addEventListener('securitypolicyviolation', violation);
+      script.textContent = 'window.__myndaUnsafeInlineExecuted = true'; document.body.appendChild(script);
+    });
+    return {evalBlocked, inlineBlocked, inlineExecuted:window.__myndaUnsafeInlineExecuted === true};
+  }, scriptFixture);
+  assert.deepStrictEqual(scripts, {evalBlocked:true, inlineBlocked:true, inlineExecuted:false});
+  return {browserLinks:true, blockedNavigation:true, blockedPopup:true, deniedPermissions:true,
+    blockedFrame:true, isolatedRenderer:true, blockedScripts:true};
 }
 
 module.exports = {inspectExternalContent, observePermissionRequests, assertGeolocationDenied};

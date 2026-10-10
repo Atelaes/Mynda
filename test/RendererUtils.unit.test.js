@@ -41,6 +41,15 @@ suite.test('uses each desktop platform\'s familiar file-manager name', () => {
   assert.strictEqual(RendererUtils.fileManagerName('linux'), 'File Manager');
 });
 
+suite.test('encodes POSIX, Windows and network artwork paths without Node access', () => {
+  assert.strictEqual(RendererUtils.artworkSourceURL('/tmp/Poster #1 50%?.jpg'),
+    'file:///tmp/Poster%20%231%2050%25%3F.jpg');
+  assert.strictEqual(RendererUtils.artworkSourceURL('C:\\Artwork\\Poster #1.jpg'),
+    'file:///C:/Artwork/Poster%20%231.jpg');
+  assert.strictEqual(RendererUtils.artworkSourceURL('\\\\server\\share\\Poster #1.jpg'),
+    'file://server/share/Poster%20%231.jpg');
+});
+
 suite.test('builds stable single-video and batch selection identities', () => {
   assert.strictEqual(RendererUtils.editorSelectionKey({id: 'video-1'}), 'single:video-1');
   assert.strictEqual(RendererUtils.editorSelectionKey({id: 'batch'}, [

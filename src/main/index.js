@@ -13,7 +13,6 @@ const {
   buildLegacySubtitleCounts,
   reconcileVideoSubtitles
 } = require('../scanning/SubtitleMatcher.js');
-const dl = require('../platform/download');
 const _ = require('lodash');
 const ffmpeg = require('fluent-ffmpeg');
 const MediaTools = require('../media/MediaTools.js');
@@ -27,11 +26,16 @@ const VideoExclusion = require('../scanning/VideoExclusion.js');
 const VideoRuntimeVerifier = require('../scanning/VideoRuntimeVerifier.js');
 const {ScanDuplicateTracker} = require('../library/LibraryDuplicates.js');
 const {containsPath} = require('../library/LibraryScanOperations.js');
-const LibraryExport = require('../library/LibraryExport.js');
 const ShareService = require('../sharing/ShareService.js');
 const ShareManifest = require('../sharing/ShareManifest.js');
 const loadReactDeveloperTools = require('./ReactDevTools.js');
 const {installExternalContentPolicy} = require('./ExternalContent.js');
+const {installRendererBridge} = require('./RendererBridge');
+const {validateRendererCommit} = require('../library/LibraryRendererPolicy');
+const {createPlaybackService} = require('./PlaybackService');
+const {createEditorService} = require('./EditorService');
+const {createDesktopService} = require('./DesktopService');
+const {createTaskMethods} = require('./TaskService');
 //const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
@@ -42,7 +46,6 @@ const videoExtensions = [
   'rm',  'rmvb', 'roq',  'svi', 'ts', 'viv', 'webm', 'wmv', 'xvid', 'yuv'
 ]
 let win;
-let library = new Library;
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const backendLog = Logger.child('Backend');
@@ -50,6 +53,8 @@ const externalContent = installExternalContentPolicy({
   ipcMain, shell: electron.shell, log: backendLog,
   rendererPath: path.join(app.getAppPath(), 'src', 'renderer', 'index.html')
 });
+const library = new Library({authorizeRenderer:externalContent.isTrustedSender});
+
 const scanLog = Logger.child('WatchfolderScan');
 const metadataLog = Logger.child('Metadata');
 const autoTagLog = Logger.child('AutoTag');
@@ -168,12 +173,47 @@ const shareService = new ShareService({
     watchfolderScanRunning || autoTagState.running || autoTagRequestPending
 });
 
+const playback = createPlaybackService({library,log:Logger.child('Player'),publish:state => {
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('playback:state',state);
+}});
+const editor = createEditorService({library,catalog:OmdbHelper,dialog,app,
+  deriveFilenameResetChanges,isAutoTagRunning:()=>autoTagState.running,
+  confirmationDialogIsDisabled,disableConfirmationDialog,log:backendLog});
+const desktop = createDesktopService({app,dialog,shell:electron.shell,library,getWindow:()=>win,
+  scan:checkWatchFolders,removeWatchfolder,shareService,
+  confirmationDialogIsDisabled,disableConfirmationDialog,log:backendLog,shareLog,scanLog});
+library.validateRendererCommit = (request,event) => validateRendererCommit(request,{library,
+  authorizeSubtitle:file=>editor.authorizeSubtitle(file,event.sender.id),
+  authorizeArtwork:file=>editor.authorizeArtwork(file,event.sender.id)});
+installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,log:backendLog,
+  methods:{...desktop.methods,
+    ...createTaskMethods({scan:requestWatchfolderScan,startTagging:requestAutoTag,
+      startSelectedTagging:requestSelectedAutoTag,cancelTagging:requestAutoTagCancellation,
+      reportFailure:reportAutoTagFailure}),
+    ...Object.fromEntries(['search','select','resetFromFilename','prepareArtwork','inspectArtwork',
+      'downloadArtwork','validateSubtitles','confirm']
+      .map(name=>['editor.'+name,(event,input)=>editor[name](input,event.sender.id)])),
+    'editor.chooseArtwork':event=>editor.chooseArtwork(event.sender.id),
+    'editor.chooseSubtitles':event=>editor.chooseSubtitles(event.sender.id),
+    'playback.play':(_event,id)=>playback.play(id),
+    'playback.stop':()=>playback.stop(),
+    'playback.getState':()=>playback.getState(),
+    'logs.write':(_event,entry)=>{
+      if (!entry || typeof entry!=='object' || !['info','warn','error'].includes(entry.level) ||
+          typeof entry.scope!=='string' || entry.scope.length>200 ||
+          typeof entry.message!=='string' || entry.message.length>50000 ||
+          typeof entry.details!=='string' || entry.details.length>50000) throw new Error('Invalid log entry.');
+      Logger.receiveRenderer(entry);return {accepted:true};
+    }
+  }});
+
 app.whenReady().then(start);
 
 async function start() {
   Logger.initialize({
     app: app,
-    ipcMain: ipcMain
+    ipcMain: ipcMain,
+    forwardedEntries: false
   });
   backendLog.info('Mynda backend starting', {
     version: app.getVersion(),
@@ -228,7 +268,7 @@ async function start() {
   });
 
   // make the temp folder if it doesn't already exist
-  const tempFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+  const tempFolder = path.join(app.getPath('userData'),'temp');
   fs.mkdir(tempFolder, (err) => {
     if (err && err.code === 'EEXIST') {
       backendLog.debug('Temporary image directory already exists', {path: tempFolder});
@@ -396,7 +436,7 @@ function testNotify(i) {
 }
 
 function eraseTempImages() {
-  let folderPath = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+  let folderPath = path.join(app.getPath('userData'),'temp');
 
   fs.readdir(folderPath, (err, files) => {
     if (err) {
@@ -444,9 +484,11 @@ async function createWindow() {
     icon: appIcon,
     //frame: false,
     webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-        enableRemoteModule: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        enableRemoteModule: false,
+        sandbox: true,
+        preload: path.join(app.getAppPath(), 'src', 'preload', 'generated', 'preload.js'),
         webviewTag: false,
         nodeIntegrationInSubFrames: false,
         nodeIntegrationInWorker: false,
@@ -455,6 +497,11 @@ async function createWindow() {
     }
   })
   externalContent.protectWindow(win);
+  const owner = win.webContents.id;
+  win.webContents.once('destroyed',()=>{
+    editor.dispose(owner); desktop.dispose(owner);
+    playback.stop().catch(error=>backendLog.error('Could not finish playback after interface closure',{error}));
+  });
   if (!libraryClose) libraryClose = require('./LibraryClose.js').installLibraryClose({
     app,ipcMain,dialog,library,getWindow:()=>win,log:backendLog
   });
@@ -1420,36 +1467,6 @@ function deriveFilenameResetChanges(video, watchfolders = library.settings.watch
   };
 }
 
-function downloadFile(url, destination) {
-  return new Promise(function(resolve, reject) {
-    let response = {success:false, message:''};
-    // event.sender.send('cancel-download', dl.canceller, "hi");
-    dl.download(url,destination, (args) => {
-      try {
-        // if successful, we'll receive an object with the path at "path"
-        if (args && Object.prototype.hasOwnProperty.call(args, 'path')) {
-          response.success = true;
-          response.message = args.path;
-          resolve(response);
-          // console.log("successfully downloaded file");
-        } else {
-          // console.log(JSON.stringify(args));
-          response.success = false;
-          response.message = args && args.message ? args.message : args;
-          response.status = args && args.status;
-          response.statusText = args && args.statusText;
-          reject(response);
-        }
-      } catch(error) {
-        response.success = false;
-        response.message = error;
-        reject(response);
-        // console.log(error);
-      }
-    });
-  });
-}
-
 function getAutoTagCandidates() {
   return library.media.filter(medium => (medium.new && !medium.autotag_tried));
 }
@@ -1858,190 +1875,7 @@ function saveBatch(batch, options = {}) {
   });
 }
 
-ipcMain.handle('library:export', async () => {
-  let defaultDirectory = '';
-  try {
-    defaultDirectory = app.getPath('documents');
-  } catch(err) {
-    backendLog.debug('Could not resolve the Documents directory for library export', {
-      error: err && err.message ? err.message : String(err)
-    });
-  }
-
-  try {
-    const result = await LibraryExport.exportLibraryCopy({
-      dialog: dialog,
-      library: library,
-      parentWindow: win || null,
-      defaultDirectory: defaultDirectory
-    });
-    if (result.canceled) {
-      backendLog.debug('Library export canceled by user');
-    } else {
-      backendLog.info('Library exported', {destination: result.filePath});
-    }
-    return {ok: true, value: result};
-  } catch(err) {
-    backendLog.error('Could not export library', {
-      code: err && err.code ? err.code : 'EXPORT_FAILED',
-      error: err && err.stack ? err.stack : String(err),
-      cause: err && err.cause && err.cause.stack ? err.cause.stack : undefined
-    });
-    return {
-      ok: false,
-      error: {
-        code: err && err.code ? err.code : 'EXPORT_FAILED',
-        message: err && err.message ? err.message : 'Mynda could not export the library.'
-      }
-    };
-  }
-});
-
-ipcMain.on('settings-folder-select', (event) => {
-  let options = {properties: ['openDirectory']};
-  dialog.showOpenDialog(null, options).then(result => {
-  event.sender.send('settings-folder-selected', result.filePaths[0]);
-}).catch(err => {
-  backendLog.error('Could not open folder-selection dialog', {error: err});
-})})
-
-ipcMain.on('settings-watchfolder-add', (event, args) => {
-  const folder = args['address'];
-  const kind = args['kind'].toLowerCase();
-
-  // check if path exists and is a folder, not a file
-  fs.lstat(folder, (err, stats) => {
-    // if path exists and is a folder
-    if(!err && stats.isDirectory()) {
-
-      // if we don't already have this watchfolder, add it
-      if (library.settings.watchfolders.filter(wf => path.resolve(wf.path) === path.resolve(folder)).length === 0) {
-        // add to library
-        let folderObject = {"path" : folder, "kind" : kind, "videos" : []};
-        library.add('settings.watchfolders.push', folderObject, error => {
-          if (error) {
-            backendLog.error('Could not save new watchfolder', {watchfolder:folder,error});
-            dialog.showMessageBox({type:'error',buttons:['OK'],title:'Watchfolder Not Saved',
-              message:'Mynda could not save this watchfolder.',detail:error.message});
-            return;
-          }
-          checkWatchFolders('watchfolder-added');
-
-          // tell the client side what happened
-          event.sender.send('settings-watchfolder-added', _.cloneDeep(folderObject));
-        });
-      } else {
-        // if this folder is already a watchfolder, display a dialog
-        dialog.showMessageBox({
-          type : 'warning',
-          buttons : ['Ok'],
-          message : 'This directory is already a watchfolder!'
-        });
-      }
-
-    } else {
-      // if not a directory or we got an error, display an error dialog
-      dialog.showMessageBox({
-        type : 'error',
-        buttons : ['Ok'],
-        message : 'Error: not a valid directory'
-      });
-    }
-  });
-
-})
-
-ipcMain.on('settings-watchfolder-remove', (event, path) => {
-
-  const confirmationPreference = 'MynSettingsFolders-confirm-remove';
-  const removeConfirmedWatchfolder = () => {
-    // The callback returns only after the operation has completed, so the
-    // renderer can refresh from the authoritative library state.
-    removeWatchfolder(path,(err) => {
-      event.sender.send('settings-watchfolder-remove', path, !err);
-
-      if (err) {
-        backendLog.error('Could not remove watchfolder', {
-          watchfolder: path,
-          error: err
-        });
-      }
-    });
-  };
-
-  if (confirmationDialogIsDisabled(confirmationPreference)) {
-    removeConfirmedWatchfolder();
-    return;
-  }
-
-  // first, show the user a confirmation dialog
-  const options = {
-    type : 'warning',
-    buttons : ['Cancel','Remove Folder'],
-    defaultId : 0,
-    cancelId : 0,
-    checkboxLabel : `Don't show this message again`,
-    message : 'Are you sure you want to remove following folder from the library?\n\n' +
-              path + '\n\n' +
-              'This will remove all videos in this folder from the library (but will save any video information you\'ve edited in case you decide to add the folder again later)'
-  };
-  dialog.showMessageBox(options).then(result => {
-    // if the user said okay
-    if (result.response === 1) {
-      if (result.checkboxChecked) {
-        disableConfirmationDialog(confirmationPreference, scanLog);
-      }
-      removeConfirmedWatchfolder();
-    } else {
-      // if the user canceled
-      backendLog.debug('User canceled watchfolder removal', {watchfolder: path});
-      event.sender.send('settings-watchfolder-remove', path, false);
-    }
-
-  }).catch(err => {
-    backendLog.error('Could not display watchfolder-removal confirmation', {
-      watchfolder: path,
-      error: err
-    });
-  });
-})
-
-ipcMain.on('editor-artwork-select', (event) => {
-  let options = {
-    filters: [{name: 'Images', extensions: ['jpg', 'png', 'gif']}],
-    properties: ['openFile']
-  };
-  dialog.showOpenDialog(null, options).then(result => {
-  event.sender.send('editor-artwork-selected', result.filePaths[0]);
-}).catch(err => {
-  backendLog.error('Could not open artwork-selection dialog', {error: err});
-})});
-
-ipcMain.on('editor-subtitle-select', (event) => {
-  let options = {
-    filters: [{name: 'Subtitles', extensions: subtitleExtensions}],
-    properties: ['openFile']
-  };
-  dialog.showOpenDialog(null, options).then(result => {
-    event.sender.send('editor-subtitle-selected', result.filePaths);
-  }).catch(err => {
-    backendLog.error('Could not open subtitle-selection dialog', {error: err});
-  })
-});
-
-ipcMain.on('download', (event, url, destination, requestedResponseChannel) => {
-    // Artwork downloads use private reply channels so concurrent downloads
-    // cannot resolve one another. Keep the original shared channel as the
-    // fallback for existing callers.
-    let responseChannel = typeof requestedResponseChannel === 'string' &&
-      /^downloaded-(?:omdb|editor-artwork)-\d+-\d+$/.test(requestedResponseChannel) ?
-      requestedResponseChannel : 'downloaded';
-    downloadFile(url, destination)
-      .then(response => event.sender.send(responseChannel, response))
-      .catch(response => event.sender.send(responseChannel, response))
-})
-
-ipcMain.on('scan-watchfolders', () => {
+function requestWatchfolderScan() {
   if (shareService.isBusy()) {
     scanLog.info('Manual watchfolder scan request rejected while Share is active', {
       sharePhase: shareService.getState().phase
@@ -2079,295 +1913,4 @@ ipcMain.on('scan-watchfolders', () => {
   }
 
   checkWatchFolders('manual');
-})
-
-ipcMain.on('autotag', () => {
-  requestAutoTag().catch(err => reportAutoTagFailure(err,'library'));
-})
-
-ipcMain.on('autotag-selected', (event, videoIDs) => {
-  requestSelectedAutoTag(videoIDs).catch(err => reportAutoTagFailure(err,'selected'));
-})
-
-ipcMain.on('autotag-cancel', () => {
-  requestAutoTagCancellation();
-})
-
-ipcMain.on('reset-from-filename', (event, requestedResponseChannel, videos) => {
-  // The renderer creates a private one-use channel for each request. Restrict
-  // its shape before reflecting it back through IPC, just as artwork download
-  // replies do, rather than accepting an arbitrary renderer-supplied channel.
-  if (typeof requestedResponseChannel !== 'string' ||
-      !/^reset-from-filename-\d+-\d+$/.test(requestedResponseChannel)) {
-    backendLog.warn('Rejected filename reset with an invalid response channel');
-    return;
-  }
-
-  const sourceVideos = Array.isArray(videos) ? videos.filter(Boolean) : [];
-  if (sourceVideos.length === 0) {
-    backendLog.warn('Filename-reset request did not include any videos');
-    event.sender.send(requestedResponseChannel, {
-      confirmed: false,
-      error: 'No videos were supplied for reset'
-    });
-    return;
-  }
-
-  // Auto-Tag owns a sequence of media writes in the main process. Its running
-  // flag now remains true until the renderer has confirmed the final write, so
-  // refusing this conflicting action closes the window in which an older
-  // Auto-Tag snapshot could land after—and undo—the user's reset.
-  if (autoTagState.running) {
-    backendLog.warn('Rejected filename reset while automatic tagging was still active', {
-      videoCount: sourceVideos.length
-    });
-    event.sender.send(requestedResponseChannel, {
-      confirmed: false,
-      error: 'Auto-Tag is still running or finishing its saves. Cancel it or wait for it to finish, then try Reset from Filename again.'
-    });
-    return;
-  }
-
-  backendLog.info('Filename-derived editor reset requested', {
-    videoCount: sourceVideos.length
-  });
-
-  let patches;
-  try {
-    patches = sourceVideos.map(video => deriveFilenameResetChanges(video));
-  } catch(err) {
-    backendLog.error('Could not derive filename metadata for editor reset', {
-      error: err && err.stack ? err.stack : String(err)
-    });
-    event.sender.send(requestedResponseChannel, {
-      confirmed: false,
-      error: err && err.message ? err.message : String(err)
-    });
-    return;
-  }
-
-  const count = patches.length;
-  const missingWatchfolders = patches.filter(patch => !patch.watchfolderFound).length;
-  const resetFields = Array.from(new Set(
-    patches.flatMap(patch => Object.keys(patch.changes || {}))
-  )).sort();
-  backendLog.info('Prepared filename-derived editor reset patches', {
-    videoCount: count,
-    missingWatchfolders: missingWatchfolders,
-    resetFields: resetFields
-  });
-  let detail =
-    'Mynda will re-detect title, series, season, and episode from each filename and its folders. ' +
-    'It will restore the watchfolder\'s default kind, clear the IMDb ID, artwork reference, and other OMDb catalog fields, ' +
-    'mark the video as New, and allow Auto-Tag to try it again.\n\n' +
-    'Tags, subtitles, watched status, playback position, technical metadata, and your rating will be kept. ' +
-    'Nothing is written to the library until you click Save in the editor.';
-
-  if (missingWatchfolders > 0) {
-    detail += `\n\nMynda could not identify a containing watchfolder for ${missingWatchfolders} ` +
-      `video${missingWatchfolders === 1 ? '' : 's'}; for those, it will use the filename alone and keep the current kind.`;
-  }
-
-  const confirmationPreference = 'MynEditor-confirm-reset-from-filename';
-  const returnResetResult = confirmed => {
-    backendLog.info(confirmed ?
-      'Filename-derived editor reset confirmed' :
-      'Filename-derived editor reset canceled', {
-        videoCount: count,
-        returnedPatchCount: confirmed ? patches.length : 0
-      });
-    event.sender.send(requestedResponseChannel, {
-      confirmed: confirmed,
-      patches: confirmed ? patches.map(({id, changes}) => ({id, changes})) : []
-    });
-  };
-
-  if (confirmationDialogIsDisabled(confirmationPreference)) {
-    returnResetResult(true);
-    return;
-  }
-
-  dialog.showMessageBox({
-    type: 'warning',
-    buttons: ['Cancel', 'Reset from Filename'],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
-    checkboxLabel: `Don't show this message again`,
-    message: count === 1 ?
-      'Reset this video from its filename?' :
-      `Reset ${count} videos from their filenames?`,
-    detail: detail
-  }).then(result => {
-    const confirmed = result.response === 1;
-    if (confirmed && result.checkboxChecked) {
-      disableConfirmationDialog(confirmationPreference, backendLog);
-    }
-    returnResetResult(confirmed);
-  }).catch(err => {
-    backendLog.error('Could not display filename reset confirmation', {
-      error: err && err.stack ? err.stack : String(err)
-    });
-    event.sender.send(requestedResponseChannel, {
-      confirmed: false,
-      error: err && err.message ? err.message : String(err)
-    });
-  });
-})
-
-ipcMain.on('save-video-confirm', (event, changes, video, showSkipDialog) => {
-  //console.log('save-video-confirm!!!');
-  // create message
-  let message = 'Are you sure you want to ';
-  if (Object.keys(changes).length === 1) { // changing only one property
-    let property = Object.keys(changes)[0];
-    let value = changes[property];
-    if (property === 'ratings') {
-      value = value.user; // for now let's assume that if we're changing the rating, we're only changing the user rating, i.e. from the table view
-      message += `rate ${video.title} ${value} star${value > 1 ? 's' : ''}?`
-    } else if (property === 'seen') {
-      message += `mark ${video.title} as ${value ? 'seen' : 'unseen'}?`
-    } else {
-      message += `change the [${property}] of ${video.title} to ${JSON.stringify(value)}?`
-    }
-  } else { // changing multiple properties
-    message += `make the following changes to ${video.title}?\n\n`
-    Object.keys(changes).forEach(key => {
-      message += `${key} : ${changes[key]}\n`
-    });
-  }
-
-  let options = {
-    type : 'question',
-    buttons : ['Yes','No'],
-    message : message
-  };
-
-  if (showSkipDialog) {
-    options.checkboxLabel = `Don't show this dialog again`;
-  }
-
-  dialog.showMessageBox(options).then(result => {
-  event.sender.send('save-video-confirm', result.response, changes, video, result.checkboxChecked);
-}).catch(err => {
-  backendLog.error('Could not display video-save confirmation', {error: err});
-})})
-
-ipcMain.on('generic-confirm', (event, returnTo, opts, data) => {
-  backendLog.debug('Generic confirmation requested', {returnChannel: returnTo});
-
-  let options = {
-    type : 'question',
-    buttons : ['Yes','No'],
-  };
-
-  // if the opts parameter is a string
-  // then we assume it's just a message
-  if (typeof opts === 'string') {
-    options.message = opts;
-  }
-
-  // if it's an object, add its data to the options
-  if (typeof opts === 'object' && opts !== null) {
-    options = {...options, ...opts};
-  }
-
-  dialog.showMessageBox(options).then(result => {
-  event.sender.send(returnTo, result.response, data, result.checkboxChecked);
-}).catch(err => {
-  backendLog.error('Could not display generic confirmation', {
-    returnChannel: returnTo,
-    error: err
-  });
-})})
-
-async function shareIPCResponse(operation, context) {
-  try {
-    return {ok: true, value: await operation()};
-  } catch(err) {
-    const serialized = ShareService.serializeError(err);
-    const expectedCodes = new Set([
-      'SHARE_REQUEST_NOT_FOUND',
-      'SHARE_REQUEST_EXISTS',
-      'SHARE_CANCELED',
-      'SHARE_BUSY',
-      'SHARE_OPERATION_CONFLICT',
-      'SHARE_PLAN_EXPIRED',
-      'SHARE_PLAN_STALE',
-      'SHARE_INSUFFICIENT_SPACE'
-    ]);
-    const logData = Object.assign({}, context || {}, {error: serialized});
-    if (expectedCodes.has(serialized.code)) {
-      shareLog.warn('Share request was not completed', logData);
-    } else {
-      shareLog.error('Share request failed', logData);
-    }
-    return {ok: false, error: serialized};
-  }
 }
-
-ipcMain.handle('share:choose-directory', async () => {
-  return shareIPCResponse(async () => {
-    const result = await dialog.showOpenDialog(win || null, {
-      title: 'Choose Mynda Share Directory',
-      properties: ['openDirectory', 'createDirectory']
-    });
-    return {directory: result.canceled ? null : result.filePaths[0] || null};
-  }, {action: 'choose-directory'});
-});
-
-ipcMain.handle('share:get-state', async () => {
-  return {ok: true, value: shareService.getState()};
-});
-
-ipcMain.handle('share:inspect', async (event, options) => {
-  return shareIPCResponse(
-    () => shareService.inspect(options && options.directory),
-    {action: 'inspect'}
-  );
-});
-
-ipcMain.handle('share:create-request', async (event, options) => {
-  return shareIPCResponse(
-    () => shareService.createRequest(options || {}),
-    {action: 'create-request'}
-  );
-});
-
-ipcMain.handle('share:plan-fulfillment', async (event, options) => {
-  return shareIPCResponse(
-    () => shareService.planFulfillment(options || {}),
-    {action: 'plan-fulfillment'}
-  );
-});
-
-ipcMain.handle('share:fulfill-request', async (event, options) => {
-  return shareIPCResponse(
-    () => shareService.fulfillRequest(options || {}),
-    {action: 'fulfill-request'}
-  );
-});
-
-ipcMain.handle('share:plan-import', async (event, options) => {
-  return shareIPCResponse(
-    () => shareService.planImport(options || {}),
-    {action: 'plan-import'}
-  );
-});
-
-ipcMain.handle('share:import', async (event, options) => {
-  const response = await shareIPCResponse(
-    () => shareService.importShare(options || {}),
-    {action: 'import'}
-  );
-  if (response.ok && response.value && response.value.shouldScan) {
-    // Let the IPC response and Share completion state reach the renderer
-    // before the ordinary scanner takes over the shared status banner.
-    setImmediate(() => checkWatchFolders('share-import'));
-  }
-  return response;
-});
-
-ipcMain.handle('share:cancel', async () => {
-  return {ok: true, value: {cancelRequested: shareService.cancel()}};
-});

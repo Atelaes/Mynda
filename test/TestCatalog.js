@@ -2,6 +2,22 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/MainBridge.integration.test.js',title:'Main application isolation wiring',
+    protects:'real main composition, isolated window options, complete handler registration and privileged caller checks'},
+  {category:'unit',file:'test/EditorArtworkDownload.unit.test.js',title:'Bounded artwork downloads',
+    protects:'HTTP protocols, size/time/redirect bounds, native redirect approval and temporary-file cleanup'},
+  {category:'unit',file:'test/DesktopService.unit.test.js',title:'Main-process desktop authorization',
+    protects:'native directory grants, owner-bound Share plans, watchfolder saves and exported-file reveal'},
+  {category:'unit',file:'test/RendererBridge.unit.test.js',title:'Restricted renderer bridge',
+    protects:'fixed capability surface, trusted senders, plain bounded payloads, stripped Electron events and isolated subscriptions'},
+  {category:'unit',file:'test/LibraryRendererPolicy.unit.test.js',title:'Renderer edit authorization',
+    protects:'scanner fields, filesystem grants, watchfolder boundaries and malformed library operations'},
+  {category:'unit',file:'test/EditorService.unit.test.js',title:'Main-process editor operations',
+    protects:'canonical video identity, owner-scoped catalog proposals and validated artwork/subtitle operations'},
+  {category:'unit',file:'test/PlaybackService.unit.test.js',title:'Main-process playback ownership',
+    protects:'authoritative media selection, process lifetime, position conflicts and confirmed playback saves'},
+  {category:'component',file:'test/Player.component.test.js',title:'Isolated player pane',
+    protects:'named playback requests, notifications, close flush and out-of-order state'},
   {
     category: 'component', file: 'test/ExternalLink.component.test.js',
     title: 'External links in catalog results and reports',
@@ -30,8 +46,8 @@ module.exports = [
     protects:'draft retention, delayed and failed saves, batch field diffs, settings transactions and playback-only patches'},
   {category:'integration',file:'test/AutoTagStorage.integration.test.js',title:'Auto-Tag storage failure and notification',
     protects:'disk-full and permission errors, atomic-write rollback, retry eligibility, queues and visible failure dialogs'},
-  {category:'integration',file:'test/RendererStartup.integration.test.js',title:'Renderer startup after an update',
-    protects:'persistent Babel cache, source overlays with identical timestamps, and actual rendered IMDb links'},
+  {category:'integration',file:'test/RendererStartup.integration.test.js',title:'Browser renderer build and update safety',
+    protects:'same-timestamp source updates, browser execution without Node/eval, forbidden imports, CSP and packaging compilation order'},
   {category:'integration',file:'test/SiblingNumbering.integration.test.js',title:'Sibling-supported numbering and correction lookups',
     protects:'independent exact witnesses, release scope, conflicting offsets, saved evidence, shuffled order and shared episode lookup fallback'},
   {category:'unit',file:'test/TaggingReport.unit.test.js',title:'Saved autotag explanations',

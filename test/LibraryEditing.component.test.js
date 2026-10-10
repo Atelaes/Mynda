@@ -35,10 +35,6 @@ const {MynEditor} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Edi
   electron: {ipcRenderer: ipc}, '../tagging/OmdbHelper.js': {}, './RendererRuntime.js': runtime,
   './SharedComponents.js': {MynOpenablePane: React.Component}, './EditorFields.js': {}
 });
-const {MynPlayer} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Player.js'), {
-  'node-mpv': function() {}, './RendererRuntime.js': runtime,
-  './SharedComponents.js': {MynOpenablePane: React.Component}
-});
 const {MynSettings, MynSettingsFolders} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Settings.js'), {
   electron: {ipcRenderer: ipc, shell: {}}, './RendererRuntime.js': runtime,
   './SharedComponents.js': {MynOpenablePane: React.Component}, './EditorFields.js': {}
@@ -47,6 +43,7 @@ const {MynDetails, MynLibTableRow} = loadFreshWithMocks(path.join(__dirname, '..
   electron: {ipcRenderer: ipc, shell: {}}, './RendererRuntime.js': runtime,
   'react-virtuoso': {TableVirtuoso() {}}, './SharedComponents.js': {}, './EditorFields.js': {}
 });
+global.window = {mynda: {editor: {prepareArtwork: async value => value}}};
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.values(value).forEach(freeze); Object.freeze(value);
@@ -187,29 +184,8 @@ suite.test('same-summary batch selection changes capture the correct new origina
   instance.componentDidUpdate(old);
   assert.strictEqual(instance.state.originalBatch[0].id, library.media[1].id);
 });
-suite.test('playback updates only position, coalesces ticks and never mutates committed video data', () => {
-  reset(); const instance = stateful(new MynPlayer({video: library.media[0]}));
-  instance.updatePosition(10); instance.updatePosition(20); instance.updatePosition(30);
-  assert.strictEqual(library.media[0].position, 0);
-  assert.strictEqual(pending.length, 1);
-  const first = pending.shift();
-  assert.deepStrictEqual(first.edits[0].changes, {position: 10});
-  complete(first);
-  assert.strictEqual(pending.length, 1);
-  const last = pending.shift();
-  assert.deepStrictEqual(last.edits[0].changes, {position: 30});
-  assert.deepStrictEqual(last.edits[0].expected, {position: 10});
-  complete(last);
-  assert.strictEqual(library.media[0].position, 30);
-});
-suite.test('a failed position commit cannot silently retry queued ticks over a manual reset', () => {
-  reset(); const instance = stateful(new MynPlayer({video: library.media[0]}));
-  instance.updatePosition(10); instance.updatePosition(20);
-  complete(pending.shift(), Object.assign(new Error('Position reset'), {code: 'LIBRARY_CONFLICT'}));
-  assert.strictEqual(pending.length, 0);
-  assert.strictEqual(library.media[0].position, 0);
-  assert(alerts.length);
-});
+
+
 suite.test('details and inline controls submit changed fields, never an entire old record', () => {
   reset(); const original = library.media[0];
   const details = new MynDetails({video: original});
@@ -314,7 +290,9 @@ suite.test('actual frozen LibraryClient records remain untouched by editor and l
     assert.strictEqual(channel, 'library:snapshot');
     return {session: 'component-test', revision: 0, data, paths: {}};
   };
-  const client = new LibraryClient({ipcRenderer: transport, log: quiet, initialData: libraryFixture()});
+  const client = new LibraryClient({api: {snapshot: () => transport.invoke('library:snapshot'),
+    onCommitted: callback => { transport.on('library:committed', callback); return () => transport.removeListener('library:committed', callback); },
+    onPrepareClose: () => () => {}, onCloseCanceled: () => () => {}}, log: quiet, initialData: libraryFixture()});
   await client.ready;
   assert(Object.isFrozen(client.media[0]));
   assert(Object.isFrozen(client.settings.used.kinds));
@@ -349,9 +327,9 @@ suite.test('actual frozen LibraryClient records remain untouched by editor and l
 suite.test('closing waits for an explicit editor save even while artwork copy precedes library IPC', async () => {
   reset([video('a', {artwork: '/tmp/editor-picked.png'})]);
   let finishCopy;
+  window.mynda.editor.prepareArtwork = source => new Promise(resolve => { finishCopy = () => resolve('/tmp/mynda-managed.png'); });
   const {MynEditor: ArtworkEditor} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
     electron: {ipcRenderer: ipc, app: {getPath: () => '/tmp/mynda-component-fixture'}},
-    fs: {copyFile: (source, destination, callback) => { finishCopy = callback; }},
     '../tagging/OmdbHelper.js': {}, './RendererRuntime.js': runtime,
     './SharedComponents.js': {MynOpenablePane: React.Component}, './EditorFields.js': {}
   });
@@ -368,6 +346,7 @@ suite.test('closing waits for an explicit editor save even while artwork copy pr
   assert.strictEqual(closed, false);
   complete(pending.shift()); await saving; await closing;
   assert.strictEqual(closed, true);
+  window.mynda.editor.prepareArtwork = async value => value;
 });
 suite.test('closing with an unsaved editor draft never implicitly saves it', async () => {
   reset(); const instance = editor(); instance.handleChange('title', 'Do not save yet');
@@ -375,17 +354,5 @@ suite.test('closing with an unsaved editor draft never implicitly saves it', asy
   assert.strictEqual(pending.length, 0);
   assert.strictEqual(library.media[0].title, 'Alien');
 });
-suite.test('closing drains the player tick coalesced behind an active position save', async () => {
-  reset(); const player = stateful(new MynPlayer({video: library.media[0]}));
-  player.updatePosition(10); player.updatePosition(20);
-  let closed = false;
-  const closing = [...closeHooks][0]().then(() => { closed = true; });
-  complete(pending.shift()); await Promise.resolve();
-  assert.strictEqual(closed, false);
-  assert.strictEqual(pending.length, 1);
-  assert.strictEqual(pending[0].edits[0].changes.position, 20);
-  complete(pending.shift()); await closing;
-  assert.strictEqual(closed, true);
-  assert.strictEqual(library.media[0].position, 20);
-});
+
 runSuite(suite);

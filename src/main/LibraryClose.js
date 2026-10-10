@@ -19,6 +19,7 @@ function installLibraryClose({app,ipcMain,dialog,library,getWindow,log,
   }
 
   ipcMain.handle('library:close-ready', (event,reply) => {
+    if (typeof library.validateSender === 'function') library.validateSender(event);
     const waiting=pending;
     if (!waiting || !reply || reply.token!==waiting.token || event.sender!==waiting.sender) return {accepted:false};
     pending=null;

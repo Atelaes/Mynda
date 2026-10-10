@@ -10,7 +10,7 @@ const {normalizeDuplicatePaths} = require('./LibraryDuplicates');
 const VideoIdentity = require('./VideoIdentity');
 const LibraryPersistence = require('./LibraryPersistence.js');
 const Operations = require('./LibraryOperations');
-const LibraryClient = require('./LibraryClient');
+const defaultLibrary = require('./LibraryDefaults');
 const commands = require('./LibraryCommands');
 const libraryLog = require('../platform/Logger.js').child('Library');
 
@@ -90,8 +90,9 @@ function errorPayload(error) {
     libraryPath: error.libraryPath, libraryOperation: error.libraryOperation};
 }
 class Library {
-  constructor() {
-    if (!electron.app) return new LibraryClient({ipcRenderer: electron.ipcRenderer, log: libraryLog, initialData: defaultLibrary});
+  constructor({authorizeRenderer, validateRendererCommit} = {}) {
+    this.authorizeRenderer = authorizeRenderer;
+    this.validateRendererCommit = validateRendererCommit;
     this.env = 'server';
     this.dataPath = electron.app.getPath('userData');
     this.libraryDirectory = path.join(this.dataPath, 'Library');
@@ -127,6 +128,7 @@ class Library {
           if (!request || typeof request.requestId !== 'string' || request.requestId.length > 200) throw Operations.failure('INVALID_LIBRARY_OPERATION', 'A request identifier is required.');
           const key = `${event.sender.id}:${request.requestId}`;
           if (!this.requests.has(key)) {
+            if (this.validateRendererCommit) this.validateRendererCommit(request,event);
             const promise = this.enqueue(request.operations, {actor: 'renderer', priority: 'user',
               updateUsedLists: Boolean(request.options && request.options.updateUsedLists), requestId: request.requestId});
             this.requests.set(key, promise);
@@ -138,6 +140,10 @@ class Library {
     }
   }
   validateSender(event) {
+    if (this.authorizeRenderer) {
+      if (!this.authorizeRenderer(event)) throw Operations.failure('LIBRARY_UNAUTHORIZED', 'Library access is limited to the application window.');
+      return;
+    }
     const sender = event && event.sender;
     let valid = false;
     try {
@@ -150,7 +156,8 @@ class Library {
         valid = actual === expected || fs.realpathSync(actual) === fs.realpathSync(expected);
       }
     } catch (_) {}
-    if (!valid || (event.senderFrame && sender.mainFrame && event.senderFrame !== sender.mainFrame)) {
+    if (!valid || !event.senderFrame || event.senderFrame !== sender.mainFrame ||
+        (typeof sender.isDestroyed === 'function' && sender.isDestroyed())) {
       throw Operations.failure('LIBRARY_UNAUTHORIZED', 'Library access is limited to the application window.');
     }
   }
@@ -485,182 +492,6 @@ class Library {
 }
 Object.assign(Library.prototype, commands);
 
-const defaultLibrary = {
-  "id": uuidv4(),
-  "videoIdScheme": VideoIdentity.VIDEO_ID_SCHEME,
-  "settings": {
-    "watchfolders": [],
-    "themes": {
-      "appearances": [
-        {
-          "name": "Dark Theme",
-          "path": "styles/themes/appearances/dark-theme.css",
-          "dependencies": {
-            "fonts": [],
-            "images": []
-          }
-        }
-      ],
-      "layouts": [
-        {
-          "name": "Default Layout Theme",
-          "path": "styles/themes/layouts/default-layout-theme.css",
-          "dependencies": {}
-        }
-      ]
-    },
-    "preferences": {
-      "defaultcolumns": {
-        "used": [
-          "title",
-          "year",
-          "director",
-          "genre",
-          "seen",
-          "ratings_user",
-          "dateadded"
-        ],
-        "unused": [
-          "kind",
-          "lastseen",
-          "watchlater",
-          "ratings_rt",
-          "ratings_imdb",
-          "ratings_mc",
-          "ratings_avg",
-          "boxoffice",
-          "rated",
-          "country",
-          "languages",
-          "duration",
-          "resolution"
-        ]
-      },
-      "defaultdefaultcolumns": {
-        "used": [
-          "title",
-          "year",
-          "director",
-          "genre",
-          "seen",
-          "ratings_user",
-          "dateadded"
-        ],
-        "unused": [
-          "kind",
-          "lastseen",
-          "watchlater",
-          "ratings_rt",
-          "ratings_imdb",
-          "ratings_mc",
-          "ratings_avg",
-          "boxoffice",
-          "rated",
-          "country",
-          "languages",
-          "duration",
-          "resolution"
-        ]
-      },
-      "hide_description": "show",
-      "override_dialogs": {
-        "MynEditorSearch-confirm-select": false,
-        "MynEditor-confirm-exit": false,
-        "MynEditorEdit-confirm-revert": false,
-        "MynLibTable-confirm-inlineEdit": false,
-        "MynAutoTag-confirm-cancel": false,
-        "MynEditor-confirm-reset-from-filename": false,
-        "MynSettingsFolders-confirm-remove": false,
-        "MynSettingsPlaylists-confirm-delete-playlist": false,
-        "MynSettingsPrefs-confirm-remove-kind": false
-      },
-      "include_user_rating_in_avg": false,
-      "include_new_vids_in_playlists": true,
-      "remove_edited_from_new": false,
-      "remove_autotagged_from_new": true,
-      "exclude_samples_from_library": true,
-      "exclude_trailers_from_library": true
-    },
-    "used": {
-      "kinds": [
-        "movie",
-        "show"
-      ],
-      "genres": [],
-      "tags": []
-    }
-  },
-  "playlists": [
-    {
-      "id": "new",
-      "name": "New",
-      "filter_function": "video.new === true",
-      "view": "flat",
-      "tab": true,
-      "flatDefaultSort": "dateadded",
-      "columns": [
-        "title",
-        "dateadded",
-        "seen",
-        "ratings_user"
-      ]
-    },
-    {
-      "id": "1",
-      "name": "Movies",
-      "filter_function": "video.kind === 'movie'",
-      "view": "flat",
-      "tab": true,
-      "columns": [
-        "title",
-        "year",
-        "director",
-        "genre",
-        "seen",
-        "watchlater",
-        "ratings_user",
-        "dateadded"
-      ]
-    },
-    {
-      "id": "2",
-      "name": "Shows",
-      "filter_function": "video.kind === 'show'",
-      "view": "series",
-      "tab": true,
-      "columns": [
-        "title",
-        "year",
-        "director",
-        "genre",
-        "seen",
-        "watchlater",
-        "ratings_user",
-        "dateadded"
-      ]
-    },
-    {
-      "id": "3",
-      "name": "♥",
-      "filter_function": "video.watchlater === true",
-      "view": "flat",
-      "tab": true,
-      "columns": [
-        "title",
-        "year",
-        "director",
-        "genre",
-        "seen",
-        "ratings_user",
-        "dateadded"
-      ]
-    }
-  ],
-  "recently_watched": [],
-  "media": [],
-  "object_media": {},
-  "inactive_media": []
-};
 
 // expose the class
 module.exports = Library;

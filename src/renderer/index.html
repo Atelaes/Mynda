@@ -1,43 +1,16 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset='UTF-8'>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Embeds, base-URL changes and form navigation have no role in Mynda.
-         A stricter script policy follows the renderer/preload migration. -->
-    <meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-    <!-- <script type="text/javascript" src="../babel.min.js"></script> -->
-    <!-- <script type="text/javascript" src="../react.development.js"></script>
-    <script type="text/javascript" src="../react-dom.development.js"></script> -->
-    <!-- <script type="text/babel" src="Renderer.js"></script> -->
+    <!-- React and drag-and-drop use inline styles. Scripts are compiled into
+         this local bundle; inline scripts, eval, network requests, embeds,
+         form navigation and workers have no role in the renderer. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'none'; frame-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <link rel="stylesheet" href="styles/main.css">
-    <script>
-      let savedPing = {};
-    </script>
-    <style>
-    </style>
+    <script defer src="generated/renderer.js"></script>
   </head>
   <body>
-    <div id="root">
-    </div>
-    <script type="text/javascript">
-      // Configure JSX explicitly instead of relying on a .babelrc somewhere
-      // above the project. The Electron smoke test runs a disposable app copy,
-      // and packaged builds must be equally independent of a developer's
-      // machine-wide Babel configuration.
-      require("@babel/register")({
-        presets: [require.resolve("@babel/preset-react")],
-        extensions: [".js"],
-        ignore: [/node_modules/],
-        // ZIP overlays can preserve a previous source modification time.
-        // Babel's persistent cache checks mtime, not the source contents, and
-        // can therefore keep running an older renderer after an update.
-        // Node still caches required modules for the lifetime of this window.
-        cache: false,
-        babelrc: false,
-        configFile: false
-      });
-      require('./Renderer.js');
-    </script>
+    <div id="root"></div>
   </body>
 </html>

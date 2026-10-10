@@ -1,4 +1,4 @@
-const electron = require('electron');
+const {app} = require('electron');
 // const request = require('request');
 const axios = require('axios');
 const fs = require('fs');
@@ -41,7 +41,7 @@ const log = Logger.child('Download');
         });
       }
       let filename = uuidv4() + ext;
-      let folder = path.join((electron.app || electron.remote.app).getPath('userData'),'temp');
+      let folder = path.join(app.getPath('userData'),'temp');
       dest = path.join(folder, filename);
     }
 

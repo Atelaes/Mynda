@@ -1,4 +1,4 @@
-const {normalizeDuplicatePaths} = require('./LibraryDuplicates.js');
+const {displayDuplicatePaths} = require('./DuplicateDisplay.js');
 const {RESOLUTION_BUCKETS, getResolutionInfo} = require('../media/VideoResolution.js');
 
 function percentage(part, total) {
@@ -19,7 +19,7 @@ function resolutionBucket(video) {
   return getResolutionInfo(video && video.metadata).label;
 }
 
-function buildLibraryStats(videos, platform = process.platform) {
+function buildLibraryStats(videos) {
   const validVideos = (Array.isArray(videos) ? videos : []).filter(video =>
     video && typeof video === 'object'
   );
@@ -56,10 +56,9 @@ function buildLibraryStats(videos, platform = process.platform) {
     const resolution = resolutionBucket(video);
     resolutionCounts.set(resolution, resolutionCounts.get(resolution) + 1);
 
-    const duplicatePaths = normalizeDuplicatePaths(
+    const duplicatePaths = displayDuplicatePaths(
       video.duplicates,
-      video.filename,
-      platform
+      video.filename
     );
     duplicateCount += duplicatePaths.length;
     if (duplicatePaths.length > 0) {

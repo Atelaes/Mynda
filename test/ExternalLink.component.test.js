@@ -8,9 +8,8 @@ require('@babel/register')({presets: [require.resolve('@babel/preset-react')], e
 
 const calls = [];
 let response = async () => ({ok: true});
-const links = loadFreshWithMocks(path.join(__dirname, '../src/renderer/ExternalLink.js'), {
-  electron: {ipcRenderer: {invoke: async (...args) => { calls.push(args); return response(); }}}
-});
+global.window = {mynda: {external: {open: async url => { calls.push(url); return response(); }}}};
+const links = require('../src/renderer/ExternalLink.js');
 const {ExternalLink, ImdbLink} = links;
 const suite = createSuite('External links in the editor', 'component',
   'Real link rendering, activation, failed browser launches and catalog-result IDs.');
@@ -25,14 +24,14 @@ suite.test('renders a copyable HTTPS link with no access to its opener', () => {
   assert.match(output, /rel="noopener noreferrer"/);
   assert.match(output, /&lt;IMDb&gt;/);
 });
-suite.test('uses the approved IPC channel for mouse and keyboard activation and stops row selection', async () => {
+suite.test('uses the named external-link bridge for mouse and keyboard activation and stops row selection', async () => {
   calls.length = 0; response = async () => ({ok: true});
   const link = unwrap(ImdbLink({imdbID: 'tt1234567', children: 'IMDb'}));
   for (const detail of [1, 0]) {
     const e = {...event(), detail}; await link.props.onClick(e);
     assert(e.prevented); assert(e.stopped);
   }
-  assert.deepStrictEqual(calls, Array(2).fill(['external:open', 'https://www.imdb.com/title/tt1234567/']));
+  assert.deepStrictEqual(calls, Array(2).fill('https://www.imdb.com/title/tt1234567/'));
 });
 suite.test('never creates an anchor for an invalid ID or arbitrary URL', () => {
   for (const imdbID of ['javascript:alert(1)', 'tt1/../../redirect', 'tt12?next=bad', undefined, {}]) {
@@ -58,6 +57,7 @@ suite.test('catalog search results use the same component and refuse malformed r
   const records = ['tt1234567', 'tt1/../../redirect'].map(imdbID => ({
     imdbID, Type: 'movie', Title: 'A result', Year: '2000', Poster: 'N/A'
   }));
+  window.mynda.editor = {search: async () => ({status: 'ambiguous', choices: records})};
   const {MynEditorSearch} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
     electron: {ipcRenderer: {}}, './ExternalLink.js': links,
     '../tagging/OmdbHelper.js': {resolve: async () => ({status: 'ambiguous', choices: records})},
@@ -75,7 +75,7 @@ suite.test('catalog search results use the same component and refuse malformed r
   calls.length = 0;
   const e = event(); await unwrap(linkNodes[0]).props.onClick(e);
   assert(e.prevented && e.stopped);
-  assert.deepStrictEqual(calls, [['external:open', 'https://www.imdb.com/title/tt1234567/']]);
+  assert.deepStrictEqual(calls, ['https://www.imdb.com/title/tt1234567/']);
 });
 
 runSuite(suite);

@@ -97,6 +97,9 @@ function auditReferences(root) {
   }
   for (const folder of ['src', 'scripts', 'test']) {
     for (const owner of filesUnder(path.join(root, folder))) {
+      // Generated scripts are verified as executable bundles and ASAR assets;
+      // their flattened imports/source maps are not authored source references.
+      if (path.relative(root, owner).split(path.sep).includes('generated')) continue;
       if (!/\.(?:js|html|css)$/.test(owner)) continue;
       const source = fs.readFileSync(owner, 'utf8');
       if (owner.endsWith('.js')) {

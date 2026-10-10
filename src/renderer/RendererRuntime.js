@@ -1,9 +1,14 @@
 // Shared renderer services. CommonJS caches this module, so every component
 // receives the same Library instance and logger set.
-const Library = require('../library/Library.js');
-const Logger = require('../platform/Logger.js');
+const LibraryClient = require('../library/LibraryClient.js');
+const initialData = require('../library/LibraryDefaults.js');
+const Logger = require('./RendererLogger.js');
 
-const library = new Library();
+const savedPing = {};
+const library = new LibraryClient({api:window.mynda.library,
+  initialData, log:Logger.child('Library'), onSaved:address => {
+    if (typeof savedPing.saved === 'function') savedPing.saved(address);
+  }});
 
 const frontendLog = Logger.child('Renderer');
 const libraryViewLog = Logger.child('LibraryView');
@@ -57,6 +62,7 @@ function disableConfirmationDialog(dialogName, log = frontendLog) {
 }
 
 module.exports = {
+  savedPing,
   library,
   frontendLog,
   libraryViewLog,

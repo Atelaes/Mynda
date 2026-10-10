@@ -9,6 +9,7 @@ const {loadFreshWithMocks} = require('./helpers/ModuleMocks');
 const {libraryFixture, videoFixture} = require('./helpers/Fixtures');
 const Persistence = require('../src/library/LibraryPersistence');
 const {buildTaggingReport} = require('../src/tagging/TaggingReport');
+const {validateRendererCommit} = require('../src/library/LibraryRendererPolicy');
 
 const suite = createSuite('Single-writer library transactions', 'integration',
   'The real library, isolated atomic files, independently scheduled Electron messages, and failures at the filesystem boundary.');
@@ -116,13 +117,18 @@ function pairedLibrary(directory, videos = [], inactiveVideos = []) {
         } catch (error) { reject(error); }
       });
     });
-    const rendererPersistence = Object.fromEntries(Object.entries(Persistence).map(([key, value]) =>
-      [key, typeof value === 'function' && key !== 'InvalidLibraryError' ? (...args) => {
-        diskCalls.push(key);
-        return value(...args);
-      } : value]));
-    const Renderer = loadClass({remote: {app}, ipcRenderer}, rendererPersistence);
-    const renderer = new Renderer();
+    const {createBridge} = require('../src/preload/Bridge');
+    const channels = {'library.snapshot':'library:snapshot','library.commit':'library:commit',
+      'library.closeReady':'library:close-ready'};
+    const api = createBridge({platform:process.platform,
+      invoke:(method,...args)=>ipcRenderer.invoke(channels[method],...args),
+      subscribe:(channel,callback)=>{
+        const listener=(_event,...args)=>callback(...args);
+        ipcRenderer.on(channel,listener);
+        return ()=>ipcRenderer.removeListener(channel,listener);
+      }}).library;
+    const Client = require('../src/library/LibraryClient');
+    const renderer = new Client({api,log:quietLog.child(),initialData:require('../src/library/LibraryDefaults')});
     const result = {renderer, sender, ipcRenderer, diskCalls};
     renderers.push(result);
     return result;
@@ -830,6 +836,81 @@ suite.test('generic renderer video replacements retain identity checks and scann
     }
     assert.strictEqual(client.renderer.media[0].title, baseline.title);
     assert.strictEqual(client.renderer.media[0].imdbID, 'tt9999999');
+  }));
+
+suite.test('untrusted renderer file references fail before queueing or writing, while ordinary edits still save', () =>
+  withTemporaryDirectory('transaction-renderer-file-gate', async directory => {
+    const f = pairedLibrary(directory, [videoFixture({id: videoID(1), subtitles: [], artwork: ''})]);
+    f.main.validateRendererCommit = request => validateRendererCommit(request, {library: f.main});
+    const client = f.createRenderer();
+    await f.flush();
+    const before = f.disk(), revision = f.main.revision;
+    for (const changes of [{subtitles: ['/private/secret']}, {artwork: '/private/secret.png'}, {dvd: true}]) {
+      const denied = patchBatch(client.renderer, [{id: videoID(1), changes}]);
+      await f.flush();
+      assert.strictEqual(denied.done, true);
+      assert.strictEqual(denied.error && denied.error.code, 'INVALID_LIBRARY_OPERATION');
+      assert.strictEqual(f.policy.writes, 0);
+      assert.strictEqual(f.main.revision, revision);
+      assert.deepStrictEqual(f.disk(), before);
+    }
+    const allowed = patchBatch(client.renderer, [{id: videoID(1), changes: {title: 'Ordinary edit'}}]);
+    await f.flush();
+    assertCommitted(allowed);
+    assert.strictEqual(f.disk().media[0].title, 'Ordinary edit');
+    assert.strictEqual(f.policy.writes, 1);
+  }));
+
+suite.test('native file grants belong to their owner and accepted file edits retain stale identity protection', () =>
+  withTemporaryDirectory('transaction-renderer-owner-grants', async directory => {
+    const f = pairedLibrary(directory, [videoFixture({id: videoID(1), subtitles: [], artwork: ''})]);
+    f.main.validateRendererCommit = (request, event) => validateRendererCommit(request, {library: f.main,
+      authorizeSubtitle: value => event.sender.id === 1 && value === '/chosen/subtitle.srt',
+      authorizeArtwork: value => event.sender.id === 1 && value === '/managed/new.png'});
+    const owner = f.createRenderer(1), other = f.createRenderer(2);
+    await f.flush();
+    const changes = {subtitles: ['/chosen/subtitle.srt'], artwork: '/managed/new.png'};
+    const denied = patchBatch(other.renderer, [{id: videoID(1), changes}]);
+    await f.flush();
+    assert.strictEqual(denied.error && denied.error.code, 'INVALID_LIBRARY_OPERATION');
+    assert.strictEqual(f.policy.writes, 0);
+    const baseline = clone(owner.renderer.media[0]);
+    const stale = patchBatch(owner.renderer, [{id: videoID(1), changes: {...changes, title: 'Old title edit'}, baseline}]);
+    const newer = patchBatch(f.main, [{id: videoID(1), changes: {imdbID: 'tt9999999'}, baseline}], {priority: 'background'});
+    await f.flush(message => message.direction !== 'invoke');
+    assertCommitted(newer);
+    await f.flush();
+    assert.strictEqual(stale.error && stale.error.code, 'LIBRARY_CONFLICT');
+    assert.deepStrictEqual(f.disk().media[0].subtitles, []);
+    const accepted = patchBatch(owner.renderer, [{id: videoID(1), changes}]);
+    await f.flush();
+    assertCommitted(accepted);
+    assert.deepStrictEqual(f.disk().media[0].subtitles, changes.subtitles);
+    assert.strictEqual(f.disk().media[0].artwork, changes.artwork);
+    assert.strictEqual(f.disk().media[0].imdbID, 'tt9999999');
+  }));
+
+suite.test('replaying a completed request does not need another file grant or perform another write', () =>
+  withTemporaryDirectory('transaction-renderer-grant-replay', async directory => {
+    const f = pairedLibrary(directory, [videoFixture({id: videoID(1), subtitles: []})]);
+    let validGrant = true, validations = 0;
+    f.main.validateRendererCommit = request => {
+      validations++;
+      validateRendererCommit(request, {library: f.main, authorizeSubtitle: () => validGrant});
+    };
+    const client = f.createRenderer();
+    await f.flush();
+    const first = patchBatch(client.renderer, [{id: videoID(1), changes: {subtitles: ['/chosen/subtitle.srt']}}]);
+    await f.flush();
+    assertCommitted(first);
+    const request = f.history.find(entry => entry.direction === 'invoke' && entry.channel === 'library:commit').args[0];
+    validGrant = false;
+    const duplicate = client.ipcRenderer.invoke('library:commit', request);
+    await f.flush();
+    const result = await duplicate;
+    assert.strictEqual(result.error, undefined);
+    assert.strictEqual(validations, 1);
+    assert.strictEqual(f.policy.writes, 1);
   }));
 
 suite.test('an autotag save conflict records a readable explanation without changing manual tags or retry eligibility', () =>

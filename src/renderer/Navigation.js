@@ -1,6 +1,5 @@
 // Top navigation and playlist tabs.
 const React = require('react');
-const {ipcRenderer} = require('electron');
 const {library} = require('./RendererRuntime.js');
 
 // ###### Nav Pane: contains playlist tabs and search field ###### //
@@ -12,12 +11,17 @@ class MynNav extends React.Component {
       numVidsAdded:0,
     }
 
-    // sent by index.js when a video is added to the library;
-    ipcRenderer.on('videos_added', (event, numVidsAdded) => {
-      this.setState({numVidsAdded:numVidsAdded});
-    });
-
     this.render = this.render.bind(this);
+  }
+
+  componentDidMount() {
+    this._removeVideosAdded = window.mynda.events.onVideosAdded(numVidsAdded => {
+      this.setState({numVidsAdded});
+    });
+  }
+
+  componentWillUnmount() {
+    if (this._removeVideosAdded) this._removeVideosAdded();
   }
 
   clearSearch(e) {

@@ -3,7 +3,8 @@
 const fs=require('fs');
 const path=require('path');
 const assert=require('assert');
-const {app,dialog,ipcMain,session}=require('electron');
+const {app,dialog,session}=require('electron');
+const {EventEmitter}=require('events');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify}=require('./SmokeLifecycle');
 const {videos,ids,assertSaved}=require('./LibraryJourneyFixtures');
 const userData=process.env.MYNDA_E2E_USER_DATA;
@@ -13,7 +14,7 @@ assert(['exercise','restart'].includes(phase),'Unknown test phase');
 app.setPath('userData',userData);
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 const root=app.getAppPath();
-let stage='startup',windowFound=false,library;
+let stage='startup',windowFound=false,library,background='';
 const messages=[];
 const finish=createSmokeTerminator({app,clearDeadline:()=>clearTimeout(deadline),
   writeResult:result=>fs.writeSync(1,'MYNDA_ELECTRON_SMOKE_RESULT:'+JSON.stringify({...result,phase,rendererConsole:messages.slice(-12)})+'\n')});
@@ -33,8 +34,8 @@ dialog.showMessageBox=(...args)=>{
 const libraryFile=require.resolve(path.join(root,'src/library/Library.js'));
 const RealLibrary=require(libraryFile);
 require.cache[libraryFile].exports=class extends RealLibrary {
-  constructor() {
-    super();library=this;
+  constructor(...args) {
+    super(...args);library=this;
     if(phase==='exercise') {
       assert.strictEqual(this.media.length,0,'Exercise phase requires a fresh fixture');
       const mediaDirectory=path.join(userData,'media');
@@ -52,6 +53,25 @@ require.cache[libraryFile].exports=class extends RealLibrary {
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
 const startupReady=deferred(),scanStarted=deferred(),scanRelease=deferred(),tagStarted=deferred(),tagRelease=deferred();
 let scanArmed=false,tagRequests=0;
+
+// Replace only the external player process. Playback coordination, event
+// handling, library commits, and renderer notifications remain production code.
+const mediaTools=require(path.join(root,'src/media/MediaTools.js'));
+mediaTools.mpvPath=process.execPath;
+const processTools=require(path.join(root,'src/media/MpvProcess.js'));
+const playback={player:null,loads:[],resumes:[],stops:[]};
+class FixturePlayer extends EventEmitter {
+  constructor() {super();playback.player=this;}
+  async load(filename) {playback.loads.push(filename);}
+  async goToPosition(position) {playback.resumes.push(position);}
+  async addSubtitles() {}
+  async play() {}
+}
+const mpvModule=require.resolve('node-mpv');
+require(mpvModule);
+require.cache[mpvModule].exports=FixturePlayer;
+processTools.startMpvPlayer=async()=>{};
+processTools.stopMpvPlayer=player=>{if(player) playback.stops.push(player);};
 const metadata=require(path.join(root,'src/media/MediaMetadata.js'));
 metadata.retrieveMetadata=async options=>{
   assert(scanArmed && phase==='exercise','Unexpected media probe');
@@ -64,20 +84,12 @@ catalog.resolve=async video=>{
   tagStarted.resolve();await tagRelease.promise;
   return {status:'matched',video:{...video,title:'Catalog Alpha',imdbID:'tt1234567'},evidence:{kind:'movie'}};
 };
-ipcMain.handle('journey:arm-scan',async()=>{
+async function armScan() {
   scanArmed=true;
   await library.patchMedia(ids[0],{'metadata.checked':false});
-  return true;
-});
-ipcMain.handle('journey:startup-ready',()=>startupReady.promise.then(()=>true));
-ipcMain.handle('journey:scan-started',()=>scanStarted.promise.then(()=>true));
-ipcMain.handle('journey:tag-started',()=>tagStarted.promise.then(()=>true));
-ipcMain.handle('journey:release-scan',()=>{scanRelease.resolve();return true;});
-ipcMain.handle('journey:release-tag',()=>{tagRelease.resolve();return true;});
-ipcMain.on('journey:stage',(_event,value)=>{stage=String(value);});
+}
 
 app.on('ready',()=>{
-  session.defaultSession.setPreloads([path.join(root,'LibraryJourneyPreload.js')]);
   session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_details,callback)=>callback({cancel:true}));
 });
 app.on('browser-window-created',(_event,window)=>{
@@ -85,6 +97,7 @@ app.on('browser-window-created',(_event,window)=>{
   const send=window.webContents.send.bind(window.webContents);
   window.webContents.send=(channel,...args)=>{
     if(channel==='status-update' && args[0]) {
+      background=args[0].action || '';
       if(args[0].action==='check') sawScan=true;
       if(sawScan && args[0].action==='') startupReady.resolve();
     }
@@ -98,12 +111,15 @@ app.on('browser-window-created',(_event,window)=>{
     if(windowFound || !window.webContents.getURL().includes('/src/renderer/index.html')) return;
     windowFound=true;stage='library-actions';
     try {
-      const result=await window.webContents.executeJavaScript(
-        `require(${JSON.stringify(path.join(root,'LibraryJourneyRenderer.js'))}).run(${JSON.stringify(phase)})`);
+      const result=await require('./LibraryJourneyRenderer').run({window,phase,library,playback,
+        startupReady:startupReady.promise,armScan,scanStarted:scanStarted.promise,releaseScan:scanRelease.resolve,
+        tagStarted:tagStarted.promise,releaseTag:tagRelease.resolve,background:()=>background,stage:value=>{stage=value;}});
       stage='graceful-close';
       closeAndVerify(window,()=>{
         const saved=JSON.parse(fs.readFileSync(path.join(userData,'Library/library.json'),'utf8'));
         assertSaved(saved);
+        assert(playback.player && playback.stops.includes(playback.player), 'Closing must stop the backend player');
+        assert.strictEqual(playback.player.listenerCount('timeposition'),0,'Closing must detach playback events');
         if(phase==='exercise') assert.strictEqual(tagRequests,1);
         return {stage:'complete',...result,gracefulClose:true};
       },finish);

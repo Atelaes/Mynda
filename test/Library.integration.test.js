@@ -166,9 +166,8 @@ suite.test('preserves current subtitle provenance during unrelated renderer edit
   'library-renderer-replacement',
   async directory => {
     global.savedPing = {saved() {}};
-    const {Library, ipcRenderer} = loadLibraryClass(directory, true);
-    const instance = new Library();
-    await instance.ready;
+    // Provenance normalization is now exclusively a backend operation.
+    const instance = require('../src/library/LibraryCommands');
     const detected = path.join(directory, 'watch', 'Movie.en.srt');
     const ignored = path.join(directory, 'watch', 'Movie.commentary.srt');
     const duplicate = path.join(directory, 'watch', 'Movie Copy.mkv');
@@ -191,7 +190,6 @@ suite.test('preserves current subtitle provenance during unrelated renderer edit
     assert.deepStrictEqual(prepared.subtitles, [detected]);
     assert.deepStrictEqual(prepared.ignored_subtitles, [ignored]);
     assert.deepStrictEqual(prepared.duplicates, [duplicate]);
-    assert(ipcRenderer.sent.some(entry => entry.channel === 'library:snapshot'));
     delete global.savedPing;
   }
 ));

@@ -97,8 +97,8 @@ suite.test('copies only the matching staged platform media directory into Resour
   assert.strictEqual(packageJson.build.asarUnpack, undefined);
 });
 
-suite.test('verifies media binaries even when electron-builder is invoked directly', () => {
-  assert.strictEqual(packageJson.build.beforeBuild, './scripts/verify-media-tools.js');
+suite.test('builds the browser bundle and verifies media even when electron-builder is invoked directly', () => {
+  assert.strictEqual(packageJson.build.beforeBuild, './scripts/before-build.js');
   assert(packageJson.scripts['media:prepare'].includes('prepare-media-tools.js'));
   assert(packageJson.scripts['media:prepare:macos'].includes('prepare-media-tools-macos.sh'));
   assert(packageJson.scripts['media:prepare:windows'].includes('prepare-media-tools-windows.ps1'));

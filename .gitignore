@@ -12,3 +12,5 @@ src/Collection.js
 .babelrc
 
 /dist/
+/src/renderer/generated/
+/src/preload/generated/

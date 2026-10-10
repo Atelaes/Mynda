@@ -1,8 +1,6 @@
 // Pure and near-pure helpers shared by renderer component groups.
 const _ = require('lodash');
-const path = require('path');
-const URL = require('url');
-const {normalizeDuplicatePaths} = require('../library/LibraryDuplicates.js');
+const {displayDuplicatePaths} = require('../library/DuplicateDisplay.js');
 const {isVideoID} = require('../library/VideoIdentity.js');
 
 // Sort display titles by their meaningful first word while preserving the
@@ -19,14 +17,26 @@ function removeLeadingArticle(value) {
 function artworkSourceURL(artwork, placeholder = '') {
   const source = typeof artwork === 'string' && artwork ? artwork : placeholder;
   if (typeof source !== 'string' || !source) return '';
-  if (!path.isAbsolute(source) || isValidURL(source)) return source;
-  return URL.pathToFileURL(source).href;
+  // A stored path is data; encoding every segment prevents literal %, # and ?
+  // in filenames from changing URL interpretation. Windows drive and UNC
+  // paths are also recognized when inspecting an imported library elsewhere.
+  if (/^[a-z]:[\\/]/i.test(source)) {
+    return 'file:///' + source.slice(0, 2) + source.slice(2).replace(/\\/g, '/')
+      .split('/').map(encodeURIComponent).join('/');
+  }
+  if (/^\\\\[^\\]+\\/.test(source)) {
+    const parts = source.slice(2).split('\\');
+    const host = parts.shift();
+    return 'file://' + encodeURIComponent(host) + '/' + parts.map(encodeURIComponent).join('/');
+  }
+  if (!source.startsWith('/')) return source;
+  return 'file://' + source.split('/').map(encodeURIComponent).join('/');
 }
 
 // Electron's shell.showItemInFolder() is portable, but each desktop gives
 // its file browser a different familiar name. Keep that presentation choice
 // out of the component so Linux is not described as Windows.
-function fileManagerName(platform = process.platform) {
+function fileManagerName(platform = typeof window !== 'undefined' && window.mynda ? window.mynda.app.platform : '') {
   if (platform === 'darwin') return 'Finder';
   if (platform === 'win32') return 'Explorer';
   return 'File Manager';
@@ -291,7 +301,7 @@ function validateVideo(video) {
   if (repaired.kind !== 'show') {
     repaired.seriesImdbID = '';
   }
-  repaired.duplicates = normalizeDuplicatePaths(repaired.duplicates, repaired.filename);
+  repaired.duplicates = displayDuplicatePaths(repaired.duplicates, repaired.filename);
 
   // if the ratings object doesn't have all the sources, fill it with empty values;
   // most things will work fine if we don't do this, but the bit of logic
@@ -317,7 +327,7 @@ function validateVideo(video) {
 // helper function to determine if a string is a valid URL
 function isValidURL(s) {
   try {
-    let url = new URL.URL(s);
+    let url = new URL(s);
     return url.host !== '';
   } catch (error) {
     return false;

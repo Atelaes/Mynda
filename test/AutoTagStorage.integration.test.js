@@ -1,4 +1,4 @@
-const fs=require('fs'),path=require('path'),vm=require('vm');
+const fs=require('fs'),path=require('path');
 const {EventEmitter}=require('events');
 const {assert,createSuite,runSuite,withTemporaryDirectory}=require('./helpers/TestHarness');
 const {loadFreshWithMocks}=require('./helpers/ModuleMocks');
@@ -130,14 +130,15 @@ suite.test('storage errors retain their OS code and have specific explanations w
   }));
 
 suite.test('both real IPC entry points send unexpected rejection to the same failure reporter',async()=>{
-  const source=fs.readFileSync(path.join(__dirname,'../src/main/index.js'),'utf8');
-  const start=source.indexOf("ipcMain.on('autotag',"),end=source.indexOf("ipcMain.on('autotag-cancel',",start);
-  assert(start>=0 && end>start);
-  const handlers={},received=[],error=new Error('Unexpected runner failure');
-  vm.runInNewContext(source.slice(start,end),{ipcMain:{on:(name,fn)=>{handlers[name]=fn;}},
-    requestAutoTag:async()=>{throw error;},requestSelectedAutoTag:async()=>{throw error;},
-    reportAutoTagFailure:async(e,scope)=>{received.push({error:e,scope});}});
-  handlers.autotag();handlers['autotag-selected']({},['selected-video']);await Promise.resolve();
+  const {createTaskMethods}=require('../src/main/TaskService');
+  const {installRendererBridge}=require('../src/main/RendererBridge');
+  const received=[],error=new Error('Unexpected runner failure');let handler;
+  const methods=createTaskMethods({startTagging:async()=>{throw error;},startSelectedTagging:async()=>{throw error;},
+    reportFailure:async(e,scope)=>{received.push({error:e,scope});}});
+  installRendererBridge({ipcMain:{handle:(_name,fn)=>{handler=fn;}},isTrustedSender:()=>true,methods});
+  await handler({},'tagging.start',[]);
+  await handler({},'tagging.startSelected',[['a'.repeat(64)]]);
+  await new Promise(resolve=>setImmediate(resolve));
   assert.strictEqual(received.length,2);assert(received.every(item=>item.error===error));
   assert.deepStrictEqual(received.map(item=>item.scope),['library','selected']);
 });
