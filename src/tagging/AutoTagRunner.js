@@ -19,6 +19,11 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
   return async function autoTag(options = {}) {
     if (state.running) return;
     const videos = _.cloneDeep(Array.isArray(options.videos) ? options.videos : getCandidates());
+    // Lookups run outside the library commit queue. Keep the record they were
+    // based on so a later result cannot overwrite edits made during a lookup.
+    // Successful earlier passes become the baseline for this run's retries;
+    // never refresh it from arbitrary concurrent edits in the live library.
+    const saveBaselines = new Map(videos.map(video => [video.id, _.cloneDeep(video)]));
     const budgets = videos.map(() => createRequestBudget(options.requestBudgetLimit));
     state.running = true;
     state.cancelRequested = false;
@@ -38,7 +43,23 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       if (!batchSave.length) return;
       const completed = batchSave;
       batchSave = [];
-      try { await save(completed); }
+      try {
+        const result = await save(completed, {
+          baselines: completed.map(video => _.cloneDeep(saveBaselines.get(video.id)))
+        });
+        const conflicts = new Set((result && result.conflicts || []).map(item => item.id));
+        for (const video of completed) {
+          if (!conflicts.has(video.id)) saveBaselines.set(video.id, _.cloneDeep(video));
+          else {
+            const index = videos.findIndex(input => input.id === video.id);
+            const previous = outcomes.get(index);
+            if (previous) statistics[previous]--;
+            outcomes.set(index, 'Changed during lookup');
+            statistics['Changed during lookup'] = (statistics['Changed during lookup'] || 0) + 1;
+            log.warn('Automatic tagging result skipped because the video changed during lookup', {id:video.id});
+          }
+        }
+      }
       catch(cause) {
         const error = new Error('Auto-Tag could not finish saving its results.');
         error.name = 'AutoTagSaveError';

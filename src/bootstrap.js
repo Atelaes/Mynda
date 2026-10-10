@@ -4,5 +4,8 @@
 if (process.env.MYNDA_PACKAGED_MEDIA_SMOKE === '1') {
   require('./main/PackagedMediaSmoke.js');
 } else {
-  require('./main/index.js');
+  const {app, BrowserWindow} = require('electron');
+  require('./main/SingleInstance.js').startSingleInstance({
+    app, BrowserWindow, start: () => require('./main/index.js')
+  });
 }

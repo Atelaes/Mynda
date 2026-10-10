@@ -7,6 +7,7 @@ const mpvAPI = require('node-mpv');
 const MediaTools = require('../media/MediaTools.js');
 const MpvProcess = require('../media/MpvProcess.js');
 const {library, playerLog} = require('./RendererRuntime.js');
+const {reportSaveFailure} = require('./LibraryEdits.js');
 const {MynOpenablePane} = require('./SharedComponents.js');
 
 // Turn node-mpv's string, Error, and structured IPC rejection shapes into a
@@ -423,18 +424,62 @@ class MynPlayer extends MynOpenablePane {
     this.loadingIndicator = null;
     this.mpv = null;
     this.playbackAttempt = 0;
+    this._removeCloseHook = library.onBeforeClose ? library.onBeforeClose(async () => {
+      while (this._positionSavePending || (this._pendingPositions && this._pendingPositions.size)) {
+        await this.flushPosition();
+      }
+    }) : null;
 
     this.render = this.render.bind(this);
     this.setUpVideo = this.setUpVideo.bind(this);
   }
 
   updatePosition(time) {
-    this.state.video.position = Math.round(time * 10) / 10;
-    playerLog.debug('Updating saved playback position', {
-      videoID: this.state.video.id,
-      position: this.state.video.position
+    const id = this.state.video.id;
+    const position = Math.round(time * 10) / 10;
+    // Playback state is a local draft; never mutate the renderer's committed
+    // video record, and never resubmit unrelated title/catalog fields.
+    this.state.video = {...this.state.video, position};
+    this._pendingPositions = this._pendingPositions || new Map();
+    this._pendingPositions.set(id, position);
+    this.flushPosition().catch(() => {});
+  }
+
+  flushPosition() {
+    if (this._positionSavePending) return this._positionSavePromise;
+    if (!this._pendingPositions || !this._pendingPositions.size) return Promise.resolve();
+    const [id, position] = this._pendingPositions.entries().next().value;
+    this._pendingPositions.delete(id);
+    const current = (library.media || []).find(video => video.id === id);
+    if (!current) return this.flushPosition();
+    this._positionSavePending = true;
+    let finish, fail;
+    this._positionSavePromise = new Promise((resolve, reject) => { finish = resolve; fail = reject; });
+    this._positionSavePromise.catch(() => {});
+    const ownSave = this._positionSavePromise;
+    library.patchMedia(id, {position}, {position: current.position}, error => {
+      this._positionSavePending = false;
+      if (error) {
+        // Do not let queued position ticks immediately retry and overwrite a
+        // conflicting manual reset. A later playback event can save afresh.
+        this._pendingPositions.delete(id);
+        const failureKey = `${error.code || ''}:${error.message || error}`;
+        if (failureKey !== this._positionSaveError) {
+          reportSaveFailure(error, playerLog, 'save the playback position');
+        }
+        this._positionSaveError = failureKey;
+      } else {
+        this._positionSaveError = null;
+      }
+      if (error) fail(error); else finish();
+      this.flushPosition().catch(() => {});
     });
-    library.replace(`media.id=${this.state.video.id}`,this.state.video);
+    return ownSave;
+  }
+
+  componentWillUnmount() {
+    if (this._removeCloseHook) this._removeCloseHook();
+    this.onExit();
   }
 
   // called when exiting MynPlayer pane

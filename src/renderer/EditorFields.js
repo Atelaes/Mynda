@@ -1074,7 +1074,7 @@ class MynEditListWidget extends MynEditWidget {
       return;
     }
 
-    var temp = this.state.list;
+    const temp = this.state.list.slice();
     temp.splice(index, 1);
     this.updateList(temp);
   }
@@ -1177,7 +1177,7 @@ class MynEditAddToList extends MynEditListWidget {
         // console.log('transformed to ' + item);
       }
 
-      let temp = this.state.list;
+      let temp = Array.isArray(this.state.list) ? this.state.list.slice() : [];
       try {
         if (!this.state.list.includes(item)) {
           temp.push(item);

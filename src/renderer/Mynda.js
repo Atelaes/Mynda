@@ -2,6 +2,7 @@
 const React = require('react');
 const {ipcRenderer} = require('electron');
 const _ = require('lodash');
+const {reportSaveFailure} = require('./LibraryEdits.js');
 const {
   compilePlaylistFilter,
   createPlaylistFilterContext
@@ -850,14 +851,9 @@ class Mynda extends React.Component {
 
   // store the 5 most recently played videos
   logPlayed(id) {
-    let recent = this.state.recentlyWatched;
-    recent = recent.filter(v_id => v_id !== id); // delete this id if it's already in the array
-    recent.unshift(id); // then add this id to the top of the list
-    recent = recent.slice(0,10); // if the list is longer than 10 elements, clip it at 10
-    this.setState({recentlyWatched:recent},() => {
-      // then save to the library
-      library.replace('recently_watched',recent);
-    });
+    library.recordPlayed(id, error => {
+      if (error) reportSaveFailure(error, playerLog, 'save recently watched videos');
+    }, {limit: 10});
   }
 
   scanWatchfolders() {
@@ -955,18 +951,23 @@ class Mynda extends React.Component {
           this.refreshDetails(timeout);
         });
       } else if (address.includes('media')) {
-        // A one-video save replaces an entry inside the existing media array,
-        // so no parent-state handoff is needed before refreshing its consumers.
+        // Committed updates replace immutable snapshots. Refresh the array
+        // reference even when only one video's fields changed.
         frontendLog.debug('Refreshing renderer state after a video edit', {
           address: address
         });
         this.setState(previousState => ({
+          videos: library.media,
           mediaRevision: previousState.mediaRevision + 1
         }), () => {
           this.setPlaylist(this.state.currentPlaylistID);
           this.setPlaylistLengths(true);
           this.refreshDetails(timeout);
         });
+      }
+
+      if (address === 'recently_watched') {
+        this.setState({recentlyWatched: library.recently_watched});
       }
 
       // if a playlist was changed

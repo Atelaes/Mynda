@@ -40,6 +40,10 @@ class Boundary extends React.Component {
 }
 
 const runtimeLibrary = libraryFixture();
+runtimeLibrary.recentRequests = [];
+runtimeLibrary.recordPlayed = function recordPlayed(id, callback, options) {
+  this.recentRequests.push({id, callback, options});
+};
 runtimeLibrary.replaceCalls = [];
 runtimeLibrary.replace = function replace(address, value) {
   this.replaceCalls.push({address, value});
@@ -152,17 +156,21 @@ suite.test('searches multiple words across titles, genres, cast, and tags', () =
   assert.deepStrictEqual(instance.searchFilter('unfindable'), []);
 });
 
-suite.test('keeps only ten recent videos, moves repeats to the front, and saves once', () => {
+suite.test('requests an authoritative recent-video update and displays only committed notifications', () => {
   const instance = instanceFor();
-  instance.state.recentlyWatched = Array.from({length: 10}, (unused, index) => `video-${index}`);
+  const before = Array.from({length: 10}, (unused, index) => `video-${index}`);
+  instance.state.recentlyWatched = before;
+  instance.componentDidMount();
+  runtimeLibrary.recentRequests = [];
   instance.logPlayed('video-5');
-  assert.strictEqual(instance.state.recentlyWatched[0], 'video-5');
-  assert.strictEqual(instance.state.recentlyWatched.length, 10);
-  assert.strictEqual(instance.state.recentlyWatched.filter(id => id === 'video-5').length, 1);
-  assert.deepStrictEqual(runtimeLibrary.replaceCalls, [{
-    address: 'recently_watched',
-    value: instance.state.recentlyWatched
-  }]);
+  assert.strictEqual(instance.state.recentlyWatched, before);
+  assert.strictEqual(runtimeLibrary.recentRequests.length, 1);
+  assert.strictEqual(runtimeLibrary.recentRequests[0].id, 'video-5');
+  assert.strictEqual(runtimeLibrary.recentRequests[0].options.limit, 10);
+  assert.strictEqual(runtimeLibrary.replaceCalls.length, 0);
+  runtimeLibrary.recently_watched = ['video-5', 'video-0'];
+  savedPing.saved('recently_watched');
+  assert.deepStrictEqual(instance.state.recentlyWatched, ['video-5', 'video-0']);
 });
 
 suite.test('sends scans over IPC and rejects invalid temporary playlist views', () => {

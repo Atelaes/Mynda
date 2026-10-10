@@ -2,6 +2,18 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/LibraryTransactions.integration.test.js',title:'Single-writer library transactions',
+    protects:'overlapping process edits, confirmed state, disk failures, stale identity conflicts, atomic moves, user priority and revision recovery'},
+  {category:'unit',file:'test/SingleInstance.unit.test.js',title:'Library single-instance startup',
+    protects:'early process locking, secondary-instance exit, window focus and packaged smoke isolation'},
+  {category:'unit',file:'test/LibraryClose.unit.test.js',title:'Library shutdown saves',
+    protects:'renderer flush, outstanding commits, close cancellation, explicit discard and bounded shutdown waits'},
+  {category:'unit',file:'test/LibraryScanOperations.unit.test.js',title:'Transactional scan operations',
+    protects:'fresh-record merging, active/inactive moves, watchfolder ownership and stale scan results'},
+  {category:'integration',file:'test/AutoTagConcurrentEdits.integration.test.js',title:'Autotag saves alongside manual editing',
+    protects:'lookup baselines, late manual changes, coherent conflict skips and accurate saved-result accounting'},
+  {category:'component',file:'test/LibraryEditing.component.test.js',title:'Confirmed library editing',
+    protects:'draft retention, delayed and failed saves, batch field diffs, settings transactions and playback-only patches'},
   {category:'integration',file:'test/AutoTagStorage.integration.test.js',title:'Auto-Tag storage failure and notification',
     protects:'disk-full and permission errors, atomic-write rollback, retry eligibility, queues and visible failure dialogs'},
   {category:'integration',file:'test/RendererStartup.integration.test.js',title:'Renderer startup after an update',

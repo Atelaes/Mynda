@@ -159,4 +159,12 @@ suite.test('long histories keep the latest correction visible and state the omit
   assert.strictEqual(r.corrections.length,40);assert.strictEqual(r.moreCorrections,11);
   assert.match(r.corrections[39].label,/Sibling-supported/);
 });
+suite.test('a concurrent edit explains that the proposed tags were skipped and current tags preserved',()=>{
+  const result=report(failure('changed-during-lookup',{autotag_tried:false}));
+  assert.strictEqual(result.status,'unmatched');
+  assert.match(result.summary,/edited while Auto-Tag/);
+  assert.match(result.summary,/saved changes were preserved/);
+  assert.match(result.nextStep,/updated information/);
+});
+
 runSuite(suite);

@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const {v4: uuidv4} = require('uuid');
 const hashObject = require('object-hash');
+const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const OmdbHelper = require('../tagging/OmdbHelper.js');
 const TaggingEvidence = require('../tagging/TaggingEvidence');
 const {MynAutotagReport} = require('./AutotagReport.js');
@@ -55,6 +56,13 @@ class MynEditor extends MynOpenablePane {
     super(props)
 
     this._isMounted = false;
+    this._removeCloseHook = library && library.onBeforeClose ? library.onBeforeClose(async () => {
+      // An explicitly requested save includes artwork preparation before IPC.
+      // Merely having an unsaved draft does not trigger a save on app close.
+      if (this._saveRequest && !await this._saveRequest) {
+        throw this._saveFailure || new Error('Mynda could not finish saving the editor changes.');
+      }
+    }) : null;
 
     this.state = {
       paneID: 'editor-pane',
@@ -100,6 +108,7 @@ class MynEditor extends MynOpenablePane {
   // }
 
   handleChange(...args) {
+    if (this._saving) return;
     // console.log("UPDATING");
 
     let update;
@@ -175,6 +184,7 @@ class MynEditor extends MynOpenablePane {
   }
 
   revertChanges() {
+    if (this._saving) return;
     this.componentDidUpdate({video:null});
 
   }
@@ -185,6 +195,7 @@ class MynEditor extends MynOpenablePane {
   // channel prevents simultaneous editor actions from hearing one another.
   requestResetFromFilename(event) {
     if (event) event.preventDefault();
+    if (this._saving) return;
     if (!this.state.video) return;
     if (this.state.resetFromFilenamePending) {
       editorLog.warn('Ignored duplicate filename-reset request while the first request was pending');
@@ -356,25 +367,45 @@ class MynEditor extends MynOpenablePane {
   }
 
   saveChanges(event) {
+    if (event) event.preventDefault();
+    if (this._saveRequest) return this._saveRequest;
+    this._saveFailure = null;
+    const request = this.submitChanges(event).catch(error => {
+      this._saveFailure = error;
+      this._saving = false;
+      this.setState({savePending: false});
+      reportSaveFailure(error, editorLog, 'save your edits');
+      return false;
+    });
+    this._saveRequest = request;
+    request.then(() => { if (this._saveRequest === request) this._saveRequest = null; });
+    return request;
+  }
+
+  async submitChanges(event) {
     if (event) {
       event.preventDefault();
     }
 
+    if (this._saving) return false;
+    const draftState = _.cloneDeep(this.state);
+    const submittedProps = this.props;
+
     // A form can still submit via Enter even when its visible submit button is
     // disabled. Refuse that race explicitly so Save cannot run between the
     // reset request and the arrival of its per-video patches.
-    if (this.state.resetFromFilenamePending) {
+    if (draftState.resetFromFilenamePending) {
       editorLog.warn('Blocked editor save while filename reset was pending');
       alert('Please wait for the filename reset to finish before saving.');
       return;
     }
 
     /* make sure all the fields are valid before submitting */
-    // console.log("VALID: " + JSON.stringify(this.state.valid));
+    // console.log("VALID: " + JSON.stringify(draftState.valid));
     let valid = true;
     let invalidFields = [];
-    for (var i=0, keys=Object.keys(this.state.valid); i<keys.length; i++) {
-      if (this.state.valid[keys[i]] == false) {
+    for (var i=0, keys=Object.keys(draftState.valid); i<keys.length; i++) {
+      if (draftState.valid[keys[i]] == false) {
         valid = false;
         invalidFields.push(keys[i]);
       }
@@ -384,47 +415,48 @@ class MynEditor extends MynOpenablePane {
       return;
     }
 
+    this._saving = true;
+    this.setState({savePending: true});
+    const submittedSelection = editorSelectionKey(draftState.video, submittedProps.batch);
+
     // Before saving, we need to move the artwork image to the appropriate
     // folder in the user data. In the case of a new image, it may either be
     // in its original location on the user's local drive (in the case that
     // the user browsed to it or entered its path manually), or it may be
     // saved in a temp folder (in the case that it was downloaded from a URL)
-    if (this._isMounted && typeof this.state.video.artwork === 'string' && this.state.video.artwork !== '') {
+    if (this._isMounted && typeof draftState.video.artwork === 'string' && draftState.video.artwork !== '') {
       let fileExt;
       try {
-        fileExt = this.state.video.artwork.match(/.\w{3,4}$/)[0];
+        fileExt = draftState.video.artwork.match(/.\w{3,4}$/)[0];
       } catch(err) {
         fileExt = '.jpg'; // just use .jpg as the extension if we can't find one, i guess?
       }
 
       const artworkFolder = path.join((electron.app || electron.remote.app).getPath('userData'),'Library','Artwork');
-      const oldArtworkPath = path.resolve(__dirname, this.state.video.artwork); // create the correct absolute path, in case it was a relative one
+      const oldArtworkPath = path.resolve(__dirname, draftState.video.artwork); // create the correct absolute path, in case it was a relative one
       // if the file is not already in the Artwork folder,
       // copy it there and update the reference to it in the video object
       if (path.resolve(path.dirname(oldArtworkPath)) !== path.resolve(artworkFolder)) {
         const newArtworkPath = path.join(artworkFolder, uuidv4() + fileExt);
-        fs.copyFile(oldArtworkPath, newArtworkPath, (err) => {
-          if (err) {
-            artworkLog.error('Could not copy editor artwork into the library artwork folder', {
-              source: oldArtworkPath,
-              destination: newArtworkPath,
-              error: err
-            });
-          } else {
-            artworkLog.info('Editor artwork copied into the library artwork folder', {
-              destination: newArtworkPath
-            });
-          }
-        });
+        try {
+          await new Promise((resolve, reject) => fs.copyFile(oldArtworkPath, newArtworkPath,
+            error => error ? reject(error) : resolve()));
+        } catch (error) {
+          this._saving = false;
+          this.setState({savePending: false});
+          this._saveFailure = error;
+          reportSaveFailure(error, artworkLog, 'save the artwork');
+          return false;
+        }
         // this.handleChange({'artwork':newArtworkPath}); // <-- I think this was happening too slowly (part of the function is async), so the new path was not being saved
-        this.state.video.artwork = newArtworkPath;
+        draftState.video.artwork = newArtworkPath;
         artworkLog.debug('Editor artwork path updated', {
-          videoID: this.state.video.id,
-          artwork: this.state.video.artwork
+          videoID: draftState.video.id,
+          artwork: draftState.video.artwork
         });
       } else {
         artworkLog.debug('Editor artwork already uses the library artwork folder', {
-          videoID: this.state.video.id,
+          videoID: draftState.video.id,
           artwork: oldArtworkPath
         });
       }
@@ -443,44 +475,46 @@ class MynEditor extends MynOpenablePane {
     // if we're editing multiple videos
     // find the edited fields, and apply only those changes to
     // the videos in the batch
-    if (this.state.video.id === 'batch') {
-      // Reminder: this.state.video is the edited 'batch object',
+    if (draftState.video.id === 'batch') {
+      // Reminder: draftState.video is the edited 'batch object',
       // initially containing the values of the elements all the videos have in common,
       // and now also containing any changes the user made in the editor,
       // which we will now apply to the videos and then save them
 
       editorLog.debug('Batch save requested', {
-        videoCount: this.props.batch ? this.props.batch.length : 0,
-        changedFields: Array.from(this.state.changed).sort()
+        videoCount: submittedProps.batch ? submittedProps.batch.length : 0,
+        changedFields: Array.from(draftState.changed).sort()
       });
-      if (this.props.batch) { // <-- this should always be true if this.state.video.id === 'batch', this is just for safety
-        const changedFields = Array.from(this.state.changed).sort();
-        const filenameResetPatches = this.state.pendingFilenameResetPatches || {};
+      if (submittedProps.batch) { // <-- this should always be true if draftState.video.id === 'batch', this is just for safety
+        const changedFields = Array.from(draftState.changed).sort();
+        const filenameResetPatches = draftState.pendingFilenameResetPatches || {};
         const filenameResetPatchCount = Object.keys(filenameResetPatches).length;
 
         // A confirmed batch reset must have one private patch per selected
         // video. If that invariant is ever broken, stop instead of silently
         // saving only the user's ordinary overrides (the original symptom).
-        if (this.state.filenameResetStaged && filenameResetPatchCount !== this.props.batch.length) {
+        if (draftState.filenameResetStaged && filenameResetPatchCount !== submittedProps.batch.length) {
           editorLog.error('Blocked batch save because staged filename-reset patches were incomplete', {
-            videoCount: this.props.batch.length,
+            videoCount: submittedProps.batch.length,
             filenameResetPatchCount: filenameResetPatchCount,
             changedFields: changedFields
           });
           alert('The filename reset data is incomplete, so Mynda has not saved this batch. Please use Reset from Filename again.');
-          return;
+          this._saving = false;
+          this.setState({savePending: false});
+          return false;
         }
 
         editorLog.info('Preparing editor batch save', {
-          videoCount: this.props.batch.length,
-          filenameResetStaged: Boolean(this.state.filenameResetStaged),
+          videoCount: submittedProps.batch.length,
+          filenameResetStaged: Boolean(draftState.filenameResetStaged),
           filenameResetPatchCount: filenameResetPatchCount,
           changedFields: changedFields
         });
 
         batchSaveProgress = {
           numCurrent: 0,
-          numTotal: this.props.batch.length
+          numTotal: submittedProps.batch.length
         };
 
         // Show the banner before the first synchronous file write begins. With
@@ -494,7 +528,8 @@ class MynEditor extends MynOpenablePane {
         }
 
         // loop through the videos we're editing
-        this.props.batch.map(video => {
+        (draftState.originalBatch || submittedProps.batch).map(original => {
+          const video = _.cloneDeep(original);
           // Unlike ordinary batch edits, this reset contains a different
           // derived title/season/episode for each file. Apply that video's
           // private patch first; any fields the user edited afterwards are
@@ -509,23 +544,23 @@ class MynEditor extends MynOpenablePane {
             if (prop === 'id' || prop === 'metadata') return;
 
             // if this property was changed
-            if (this.state.changed.has(prop)) {
-              if (Array.isArray(this.state.video[prop])) {
+            if (draftState.changed.has(prop)) {
+              if (Array.isArray(draftState.video[prop])) {
                 // if this property is an array, we need to compare individual array elements
 
                 // deleted any of the common elements that the user deleted
-                let deleted = this.state.batchObjectUnedited[prop].filter(el => !this.state.video[prop].includes(el));
+                let deleted = draftState.batchObjectUnedited[prop].filter(el => !draftState.video[prop].includes(el));
                 video[prop] = video[prop].filter(el => !deleted.includes(el));
 
                 // add any new elements the user added
-                let added = this.state.video[prop].filter(el => !this.state.batchObjectUnedited[prop].includes(el)).filter(el => !video[prop].includes(el));
+                let added = draftState.video[prop].filter(el => !draftState.batchObjectUnedited[prop].includes(el)).filter(el => !video[prop].includes(el));
                 video[prop] = [...video[prop], ...added];
 
-              } else if (typeof this.state.video[prop] === 'object' && this.state.video[prop] !== null) {
+              } else if (typeof draftState.video[prop] === 'object' && draftState.video[prop] !== null) {
                 // if this property is an object, we need to compare individual object properties
 
-                let original = this.state.batchObjectUnedited[prop];
-                let altered = this.state.video[prop];
+                let original = draftState.batchObjectUnedited[prop];
+                let altered = draftState.video[prop];
 
                 // any props that were in the original batch object (common to all videos)
                 // and were changed, add the change to this video
@@ -550,7 +585,7 @@ class MynEditor extends MynOpenablePane {
               } else {
                 // this property is not an array or an object,
                 // so we simply replace the old value with the edited value
-                video[prop] = this.state.video[prop];
+                video[prop] = draftState.video[prop];
               }
             }
           });
@@ -560,49 +595,20 @@ class MynEditor extends MynOpenablePane {
             changedFields: changedFields
           });
 
-          // Prepare this video's final replacement. Do not submit it yet:
-          // replaceMediaBatch() will merge every prepared video into the
-          // freshest media array and commit that array with one library write.
+          // Prepare a private edited record. Only its field differences will
+          // be submitted, against this video's untouched original baseline.
           let temp = _.cloneDeep(video);
           const identityChanges = {};
           for (const field of ['imdbID','seriesImdbID']) {
-            if (this.state.changed.has(field)) identityChanges[field] = temp[field];
+            if (draftState.changed.has(field)) identityChanges[field] = temp[field];
           }
           temp = TaggingEvidence.markUserEdit(temp,identityChanges);
           temp.seriesImdbID = temp.kind === 'show' &&
             typeof temp.seriesImdbID === 'string' ? temp.seriesImdbID : '';
           temp.autotag_tried = false; // reset this flag whenever a video is saved
-          // Transient signal for Library.js; it is removed before saving.
-          temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
           batchVideosToSave.push(temp);
         });
 
-        if (batchVideosToSave.length > 0) {
-          library.replaceMediaBatch(batchVideosToSave, (err) => {
-            if (err) {
-              editorLog.error('Editor video batch save failed', {
-                videoCount: batchVideosToSave.length,
-                filenameResetPatchCount: filenameResetPatchCount,
-                error: err && err.stack ? err.stack : String(err)
-              });
-            } else {
-              // The complete media-array write has finished. Jump the counter
-              // to N of N and leave it visible until the queued settings save
-              // below also completes.
-              batchSaveProgress.numCurrent = batchSaveProgress.numTotal;
-              editorLog.info('Editor video batch saved', {
-                videoCount: batchVideosToSave.length,
-                filenameResetPatchCount: filenameResetPatchCount,
-                changedFields: changedFields
-              });
-            }
-            sendLocalStatusUpdate({
-              action: 'batch_save',
-              numCurrent: batchSaveProgress.numCurrent,
-              numTotal: batchSaveProgress.numTotal
-            });
-          });
-        }
 
       } else {
         editorLog.error('The editor batch did not include its source video objects');
@@ -610,83 +616,86 @@ class MynEditor extends MynOpenablePane {
     } else {
       // SINGLE VIDEO
       // save the video data in library.media
-      let temp = _.cloneDeep(this.state.video);
+      let temp = _.cloneDeep(draftState.video);
       temp.seriesImdbID = temp.kind === 'show' &&
         typeof temp.seriesImdbID === 'string' ? temp.seriesImdbID : '';
       temp.autotag_tried = false; // reset this flag whenever a video is saved
-      // Transient signal for Library.js; it is removed before saving.
-      temp.__mynda_subtitles_edited = this.state.changed.has('subtitles');
-      let index = library.media.findIndex((video) => video && video.id === this.props.video.id);
-      library.replace("media." + index, temp);
+      batchVideosToSave.push(temp);
     }
 
-    // then, add any new tags to the library.settings.used.tags list so they'll be available
-    // as options for the next video the user edits
-    let tags = [...this.props.settings.used.tags];
-    tags = tags.concat(this.state.video.tags.filter(tag => tags.indexOf(tag) < 0)).sort();
-
-    // and then do the same for genres
-    let genres = [...this.props.settings.used.genres];
-    const saveNewGenre = this.state.video.genre !== '' && genres.indexOf(this.state.video.genre) < 0;
-
-    // Whichever settings operation is last owns the completion callback. The
-    // callback is omitted for ordinary single-video saves, whose behavior and
-    // lack of a progress banner remain unchanged.
-    const finishBatchSave = batchSaveProgress && batchSaveProgress.numTotal > 0 ? (err) => {
-      // Tags and genres are queued after the one media-array replacement. Keep
-      // the completed "N of N" message visible until the final settings
-      // operation finishes, then release the banner for the next task.
-      if (err) {
-        editorLog.error('Could not finish editor batch settings save', {
-          videoCount: batchSaveProgress.numTotal,
-          error: err && err.stack ? err.stack : String(err)
-        });
-      } else {
-        editorLog.info('Editor batch save finished', {
-          videoCount: batchSaveProgress.numTotal
-        });
+    const originals = draftState.video.id === 'batch' ?
+      (draftState.originalBatch || submittedProps.batch || []) :
+      [draftState.originalVideo || submittedProps.video];
+    const edits = batchVideosToSave.map(video => {
+      const original = originals.find(item => item.id === video.id);
+      const comparison = draftState.video.id === 'batch' ? original :
+        draftState.draftBaseline || original;
+      const edit = videoEdit(original, video, comparison);
+      // The opt-in New preference is an intentional implicit edit; ordinary
+      // normalization for form controls is not an edit to technical metadata.
+      if (draftState.video.id !== 'batch' && original.new !== video.new) {
+        edit.changes.new = video.new;
+        edit.expected.new = original.new;
       }
-      sendLocalStatusUpdate({action: ''});
-    } : undefined;
-
-    library.replace("settings.used.tags", tags, saveNewGenre ? undefined : finishBatchSave);
-
-    if (saveNewGenre) {
-      // library.add("settings.used.genres.0",this.state.video.genre);
-      genres.push(this.state.video.genre);
-      genres.sort();
-      library.replace("settings.used.genres", genres, finishBatchSave);
+      return edit;
+    });
+    if (!edits.length) {
+      this._saving = false;
+      this.setState({savePending: false});
+      return false;
     }
 
-    // console.log('object when saving:');
-    // console.log(this.state.video);
-
-    // save hash so that later we can check if the video has changed
-    // (in order to ask the user if they want to save before exiting)
-    // and reset the 'changed' set (which keeps track of which fields
-    // are changed before saving)
-    this.setState({
-      saveHash: hashObject(this.state.video),
-      changed: new Set(),
-      pendingFilenameResetPatches: {},
-      resetFromFilenamePending: false,
-      filenameResetStaged: false
+    // One transaction owns both video patches and the additive used-tag/genre
+    // lists. Its callback confirms this save only, never the entire scan queue.
+    return new Promise(resolve => {
+      library.patchMediaBatch(edits, error => {
+        this._saving = false;
+        const sameSelection = submittedSelection === editorSelectionKey(this.props.video, this.props.batch);
+        this.setState({savePending: false});
+        if (error) {
+          this._saveFailure = error;
+          reportSaveFailure(error, editorLog, 'save your edits');
+        } else if (sameSelection) {
+          const committed = edits.map(edit => library.media.find(video => video.id === edit.id))
+            .filter(Boolean);
+          const originalVideo = draftState.video.id === 'batch' ? null :
+            _.cloneDeep(committed[0] || batchVideosToSave[0]);
+          const draft = draftState.video.id === 'batch' ? draftState.video :
+            _.cloneDeep(originalVideo);
+          validateVideo(draft);
+          this.setState({
+            video: draft,
+            originalVideo,
+            draftBaseline: _.cloneDeep(draft),
+            originalBatch: draftState.video.id === 'batch' ? _.cloneDeep(committed) : [],
+            batchObjectUnedited: draftState.video.id === 'batch' ? _.cloneDeep(draft) : undefined,
+            saveHash: hashObject(draft),
+            changed: new Set(),
+            pendingFilenameResetPatches: {},
+            resetFromFilenamePending: false,
+            filenameResetStaged: false,
+            savePending: false
+          });
+        }
+        if (batchSaveProgress) sendLocalStatusUpdate({action: ''});
+        resolve(!error);
+      }, {priority: 'user', updateUsedLists: true});
     });
   }
 
   componentDidUpdate(oldProps) {
-    if (!_.isEqual(oldProps.video, this.props.video)) {
+    if (!_.isEqual(oldProps.video, this.props.video) ||
+        editorSelectionKey(oldProps.video, oldProps.batch) !== editorSelectionKey(this.props.video, this.props.batch)) {
       const oldSelectionKey = editorSelectionKey(oldProps.video, oldProps.batch);
       const currentSelectionKey = editorSelectionKey(this.props.video, this.props.batch);
 
-      // Parent-level library updates recreate the batch summary object. Before
-      // this guard, such a same-selection refresh unconditionally replaced the
-      // editor state and erased the confirmed per-video reset patches. Preserve
-      // the local reset transaction until the user explicitly Saves, Reverts,
-      // or moves to a genuinely different video selection.
+      // Committed background updates can refresh this same record while the
+      // user is editing it. Preserve the draft AND its original comparison
+      // baseline until Save, Revert, or a genuine selection change.
       if (oldSelectionKey === currentSelectionKey &&
-          (this.state.resetFromFilenamePending || this.state.filenameResetStaged)) {
-        editorLog.info('Preserved staged filename reset during same-selection refresh', {
+          (this._saving || this.state.resetFromFilenamePending || this.state.filenameResetStaged ||
+            (this.state.video && this.state.saveHash !== hashObject(this.state.video)))) {
+        editorLog.debug('Preserved editor draft during same-selection refresh', {
           selectionType: this.props.video && this.props.video.id === 'batch' ? 'batch' : 'single',
           videoCount: this.props.video && this.props.video.id === 'batch' ?
             (this.props.batch || []).length : 1,
@@ -720,6 +729,9 @@ class MynEditor extends MynOpenablePane {
         }
 
         this.setState({
+          originalVideo: _.cloneDeep(this.props.video),
+          originalBatch: _.cloneDeep(this.props.batch || []),
+          draftBaseline: _.cloneDeep(videoEditPrepped),
           video: videoEditPrepped,
           changed: new Set(),
           pendingFilenameResetPatches: {},
@@ -740,20 +752,24 @@ class MynEditor extends MynOpenablePane {
     );
   }
 
-  goToPrevious() {
+  async goToPrevious() {
     if (this.isBatchEdit()) return;
     if (this.props.detailRowBoundaryFlag !== 'first') {
-      if (this.state.changed.size > 0)
-        this.saveChanges();
+      if (this._saving) return;
+      if (this.state.video && this.state.saveHash !== hashObject(this.state.video)) {
+        if (!await this.saveChanges()) return;
+      }
       this.props.goToPrevious();
     }
   }
 
-  goToNext() {
+  async goToNext() {
     if (this.isBatchEdit()) return;
     if (this.props.detailRowBoundaryFlag !== 'last') {
-      if (this.state.changed.size > 0)
-        this.saveChanges();
+      if (this._saving) return;
+      if (this.state.video && this.state.saveHash !== hashObject(this.state.video)) {
+        if (!await this.saveChanges()) return;
+      }
       this.props.goToNext();
     }
   }
@@ -765,6 +781,7 @@ class MynEditor extends MynOpenablePane {
 
   componentWillUnmount() {
     this._isMounted = false;
+    if (this._removeCloseHook) this._removeCloseHook();
   }
 
   createContentJSX() {
@@ -812,6 +829,7 @@ class MynEditor extends MynOpenablePane {
           resetFromFilename={this.requestResetFromFilename}
           resetPatches={this.state.pendingFilenameResetPatches}
           resetPending={this.state.resetFromFilenamePending}
+          savePending={this.state.savePending}
           changedFields={this.state.changed}
           batchBaseline={this.state.batchObjectUnedited}
           saveChanges={this.saveChanges}
@@ -1917,7 +1935,8 @@ class MynEditorEdit extends React.Component {
     return (
       <div id="edit-container">
         {batchNotification}
-        <form onSubmit={this.props.saveChanges}>
+        <fieldset disabled={this.props.savePending} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
+        <form onSubmit={this.props.saveChanges} aria-busy={Boolean(this.props.savePending)}>
           {filename}
           {markBatchChange(title, 'title')}
           {markBatchChange(series, 'series')}
@@ -1951,7 +1970,7 @@ class MynEditorEdit extends React.Component {
             type="button"
             className="edit-field filename-reset-btn"
             onClick={this.props.resetFromFilename}
-            disabled={this.props.resetPending}
+            disabled={this.props.resetPending || this.props.savePending}
             title="Re-detect identification from each filename and its folders, then clear downloaded catalog information so tagging can be tried again"
           >
             {this.props.resetPending ? 'Preparing Reset…' : 'Reset from Filename'}
@@ -1960,11 +1979,12 @@ class MynEditorEdit extends React.Component {
           <input
             className="edit-field save-btn"
             type="submit"
-            value="Save"
-            disabled={this.props.resetPending}
+            value={this.props.savePending ? 'Saving…' : 'Save'}
+            disabled={this.props.resetPending || this.props.savePending}
             title={this.props.resetPending ? 'Wait for the filename reset to finish before saving' : ''}
           />
         </form>
+        </fieldset>
       </div>
     );
   }

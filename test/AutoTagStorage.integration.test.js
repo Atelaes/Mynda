@@ -2,7 +2,7 @@ const fs=require('fs'),path=require('path'),vm=require('vm');
 const {EventEmitter}=require('events');
 const {assert,createSuite,runSuite,withTemporaryDirectory}=require('./helpers/TestHarness');
 const {loadFreshWithMocks}=require('./helpers/ModuleMocks');
-const {videoFixture}=require('./helpers/Fixtures');
+const {videoFixture,libraryFixture}=require('./helpers/Fixtures');
 const {createAutoTagRunner}=require('../src/tagging/AutoTagRunner');
 const {describeFailure,createFailureReporter}=require('../src/main/AutoTagFailure');
 const suite=createSuite('Auto-Tag storage failure and notification','integration',
@@ -33,9 +33,9 @@ function fixture(directory,count=25) {
     electron:{app:{getPath:()=>directory},ipcMain:new EventEmitter(),ipcRenderer:{}},
     './LibraryPersistence.js':persistence,'../platform/Logger.js':{child:()=>log}
   });
+  persistence.writeLibraryFile(primary,libraryFixture({videoIdScheme:2,media:Array.from({length:count},(_,n)=>videoFixture({id:String(n+1).padStart(64,'0'),
+    title:`Original ${n+1}`,filename:`/Movies/${n+1}.mkv`,imdbID:'',new:true,autotag_tried:false}))}));
   const library=new Library();
-  library.media=Array.from({length:count},(_,n)=>videoFixture({id:String(n+1).padStart(64,'0'),
-    title:`Original ${n+1}`,filename:`/Movies/${n+1}.mkv`,imdbID:'',new:true,autotag_tried:false}));
   library.save();library.lastAutomaticBackupDate=new Date();policy.writes=0;
   const state={running:false,cancelRequested:false,scope:'library'},requests=[],statuses=[],dialogs=[];
   const save=batch=>new Promise((resolve,reject)=>library.replaceMediaBatch(batch,error=>error?reject(error):resolve()));
@@ -59,7 +59,7 @@ suite.test('a partial disk-full write preserves earlier saves, rolls back the fa
     try {await f.run();}catch(error){failure=error;await f.report(error);}
     assert(failure);assert.strictEqual(failure.code,'ENOSPC');
     assert.deepStrictEqual(failure.autoTagFailure,{stage:'save',videoCount:10,committed:false});
-    assert.strictEqual(failure.cause.cause.code,'ENOSPC');
+    assert.strictEqual(failure.cause.code,'ENOSPC');
     assert.strictEqual(f.requests.length,20);assert.strictEqual(f.dialogs.length,1);
     assert.match(f.dialogs[0].message,/out of space/);assert(f.dialogs[0].detail.includes(f.library.path));
     assert.match(f.dialogs[0].detail,/last 10 videos were not saved/);
@@ -93,28 +93,25 @@ suite.test('failure of the final partial batch keeps its videos and primary file
 suite.test('a failed queued batch does not stall later jobs or idle waiters',()=>
   withTemporaryDirectory('autotag-queue-failure',async directory=>{
     const f=fixture(directory,2),original=JSON.stringify(f.library.media),failures=[];
-    const pending={opType:'replace',address:'media',entry:[]};f.library.waitConfirm=pending;
     f.policy.code='ENOSPC';
     for(const v of f.library.media)f.library.replaceMediaBatch([{...v,title:'Unsaved',autotag_tried:true}],e=>failures.push(e));
     let idle=false;const waiting=f.library.whenIdle().then(()=>{idle=true;});
-    f.library.getConfirm(pending);await Promise.resolve();
+    await waiting;
     assert.strictEqual(failures.length,2);assert(failures.every(e=>e.code==='ENOSPC'));
-    assert.strictEqual(f.library.Queue.length,0);assert.strictEqual(f.library.waitConfirm,null);
+    assert.strictEqual(f.library.queue.length,0);assert.strictEqual(f.library.running,false);
     assert.strictEqual(idle,true);await waiting;
     assert.strictEqual(JSON.stringify(f.library.media),original);
   }));
 
-suite.test('a post-save synchronization failure cannot roll back a committed batch',()=>
+suite.test('a disconnected renderer cannot turn a durable batch into a failed save',()=>
   withTemporaryDirectory('autotag-committed-save',async directory=>{
     const f=fixture(directory,1);
-    f.library.sync=()=>{throw Object.assign(new Error('IPC unavailable'),{code:'ENOSPC'});};
-    let failure;try {await f.run();}catch(error){failure=error;}
-    assert(failure && failure.autoTagFailure.committed);
+    f.library.renderers.add({send(){throw new Error('IPC unavailable');}});
+    const result=await f.run();
+    assert.strictEqual(result.statistics.Success,1);
     assert(f.library.media[0].imdbID);
     assert.deepStrictEqual(f.persistence.readLibraryFile(f.library.path).data.media,f.library.media);
-    const report=describeFailure(failure,f.library.path);
-    assert.match(report.options.detail,/last batch was saved/);
-    assert(!report.options.detail.includes('not saved'));
+    assert.strictEqual(f.library.renderers.size,0);
   }));
 
 suite.test('storage errors retain their OS code and have specific explanations without metadata dumps',()=>

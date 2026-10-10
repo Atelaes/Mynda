@@ -58,6 +58,13 @@ function createFailureReporter({dialog,log,getLibraryPath,getWindow}) {
   const record=(message,details)=>{try {log.error(message,details);}catch(error) { /* The log drive may also be full. */ }};
   return async function reportFailure(error,scope='library') {
     const failure=describeFailure(error,getLibraryPath());
+    if (failure.code==='LIBRARY_CLOSING') {
+      // Shutdown deliberately refuses new background work. This is a normal
+      // stop, not a disk error, and must not open a competing modal while the
+      // user is deciding whether to finish closing.
+      try {log.info('Automatic tagging stopped because Mynda is closing',{scope});} catch (_) {}
+      return;
+    }
     record('Automatic tagging stopped after an error',{scope,code:failure.code,libraryPath:failure.location,
       ...failure.context,causes:causes(error).map(item=>({code:item.code,
         message:String(item.message || item).slice(0,600),stack:item.stack && item.stack.slice(0,2000)}))});

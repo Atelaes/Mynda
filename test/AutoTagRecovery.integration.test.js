@@ -59,14 +59,14 @@ suite.test('never resolves conflicting parents or uses generic/bonus/invalid evi
 });
 
 async function runBatch(responder, options={}) {
-  const saves=[],requests=[],messages=[],logs=[];
+  const saves=[],saveOptions=[],requests=[],messages=[],logs=[];
   const context={_,AutoTagRecovery:Recovery,autoTagRunning:false,autoTagCancelRequested:false,
     autoTagScope:'library',autoTagCancellationDecision:null,
     validSeriesImdbID:id=>/^tt\d+$/.test(id),
     win:{webContents:{send:(channel,message)=>messages.push({channel,message})}},
     library:{settings:{preferences:{remove_autotagged_from_new:false}},whenIdle:async()=>{}},
     autoTagLog:Object.fromEntries(['info','warn','error','debug'].map(level=>[level,(message,data)=>logs.push({level,message,data})])),
-    saveBatch:async batch=>{assert.strictEqual(new Set(batch.map(v=>v.id)).size,batch.length,'Duplicate IDs within one save batch');saves.push(_.cloneDeep(batch));},
+    saveBatch:async (batch,options)=>{assert.strictEqual(new Set(batch.map(v=>v.id)).size,batch.length,'Duplicate IDs within one save batch');saves.push(_.cloneDeep(batch));saveOptions.push(_.cloneDeep(options));},
     OmdbHelper:{createSeriesSearchSession:SeriesSearch.createSession,seriesSearchSummary:SeriesSearch.sessionSummary,
       resolve:async(input,searchOptions)=>{requests.push({input:_.cloneDeep(input),options:searchOptions});return responder(input,searchOptions,context);}}
   };
@@ -79,7 +79,7 @@ async function runBatch(responder, options={}) {
     getCandidates:()=>[], save:context.saveBatch, notifyStatus:message=>messages.push({channel:'status-update',message}),
     chooseSeries:async()=>null, preferences:context.library.settings.preferences, whenIdle:context.library.whenIdle});
   const result=await run({videos:[video(1),video(2),video(3)],...options});
-  return {result,saves,requests,messages,logs,context};
+  return {result,saves,saveOptions,requests,messages,logs,context};
 }
 
 suite.test('the real loop retries early ambiguity once, saves the final result and counts each file once', async () => {
@@ -97,6 +97,9 @@ suite.test('the real loop retries early ambiguity once, saves the final result a
   assert.strictEqual(r.result.statistics.recoveredSeriesRetries,1);
   const final=r.saves.flat().filter(v=>v.id==='video-1').pop();
   assert.strictEqual(final.imdbID,'tt2000001');assert.strictEqual(final.new,true);
+  assert.strictEqual(r.saveOptions[0].baselines[0].taggingDecision,undefined);
+  assert.strictEqual(r.saveOptions[1].baselines[0].taggingDecision.reason.code,'ambiguous-series',
+    'A retry must compare against its own previously saved attempt rather than conflict with that report');
   assert.strictEqual(r.context.autoTagRunning,false);
   assert(r.logs.some(l=>l.message==='Automatic tagging series retry finished'&&l.data.id==='video-1'));
   assert.strictEqual(r.logs.filter(l=>l.message==='Automatic tagging series discovery summary').length,1);

@@ -38,4 +38,9 @@ const {library} = require('./RendererRuntime.js');
 
 const {Mynda} = require('./Mynda.js');
 
-ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));
+library.ready.then(() => {
+  ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));
+}).catch(error => {
+  frontendLog.error('Could not initialize the library view', {error});
+  document.getElementById('root').textContent = 'Mynda could not load its library. Please restart the app. ' + error.message;
+});

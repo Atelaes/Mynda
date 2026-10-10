@@ -26,6 +26,7 @@ const MovieSearch = require('../tagging/MovieSearch.js');
 const VideoExclusion = require('../scanning/VideoExclusion.js');
 const VideoRuntimeVerifier = require('../scanning/VideoRuntimeVerifier.js');
 const {ScanDuplicateTracker} = require('../library/LibraryDuplicates.js');
+const {containsPath} = require('../library/LibraryScanOperations.js');
 const LibraryExport = require('../library/LibraryExport.js');
 const ShareService = require('../sharing/ShareService.js');
 const ShareManifest = require('../sharing/ShareManifest.js');
@@ -54,6 +55,7 @@ const reportAutoTagFailure = require('./AutoTagFailure').createFailureReporter({
 });
 const shareLog = Logger.child('Share');
 const videoExclusionLog = Logger.child('VideoExclusion');
+let libraryClose;
 let libFileTree; // where we store video and subtitle information we find in the watchfolders prior to adding the videos to the library
 let libMulch = [];  //After libFileTree has been created and chewed up, this is the flattened version
 let parsing = {}; // this is just to keep track of when we're done looking through all the watchfolders for videos
@@ -61,6 +63,7 @@ let unavailableWatchFolders = new Set(); // watchfolders whose scan failed; pres
 let subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
 let addVideoTimeout; // just a delay for adding the videos to the library once we're done parsing, to make sure it only happens once
 let newIDs = [];
+let scanActivationBaselines = new Map();
 let ffMpegQueue = [];
 let videoAddTimers = [];
 let appStartTime = new Date();
@@ -441,6 +444,10 @@ async function createWindow() {
         enableRemoteModule: true
     }
   })
+  if (!libraryClose) libraryClose = require('./LibraryClose.js').installLibraryClose({
+    app,ipcMain,dialog,library,getWindow:()=>win,log:backendLog
+  });
+  libraryClose.attachWindow(win);
 
   if (!app.isPackaged) {
     win.webContents.openDevTools();
@@ -457,136 +464,45 @@ function cleanLibrary() {
   });
 }
 
-function removeWatchfolder(path,cb) {
-  // in case we're currently adding media, we need to delete the removed
-  // watchfolder from libFileTree, otherwise videos may get re-added as they get removed
-  libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== path);
-  scanLog.info('Removing watchfolder', {watchfolder: path});
-  scanLog.debug('Removed watchfolder from the current scan tree', {
-    watchfolder: path,
-    remainingWatchfolders: libFileTree.folders.length
-  });
-
-  // remove videos
-  removeWatchfolderVideosFromLibrary(path);
-
-  // remove the watchfolder
-  let index;
-  library.settings.watchfolders.map((folder,i) => {
-    if (folder && folder.path === path) {
-      index = i;
+function removeWatchfolder(folder,cb) {
+  // Move current records and remove the folder in one durable operation. Do
+  // not change the in-progress scan tree if that save fails.
+  scanLog.info('Removing watchfolder', {watchfolder: folder});
+  library.transaction([{opType:'remove-watchfolder',path:folder}],error => {
+    if (!error && libFileTree && Array.isArray(libFileTree.folders)) {
+      libFileTree.folders = libFileTree.folders.filter(wf => wf.path !== folder);
     }
-  });
-  library.remove(`settings.watchfolders.${index}`,cb);
-}
-
-
-
-async function removeWatchfolderVideosFromLibrary(folder) {
-  scanLog.info('Moving videos from removed watchfolder to inactive media', {
-    watchfolder: folder
-  });
-
-  let vidIDs;
-  // try {
-  //   vidIDs = library.settings.watchfolders.filter(wf => wf && wf.path === folder)[0].videos;
-  // } catch(err) {
-  //   console.log(`Could not find video manifest for the watchfolder ${folder}: ${err}\nGetting list of videos from the library itself`);
-    vidIDs = library.media.filter(v => v && new RegExp('^' + folder).test(v.filename)).map(v => v.id);
-  // }
-
-  let removedMedia = [];
-  let keptMedia = library.media.filter(v => {
-    if (!v) return false;
-    if (!vidIDs.includes(v.id)) return true;
-    removedMedia.push(_.cloneDeep(v));
-    return false;
-  });
-  let inactiveMedia = [...library.inactive_media, ...removedMedia];
-
-  library.replace('media',keptMedia);
-  library.replace('inactive_media',inactiveMedia);
+    if (cb) cb(error);
+  },{priority:'interactive'});
 }
 
 function removeVideo(video, index, fromInactive) {
-  return new Promise((resolve,reject) => {
-    let address;
-    if (fromInactive) {
-      scanLog.debug('Deleting video from inactive media', {
-        filename: video.filename,
-        id: video.id
-      });
-      address = 'inactive_media';
-    } else {
-      scanLog.debug('Moving video from active to inactive media', {
-        filename: video.filename,
-        id: video.id
-      });
-      address = 'media';
-    }
-
-    // if we weren't given an index, find it
-    if (typeof index === "undefined") {
-      index = indexOfVideoInLibrary(video.id,fromInactive); // if the second parameter is true, indexOfVideoInLibrary checks inactive_media instead of media
-    }
-
-    // remove from library.media or library.inactive_media
-    library.remove(`${address}.${index}`, (err) => {
-      if (err) {
-        reject(`Error removing ${video.title} (${video.filename}); given bad index (index === ${index}) or could not find video in library.${address}:\n${err}`);
-        return;
-      }
-
-      if (!fromInactive) {
-        // add the video to library.inactive_media
-        library.add('inactive_media.push',video, (err) => {
-          if (err) {
-            reject(`Error: could not add ${video.filename} to inactive_media: ${err}`);
-            return;
-          } else {
-            resolve();
-          }
-        });
-
-
-        // // remove video id from its watchfolder's list of video ids
-        // library.settings.watchfolders.map((wf, i) => {
-        //   if (!wf) return;
-        //
-        //   if (new RegExp('^' + wf.path).test(video.filename)) {
-        //     console.log(`${video.filename} is part of the watchfolder ${wf.path}; removing from the watchfolder's list of id's`);
-        //     wf.videos = wf.videos.filter(id => id !== video.id);
-        //     library.replace(`settings.watchfolders.${i}`, library.settings.watchfolders[i], (err) => {
-        //       if (err) {
-        //         reject(`Error: could not update watchfolder manifest: ${err}`);
-        //       } else {
-        //         resolve();
-        //       }
-        //     });
-        //   }
-        // });
-      } else {
-        resolve();
-      }
-    });
-  });
-}
-function deleteFromInactive(video, index) {
-  return removeVideo(video, index, true);
+  return library.moveMedia([video.id], fromInactive ? 'inactive_media' : 'media',
+    fromInactive ? null : 'inactive_media', undefined,
+    {priority:'background',expectedFilenames:{[video.id]:video.filename}});
 }
 
-// Promise wrapper for Library.replace(), so callers can wait until a queued
-// replacement has actually been applied to the local library object.
-function replaceLibrary(address, replacement) {
-  return new Promise((resolve, reject) => {
-    library.replace(address, replacement, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
+// Each background producer awaits its bounded commit. No scan/probe/network
+// work runs inside the authoritative library's commit queue.
+function patchScannedVideos(patches) {
+  if (!patches.length) return Promise.resolve();
+  return library.patchMediaBatch(patches, undefined, {priority:'background',conflict:'skip'});
+}
+
+async function saveScanAdditions(videos, duplicateTracker) {
+  for (let start=0; start<videos.length; start+=10) {
+    await library.upsertMediaBatch(videos.slice(start,start+10).map(video => {
+      const baseline = scanActivationBaselines.get(video.id);
+      return baseline ? {video,baseline} : video;
+    }),undefined,{priority:'background',requireWatchfolder:true});
+  }
+  // Only duplicates are changed here; the scan must never replace the whole
+  // current media array or restore stale titles/playback state.
+  const baseline = library.media;
+  const discovered = duplicateTracker.apply(baseline);
+  const patches = discovered.flatMap((video,index) => video && !_.isEqual(video.duplicates,baseline[index].duplicates) ?
+    [{id:video.id,baseline:baseline[index],changes:{duplicates:video.duplicates}}] : []);
+  for (let start=0;start<patches.length;start+=10) await patchScannedVideos(patches.slice(start,start+10));
 }
 
 //Takes a complete file address of a directory.
@@ -725,6 +641,7 @@ async function checkWatchFolders(trigger = 'automatic') {
     parsing = {};
     libMulch = [];
     newIDs = [];
+    scanActivationBaselines = new Map();
     unavailableWatchFolders = new Set();
     subtitleReconciliationContext = {detectedOwners: new Map(), legacyCounts: new Map()};
     videoExclusion.reset();
@@ -910,14 +827,16 @@ async function confirmCurrentVideos() {
       files: preparedSubtitles.stats.unmatched
     });
   }
-  for (let h=library.media.length-1; h>=0; h--) {
-    let video = library.media[h];
+  const scannedMedia = _.cloneDeep(library.media);
+  for (let h=scannedMedia.length-1; h>=0; h--) {
+    let video = scannedMedia[h];
     if (!video) {
       // library.remove(`media.${h}`);
       continue;
     }
 
     let filename = video.filename;
+    let matchingSubtitles;
     // We put the whole thing in a try block, as we'll be traversing
     // nodes that aren't guaranteed to exist, and are expected not to if the
     // video has moved or been removed.
@@ -929,7 +848,7 @@ async function confirmCurrentVideos() {
       // Start by figuring out which watchfolder the video is in
       let conWatchFolder;
       for (let watchfolder of library.settings.watchfolders) {
-        if (filename.includes(watchfolder.path)) {
+        if (containsPath(watchfolder.path, filename)) {
           conWatchFolder = watchfolder.path;
           problem = false;
           break;
@@ -964,7 +883,7 @@ async function confirmCurrentVideos() {
             if (libTreeLoc.videos[k].filename === filename) {
 
               // before deleting existing video from libFileTree, check for any subtitle changes
-              updateVideoSubs(video, libTreeLoc.videos[k].subtitles);
+              matchingSubtitles = libTreeLoc.videos[k].subtitles || [];
 
               // If we've gotten here, then we have confirmed the video exists,
               // so delete it from libFileTree
@@ -988,6 +907,9 @@ async function confirmCurrentVideos() {
       });
       await removeVideo(video);
     }
+    // Save failures must escape reconciliation; they are not evidence that a
+    // file vanished and must never send a present video to inactive media.
+    if (matchingSubtitles) await updateVideoSubs(video, matchingSubtitles);
   }
   scanLog.debug('Watchfolder tree reconciliation finished; checking unmatched videos');
 
@@ -1068,7 +990,7 @@ async function addVideoController() {
           video && video.id === result.duplicateOfID
         );
         if (batchPrimary) {
-          updateVideoSubs(batchPrimary, [
+          await updateVideoSubs(batchPrimary, [
             ...(batchPrimary.detected_subtitles || []),
             ...(result.detectedSubtitles || [])
           ]);
@@ -1092,7 +1014,6 @@ async function addVideoController() {
     elapsedMs: checkEnd-checkStart
   });
 
-  let combinedMedia = duplicateTracker.apply(library.media.concat(newMedia));
   let minimumResultStatus = Promise.resolve();
   if (newMedia.length > 0 || duplicateVideos > 0) {
     // The potentially slow content-ID work is complete, so this total now
@@ -1110,37 +1031,27 @@ async function addVideoController() {
     });
   }
   await Promise.all([
-    replaceLibrary('media', combinedMedia),
+    saveScanAdditions(newMedia, duplicateTracker),
     minimumResultStatus
   ]);
 
   // tell the user how many videos we added
   win.webContents.send('videos_added',newMedia.length);
 
-  // now let's try and get some metadata.
-  // eventually we want to do all this after the above media replacement library call
-  // has finished; currently we can only accomplish that with a callback, which doesn't
-  // allow us to use await with the getMetadata() call below; the ideal solution is to
-  // modify Library.js to work with promises, but in the meantime, a workable solution is
-  // to use the combinedMedia object we created above to base our metadata search on,
-  // so that even if the library call hasn't finished, we're not using an outdated media object here
+  // File probes run outside the commit queue. Commit small field-scoped
+  // batches as results become ready so user edits can run between them.
   let metaStart = new Date();
-  let unchecked = combinedMedia.filter(v =>
+  let unchecked = _.cloneDeep(library.media).filter(v =>
     v !== null && MediaMetadata.needsMetadataScan(v.metadata) && !isInUnavailableWatchFolder(v.filename)
   ); // Include one recheck of legacy MJPEG metadata that may describe cover art.
   let numTotal = unchecked.length;
   let numChecked = 0;
   let numSuccessful = 0;
 
-  // we have to store the metadata in an object (metadataToAdd) instead of just adding it directly to each video as we go,
-  // because getting the metadata takes a while and we don't want to overwrite any other edits the user may make
-  // to the videos during the process; then after we've got all the data, we'll add them all to their
-  // respective videos in the library and update it at once, which should happen quickly enough not to
-  // disturb anything the user is doing
-  let metadataToAdd = {};
+  let metadataPatches = [];
 
   // loop through all the unchecked videos and check them,
-  // storing the metadata in the metadataToAdd object with the video's id as the key
+  // submitting metadata-only changes against each probe's original filename
   for (let v of unchecked) {
     if (v !== null && MediaMetadata.needsMetadataScan(v.metadata)) {
       numChecked++;
@@ -1151,22 +1062,15 @@ async function addVideoController() {
           'populate technical metadata for unchecked library video'
       });
       if (MediaMetadata.hasTechnicalMetadata(metadata)) numSuccessful++;
-      metadataToAdd[v.id] = metadata;
+      metadataPatches.push({id:v.id,baseline:v,expected:{filename:v.filename},changes:{metadata}});
+      if (metadataPatches.length >= 10) {
+        await patchScannedVideos(metadataPatches);
+        metadataPatches = [];
+      }
     }
   }
 
-  // now update the actual videos with their metadata. The media replacement
-  // above has been awaited, so library.media includes all newly added or
-  // rescued videos before this snapshot is made.
-  let updatedMedia = library.media.map(v => {
-    if (v && metadataToAdd[v.id]) {
-      v.metadata = metadataToAdd[v.id];
-    }
-    return v;
-  });
-
-  // save to library
-  await replaceLibrary('media', updatedMedia);
+  await patchScannedVideos(metadataPatches);
   win.webContents.send('status-update', {action: 'metadata_save', numTotal: numSuccessful});
   backendLog.info('Video metadata scan finished', {
     videosChecked: numChecked,
@@ -1216,7 +1120,7 @@ async function addVideoFile(video) {
     // is in the watchfolder manifest, and then we're done
     case 1:
       let vidIndex = indexOfVideoInLibrary(id);
-      let libraryVideo = library.media[vidIndex];
+      let libraryVideo = _.cloneDeep(library.media[vidIndex]);
       scanLog.debug('Rejected duplicate of an active library video', {
         filename: file,
         duplicateOfID: libraryVideo.id,
@@ -1228,7 +1132,7 @@ async function addVideoFile(video) {
         ...(libraryVideo.detected_subtitles || []),
         ...(video.subtitles || [])
       ];
-      updateVideoSubs(libraryVideo, duplicateDetectedSubtitles);
+      await updateVideoSubs(libraryVideo, duplicateDetectedSubtitles);
       return {
         disposition: 'duplicate-active',
         duplicateOfID: libraryVideo.id,
@@ -1263,6 +1167,7 @@ async function addVideoFile(video) {
 
         try {
           vidObj = _.cloneDeep(library.inactive_media[inactiveVidIndex]);
+          scanActivationBaselines.set(id, _.cloneDeep(vidObj));
           vidObj.filename = file; // this is important because the file may have been renamed
 
           // === DO NOT UPDATE THE KIND BASED ON WATCHFOLDER DEFAULT KIND ===
@@ -1274,7 +1179,7 @@ async function addVideoFile(video) {
           //   console.log('Could not update kind based on watchfolder default kind: ' + err);
           // }
 
-          await deleteFromInactive(vidObj, inactiveVidIndex);
+          // Removal from inactive and insertion into active are one later commit.
 
         } catch(err) {
           scanLog.error('Could not reactivate video from inactive media', {
@@ -1333,7 +1238,7 @@ async function addVideoFile(video) {
       delete video.folderParts;
 
       if (typeof vidObj === 'object' && vidObj !== null) {
-        updateVideoSubs(vidObj, video.subtitles);
+        await updateVideoSubs(vidObj, video.subtitles);
         // Register only successful additions. A failed first candidate must
         // not cause a later copy in the same scan to be discarded as though a
         // usable primary video already existed.
@@ -1375,8 +1280,14 @@ async function createVideoID(filepath) {
 }
 
 
-function updateVideoSubs(video, detectedSubtitles) {
+async function updateVideoSubs(video, detectedSubtitles) {
+  const baseline = _.cloneDeep(video);
   if (reconcileVideoSubtitles(video, detectedSubtitles || [], subtitleReconciliationContext)) {
+    if (library.media.some(current => current && current.id === video.id)) {
+      const expected = Object.fromEntries(['filename','subtitles','detected_subtitles','manual_subtitles',
+        'ignored_subtitles','subtitle_tracking_initialized'].map(field => [field,baseline[field]]));
+      await patchScannedVideos([{id:video.id,baseline,expected,replacement:video}]);
+    }
     scanLog.debug('Detected subtitle changes for video', {
       filename: video.filename,
       subtitleCount: Array.isArray(video.subtitles) ? video.subtitles.length : 0
@@ -1775,9 +1686,8 @@ async function requestSelectedAutoTag(videoIDs) {
 
   autoTagRequestPending = true;
   try {
-    // A just-completed editor Save may still be mirroring to the main process.
-    // Wait for that transaction before taking the authoritative selected-video
-    // snapshot used by the confirmation and tagging run.
+    // Settle already submitted commits before choosing the authoritative
+    // selected-video snapshot for confirmation. Lookups never occupy this queue.
     await library.whenIdle();
     const selected = getSelectedAutoTagVideos(videoIDs);
     if (selected.length === 0) {
@@ -1908,17 +1818,17 @@ async function autoTag(options = {}) {
   })(options);
 }
 
-function saveBatch(batch) {
+function saveBatch(batch, options = {}) {
   const replacements = batch.map(video => _.cloneDeep(video));
   autoTagLog.debug('Saving automatic tagging batch', {
     videoCount: replacements.length
   });
 
-  // Submit only the videos in this batch. Library.js merges them into the
-  // freshest media array when the queued operation actually executes, avoiding
-  // the stale full-array snapshots that previously survived past cancellation.
+  const patches = replacements.map((replacement,index) => ({
+    id:replacement.id, replacement, baseline:options.baselines && options.baselines[index]
+  }));
   return new Promise((resolve, reject) => {
-    library.replaceMediaBatch(replacements, (err) => {
+    library.patchMediaBatch(patches, (err, result) => {
       if (err) {
         autoTagLog.error('Could not save automatic tagging batch', {
           videoCount: replacements.length,
@@ -1932,8 +1842,8 @@ function saveBatch(batch) {
       autoTagLog.debug('Automatic tagging batch saved locally', {
         videoCount: replacements.length
       });
-      resolve();
-    });
+      resolve(result);
+    }, {priority:'background',conflict:'skip',coherent:true,source:'autotag'});
   });
 }
 
@@ -1997,7 +1907,13 @@ ipcMain.on('settings-watchfolder-add', (event, args) => {
       if (library.settings.watchfolders.filter(wf => path.resolve(wf.path) === path.resolve(folder)).length === 0) {
         // add to library
         let folderObject = {"path" : folder, "kind" : kind, "videos" : []};
-        library.add('settings.watchfolders.push', folderObject, () => {
+        library.add('settings.watchfolders.push', folderObject, error => {
+          if (error) {
+            backendLog.error('Could not save new watchfolder', {watchfolder:folder,error});
+            dialog.showMessageBox({type:'error',buttons:['OK'],title:'Watchfolder Not Saved',
+              message:'Mynda could not save this watchfolder.',detail:error.message});
+            return;
+          }
           checkWatchFolders('watchfolder-added');
 
           // tell the client side what happened

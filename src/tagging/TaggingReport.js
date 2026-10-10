@@ -26,6 +26,8 @@ function message(value) {
 }
 
 const REASONS = {
+  'changed-during-lookup': ['The video was edited while Auto-Tag was looking it up. The proposed tags were not applied, so your saved changes were preserved.',
+    'Review the current tags. Run Auto-Tag again if you still want an automatic lookup using the updated information.'],
   'no-results': ['The searches and lookups performed did not find a safe match. This does not establish that the record is absent from OMDb.',
     'Check the title, year and episode numbers, or select a verified record in Search.'],
   'not-enough-data': ['The available identification was not usable for automatic tagging.',

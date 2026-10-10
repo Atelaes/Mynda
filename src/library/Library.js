@@ -1,125 +1,46 @@
 
+'use strict';
 const electron = require('electron');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const {fileURLToPath} = require('url');
+const {v4: uuidv4} = require('uuid');
 const _ = require('lodash');
-const { ipcRenderer } = require('electron');
-const { trackManualSubtitleEdit } = require('../scanning/SubtitleMatcher.js');
-const {normalizeDuplicatePaths} = require('./LibraryDuplicates.js');
-const VideoIdentity = require('./VideoIdentity.js');
-
-// LibraryPersistence owns file validation, atomic writes, automatic snapshots,
-// retention, and preservation of damaged bytes. Keeping those mechanics out of
-// this class lets a future manual-backup UI reuse them without duplicating the
-// main library's save logic.
+const {normalizeDuplicatePaths} = require('./LibraryDuplicates');
+const VideoIdentity = require('./VideoIdentity');
 const LibraryPersistence = require('./LibraryPersistence.js');
-const Logger = require('../platform/Logger.js');
+const Operations = require('./LibraryOperations');
+const LibraryClient = require('./LibraryClient');
+const commands = require('./LibraryCommands');
+const libraryLog = require('../platform/Logger.js').child('Library');
 
-const libraryLog = Logger.child('Library');
+function normalizeLibraryData(data) {
+  const library = {};
 
-function summarizeLibraryOperation(operation) {
-  if (!operation || typeof operation !== 'object') return operation;
-  return {
-    opType: operation.opType,
-    address: operation.address,
-    sync: Boolean(operation.sync),
-    hasEntry: typeof operation.entry !== 'undefined' && operation.entry !== null
-  };
-}
-
-class Library {
-  constructor() {
-    this.env = (electron.app) ? 'server' : 'browser';
-    this.browser = null;
-    if (this.env === 'server') {
-      electron.ipcMain.on('lib-sync-op', (event, message) => {
-        message.origin = event.sender;
-        this.alter(message)
-      });
-      electron.ipcMain.on('lib-confirm', (event, message) => {
-        this.getConfirm(message)
-      });
-      electron.ipcMain.on('lib-beacon', (event, message) => {
-        this.browser = event.sender;
-      });
-    } else {
-      ipcRenderer.on('lib-sync-op', (event, message) => {
-        this.alter(message)
-      });
-      ipcRenderer.on('lib-confirm', (event, message) => {
-        this.getConfirm(message)
-      });
-      ipcRenderer.send('lib-beacon');
-    }
-
-    // Both Electron processes construct a Library instance. They resolve the
-    // same user-data paths here, while the existing IPC queue keeps their
-    // in-memory copies synchronized after either side initiates an edit.
-    this.dataPath = (electron.app || electron.remote.app).getPath('userData');
-    this.libraryDirectory = path.join(this.dataPath, 'Library');
-    this.path = path.join(this.libraryDirectory, 'library.json');
-    this.artworkDirectory = path.join(this.libraryDirectory, 'Artwork');
-
-    // Automatic restore points and preserved damaged originals are deliberately
-    // separated. Retention manages Backups; it must never prune Recovery files.
-    this.backupDirectory = path.join(this.libraryDirectory, 'Backups');
-    this.recoveryDirectory = path.join(this.libraryDirectory, 'Recovery');
-
-    // loadIssue remains null during an ordinary startup. load() populates it
-    // only when the primary exists but cannot safely be used, which blocks all
-    // normal primary saves until index.js resolves the startup dialog.
-    this.loadIssue = null;
-
-    // Each process caches the last snapshot it created. The due-check refreshes
-    // from disk once this cache ages out, accounting for backups made by the
-    // other Electron process.
-    this.lastAutomaticBackupDate = null;
-    LibraryPersistence.ensureDirectory(this.libraryDirectory);
-    LibraryPersistence.ensureDirectory(this.artworkDirectory);
-
-    // On a healthy startup this is the primary library. During recovery it is
-    // the newest validated backup loaded provisionally, or a provisional empty
-    // default when no backup exists. No application window opens until the user
-    // accepts or declines that recovery choice in index.js.
-    this.applyLibraryData(this.load());
-
-    this.Queue = [];
-    this.arrayCleanupHistory = {};
-    this.waitConfirm = null;
-    this.idleWaiters = [];
-    // this.lastUpdate = Date.now();
-  }
-
-  // Normalize data from every entry path: ordinary primary load, automatic
-  // backup recovery, and explicit empty-library creation. Centralizing this
-  // prevents recovered older libraries from bypassing current migrations and
-  // default-field repair.
-  applyLibraryData(data) {
     Object.keys(defaultLibrary).map((key) => {
-      this[key] = typeof data[key] === 'undefined' ? _.cloneDeep(defaultLibrary[key]) : data[key];
+      library[key] = typeof data[key] === 'undefined' ? _.cloneDeep(defaultLibrary[key]) : data[key];
     });
     // Missing scheme means a legacy library, never a freshly fingerprinted
     // library. Conversion is an explicit offline operation, not a default.
-    this.videoIdScheme = data.videoIdScheme === undefined ? 1 : data.videoIdScheme;
+    library.videoIdScheme = data.videoIdScheme === undefined ? 1 : data.videoIdScheme;
 
     // Existing libraries predate some preference fields. Add new preferences
     // individually so a user's explicit false value is preserved, while a
     // missing or malformed value receives the current default.
-    if (!this.settings || typeof this.settings !== 'object' || Array.isArray(this.settings)) {
-      this.settings = _.cloneDeep(defaultLibrary.settings);
+    if (!library.settings || typeof library.settings !== 'object' || Array.isArray(library.settings)) {
+      library.settings = _.cloneDeep(defaultLibrary.settings);
     }
-    if (!this.settings.preferences ||
-        typeof this.settings.preferences !== 'object' ||
-        Array.isArray(this.settings.preferences)) {
-      this.settings.preferences = _.cloneDeep(defaultLibrary.settings.preferences);
+    if (!library.settings.preferences ||
+        typeof library.settings.preferences !== 'object' ||
+        Array.isArray(library.settings.preferences)) {
+      library.settings.preferences = _.cloneDeep(defaultLibrary.settings.preferences);
     }
     for (const preferenceName of [
       'remove_edited_from_new',
       'exclude_samples_from_library',
       'exclude_trailers_from_library'
     ]) {
-      if (typeof this.settings.preferences[preferenceName] !== 'boolean') {
-        this.settings.preferences[preferenceName] =
+      if (typeof library.settings.preferences[preferenceName] !== 'boolean') {
+        library.settings.preferences[preferenceName] =
           defaultLibrary.settings.preferences[preferenceName];
       }
     }
@@ -129,8 +50,8 @@ class Library {
     // series ID, while duplicate paths are normalized and cannot include the
     // selected library copy itself.
     for (const listName of ['media', 'inactive_media']) {
-      if (Array.isArray(this[listName])) {
-        this[listName].forEach(video => {
+      if (Array.isArray(library[listName])) {
+        library[listName].forEach(video => {
           if (!video || typeof video !== 'object') return;
           delete video.collections;
           video.seriesImdbID = video.kind === 'show' &&
@@ -141,8 +62,8 @@ class Library {
     }
 
     // Retired or otherwise unsupported playlist views fall back to the flat view.
-    if (Array.isArray(this.playlists)) {
-      this.playlists.forEach(playlist => {
+    if (Array.isArray(library.playlists)) {
+      library.playlists.forEach(playlist => {
         if (playlist && playlist.view !== 'series') playlist.view = 'flat';
       });
     }
@@ -150,486 +71,180 @@ class Library {
     // Keep only confirmation preferences that the current build supports.
     try {
       const supportedDialogs = Object.keys(defaultLibrary.settings.preferences.override_dialogs);
-      this.settings.preferences.override_dialogs = _.pick(
+      library.settings.preferences.override_dialogs = _.pick(
         {
           ...defaultLibrary.settings.preferences.override_dialogs,
-          ...(this.settings.preferences.override_dialogs || {})
+          ...(library.settings.preferences.override_dialogs || {})
         },
         supportedDialogs
       );
     } catch (err) {
-      this.settings.preferences.override_dialogs = _.cloneDeep(defaultLibrary.settings.preferences.override_dialogs);
-    }
-  }
-
-  // Prepare a full-video replacement that originated in the renderer's editor.
-  // This is needed for both ordinary one-video saves and replaceMediaBatch().
-  // A scan may have refreshed the video's subtitle state after the editor was
-  // opened, so unrelated metadata edits must not overwrite that newer state.
-  // When subtitles really were edited, record the user's additions/removals so
-  // later scans know which detected files should stay ignored or manually kept.
-  prepareRendererVideoReplacement(oldVideo, replacement) {
-    const subtitlesWereEdited = replacement.__mynda_subtitles_edited === true;
-    delete replacement.__mynda_subtitles_edited;
-
-    if (oldVideo && subtitlesWereEdited) {
-      replacement = trackManualSubtitleEdit(oldVideo, replacement);
-    } else if (oldVideo) {
-      replacement.subtitles = _.cloneDeep(oldVideo.subtitles || []);
-      for (const property of [
-        'detected_subtitles',
-        'manual_subtitles',
-        'ignored_subtitles',
-        'subtitle_tracking_initialized'
-      ]) {
-        if (Object.prototype.hasOwnProperty.call(oldVideo, property)) {
-          replacement[property] = _.cloneDeep(oldVideo[property]);
-        } else {
-          delete replacement[property];
-        }
-      }
+      library.settings.preferences.override_dialogs = _.cloneDeep(defaultLibrary.settings.preferences.override_dialogs);
     }
 
-    // Duplicate paths belong to the scanner, not the editor. Preserve the
-    // freshest main-process value even if an editor opened before a scan and
-    // later saves an otherwise unrelated metadata change.
-    if (oldVideo) {
-      replacement.duplicates = normalizeDuplicatePaths(
-        oldVideo.duplicates,
-        oldVideo.filename
-      );
-    }
-    return replacement;
-  }
-
-  // Master changing function used by add, replace, and remove.
-  //opType: the type of operation (add, replace, remove)
-  //address: the location of the operation
-  //entry: the item to be placed, not used in remove
-  //sync, whether this was prompted by counterpart library
-  alter({ opType = null, address = null, entry = null, sync = false, origin = null, cb = (err) => {
-    if (err) {
-      libraryLog.error('Library operation failed without a caller-provided callback', {
-        error: err
+  return library;
+}
+function errorPayload(error) {
+  return {message: error.message, code: error.code, address: error.address, id: error.id,
+    libraryPath: error.libraryPath, libraryOperation: error.libraryOperation};
+}
+class Library {
+  constructor() {
+    if (!electron.app) return new LibraryClient({ipcRenderer: electron.ipcRenderer, log: libraryLog, initialData: defaultLibrary});
+    this.env = 'server';
+    this.dataPath = electron.app.getPath('userData');
+    this.libraryDirectory = path.join(this.dataPath, 'Library');
+    this.path = path.join(this.libraryDirectory, 'library.json');
+    this.artworkDirectory = path.join(this.libraryDirectory, 'Artwork');
+    this.backupDirectory = path.join(this.libraryDirectory, 'Backups');
+    this.recoveryDirectory = path.join(this.libraryDirectory, 'Recovery');
+    this.loadIssue = null;
+    this.lastAutomaticBackupDate = null;
+    this.session = uuidv4();
+    this.revision = 0;
+    this.queue = [];
+    this.running = false;
+    this.scheduled = false;
+    this.foregroundStreak = 0;
+    this.idleWaiters = [];
+    this.renderers = new Set();
+    this.requests = new Map();
+    this.stopping = false;
+    LibraryPersistence.ensureDirectory(this.libraryDirectory);
+    LibraryPersistence.ensureDirectory(this.artworkDirectory);
+    this.applyLibraryData(this.load());
+    for (const key of Object.keys(defaultLibrary)) Object.defineProperty(this, key, {enumerable: true, get: () => this._data[key]});
+    if (typeof electron.ipcMain.handle === 'function') {
+      electron.ipcMain.handle('library:snapshot', event => {
+        this.validateSender(event);
+        this.renderers.add(event.sender);
+        return this.snapshot();
+      });
+      electron.ipcMain.handle('library:commit', async (event, request) => {
+        try {
+          this.validateSender(event);
+          if (!request || typeof request.requestId !== 'string' || request.requestId.length > 200) throw Operations.failure('INVALID_LIBRARY_OPERATION', 'A request identifier is required.');
+          const key = `${event.sender.id}:${request.requestId}`;
+          if (!this.requests.has(key)) {
+            const promise = this.enqueue(request.operations, {actor: 'renderer', priority: 'user',
+              updateUsedLists: Boolean(request.options && request.options.updateUsedLists), requestId: request.requestId});
+            this.requests.set(key, promise);
+            promise.then(() => this.trimRequests(), () => this.trimRequests());
+          }
+          return await this.requests.get(key);
+        } catch (error) { return {error: errorPayload(error)}; }
       });
     }
-  } } = {}) {
-    //console.log(`alter(${opType}, ${address}, ${JSON.stringify(entry)}, ${sync}, ${origin})`);
-    //let startTime = new Date();
-    const operation = summarizeLibraryOperation({opType, address, entry, sync});
-    const batchMediaBefore = opType === 'replace-media-batch' && !sync ? this.media : null;
-    let phase = 'change', committed = false;
+  }
+  validateSender(event) {
+    const sender = event && event.sender;
+    let valid = false;
     try {
-      // A large editor batch arrives as a list of complete replacement videos,
-      // not as a prebuilt media array. Resolve it only when this operation
-      // reaches the front of the Library queue: earlier queued changes may have
-      // altered media in the meantime, and building the array sooner could
-      // accidentally overwrite them with stale data.
-      //
-      // Once prepared, turn the batch into one ordinary replacement of media.
-      // The existing save/sync machinery below will therefore perform one
-      // atomic library write and one renderer-to-backend IPC round trip.
-      if (opType === 'replace-media-batch') {
-        if (!Array.isArray(entry)) {
-          throw 'A media batch replacement requires an array of videos.';
-        }
-
-        let updatedMedia = this.media.slice();
-        let seenIDs = new Set();
-        for (const suppliedVideo of entry) {
-          if (!suppliedVideo || typeof suppliedVideo !== 'object' || !suppliedVideo.id) {
-            throw 'Every media batch replacement requires a video with an id.';
-          }
-          if (seenIDs.has(suppliedVideo.id)) {
-            throw `The media batch contains duplicate video id ${suppliedVideo.id}.`;
-          }
-          seenIDs.add(suppliedVideo.id);
-
-          const mediaIndex = updatedMedia.findIndex(video =>
-            video && video.id === suppliedVideo.id
-          );
-          if (mediaIndex < 0) {
-            throw `Unable to find video ${suppliedVideo.id} for batch replacement.`;
-          }
-
-          let replacement = _.cloneDeep(suppliedVideo);
-          if (this.env === 'browser' && !sync) {
-            replacement = this.prepareRendererVideoReplacement(
-              updatedMedia[mediaIndex],
-              replacement
-            );
-          }
-          updatedMedia[mediaIndex] = replacement;
-        }
-
-        opType = 'replace';
-        address = 'media';
-        entry = updatedMedia;
-      }
-
-      //Start with some basic validation
-      if (!['add', 'replace', 'remove'].includes(opType)) {
-        throw 'Unrecognized operation type.';
-      } else if (['add', 'replace'].includes(opType) && typeof entry === "undefined") {
-        throw 'Add or replace operations require entry';
-      } else if (opType === 'remove' && entry) {
-        throw 'Remove operations should not contain an entry';
-      }
-
-      // Full-video replacements made in the renderer are editor saves. Record
-      // subtitle additions/removals before mirroring the replacement to the
-      // backend so later scans can preserve the user's choices.
-      if (this.env === 'browser' && !sync && opType === 'replace' &&
-        /^media\.[^.]+$/.test(address) && entry && typeof entry === 'object') {
-        const selector = address.slice('media.'.length);
-        let oldVideo = null;
-        if (Number.isInteger(Number(selector))) {
-          oldVideo = this.media[Number(selector)];
-        } else if (selector.includes('=')) {
-          const components = selector.split('=');
-          const property = components[0];
-          const value = components.slice(1).join('=');
-          oldVideo = this.media.find(video =>
-            video && typeof video[property] !== 'undefined' && video[property] === value
-          );
-        }
-        entry = this.prepareRendererVideoReplacement(oldVideo, entry);
-      }
-
-      //Get one step away from the location specified by address
-      //Most operations won't work if we go all the way
-      let addArr = address.split('.');
-      let dest = this;
-      // let addEnd = addArr[addArr.length-1];
-      let addEnd = addArr.pop();
-      // for (let i=0; i<addArr.length-1; i++) {
-      for (let i = 0; i < addArr.length; i++) {
-        dest = dest[addArr[i]];
-      }
-
-      //Figure out what we have to do and do it
-      //Start with operations on an array
-      //Push is used as address terminus if we're just adding to end of array
-      if (Array.isArray(dest)) {
-        if (addEnd === 'push') {
-          switch (opType) {
-            case 'add':
-              dest.push(entry);
-              break;
-            default:
-              throw "Push can only be used with add.";
-          }
-        } else {
-          switch (opType) {
-            case 'add':
-              throw "Add can only be used with push.";
-              // dest.splice(addEnd, 0, entry);
-              break;
-            case 'replace':
-              // if addEnd is an integer, we take it as an index
-              if (Number.isInteger(Number(addEnd))) {
-                dest[addEnd] = entry;
-                // otherwise, addEnd should be a string of form:
-                // 'property=value' (e.g. 'id=582c8160-b185-5843-9eaf-8e71f177ae65')
-                // and we'll try to find an object in dest with that prop/value pair
-                // and replace it with entry
-              } else if (addEnd.split('=').length > 1) {
-                let components = addEnd.split('=');
-                let prop = components[0];
-                let val = components.slice(1).join('=');
-
-                let found = false;
-                for (let i = 0; i < dest.length; i++) {
-                  if (typeof dest[i][prop] !== 'undefined' && dest[i][prop] === val) {
-                    libraryLog.debug('Found array element for replacement', {
-                      address: address,
-                      index: i,
-                      property: prop
-                    });
-                    found = true;
-                    dest[i] = entry;
-                    // we could remove the break statement to replace all instances
-                    // instead of just the first one
-                    break;
-                  }
-                }
-                if (!found) {
-                  throw `Unable to find element (${addEnd}) to replace.`
-                }
-
-                // let results = dest.filter(el => typeof el[prop] !== 'undefined' && el[prop] === val);
-                // if (results.length > 0) {
-                //   console.log('found element to replace, replacing...');
-                //   results[0] = entry;
-                // } else {
-                //   throw `Unable to find element (${addEnd}) to replace.`
-                // }
-              } else {
-                throw 'Unable to parse address for replace operation'
-              }
-              break;
-            case 'remove':
-              // remember the array we're operating on so that once the queue is empty,
-              // we can clean up any null values left after something is removed
-              // the key is the address minus addEnd; this way if multiple things are
-              // removed from that same array, this same key will be overwritten;
-              // this is good because we only need to remember the edited array once
-              // let temp = [...addArr];
-              // temp.splice(-1);
-              this.arrayCleanupHistory[addArr.join('.')] = dest;
-
-              // if there are items in queue, don't remove elements,
-              // because that will throw off other operations reliant on indices;
-              // at the end, all the null elements will be removed
-              // if (this.Queue.length > 0) {
-              dest.splice(addEnd, 1, null);
-            // } else {
-            //   dest.splice(addEnd, 1);
-            // }
-          }
-        }
-      } else {
-        //If we're not in array, then we're in an object
-        switch (opType) {
-          case 'add':
-            if (dest[addEnd]) {
-              throw 'Something already exists at that location, use replace.';
-            } else {
-              dest[addEnd] = entry;
-            }
-            break;
-          case 'replace':
-            // if (typeof dest[addEnd] !== "undefined") {
-            dest[addEnd] = entry;
-            // } else {
-            //   throw 'Nothing to replace, use add.';
-            // }
-            break;
-          case 'remove':
-            delete dest[addEnd];
-        }
-      }
-
-      // cleanup...
-      // get rid of null placeholders in any array that we've removed something from,
-      // but only if the queue is empty
-      if (this.Queue.length === 0) {
-        //console.log('cleaning up...');
-        // console.log(JSON.stringify(this.arrayCleanupHistory));
-        Object.keys(this.arrayCleanupHistory).map(key => {
-          let cleaned = this.arrayCleanupHistory[key];
-          if (Array.isArray(cleaned)) {
-            //console.log(`cleaning ${key}`);
-            cleaned = cleaned.filter(el => el !== null);
-            // console.log(`Cleaned: ${JSON.stringify(cleaned)}`);
-
-            // for some reason we have to do this part over again, I don't know...
-            let destination = this;
-            let map = key.split('.');
-            let end = map.pop();
-            map.map(loc => {
-              destination = destination[loc];
-            });
-            // console.log(`\nBefore cleaning: ${JSON.stringify(destination[end])}\n`);
-            destination[end] = _.cloneDeep(cleaned);
-            // console.log(`\nAfter cleaning: ${JSON.stringify(destination[end])}\n`);
-            // console.log(`\n==== WATCHFOLDERS ====\n\n\n${JSON.stringify(this.settings.watchfolders)}\n\n\n`);
-            // console.log(`\n==== INACTIVE_MEDIA ====\n\n\n${JSON.stringify(this.inactive_media)}\n\n\n`);
-          }
-        });
-        // reset it
-        this.arrayCleanupHistory = {};
-      }
-
-      // save to file, communicate with partner library
-      if (sync) {
-        //If this was requested by other library, let them know we did it
-        this.confirm({ opType: opType, address: address, entry: entry, sync: sync, origin: origin });
-      } else {
-
-        // Start by saving to file.
-        phase = 'save';
-        this.save();
-        committed = true;
-
-        //If this was a local operation, request other library mirror it
-        phase = 'sync';
-        this.sync({ opType: opType, address: address, entry: entry, sync: sync, origin: origin });
-
-        // execute callback;
-        phase = 'callback';
-        cb();
-      }
-
-      // let React know that we've done a save, so that it can perform whatever re-rendering it needs to
-      if (this.env === 'browser') {
-        savedPing.saved(address);
-      }
-    } catch (e) {
-      // A failed atomic save leaves the previous file intact. Keep the batch's
-      // in-memory videos intact too, so unsaved attempts do not disappear from
-      // New or become ineligible for a retry. Never undo a committed save.
-      if (batchMediaBefore && !committed) this.media = batchMediaBefore;
-      const error = new Error(`Library ${operation.opType} at ${operation.address} failed: ${e && e.message ? e.message : String(e)}`);
-      error.cause = e;
-      error.code = e && e.code;
-      error.libraryPath = this.path;
-      error.libraryOperation = {...operation, phase, committed};
-      // Preserve the OS error without serializing the entire media array into
-      // the message (which previously buried the cause in truncated logs).
-      try { cb(error); }
-      finally {
-        // A failed queued operation has no mirror confirmation to advance it.
-        // Let subsequent jobs finish or report their own error, and unblock
-        // whenIdle once the queue is actually empty.
-        if (!this.waitConfirm) this.getConfirm();
-      }
+      valid = Boolean(sender && typeof sender.getURL === 'function' &&
+        path.resolve(fileURLToPath(sender.getURL())) === path.resolve(__dirname, '../renderer/index.html'));
+    } catch (_) {}
+    if (!valid || (event.senderFrame && sender.mainFrame && event.senderFrame !== sender.mainFrame)) {
+      throw Operations.failure('LIBRARY_UNAUTHORIZED', 'Library access is limited to the application window.');
     }
-    //let endTime = new Date();
-    //let totalTime = endTime - startTime;
-    //console.log(`alter( ${JSON.stringify(arguments[0])}) took ${totalTime}ms.`)
-
   }
-
-  // Takes a string address in dot format, and adds "addition" to that location.
-  add(address, addition, cb) {
-    //console.log('adding...')
-    this.addToQueue({ opType: 'add', address: address, entry: addition, sync: false, origin: null, cb: cb });
+  trimRequests() {
+    // Completed request IDs allow reconnect/repeated delivery without a second write.
+    while (this.requests.size > 512) this.requests.delete(this.requests.keys().next().value);
   }
-
-  // Takes a string address in dot format, and replaces whatever is there with "replacement".
-  replace(address, replacement, cb) {
-    this.addToQueue({ opType: 'replace', address: address, entry: replacement, sync: false, origin: null, cb: cb });
+  snapshot() {
+    return {session: this.session, revision: this.revision, data: this._data,
+      paths: {dataPath: this.dataPath, libraryDirectory: this.libraryDirectory, path: this.path,
+        artworkDirectory: this.artworkDirectory, backupDirectory: this.backupDirectory, recoveryDirectory: this.recoveryDirectory}};
   }
-
-  // Replace many editor videos as one queued operation. alter() deliberately
-  // receives the individual videos rather than a whole array assembled here,
-  // so it can merge them into the freshest media state when the queue reaches
-  // this job. The final operation still uses the normal atomic save, IPC sync,
-  // confirmation, callback, and savedPing behavior of replace('media', ...).
-  replaceMediaBatch(replacements, cb) {
-    this.addToQueue({
-      opType: 'replace-media-batch',
-      address: 'media',
-      entry: replacements,
-      sync: false,
-      origin: null,
-      cb: cb
+  applyLibraryData(data) { this._data = Operations.deepFreeze(normalizeLibraryData(_.cloneDeep(data))); }
+  getSaveObject() { return this._data; }
+  transaction(operations, callback, options = {}) {
+    let prepared;
+    try { prepared = operations.map(op => Operations.prepareOperation(this._data, op)); }
+    catch (error) {
+      const failed = Promise.reject(error);
+      failed.catch(err => { if (callback) callback(err); else libraryLog.error('Library command rejected', {error: err}); });
+      return failed;
+    }
+    const promise = this.enqueue(prepared, {...options, actor: 'backend'});
+    promise.then(result => {
+      if (callback) { try { callback(null, result); } catch (error) { libraryLog.error('Library save callback failed after commit', {error}); } }
+    }, error => {
+      if (callback) { try { callback(error); } catch (callbackError) { libraryLog.error('Library failure callback failed', {error: callbackError}); } }
+      else libraryLog.error('Library operation failed', {error});
+    });
+    return promise;
+  }
+  stopBackgroundWrites() { this.stopping = true; }
+  resumeWrites() { this.stopping = false; }
+  enqueue(operations, options = {}) {
+    return new Promise((resolve, reject) => {
+      if (this.stopping && options.priority === 'background') {
+        reject(Operations.failure('LIBRARY_CLOSING', 'Mynda is closing; no new background save was accepted.'));
+        return;
+      }
+      this.queue.push({operations: _.cloneDeep(operations), options: {...options}, resolve, reject});
+      this.schedule();
     });
   }
-
-  // Takes a string address in dot format, and removes whatever is there.
-  remove(address, cb) {
-    this.addToQueue({ opType: 'remove', address: address, entry: null, sync: false, origin: null, cb: cb });
+  schedule() {
+    if (this.running || this.scheduled) return;
+    this.scheduled = true;
+    setImmediate(() => { this.scheduled = false; this.drainOne(); });
   }
-
-  addToQueue(argObj) {
-    if (this.waitConfirm) {
-      //console.log('Something already in pipeline, adding to queue...')
-      this.Queue.push(argObj);
-    } else {
-      //console.log('Nothing in pipeline, performing operation now...')
-      this.alter(argObj);
+  drainOne() {
+    if (this.running || !this.queue.length) { this.resolveIdle(); return; }
+    let index = this.queue.findIndex(job => job.options.priority !== 'background');
+    const background = this.queue.findIndex(job => job.options.priority === 'background');
+    if (index < 0 || (this.foregroundStreak >= 8 && background >= 0)) index = background >= 0 ? background : 0;
+    const job = this.queue.splice(index, 1)[0];
+    this.foregroundStreak = job.options.priority === 'background' ? 0 : this.foregroundStreak + 1;
+    this.running = true;
+    let committed = false;
+    try {
+      const before = this._data;
+      const outcome = Operations.applyOperations(before, job.operations, job.options);
+      VideoIdentity.assertLibraryIdentity(outcome.data);
+      if (this.loadIssue) throw new Error('Refusing to overwrite an unreadable library before recovery is resolved.');
+      let delta = {sections: {}, records: {}};
+      if (outcome.data !== before) {
+        const candidate = Operations.deepFreeze(outcome.data);
+        delta = Operations.makeDelta(before, candidate);
+        this.maybeCreateAutomaticBackup();
+        LibraryPersistence.writeLibraryFile(this.path, candidate);
+        committed = true;
+        this._data = candidate;
+        this.revision++;
+      }
+      const response = {session: this.session, revision: this.revision, delta, addresses: outcome.addresses,
+        requestId: job.options.requestId, skipped: outcome.skipped, conflicts: outcome.skipped};
+      if (committed) {
+        for (const renderer of this.renderers) {
+          try {
+            if (renderer.isDestroyed && renderer.isDestroyed()) { this.renderers.delete(renderer); continue; }
+            renderer.send('library:committed', response);
+          } catch (error) { this.renderers.delete(renderer); try { libraryLog.warn('Renderer disconnected after library commit', {error}); } catch (_) {} }
+        }
+      }
+      job.resolve(response);
+    } catch (error) {
+      error.libraryPath = this.path;
+      error.libraryOperation = {phase: committed ? 'publish' : 'commit', committed};
+      job.reject(error);
+    } finally {
+      this.running = false;
+      if (this.queue.length) this.schedule();
+      else this.resolveIdle();
     }
   }
-
-  // A local Library callback means that process has saved and sent its IPC
-  // mirror operation; it does not mean the other Electron process has applied
-  // it yet. Long-running workflows such as Auto-Tag need this stronger barrier
-  // before announcing completion, otherwise the user can begin a conflicting
-  // edit while an older full-library synchronization is still in flight.
   whenIdle() {
-    if (!this.waitConfirm && this.Queue.length === 0) {
-      return Promise.resolve();
-    }
+    if (!this.running && !this.queue.length) return Promise.resolve();
     return new Promise(resolve => this.idleWaiters.push(resolve));
   }
-
-  resolveIdleWaiters() {
-    if (this.waitConfirm || this.Queue.length > 0) return;
-
-    const waiters = this.idleWaiters.splice(0);
-    waiters.forEach(resolve => resolve());
+  resolveIdle() {
+    if (this.running || this.queue.length) return;
+    this.idleWaiters.splice(0).forEach(resolve => resolve());
   }
-
-  // Takes an operation type, a string address in dot format, and optionally an item.
-  // Communicates to counterpart library that a change has been made that should be mirrored.
-  sync(argObj) {
-    // tell partner to replicate the action.
-    argObj.sync = true;
-    if (this.waitConfirm) {
-      libraryLog.warn('A library synchronization confirmation was already pending', {
-        pendingOperation: summarizeLibraryOperation(this.waitConfirm),
-        attemptedOperation: summarizeLibraryOperation(argObj)
-      });
-    } else {
-      this.waitConfirm = _.cloneDeep(argObj);
-    }
-    if (this.env === 'server') {
-      try {
-        //console.log('Sending a mirror request to browser');
-        this.browser.send('lib-sync-op', argObj);
-      } catch (err) {
-        //console.log('Browser does not exist yet or did not send beacon. Continuing server operation without sending sync operation.');
-        this.getConfirm(); // manually call getConfirm to proceed to the next item in queue
-      }
-    } else {
-      //console.log('Sending a mirror request to server');
-      ipcRenderer.send('lib-sync-op', argObj);
-    }
-  }
-
-  // Takes an operation type, a string address in dot format, and optionally an item.
-  // Communicates to counterpart library that it has received and implemented the
-  // requested change.
-  confirm(argObj) {
-    if (this.env === 'server') {
-      let origin = argObj.origin;
-      argObj.origin = null;  //This is only added on syncOps received by server.
-      origin.send('lib-confirm', argObj);
-    } else {
-      ipcRenderer.send('lib-confirm', argObj);
-    }
-  }
-
-  getConfirm(argObj) {
-    if (_.isEqual(argObj, this.waitConfirm)) {
-      //console.log("Got a valid confirmation back, sync operation successful!")
-    } else if (typeof argObj === "undefined") {
-      // sync op was aborted, getConfirm was called manually by the server (from the sync() function) to move to the next queue item
-    } else {
-      libraryLog.warn('Library synchronization confirmation did not match the pending operation', {
-        receivedConfirmation: summarizeLibraryOperation(argObj),
-        expectedConfirmation: summarizeLibraryOperation(this.waitConfirm)
-      });
-    }
-
-    this.waitConfirm = null;
-    if (this.Queue.length > 0) {
-      let nextOp = this.Queue.shift();
-      libraryLog.debug('Starting next queued library operation', {
-        queuedOperationsRemaining: this.Queue.length,
-        operationType: nextOp.opType,
-        address: nextOp.address
-      });
-      this.alter(nextOp);
-    }
-
-    // alter(nextOp) sets waitConfirm again when it starts another outbound
-    // synchronization. Only the confirmation for the final queued operation
-    // reaches this point with both waitConfirm and Queue empty.
-    this.resolveIdleWaiters();
-  }
-
-  // Build the serializable portion of the Library instance. IPC state, queues,
-  // paths, and recovery bookkeeping are class internals and must not leak into
-  // library.json or a manual library copy.
-  getSaveObject() {
-    let saveObj = {};
-    Object.keys(defaultLibrary).map((key) => { saveObj[key] = this[key] });
-    return saveObj;
-  }
-
   // index.js asks for this after Electron becomes ready. Returning a clone lets
   // the recovery UI inspect paths and error details without mutating the state
   // that guards primary saves.
@@ -861,6 +476,7 @@ class Library {
     }
   }
 }
+Object.assign(Library.prototype, commands);
 
 const defaultLibrary = {
   "id": uuidv4(),

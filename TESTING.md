@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-The current catalog contains 52 suites: 50 fast suites with 2,550 named cases, plus two Electron end-to-end suites (source and ASAR). Before media-tool setup, `npm run test:core` selects 48 suites with 2,543 cases. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
+Use `npm run test:list` for the current catalog and each test run's final summary for suite and case totals. The catalog includes fast tests and two Electron end-to-end suites (source and ASAR). Before media-tool setup, `npm run test:core` excludes the two fast suites that require native media tools. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
 
 ## The first commands to learn
 
@@ -44,6 +44,16 @@ To run one test file while working on a failure:
 ```bash
 node test/MovieSearch.unit.test.js
 ```
+
+## Library save architecture and checks
+
+The backend owns the committed library and its only ordinary disk writer. The renderer loads a confirmed, immutable snapshot over IPC, submits commands, and applies revisioned commits. A save succeeds only after the candidate was written atomically and the renderer has incorporated its result. Failed writes leave the previous committed state intact. The JSON format, backup retention, recovery, and export behavior remain compatible.
+
+Scans and Auto-Tag do filesystem/network work outside the commit queue. They submit small, ready batches; user edits take priority between commits, with fairness for background progress. Playback updates only position, and editor/settings changes carry field baselines. Disjoint changes merge against current state; conflicting manual changes are preserved. An Auto-Tag conflict records a readable explanation and leaves the video eligible for a retry.
+
+Closing flushes already-requested editor saves, deferred settings changes, and playback positions, then drains ready backend commits. It does not wait for an entire scan or catalog lookup and does not automatically save an unsubmitted editor draft. If completion cannot be confirmed, the user can wait, cancel closing, or explicitly quit without saving. A single-instance lock prevents two normal app launches from writing the same library.
+
+The focused suites above run under both `npm run test:core` and `npm test`; persistence/protocol fixtures use disposable files and controlled IPC. Before release, also run `npm run test:electron` on each supported native platform. On a copy of a real library, start a scan or Auto-Tag, save an editor change while it runs, verify the change appears promptly and survives restart, and close immediately after a settings or playback update. Native dialogs, filesystem performance, and actual Electron rendering still require this platform check.
 
 ## What the categories mean
 
@@ -105,7 +115,13 @@ A “test double” is simply a small, predictable substitute for something outs
 | `MediaDependencies.integration.test.js` | Integration | Production node-mpv JSON-IPC startup, real graphical output, encode/probe/decode operations, strict LGPL bundles, and MPV DVD capability |
 | `MediaMetadata.integration.test.js` | Integration | Real FFprobe and FFmpeg fallback on generated videos with embedded covers, genuine MJPEG video, unavailable files, and scratch cleanup |
 | `LibraryPersistence.integration.test.js` | Integration | Schema validation, atomic saves, backup names/retention, recovery, and preservation of damaged bytes |
-| `Library.integration.test.js` | Integration | First launch, schema/version guards, add/replace/remove, synchronization waits, scanner-owned fields, exports, and recovery decisions |
+| `Library.integration.test.js` | Integration | First launch, schema/version guards, add/replace/remove, commit completion, scanner-owned fields, exports, and recovery decisions |
+| `LibraryTransactions.integration.test.js` | Integration | Real store/client persistence, concurrent edits, conflicts, disk failures, request deduplication, reloads, revision gaps, immutable snapshots, priority, and close preparation |
+| `LibraryEditing.component.test.js` | Component | Editor drafts, selection and artwork races, atomic batch edits, inline patches, playback coalescing, settings debounce, and pending-save close hooks |
+| `LibraryScanOperations.unit.test.js` | Unit | Scan upserts, inactive reactivation, stale filename observations, user-edit preservation, subtitle provenance, and watchfolder removal |
+| `AutoTagConcurrentEdits.integration.test.js` | Integration | Manual edits during catalog lookups and retry baselines after the run's own successful saves |
+| `LibraryClose.unit.test.js` | Unit | Window/app close coordination, validated renderer acknowledgments, timeouts, wait/cancel/discard choices, and ready-commit draining |
+| `SingleInstance.unit.test.js` | Unit | Acquiring the application lock before library startup and focusing an existing window |
 | `Logger.integration.test.js` | Integration | File routing, visible renderer DEBUG output, forwarding, secret redaction, rotation, and listener shutdown |
 | `ReadWrite.integration.test.js` | Integration | Defaults, main/renderer paths, ordinary persistence, and malformed-file replacement |
 | `ShareManifest.integration.test.js` | Integration | Manifest/ID compatibility, safe paths, atomic files, Windows flush permissions, and preservation after a failed flush |

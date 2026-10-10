@@ -3,6 +3,7 @@ const React = require('react');
 const {ipcRenderer, shell} = require('electron');
 const os = require('os');
 const _ = require('lodash');
+const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const {formatBoxOffice, formatCompactBoxOffice} = require('../library/BoxOffice.js');
 const {getResolutionInfo} = require('../media/VideoResolution.js');
 
@@ -337,10 +338,8 @@ class MynLibSeries extends React.Component {
   }
 
   addEpisodeToColumns() {
-    if (!this.state.columns.includes('episode')) {
-      this.state.columns.unshift('episode');
-    }
-    return this.state.columns;
+    return this.state.columns.includes('episode') ?
+      this.state.columns : ['episode', ...this.state.columns];
   }
 
   componentDidMount() {
@@ -1083,12 +1082,11 @@ class MynLibTableRow extends React.Component {
     // console.log('changes == ' + JSON.stringify(changes));
 
 
-    ipcRenderer.once('save-video-confirm', (event, response, changes, originalVid, skipDialog) => {
+    const confirmSave = (event, response, changes, originalVid, skipDialog) => {
       if (response === 0) { // yes
         // save video to library
-        let updated = { ...originalVid, ...changes };
-        let index = library.media.findIndex((video) => video.id === updated.id);
-        library.replace("media." + index, updated);
+        library.patchMediaBatch([videoEdit(originalVid, {...originalVid, ...changes})],
+          error => reportSaveFailure(error, libraryViewLog));
       } else {
         libraryViewLog.debug('Inline video edit canceled by user', {
           videoID: originalVid && originalVid.id
@@ -1101,16 +1099,16 @@ class MynLibTableRow extends React.Component {
         // console.log('option to override dialog was checked!');
         disableConfirmationDialog('MynLibTable-confirm-inlineEdit', libraryViewLog);
       }
-    });
+    };
 
     // user confirmation dialog
     if (!this.props.settings.preferences.override_dialogs || !this.props.settings.preferences.override_dialogs['MynLibTable-confirm-inlineEdit']) {
+      ipcRenderer.once('save-video-confirm', confirmSave);
       ipcRenderer.send('save-video-confirm', changes, originalVid, true); // pass 'true' to show the skip dialog checkbox
     } else {
       // save changes without the confirmation dialog
-      let updated = { ...originalVid, ...changes };
-      let index = library.media.findIndex((video) => video.id === updated.id);
-      library.replace("media." + index, updated);
+      library.patchMediaBatch([videoEdit(originalVid, {...originalVid, ...changes})],
+        error => reportSaveFailure(error, libraryViewLog));
     }
   }
 
@@ -1244,8 +1242,8 @@ class MynDetails extends React.Component {
       return;
     }
 
-    let updated = {...this.props.video, ...changes};
-    library.replace(`media.id=${this.props.video.id}`,updated);
+    library.patchMediaBatch([videoEdit(this.props.video, {...this.props.video, ...changes})],
+      error => reportSaveFailure(error, libraryViewLog));
   }
 
   openInFinder() {

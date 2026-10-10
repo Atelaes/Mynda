@@ -29,6 +29,15 @@ function loadLibraryClass(userData, renderer = false) {
   ipcRenderer.send = function send(channel, ...args) {
     this.sent.push({channel, args});
   };
+  ipcRenderer.invoke = async function invoke(channel, ...args) {
+    this.sent.push({channel, args});
+    assert.strictEqual(channel, 'library:snapshot');
+    return {session: 'isolated-renderer-fixture', revision: 0,
+      data: libraryFixture({videoIdScheme: 2}), paths: {
+        dataPath: userData, libraryDirectory: path.join(userData, 'Library'),
+        path: path.join(userData, 'Library', 'library.json')
+      }};
+  };
   const app = {getPath: name => {
     assert.strictEqual(name, 'userData');
     return userData;
@@ -155,10 +164,11 @@ suite.test('adds, replaces, removes, and batch-replaces media through the normal
 
 suite.test('preserves current subtitle provenance during unrelated renderer edits', () => withTemporaryDirectory(
   'library-renderer-replacement',
-  directory => {
+  async directory => {
     global.savedPing = {saved() {}};
     const {Library, ipcRenderer} = loadLibraryClass(directory, true);
     const instance = new Library();
+    await instance.ready;
     const detected = path.join(directory, 'watch', 'Movie.en.srt');
     const ignored = path.join(directory, 'watch', 'Movie.commentary.srt');
     const duplicate = path.join(directory, 'watch', 'Movie Copy.mkv');
@@ -181,7 +191,7 @@ suite.test('preserves current subtitle provenance during unrelated renderer edit
     assert.deepStrictEqual(prepared.subtitles, [detected]);
     assert.deepStrictEqual(prepared.ignored_subtitles, [ignored]);
     assert.deepStrictEqual(prepared.duplicates, [duplicate]);
-    assert(ipcRenderer.sent.some(entry => entry.channel === 'lib-beacon'));
+    assert(ipcRenderer.sent.some(entry => entry.channel === 'library:snapshot'));
     delete global.savedPing;
   }
 ));
@@ -230,22 +240,22 @@ suite.test('creates an empty library only after an explicit recovery decision', 
   }
 ));
 
-suite.test('resolves idle waiters only after the real synchronization confirmation', () =>
+suite.test('resolves backend idle waiters only after queued commits reach disk', () =>
   withTemporaryDirectory('library-idle-waiter', async directory => {
     const {Library} = loadLibraryClass(directory);
     const instance = new Library();
-    const pending = {opType: 'replace', address: 'media.id=movie', entry: {id: 'movie'}};
-    instance.waitConfirm = pending;
-
+    const first = operate(instance, 'replace', 'settings.preferences.exclude_samples_from_library', false);
+    const second = operate(instance, 'replace', 'settings.preferences.exclude_trailers_from_library', false);
     let resolved = false;
     const waiting = instance.whenIdle().then(() => { resolved = true; });
     await Promise.resolve();
     assert.strictEqual(resolved, false);
-
-    instance.getConfirm(pending);
-    await waiting;
+    await Promise.all([first, second, waiting]);
     assert.strictEqual(resolved, true);
     assert.strictEqual(instance.idleWaiters.length, 0);
+    const disk = Persistence.readLibraryFile(instance.path).data;
+    assert.strictEqual(disk.settings.preferences.exclude_samples_from_library, false);
+    assert.strictEqual(disk.settings.preferences.exclude_trailers_from_library, false);
   })
 );
 
@@ -253,7 +263,7 @@ suite.test('exports a validated atomic library copy through the save-dialog work
   withTemporaryDirectory('library-manual-export', async directory => {
     const {Library} = loadLibraryClass(directory);
     const instance = new Library();
-    instance.media = [videoFixture({id: '4'.repeat(64)})];
+    await operate(instance, 'add', 'media.push', videoFixture({id: '4'.repeat(64)}));
     const chosenWithoutExtension = path.join(directory, 'Chosen Library Backup');
     const calls = [];
     const parentWindow = {name: 'main-window'};

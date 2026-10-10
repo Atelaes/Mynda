@@ -188,9 +188,9 @@ function safeTimestamp(date = new Date()) {
   return date.toISOString().replace(/:/g, '-').replace('.', '-');
 }
 
-// Automatic names include process and sequence identifiers because Mynda has
-// both a main-process and renderer-process Library instance. If they happen to
-// create a snapshot at the same millisecond, neither can overwrite the other.
+// Automatic names include process and sequence identifiers so separate app
+// sessions or multiple snapshots in one millisecond cannot reuse a filename.
+// The authoritative main-process library is the only automatic-backup writer.
 function automaticBackupFilename(date = new Date()) {
   return `library-${safeTimestamp(date)}-p${process.pid}-${++backupFileNumber}.json`;
 }

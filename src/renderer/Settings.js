@@ -2,6 +2,7 @@
 const React = require('react');
 const {ipcRenderer, shell} = require('electron');
 const _ = require('lodash');
+const {reportSaveFailure} = require('./LibraryEdits.js');
 const {v4: uuidv4} = require('uuid');
 const {DragDropContext, Droppable, Draggable} = require('react-beautiful-dnd');
 const {
@@ -33,6 +34,12 @@ class MynSettings extends MynOpenablePane {
     super(props)
 
     this.save = this.save.bind(this);
+    this._removeCloseHook = library.onBeforeClose ? library.onBeforeClose(async () => {
+      await this.flushSettings();
+      while (this._settingsSavePending || Object.keys(this._pendingSettings || {}).length) {
+        await this.flushSettings();
+      }
+    }) : null;
 
     this.state = {
       paneID: 'settings-pane',
@@ -75,28 +82,61 @@ class MynSettings extends MynOpenablePane {
   }
 
   save(saveObj) {
-    // if the timer is already running
-    if (this.state.timer !== null) {
-      // cancel the old timer before we set a new one
-      clearTimeout(this.state.timer);
+    // Accumulate distinct controls edited during the debounce interval. The
+    // previous implementation canceled their timer and lost all but the last.
+    this._pendingSettings = this._pendingSettings || {};
+    for (const [address, entry] of Object.entries(saveObj)) {
+      const pending = this._pendingSettings[address];
+      this._pendingSettings[address] = {
+        opType: 'replace', address, entry: _.cloneDeep(entry),
+        expected: pending ? pending.expected : _.cloneDeep(_.get(library, address))
+      };
     }
+    clearTimeout(this.state.timer);
+    this.state.timer = setTimeout(() => this.flushSettings().catch(() => {}), 500);
+  }
 
-    // set new delay timer
-    // console.log('Setting new timer...');
-    this.state.timer = setTimeout(() => {
-      // console.log('Timer ended; saving');
+  flushSettings() {
+    clearTimeout(this.state.timer);
+    this.state.timer = null;
+    if (this._settingsSavePending) {
+      return this._settingsSavePromise.then(() => this.flushSettings());
+    }
+    const operations = Object.values(this._pendingSettings || {});
+    if (!operations.length) return Promise.resolve();
+    this._pendingSettings = {};
+    this._settingsSavePending = true;
+    let finish, fail;
+    this._settingsSavePromise = new Promise((resolve, reject) => { finish = resolve; fail = reject; });
+    // Automatic debounce callers do not await the promise; close hooks do.
+    this._settingsSavePromise.catch(() => {});
+    const ownSave = this._settingsSavePromise;
+    library.transaction(operations, error => {
+      this._settingsSavePending = false;
+      if (error) {
+        // Keep failed drafts for a later explicit edit/retry, without an
+        // automatic retry loop or a later unrelated save silently accepting it.
+        this._failedSettings = operations;
+        reportSaveFailure(error, settingsLog, 'save the settings');
+      } else {
+        this._failedSettings = null;
+        for (const committed of operations) {
+          const pending = this._pendingSettings[committed.address];
+          if (pending && _.isEqual(pending.expected, committed.expected)) {
+            pending.expected = _.cloneDeep(committed.entry);
+          }
+        }
+      }
+      if (error) fail(error); else finish();
+      if (Object.keys(this._pendingSettings).length && !this.state.timer) this.flushSettings().catch(() => {});
+    }, {priority: 'user'});
+    return ownSave;
+  }
 
-      // SAVE
-      // saveObj should be an object with the keys being the 'replace' parameter in the library.replace function
-      // (i.e. a string address in dot notation pointing to the object being updated in the library)
-      // and the values should be the object being updated;
-      // then we just loop over all the keys, and save everything to the library
-      Object.keys(saveObj).forEach((address) => {
-        library.replace(address, saveObj[address]);
-      });
-
-      this.setState({timer:null});
-    },500);
+  componentWillUnmount() {
+    // Closing the app/settings owner must not abandon an already staged edit.
+    this.flushSettings().catch(() => {});
+    if (this._removeCloseHook) this._removeCloseHook();
   }
 
   setView(view,event,index) {
@@ -268,10 +308,9 @@ class MynSettingsFolders extends React.Component {
     });
 
     try {
-      let temp = _.cloneDeep(this.state.existingFolders[index]);
-      temp.kind = event.target.value;
-
-      library.replace(`settings.watchfolders.${index}`,temp);
+      const folder = this.state.existingFolders[index];
+      library.patchWatchfolder(folder.path, {kind: event.target.value}, {kind: folder.kind},
+        error => reportSaveFailure(error, settingsLog, 'save the watchfolder settings'));
 
     } catch(err) {
       settingsLog.error('Could not edit a watchfolder default kind', {
@@ -703,11 +742,8 @@ class MynSettingsPrefs extends React.Component {
         this.setState({kinds:value});
         break;
       case "override-dialogs" :
-        address = "settings.preferences.override_dialogs";
-        let new_od = _.cloneDeep(this.state.override_dialogs);
-        new_od[subProp] = value;
-        value = new_od;
-        this.setState({override_dialogs:value});
+        address = `settings.preferences.override_dialogs.${subProp}`;
+        this.setState({override_dialogs: {...this.state.override_dialogs, [subProp]: value}});
         break;
     }
 
