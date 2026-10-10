@@ -14,6 +14,8 @@ module.exports = [
   },
   {category:'unit',file:'test/ElectronSmokeLifecycle.unit.test.js',title:'Electron smoke-test lifecycle',
     protects:'noninteractive failure teardown, preserved result output, graceful-close ordering and saved-data verification'},
+  {category:'unit',file:'test/ElectronPermissions.unit.test.js',title:'Electron permission smoke-test evidence',
+    protects:'unchanged forwarding of production permission decisions and rejection of OS-only denials or lookup failures'},
   {category:'integration',file:'test/LibraryTransactions.integration.test.js',title:'Single-writer library transactions',
     protects:'overlapping process edits, confirmed state, disk failures, stale identity conflicts, atomic moves, user priority and revision recovery'},
   {category:'unit',file:'test/SingleInstance.unit.test.js',title:'Library single-instance startup',

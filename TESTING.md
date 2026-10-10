@@ -39,7 +39,9 @@ The complete command set is:
 
 The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
 
-The startup suites also activate real IMDb links, verify that the main process approves their browser destinations, and reject unsafe URL requests. They attempt a popup, page navigation and an embedded frame, and check that geolocation permission is denied. Only `shell.openExternal` is replaced with a recorder: the tests do not open your browser or fetch IMDb. Chromium's guards, React events and IPC are real.
+The startup suites also activate real IMDb links, verify that the main process approves their browser destinations, and reject unsafe URL requests. They attempt a popup, page navigation and an embedded frame, and make a real geolocation request. That request must return `PERMISSION_DENIED`, and the test must observe Mynda's production handler denying it for the tested renderer. An OS-only denial, unavailable location or timeout fails. A test observer forwards the installed handler's answers unchanged; `shell.openExternal` is replaced with a recorder so the tests do not open your browser or fetch IMDb. Chromium's guards, React events and IPC are real.
+
+Do not use `navigator.permissions.query()` to verify this policy on Electron 12.0.5. Its [permission manager](https://github.com/electron/electron/blob/v12.0.5/shell/browser/electron_permission_manager.cc) hard-codes `GetPermissionStatus` and `GetPermissionStatusForFrame` to `GRANTED`, independently of the request handler. The original startup assertion therefore failed in both source and ASAR runs on macOS. The corrected test checks the actual request and application decision instead.
 
 The library workflow suites open a separate app with three synthetic videos and a temporary watchfolder. They perform the following through the real rendered controls and application IPC, then close and start a **new Electron process** against that same temporary library:
 
@@ -85,7 +87,7 @@ The editor's catalog results and autotag report share `ExternalLink.js`. Support
 
 This is the first, bounded security step. Renderer Node access and `remote` still exist, and this policy cannot contain a renderer that already executes arbitrary Node code. The planned preload migration, broader privileged-IPC validation, Electron upgrade, isolation/sandboxing and stricter script CSP are still required. The unit tests exercise hostile URLs, callers and permissions; component tests cover both link locations; native tests check the actual Electron enforcement in source and ASAR launches.
 
-Platform baseline reported on 2026-10-10: the library save/restart Electron journeys passed on the user's Mac, and the Windows build process works. An Ubuntu build has not yet been tested. These results precede the external-content changes; run `npm test` and `npm run test:electron` again after applying them.
+Platform baseline reported on 2026-10-10: after the external-content changes, all 68 fast suites (2,799 cases) and both library save/restart Electron journeys passed on the user's Mac. The two startup suites failed at the permission-status assertion described above; the corrected native checks need to be rerun. The Windows build process was verified before these changes. An Ubuntu build has not yet been tested.
 
 ## What the categories mean
 
@@ -106,6 +108,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | Suite | Category | What it protects |
 |---|---|---|
 | `ExternalContent.unit.test.js` | Unit | Approved URLs, exact main-frame callers, canonical application paths, blocked navigation/popups/webviews and denied browser permissions |
+| `ElectronPermissions.unit.test.js` | Unit | Permission-test observer preserves production decisions; OS-only denial, wrong caller, grant, timeout and unavailable location cannot pass |
 | `ExternalLink.component.test.js` | Component | Catalog-result links, shared browser-opening IPC, invalid IDs, keyboard/mouse activation and launch-failure messages |
 | Tagging architectural contracts | Integration | Final policy ownership, shared budgets, provenance, cache lifetime and exhaustive small-batch permutations |
 | Tagging editor provenance | Component | User ID authorship, one application per preview and stale selection rejection |

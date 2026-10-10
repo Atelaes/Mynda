@@ -6,8 +6,10 @@ const path = require('path');
 const {pathToFileURL} = require('url');
 const {app, dialog, shell, BrowserWindow} = require('electron');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
-const {inspectExternalContent} = require('./ExternalContentJourney.js');
+const {inspectExternalContent,observePermissionRequests} = require('./ExternalContentJourney.js');
 const browserLinks = [];
+const permissionDecisions = [];
+const observedSessions = new WeakSet();
 shell.openExternal = async url => { browserLinks.push(url); };
 
 const RESULT_PREFIX = 'MYNDA_ELECTRON_SMOKE_RESULT:';
@@ -136,7 +138,8 @@ async function inspectMainWindow(window) {
     }
 
     activeStage='external-content';
-    const externalContent = await inspectExternalContent({app, BrowserWindow, window, opened:browserLinks});
+    const externalContent = await inspectExternalContent({app, BrowserWindow, window,
+      opened:browserLinks, permissionDecisions});
 
     activeStage='open-settings';
     await window.webContents.executeJavaScript(
@@ -262,6 +265,13 @@ const overallTimeout = setTimeout(() => {
 }, timeoutMs);
 
 app.on('browser-window-created', (event, window) => {
+  // This event runs inside the BrowserWindow constructor, before production
+  // installs its policy. Keep the real handler and only record its answers.
+  const session = window.webContents.session;
+  if (!observedSessions.has(session)) {
+    observedSessions.add(session);
+    observePermissionRequests(session, permissionDecisions);
+  }
   window.webContents.on('console-message', (consoleEvent, level, message, line, sourceId) => {
     rendererConsole.push({
       level,
