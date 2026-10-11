@@ -46,6 +46,9 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   }
   function grant(owner, kind, value) {
     requireOwner(owner);
+    // Every artwork entry point returns the same canonical spelling, including
+    // newly copied/downloaded files under an aliased user-data directory.
+    if (kind === 'artwork') value = fs.realpathSync(value);
     if (!grants.has(owner)) grants.set(owner, {artwork: new Map(), subtitles: new Map(), urls: new Set()});
     if (kind === 'urls') grants.get(owner).urls.add(value);
     else grants.get(owner)[kind].set(value, fileIdentity(value));

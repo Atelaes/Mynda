@@ -113,16 +113,17 @@ suite.test('legacy null library slots do not break video or existing-file lookup
   source.artwork = local; source.subtitles = [subtitle];
   library.media = [null, source]; library.inactive_media = [null];
   assert.strictEqual((await service.search(source, 10)).status, 'candidate');
-  assert.strictEqual(await service.inspectArtwork(local, 10), local);
+  assert.strictEqual(await service.inspectArtwork(local, 10), fs.realpathSync(local));
   assert.deepStrictEqual((await service.validateSubtitles([subtitle], 10)).accepted, [subtitle]);
 });
 suite.test('local artwork uses content signatures and backend-generated destinations', async () => {
   const {service} = setup();
   const source = path.join(root, 'picked-file.txt');
   fs.writeFileSync(source, image);
-  assert.strictEqual(await service.inspectArtwork(source), source);
-  const managed = await service.prepareArtwork(source);
-  assert.strictEqual(path.dirname(managed), path.join(root, 'Library', 'Artwork'));
+  const accepted = await service.inspectArtwork(source);
+  assert.strictEqual(accepted, fs.realpathSync(source));
+  const managed = await service.prepareArtwork(accepted);
+  assert.strictEqual(path.dirname(managed), fs.realpathSync(path.join(root, 'Library', 'Artwork')));
   assert.strictEqual(path.extname(managed), '.png');
   assert.deepStrictEqual(fs.readFileSync(managed), image);
   assert.strictEqual(await service.prepareArtwork(managed), managed);
@@ -143,6 +144,45 @@ suite.test('symlinked artwork is copied rather than keeping an unmanaged target'
   assert.notStrictEqual(managed, source); assert.notStrictEqual(managed, link);
   assert.deepStrictEqual(fs.readFileSync(managed), image);
 });
+suite.test('artwork paths and grants remain stable through an aliased user-data directory', async () => {
+  const target = path.join(root, 'alias-target');
+  const alias = path.join(root, 'alias-user-data');
+  fs.mkdirSync(target);
+  // Directory junctions do not need Windows symlink privileges. On macOS and
+  // Linux this recreates the /var -> /private/var alias used by macOS temp paths.
+  fs.symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const local = path.join(alias, 'chosen.png'); fs.writeFileSync(local, image);
+  const {service, calls} = setup({app: {getPath: () => alias}, dialog: {
+    showMessageBox: async () => ({response: 1}),
+    showOpenDialog: async () => ({canceled: false, filePaths: [local]})
+  }});
+  const chosen = await service.chooseArtwork(10);
+  assert.strictEqual(chosen, fs.realpathSync(local));
+  assert.notStrictEqual(chosen, local, 'the fixture must exercise a real path alias');
+  assert.strictEqual(service.authorizeArtwork(chosen, 10), true);
+  assert.strictEqual(service.authorizeArtwork(chosen, 11), false);
+  const inspected = await service.inspectArtwork(local, 10);
+  assert.strictEqual(inspected, chosen);
+  const managed = await service.prepareArtwork(inspected, 10);
+  assert.strictEqual(managed, fs.realpathSync(managed));
+  assert.strictEqual(path.dirname(managed), fs.realpathSync(path.join(alias, 'Library', 'Artwork')));
+  assert.deepStrictEqual(fs.readFileSync(managed), image);
+  assert.strictEqual(service.authorizeArtwork(managed, 10), true);
+  assert.strictEqual(await service.prepareArtwork(managed, 10), managed);
+  const downloaded = await service.downloadArtwork('https://artwork.example/alias.png', 10);
+  assert.strictEqual(downloaded.success, true);
+  assert.strictEqual(downloaded.message, fs.realpathSync(downloaded.message));
+  assert.strictEqual(path.dirname(downloaded.message), fs.realpathSync(path.join(alias, 'temp')));
+  assert.strictEqual(calls.filter(call => call[0] === 'download').length, 1);
+  assert.strictEqual(service.authorizeArtwork(downloaded.message, 10), true);
+  const savedDownload = await service.prepareArtwork(downloaded.message, 10);
+  assert.strictEqual(await service.prepareArtwork(savedDownload, 10), savedDownload);
+  fs.writeFileSync(managed, 'changed since approval');
+  assert.strictEqual(service.authorizeArtwork(managed, 10), false);
+  await assert.rejects(service.prepareArtwork(managed, 10));
+  service.dispose(10);
+  assert.strictEqual(service.authorizeArtwork(savedDownload, 10), false);
+});
 suite.test('downloads accept HTTP images only and ignore any caller-supplied destination', async () => {
   const {service, calls} = setup();
   for (const url of ['file:///private/a.png','javascript:alert(1)','https://user:password@host/a.png']) {
@@ -150,7 +190,7 @@ suite.test('downloads accept HTTP images only and ignore any caller-supplied des
   }
   const result = await service.downloadArtwork('https://artwork.example/poster.png', '/tmp/attacker-path');
   assert(result.success);
-  assert.strictEqual(path.dirname(result.message), path.join(root, 'temp'));
+  assert.strictEqual(path.dirname(result.message), fs.realpathSync(path.join(root, 'temp')));
   assert.strictEqual(path.extname(result.message), '.png');
   assert.strictEqual(calls.filter(call => call[0] === 'download').length, 1);
 });
@@ -186,11 +226,11 @@ suite.test('file grants are owned by the requesting window and revoked at teardo
 suite.test('a modified or replaced file cannot reuse a previous grant', async () => {
   const {service} = setup();
   const local = path.join(root, 'changing.png'); fs.writeFileSync(local, image);
-  await service.inspectArtwork(local, 10);
-  assert.strictEqual(service.authorizeArtwork(local, 10), true);
+  const accepted = await service.inspectArtwork(local, 10);
+  assert.strictEqual(service.authorizeArtwork(accepted, 10), true);
   fs.writeFileSync(local, 'this is no longer an image');
-  assert.strictEqual(service.authorizeArtwork(local, 10), false);
-  await assert.rejects(service.prepareArtwork(local, 10));
+  assert.strictEqual(service.authorizeArtwork(accepted, 10), false);
+  await assert.rejects(service.prepareArtwork(accepted, 10));
   const subtitle = path.join(root, 'changing.srt'); fs.writeFileSync(subtitle, 'approved captions');
   await service.validateSubtitles([subtitle], 10);
   fs.unlinkSync(subtitle); fs.writeFileSync(subtitle, 'replacement captions');
