@@ -10,6 +10,8 @@ module.exports = [
     protects:'modern DOM Files, removal, on-demand file paths, native approval/cancellation and stale editor changes'},
   {category:'unit',file:'test/ElectronConsole.unit.test.js',title:'Electron console diagnostics',
     protects:'warning and error capture across legacy and modern console event APIs'},
+  {category:'unit',file:'test/ElectronBrowserDriver.unit.test.js',title:'Electron browser-driver diagnostics',
+    protects:'renderer result transfer, failed control selectors, original exceptions and execution failures'},
   {category:'integration',file:'test/MainBridge.integration.test.js',title:'Main application isolation wiring',
     protects:'real main composition, isolated window options, complete handler registration and privileged caller checks'},
   {category:'unit',file:'test/EditorArtworkDownload.unit.test.js',title:'Bounded artwork downloads',

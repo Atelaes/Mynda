@@ -12,23 +12,39 @@ async function wait(check, label, timeout = 10000) {
 }
 
 function browserDriver(window) {
-  const inspect = (fn, ...args) => window.webContents.executeJavaScript(
-    `(${fn.toString()})(...${JSON.stringify(args)})`);
+  async function execute(label, fn, args) {
+    // Electron otherwise replaces renderer exceptions with "Script failed to
+    // execute". Return plain error details across the existing test boundary.
+    const result = await window.webContents.executeJavaScript(`(async () => {
+      try { return {ok:true,value:await (${fn.toString()})(...${JSON.stringify(args)})}; }
+      catch (error) { return {ok:false,error:{name:String(error && error.name || 'Error'),
+        message:String(error && error.message || error),stack:String(error && error.stack || '')}}; }
+    })()`).catch(error => {
+      throw new Error(`Renderer action failed (${label}): ${error.message || error}`);
+    });
+    if (!result.ok) {
+      const error = new Error(`Renderer action failed (${label}): ${result.error.name}: ${result.error.message}`);
+      if (result.error.stack) error.stack += '\nRenderer stack:\n' + result.error.stack;
+      throw error;
+    }
+    return result.value;
+  }
+  const inspect = (fn, ...args) => execute('inspect ' + fn.toString().slice(0,180),fn,args);
   const exists = selector => inspect(selector => Boolean(document.querySelector(selector)), selector);
-  const click = (selector, options = {}) => inspect((selector, options) => {
+  const click = (selector, options = {}) => execute('click ' + selector,(selector, options) => {
     const target = document.querySelector(selector);
     if (!target) throw new Error('Missing UI control: ' + selector);
     target.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, detail:1, ...options}));
     return true;
-  }, selector, options);
-  const type = (selector, value) => inspect((selector, value) => {
+  }, [selector, options]);
+  const type = (selector, value) => execute('type ' + selector,(selector, value) => {
     const target = document.querySelector(selector);
     if (!target) throw new Error('Missing UI control: ' + selector);
     const prototype = target.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(prototype, 'value').set.call(target, value);
     target.dispatchEvent(new Event('input', {bubbles:true}));
     return true;
-  }, selector, value);
+  }, [selector, value]);
   const row = id => `tr[vid_id="${id}"]`;
   const selected = () => inspect(() => [...document.querySelectorAll('tr.movie-row.selected')]
     .map(element => element.getAttribute('vid_id')));

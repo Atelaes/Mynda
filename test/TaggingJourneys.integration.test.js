@@ -7,6 +7,8 @@ const fixtures=require('./electron/TaggingFixtures');
 const {createNetwork,redact}=require('./electron/TaggingNetwork');
 const {confirmLive}=require('./electron/LiveTaggingConsent');
 const checks=require('./electron/TaggingAssertions');
+const Evidence=require('../src/tagging/TaggingEvidence');
+const {buildTaggingReport}=require('../src/tagging/TaggingReport');
 const {createAutoTagRunner}=require('../src/tagging/AutoTagRunner');
 const suite=createSuite('Tagging journey catalog and live-test safeguards','integration',
   'Real request/cache/matching/application code, downloaded PNG bytes, fixture integrity, consent, budgets and secret redaction.');
@@ -77,6 +79,42 @@ suite.test('manual movie and episode proposals apply real metadata and authorize
         results.push(result.video);
       }
       checks.verify('manual',results);network.assertHealthy();
+    } finally {network.restore();}
+  }));
+suite.test('a typed IMDb ID becomes completed match evidence only after selection, and survives serialization and refresh',()=>
+  withTemporaryDirectory('explicit-id-tagging-contract',async directory=>{
+    fs.mkdirSync(path.join(directory,'Library','Artwork'),{recursive:true});
+    const network=createNetwork({axios,imageBytes:fs.readFileSync(path.join(__dirname,'..','images','qmark.png'))});
+    try {
+      const app={getPath:()=>directory};
+      const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
+        electron:{app},'../../omdb':{key:'fixture-only'},
+        [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
+      });
+      const library={media:fixtures.videos('manual',path.join(directory,'media'))};
+      const originals=fixtures.copy(library.media);
+      const editor=require('../src/main/EditorService').createEditorService({library,catalog,app,dialog:{}});
+      for(const [index,imdbID] of ['tt19000002','tt19000221'].entries()) {
+        const draft=Evidence.markUserEdit({...originals[index],imdbID},{imdbID});
+        assert.strictEqual(buildTaggingReport(draft),null,'Typing an ID is not a successful lookup');
+        const proposal=await editor.search(draft,'window-1');
+        assert.strictEqual(proposal.status,'candidate');
+        const result=await editor.select({draft,choice:{myndaProposalID:proposal.proposalID}},'window-1');
+        assert.strictEqual(result.status,'matched');
+        assert.strictEqual(result.video.taggingEvidence.kind,'explicit-id','Entry provenance must not erase the completed lookup kind');
+        checks.matched(result.video,imdbID);
+        const saved=fixtures.copy({...result.video,autotag_tried:false});
+        assert.strictEqual(buildTaggingReport(saved).status,'matched','The saved match must have a report');
+        assert.strictEqual(saved.taggingEvidence.identities.record.origin,'user');
+        assert.deepStrictEqual(library.media,originals,'Search and selection must leave the library unchanged');
+        const refreshed=await catalog.tag(saved);
+        assert.strictEqual(refreshed.status,'matched');
+        assert.strictEqual(buildTaggingReport(refreshed.video).status,'matched');
+        assert.strictEqual(refreshed.evidence.kind,'explicit-id');
+        assert.deepStrictEqual(refreshed.evidence.original,saved.taggingEvidence.original);
+        assert.strictEqual(refreshed.evidence.identities.record.origin,'user');
+      }
+      network.assertHealthy();
     } finally {network.restore();}
   }));
 suite.test('live consent is required in noninteractive runs; a declined prompt is not approval',async()=>{

@@ -101,7 +101,7 @@ npm run test:tagging:asar
 
 To diagnose just one journey, use `npm run test:tagging -- --case=manual`. Valid cases are `movies`, `episode-parents`, `episode-numbering`, `manual`, `batch`, `selected`, `concurrency`, `failures`, `cancel`, and `disk-full`. Add `--keep` to retain successful test files too. Failed runs retain their disposable library, application logs, request ledger, console/dialog diagnostics and a screenshot when a window could be captured, under `sandbox/test-results/`. An early native launch failure may only have stdout/stderr and the staged files. The runner prints the exact directory. These files are excluded from Git and release packages. An unexpected dialog fails immediately instead of requiring a person to dismiss it.
 
-The fast `TaggingJourneys.integration.test.js` validates the same raw fixtures through the real engine and manual editor service, including actual downloaded image bytes and artwork grants. It also checks live consent, the shared network budget, redaction and the no-network restart rule. Passing these checks does **not** certify native UI execution.
+The fast `TaggingJourneys.integration.test.js` validates the same raw fixtures through the real engine and manual editor service, including actual downloaded image bytes and artwork grants. Explicit-ID selections must retain completed match evidence and a readable report after serialization and refresh; typing an ID alone must not imply success. It also checks live consent, the shared network budget, redaction and the no-network restart rule. Passing these checks does **not** certify native UI execution.
 
 ### Optional live provider check
 
@@ -173,6 +173,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | `ArtworkEditor.component.test.js` | Component | modern File drops, native cancellation, inspection errors and stale responses |
 | `ArtworkImage.component.test.js` | Component | missing artwork, placeholders, retry, stale load events and retained references |
 | `ElectronConsole.unit.test.js` | Unit | warning/error diagnostics across console event API changes |
+| `ElectronBrowserDriver.unit.test.js` | Unit | renderer result transfer, failed control selectors, original exceptions and execution failures |
 | `MainBridge.integration.test.js` | Integration | real main composition, isolated window options, complete handler registration and privileged caller checks |
 | `EditorArtworkDownload.unit.test.js` | Unit | HTTP protocols, size/time/redirect bounds, native redirect approval and temporary-file cleanup |
 | `DesktopService.unit.test.js` | Unit | native directory grants, owner-bound Share plans, watchfolder saves and exported-file reveal |

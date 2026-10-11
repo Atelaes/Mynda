@@ -117,7 +117,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     const untouched = copy(current()[2]);
     await batch([0,1]);
     assert.strictEqual(await value('.edit-field-country'),'','Mixed country should be blank');
-    await ui.type('.edit-field-description','Batch description');
+    await ui.type('#edit-field-description','Batch description');
     await ui.save(()=>current().slice(0,2).every(video=>video.description==='Batch description'));
     assert.strictEqual(current()[0].country,'Alpha'); assert.strictEqual(current()[1].country,'Beta');
     await ui.type('.edit-field-country','Shared country');

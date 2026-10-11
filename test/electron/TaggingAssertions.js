@@ -4,6 +4,7 @@ function matched(video, imdbID, parent) {
   assert.strictEqual(video.imdbID,imdbID,video.title);
   if (parent) assert.strictEqual(video.seriesImdbID,parent);
   assert(video.taggingEvidence, 'Missing match evidence');
+  assert(['movie','episode','explicit-id'].includes(video.taggingEvidence.kind), 'Missing completed match kind');
   assert(!video.taggingDecision || video.taggingDecision.status === 'matched', 'An old failure survived a match');
 }
 function unchangedPersonal(video) {

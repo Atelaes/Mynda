@@ -31,15 +31,15 @@ const terminate=createSmokeTerminator({app,clearDeadline:()=>clearTimeout(deadli
 }});
 async function finish(ok,details) {
   if(finished)return;finished=true;
+  const result={...details,phase,scenario,...(!ok?{rendererConsole:messages.slice(-30),dialogs:dialogHistory}:{})};
   if(!ok) {
-    const failure={...details,phase,scenario,rendererConsole:messages.slice(-30),dialogs:dialogHistory};
-    fs.writeFileSync(path.join(diagnostics,phase+'-failure.json'),network.redact(JSON.stringify(failure,null,2)));
+    fs.writeFileSync(path.join(diagnostics,phase+'-failure.json'),network.redact(JSON.stringify(result,null,2)));
     if(window && !window.isDestroyed()) {
       await Promise.race([window.capturePage().then(image=>fs.writeFileSync(path.join(diagnostics,phase+'-failure.png'),image.toPNG())).catch(()=>{}),
         new Promise(resolve=>setTimeout(resolve,1000))]);
     }
   }
-  network.restore();terminate(ok,{...details,phase,scenario});
+  network.restore();terminate(ok,result);
 }
 const dialogs={
   expect(match,response){pendingDialogs.push({match,response});},

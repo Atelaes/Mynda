@@ -14,7 +14,10 @@ function snapshot(video = {}) {
 
 function priorFor(video) {
   const prior = video && video.taggingEvidence;
-  return prior && prior.imdbID === video.imdbID ? prior : null;
+  // A typed ID records authorship before any lookup succeeds. Only completed
+  // matches may supply historical match details when that ID is refreshed.
+  return prior && validImdbID(prior.imdbID) && prior.imdbID === video.imdbID &&
+    ['movie','episode','explicit-id'].includes(prior.kind) ? prior : null;
 }
 
 function identity(video, field, source) {
