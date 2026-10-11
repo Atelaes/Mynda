@@ -614,9 +614,7 @@ class MynEditArtwork extends MynEdit {
               <details key={`${this.props.movie.id}:${artwork}`} className="artwork-file-details">
                 <summary>File info</summary>
                 <div className="artwork-file-popover">
-                  <label>Artwork location
-                    <textarea className="artwork-file-path" readOnly rows="3" value={artwork} />
-                  </label>
+                  <textarea className="artwork-file-path" aria-label="Artwork path" readOnly rows="3" value={artwork} />
                 </div>
               </details>
             )}

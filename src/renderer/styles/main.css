@@ -2012,7 +2012,7 @@ table.compact .movie-row {
 
 .edit-field.filename {
   z-index: calc(var(--openablepane-zindex) + 2);
-  font-size:.6em;
+  font-size: var(--editor-path-font-size);
   font-style: italic;
 }
 
@@ -2428,7 +2428,7 @@ table.compact .movie-row {
   gap: .4rem;
   padding: .3rem;
   border-radius: .25rem;
-  background: var(--dark-bg);
+  background: var(--editor-textinput-bg);
   color: var(--main-text);
   font-size: .8rem;
 }
@@ -2491,14 +2491,13 @@ table.compact .movie-row {
   right: 0;
   box-sizing: border-box;
   min-width: 0;
-  padding: .6rem;
+  padding: .4rem;
   border: var(--button-border);
   border-radius: .3rem;
   background: var(--dark-bg);
   color: var(--main-text);
   box-shadow: 0 .2rem .8rem #0008;
 }
-.artwork-file-popover label { display: block; }
 #editor-pane .artwork-file-path {
   display: block;
   box-sizing: border-box;
@@ -2506,11 +2505,14 @@ table.compact .movie-row {
   min-width: 0;
   max-width: 100%;
   height: auto;
-  min-height: 5em;
-  margin-top: .4rem;
-  padding: .4em;
-  border-radius: var(--button-borderradius);
+  min-height: 4.2em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font: inherit;
+  font-size: var(--editor-path-font-size);
   line-height: 1.4;
   overflow-wrap: anywhere;
   user-select: text;
