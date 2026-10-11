@@ -100,7 +100,9 @@ Validation baseline: Torgo confirmed that the isolation migration and editor-lis
 
 Electron 44 verification: all 79 fast suites (2,929 checks) passed using Electron's embedded Node 24.21.0. Compilation and actual ASAR archive checks pass with the updated packaging dependencies. The native startup attempt stopped because the editing host has no usable X display/local socket support; a minimal Electron window also fails. No native GUI or release-package result is claimed from that host. The Linux media bundle is absent there, so a full packaged media test cannot run.
 
-On the Mac, run `npm test`, `npm run test:electron`, and `npm run test:package`. Repeat the native and package checks on Windows; Ubuntu remains a release validation task. The upgraded startup journey exercises a real disk-backed DOM File without `.path`, cancellation and approval through the production artwork bridge, a dropped-image preview, and a saved copy. Component tests cover stale drop replies after Revert, changing videos, unmounting, and a newer drop. Console diagnostics handle modern Electron's event object. Before accepting the upgrade, also try normal development startup, a Finder artwork drop, native Browse dialogs, video playback/seek/subtitles, and a packaged launch. Development should open DevTools; the packaged app should not.
+On the Mac, run `npm test`, `npm run test:electron`, and `npm run test:package`. Repeat the native and package checks on Windows; Ubuntu remains a release validation task. The upgraded startup journey exercises a real disk-backed DOM File without `.path`, cancellation and approval through the production artwork bridge, a dropped-image preview, and a saved copy. Component tests cover stale drop replies after removal, changing videos, unmounting, and a newer drop. Console diagnostics handle modern Electron's event object. Before accepting the upgrade, also try normal development startup, a Finder artwork drop, native Browse dialogs, video playback/seek/subtitles, and a packaged launch. Development should open DevTools; the packaged app should not.
+
+The startup journey also creates an unavailable artwork reference in its disposable library. It checks visible placeholders and reserved image height in the editor and details pane, the closed-by-default file-location disclosure, saving an unrelated edit while retaining the missing reference, Retry after restoring the file, and removal saved to disk without deleting the image. Fast component tests additionally cover Revert, explicit mixed-batch removal, failed new-image preparation, stale image events, and unavailable placeholder assets. Missing artwork is display state; it is never automatically sanitized out of a library record.
 
 ## What the categories mean
 
@@ -121,6 +123,7 @@ A “test double” is simply a small, predictable substitute for something outs
 | Suite | Category | What it protects |
 |---|---|---|
 | `ArtworkEditor.component.test.js` | Component | modern File drops, native cancellation, inspection errors and stale responses |
+| `ArtworkImage.component.test.js` | Component | missing artwork, placeholders, retry, stale load events and retained references |
 | `ElectronConsole.unit.test.js` | Unit | warning/error diagnostics across console event API changes |
 | `MainBridge.integration.test.js` | Integration | real main composition, isolated window options, complete handler registration and privileged caller checks |
 | `EditorArtworkDownload.unit.test.js` | Unit | HTTP protocols, size/time/redirect bounds, native redirect approval and temporary-file cleanup |

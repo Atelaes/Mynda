@@ -1,5 +1,6 @@
 // Library tables, series grouping, details, and playlist-level controls.
 const React = require('react');
+const ArtworkImage = require('./ArtworkImage');
 const _ = require('lodash');
 const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const {formatBoxOffice, formatCompactBoxOffice} = require('../library/BoxOffice.js');
@@ -15,7 +16,6 @@ const {
 } = require('./RendererRuntime.js');
 const {
   removeLeadingArticle,
-  artworkSourceURL,
   fileManagerName,
   validateVideo
 } = require('./RendererUtils.js');
@@ -1294,11 +1294,10 @@ class MynDetails extends React.Component {
 
     try {
       const video = this.props.video;
-      const imageURL = artworkSourceURL(video.artwork);
-      const imageSource = artworkSourceURL(video.artwork, '../../images/qmark-details.png');
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><div className="optional-artwork-duplicate" style={{backgroundImage:`url('${imageURL}')`}}></div><img id="detail-artwork-img" src={imageSource} /></li>
+          <li className="detail" id="detail-artwork"><ArtworkImage source={video.artwork}
+            placeholder="../../images/qmark-details.png" imageID="detail-artwork-img" backdrop showStatus /></li>
           {/* <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li> */}
           <li className="detail" id="detail-title">{video.title}</li>
           <li className="detail" id="detail-year">{video.year}</li>
@@ -1328,7 +1327,7 @@ class MynDetails extends React.Component {
       // dummy details as a visual placeholder when no video is hovered/selected
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><img id="detail-artwork-img" src={'../../images/qmark-details.png'} /></li>
+          <li className="detail" id="detail-artwork"><ArtworkImage placeholder="../../images/qmark-details.png" imageID="detail-artwork-img" /></li>
           <li className="detail dummy" id="detail-title"><div className="detail-title-text">A Movie Title</div></li>
           <li className="detail dummy first"><div className="dummy-field"></div></li>
           <li className="detail dummy second"><div className="dummy-field"></div></li>
@@ -1474,7 +1473,7 @@ class MynRecentlyWatched extends MynDropdown {
         return (
           <div className='container' key={id}>
             <div className={`video${nextVidID ? '' : ' no-next'}`} onClick={() => this.props.playVideo(video.id)}>
-              <div className='artwork' style={{backgroundImage:`url('${artworkSourceURL(video.artwork, placeholderImage)}')`}} />
+              <ArtworkImage className="artwork" source={video.artwork} placeholder={placeholderImage} />
               <div className='title-position-container'>
                 <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
                 {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}

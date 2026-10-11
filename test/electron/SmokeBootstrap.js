@@ -8,6 +8,7 @@ const {app, dialog, shell, BrowserWindow} = require('electron');
 const {browserDriver, wait} = require('./BrowserDriver');
 const {consoleMessage} = require('./ConsoleMessage');
 const {inspectArtworkDrop} = require('./ArtworkDropJourney');
+const {inspectArtworkAvailability} = require('./ArtworkAvailabilityJourney');
 const {videos, ids} = require('./LibraryJourneyFixtures');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
 const {inspectExternalContent,observePermissionDecisions} = require('./ExternalContentJourney.js');
@@ -161,6 +162,8 @@ async function inspectMainWindow(window) {
 
     activeStage='artwork-drop';
     const artworkDrop = await inspectArtworkDrop({app, dialog, window, videoId:ids[0], userData, library});
+    activeStage='artwork-availability';
+    const artworkAvailability = await inspectArtworkAvailability({window, videoId:ids[0], userData, library});
 
     activeStage='open-settings';
     await window.webContents.executeJavaScript(
@@ -265,6 +268,7 @@ async function inspectMainWindow(window) {
         assets,
         externalContent,
         artworkDrop,
+        artworkAvailability,
         rendererSave,
         shutdownSave,
         saveConfirmed:true,

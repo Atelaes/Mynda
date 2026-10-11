@@ -151,6 +151,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
     fs.copyFileSync(path.join(__dirname, 'ConsoleMessage.js'), path.join(appDirectory, 'ConsoleMessage.js'));
     fs.copyFileSync(path.join(__dirname, 'ArtworkDropJourney.js'), path.join(appDirectory, 'ArtworkDropJourney.js'));
+    fs.copyFileSync(path.join(__dirname, 'ArtworkAvailabilityJourney.js'), path.join(appDirectory, 'ArtworkAvailabilityJourney.js'));
     fs.copyFileSync(path.join(__dirname, 'ExternalContentJourney.js'), path.join(appDirectory, 'ExternalContentJourney.js'));
     fs.copyFileSync(path.join(__dirname, 'BrowserDriver.js'), path.join(appDirectory, 'BrowserDriver.js'));
     fs.copyFileSync(path.join(__dirname, 'LibraryJourneyFixtures.js'), path.join(appDirectory, 'LibraryJourneyFixtures.js'));
@@ -206,6 +207,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     }
     assert.strictEqual(result.libraryCreated, true);
     assert.strictEqual(result.artworkDrop, true, 'The modern File/preload/native-approval artwork workflow did not complete');
+    assert.strictEqual(result.artworkAvailability, true, 'The missing artwork, retry and removal workflow did not complete');
     const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
     assert.strictEqual(savedLibrary.videoIdScheme, 2, 'First launch must persist the new video ID scheme');
     assert.strictEqual(result.saveConfirmed,true,'The renderer edit must be acknowledged and persisted');

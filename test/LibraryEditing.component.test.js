@@ -413,7 +413,7 @@ suite.test('actual frozen LibraryClient records remain untouched by editor and l
   assert.deepStrictEqual(client.media[0].tags, ['Science Fiction']);
 });
 suite.test('closing waits for an explicit editor save even while artwork copy precedes library IPC', async () => {
-  reset([video('a', {artwork: '/tmp/editor-picked.png'})]);
+  reset([video('a', {artwork: ''})]);
   let finishCopy;
   window.mynda.editor.prepareArtwork = source => new Promise(resolve => { finishCopy = () => resolve('/tmp/mynda-managed.png'); });
   const {MynEditor: ArtworkEditor} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
@@ -423,6 +423,7 @@ suite.test('closing waits for an explicit editor save even while artwork copy pr
   });
   const instance = stateful(new ArtworkEditor({video: library.media[0], settings: library.settings}));
   instance._isMounted = true; instance.componentDidUpdate({video: null});
+  instance.handleChange('artwork', '/tmp/editor-picked.png');
   instance.handleChange('title', 'Draft with artwork');
   const saving = instance.saveChanges();
   assert.strictEqual(pending.length, 0);
@@ -443,4 +444,65 @@ suite.test('closing with an unsaved editor draft never implicitly saves it', asy
   assert.strictEqual(library.media[0].title, 'Alien');
 });
 
+suite.test('unrelated edits retain unavailable artwork without revalidating it', async () => {
+  reset([video('a', {artwork: '/unavailable/poster.png'})]);
+  const instance = editor();
+  window.mynda.editor.prepareArtwork = async () => { throw new Error('Artwork must not be inspected'); };
+  try {
+    instance.handleChange('title', 'Updated title');
+    const saving = instance.saveChanges();
+    assert.strictEqual(pending.length, 1);
+    assert(!Object.hasOwn(pending[0].edits[0].changes, 'artwork'));
+    complete(pending.shift());
+    assert.strictEqual(await saving, true);
+    assert.strictEqual(library.media[0].artwork, '/unavailable/poster.png');
+    assert.deepStrictEqual(alerts, []);
+  } finally { window.mynda.editor.prepareArtwork = async value => value; }
+});
+suite.test('a newly selected unreadable image still blocks the save and retains the draft', async () => {
+  reset([video('a', {artwork: '/original.png'})]);
+  const instance = editor();
+  window.mynda.editor.prepareArtwork = async () => { throw new Error('Image no longer exists'); };
+  try {
+    instance.handleChange('artwork', '/new-but-missing.png');
+    assert.strictEqual(await instance.saveChanges(), false);
+    assert.strictEqual(pending.length, 0);
+    assert.strictEqual(library.media[0].artwork, '/original.png');
+    assert.strictEqual(instance.state.video.artwork, '/new-but-missing.png');
+    assert(alerts.some(message => message.includes('Image no longer exists')));
+  } finally { window.mynda.editor.prepareArtwork = async value => value; }
+});
+suite.test('artwork removal is a reversible draft and saves an explicit empty reference', async () => {
+  reset([video('a', {artwork: '/original.png'})]);
+  const instance = editor();
+  instance.removeArtwork();
+  assert.strictEqual(instance.state.video.artwork, '');
+  assert.strictEqual(library.media[0].artwork, '/original.png');
+  assert.strictEqual(pending.length, 0);
+  instance.revertChanges();
+  assert.strictEqual(instance.state.video.artwork, '/original.png');
+  instance.removeArtwork();
+  const saving = instance.saveChanges();
+  assert.strictEqual(pending[0].edits[0].changes.artwork, '');
+  assert.strictEqual(pending[0].edits[0].expected.artwork, '/original.png');
+  complete(pending.shift());
+  assert.strictEqual(await saving, true);
+  assert.strictEqual(library.media[0].artwork, '');
+});
+suite.test('explicit batch removal clears differing artwork while an untouched mixed field preserves it', async () => {
+  reset([video('a', {artwork: '/first.png'}), video('b', {artwork: '/second.png'})]);
+  const batch = {...library.media[0], id: 'batch', artwork: ''};
+  const instance = editor(batch, {batch: library.media});
+  instance.handleChange('title', 'Both titles');
+  let saving = instance.saveChanges();
+  assert(pending[0].edits.every(edit => !Object.hasOwn(edit.changes, 'artwork')));
+  complete(pending.shift()); await saving;
+  instance.removeArtwork();
+  assert.strictEqual(instance.state.saveHash, hashObject(instance.state.video), 'Mixed artwork still has an empty summary');
+  assert.strictEqual(instance.hasPendingChanges(), true, 'The explicit removal must still be treated as an unsaved edit');
+  saving = instance.saveChanges();
+  assert.deepStrictEqual(pending[0].edits.map(edit => edit.changes.artwork), ['', '']);
+  complete(pending.shift()); await saving;
+  assert.deepStrictEqual(library.media.map(video => video.artwork), ['', '']);
+});
 runSuite(suite);

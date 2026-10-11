@@ -1,4 +1,6 @@
 const path = require('path');
+const React = require('react');
+const ReactDOMServer = require('react-dom/server');
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness');
 const {loadFreshWithMocks} = require('./helpers/ModuleMocks');
 require('@babel/register')({presets:[require.resolve('@babel/preset-react')], extensions:['.js'], ignore:[/node_modules/], cache:false});
@@ -41,16 +43,16 @@ suite.test('failed inspection is visible and does not change artwork',async()=>{
   const f=fixture(async()=>{throw new Error('Image is too large');});await f.drop([file]);
   assert.strictEqual(f.editor.state.message,'Image is too large');assert.deepStrictEqual(f.updates,[]);f.editor.componentWillUnmount();
 });
-for (const action of ['revert','switch video','unmount']) {
+for (const action of ['remove','switch video','unmount']) {
   suite.test(`a pending drop cannot overwrite artwork after ${action}`,async()=>{
     const d=deferred(), f=fixture(()=>d.promise), pending=f.drop([file]);
-    if(action==='revert') f.editor.handleRevert();
+    if(action==='remove') f.editor.handleRemove();
     else if(action==='switch video') {
       const previous=f.editor.props;f.editor.props={...previous,movie:{id:'b',artwork:'/other.png'}};
       f.editor.componentDidUpdate(previous);
     } else f.editor.componentWillUnmount();
     d.resolve('/late.png');await pending;
-    assert.deepStrictEqual(f.updates,action==='revert'?[{artwork:'/original.png'}]:[]);
+    assert.deepStrictEqual(f.updates,action==='remove'?[{artwork:''}]:[]);
     f.editor.componentWillUnmount();
   });
 }
@@ -60,4 +62,43 @@ suite.test('the latest drop wins when replies arrive out of order',async()=>{
   const one=f.drop([file]),two=f.drop([file]);second.resolve('/second.png');await two;
   first.resolve('/first.png');await one;assert.deepStrictEqual(f.updates,[{artwork:'/second.png'}]);f.editor.componentWillUnmount();
 });
+suite.test('the remove button clears saved artwork and the path stays behind a closed disclosure', () => {
+  const f = fixture();
+  const html = ReactDOMServer.renderToStaticMarkup(f.editor.render());
+  assert(html.includes('aria-label="Remove artwork"'));
+  assert(html.includes('artwork-remove-icon'));
+  assert(html.includes('<summary>File info</summary>'));
+  assert(!/<details[^>]*\bopen(?:=|>)/.test(html));
+  assert(html.includes('/original.png'));
+  f.editor.handleRemove();
+  assert.deepStrictEqual(f.updates, [{artwork: ''}]);
+  assert.strictEqual(f.editor.props.movie.artwork, '/original.png', 'Clearing must not mutate the saved record');
+  f.editor.componentWillUnmount();
+});
+suite.test('empty artwork disables removal, but a mixed batch exposes explicit removal', () => {
+  const f = fixture();
+  f.editor.props = {...f.editor.props, movie: {id: 'a', artwork: ''}};
+  const findButton = () => React.Children.toArray(f.editor.render().props.children)[0]
+    .props.children.props.children[0];
+  assert.strictEqual(findButton().props.disabled, true);
+  let removed = false;
+  f.editor.props = {...f.editor.props, movie: {id: 'batch', artwork: ''}, hasArtwork: true,
+    removeArtwork() { removed = true; }};
+  assert.strictEqual(findButton().props.disabled, false);
+  f.editor.handleRemove(); assert.strictEqual(removed, true);
+  f.editor.componentWillUnmount();
+});
+for (const operation of ['downloadArtwork', 'chooseArtwork']) {
+  suite.test(`removal invalidates an outstanding ${operation} response`, async () => {
+    const d = deferred(), f = fixture();
+    window.mynda.editor[operation] = () => d.promise;
+    const pending = operation === 'downloadArtwork' ? f.editor.download('https://example.test/poster.png') :
+      f.editor.handleBrowse({preventDefault() {}});
+    f.editor.handleRemove();
+    d.resolve(operation === 'downloadArtwork' ? {success: true, message: '/late.png'} : '/late.png');
+    await pending;
+    assert.deepStrictEqual(f.updates, [{artwork: ''}]);
+    f.editor.componentWillUnmount();
+  });
+}
 runSuite(suite);

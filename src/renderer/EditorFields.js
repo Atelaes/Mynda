@@ -10,6 +10,7 @@ const {
 } = require('./RendererRuntime.js');
 const {isValidURL, findNearestOfClass} = require('./RendererUtils.js');
 const {MynOverflowTextMarquee} = require('./SharedComponents.js');
+const ArtworkImage = require('./ArtworkImage');
 
 
 class MynEdit extends React.Component {
@@ -397,13 +398,9 @@ class MynEditArtwork extends MynEdit {
 
     this.state = {
       value: "",
-      message: "",
-      revertLink: null,
-      original: props.movie.artwork
-      // cancelDownload: () => { console.log('default cancel function') }
+      message: ""
     }
 
-    this.revert = React.createRef();
     this.input = React.createRef();
     this.dlMsg = React.createRef();
     this.container = React.createRef();
@@ -442,7 +439,7 @@ class MynEditArtwork extends MynEdit {
   }
 
   removeDownloadListener() {
-    // Invalidate an outstanding bridge response on Revert or unmount.
+    // Invalidate an outstanding bridge response on removal or unmount.
     this._artworkRequest++;
   }
 
@@ -522,34 +519,19 @@ class MynEditArtwork extends MynEdit {
     } catch (error) { alert(`Mynda could not choose this image: ${error.message || error}`); }
   }
 
-  handleRevert() {
-    artworkLog.debug('Reverting editor artwork', {
-      originalArtwork: this.state.original
-    });
+  handleRemove() {
     this.removeDownloadListener();
     this.showDownloadStatus('', false);
-    this.update(this.state.original);
-  }
-
-  imageOver(event) {
-    // this.revert.current.style.visibility = "visible";
-  }
-
-  imageOut(event) {
-    // // //this is the original element the event handler was assigned to
-    // // var e = event.toElement || event.relatedTarget;
-    // // if (e.parentNode == this || e == this) {
-    // //    return;
-    // // }
-    //
-    // this.revert.current.style.visibility = "hidden";
+    this.setState({value: ''});
+    if (this.props.removeArtwork) this.props.removeArtwork();
+    else this.update('');
   }
 
   componentDidUpdate(oldProps) {
     if (oldProps.movie.id !== this.props.movie.id) {
       this.removeDownloadListener();
       this.showDownloadStatus('', false);
-      this.setState({original: this.props.movie.artwork, value: ''});
+      this.setState({value: ''});
     }
 
     // if we're given a url ( for instance by the user clicking on a search result during auto-tagging)
@@ -616,22 +598,34 @@ class MynEditArtwork extends MynEdit {
   }
 
   render() {
+    const artwork = this.props.movie.artwork || '';
+    const canRemove = Boolean(artwork || this.props.hasArtwork);
     return (
       <div ref={this.container}>
-        <img
-          id="edit-artwork-image"
-          src={this.props.movie.artwork || this.props.placeholderImage}
-          width="100"
-          onMouseOver={(e) => this.imageOver(e)}
-          onMouseLeave={(e) => this.imageOut(e)}
-        />
+        <ArtworkImage source={artwork} placeholder={this.props.placeholderImage}
+          imageID="edit-artwork-image" showStatus allowRetry>
+          <div id="edit-field-artwork-buttons">
+            <button type="button" className="artwork-remove" disabled={!canRemove}
+              aria-label={this.props.movie.id === 'batch' ? 'Remove artwork from selected videos' : 'Remove artwork'}
+              title="Remove artwork (applied when you save)" onClick={() => this.handleRemove()}>
+              <span className="artwork-remove-icon" aria-hidden="true" />
+            </button>
+            {artwork && (
+              <details key={`${this.props.movie.id}:${artwork}`} className="artwork-file-details">
+                <summary>File info</summary>
+                <div className="artwork-file-popover">
+                  <label>Artwork location
+                    <textarea className="artwork-file-path" readOnly rows="3" value={artwork} />
+                  </label>
+                </div>
+              </details>
+            )}
+            <button type="button" className="artwork-browse" onClick={(e) => this.handleBrowse(e)}>Browse</button>
+          </div>
+        </ArtworkImage>
         <div>
           <input ref={this.input} type="text" id="edit-field-artwork" value={this.state.value || ""} placeholder={this.props.placeholder || "Paste path/URL"} onChange={(e) => this.handleInput(e)} />
           <div ref={this.dlMsg} id="edit-field-artwork-dl-msg" style={{display:"none"}}>{this.state.message}</div>
-        </div>
-        <div id="edit-field-artwork-buttons">
-          <div ref={this.revert} onClick={() => this.handleRevert()} className="edit-field-revert"></div>
-          <button onClick={(e) => this.handleBrowse(e)}>Browse</button>
         </div>
       </div>
     );

@@ -101,6 +101,23 @@ class MynEditor extends MynOpenablePane {
   //   this._isMounted && this.setState({data : update});
   // }
 
+  removeArtwork() {
+    if (this._saving) return;
+    this.handleChange('artwork', '');
+    // Unlike an empty mixed-value text field, the remove button explicitly
+    // clears artwork on every selected video, even when their images differ.
+    this.setState(state => ({changed: new Set([...state.changed, 'artwork'])}));
+  }
+
+  hasPendingChanges() {
+    return Boolean(this.state.video) && (
+      this.state.saveHash !== hashObject(this.state.video) ||
+      (this.state.video.id === 'batch' && this.state.changed.size > 0) ||
+      this.state.resetFromFilenamePending ||
+      Object.keys(this.state.pendingFilenameResetPatches || {}).length > 0
+    );
+  }
+
   handleChange(...args) {
     if (this._saving) return;
     // console.log("UPDATING");
@@ -411,12 +428,13 @@ class MynEditor extends MynOpenablePane {
     this.setState({savePending: true});
     const submittedSelection = editorSelectionKey(draftState.video, submittedProps.batch);
 
-    // Before saving, we need to move the artwork image to the appropriate
-    // folder in the user data. In the case of a new image, it may either be
-    // in its original location on the user's local drive (in the case that
-    // the user browsed to it or entered its path manually), or it may be
-    // saved in a temp folder (in the case that it was downloaded from a URL)
-    if (this._isMounted && typeof draftState.video.artwork === 'string' && draftState.video.artwork !== '') {
+    // Prepare newly selected images before saving their references. An
+    // unchanged image may be temporarily offline: unrelated edits must neither
+    // require it to be readable nor erase its saved reference.
+    const artworkBaseline = draftState.draftBaseline || draftState.originalVideo || submittedProps.video;
+    const artworkChanged = draftState.video.id === 'batch' ? draftState.changed.has('artwork') :
+      draftState.video.artwork !== artworkBaseline.artwork;
+    if (this._isMounted && artworkChanged && typeof draftState.video.artwork === 'string' && draftState.video.artwork !== '') {
       try {
         draftState.video.artwork = await window.mynda.editor.prepareArtwork(draftState.video.artwork);
       } catch (error) {
@@ -660,7 +678,7 @@ class MynEditor extends MynOpenablePane {
       // baseline until Save, Revert, or a genuine selection change.
       if (oldSelectionKey === currentSelectionKey &&
           (this._saving || this.state.resetFromFilenamePending || this.state.filenameResetStaged ||
-            (this.state.video && this.state.saveHash !== hashObject(this.state.video)))) {
+            this.hasPendingChanges())) {
         editorLog.debug('Preserved editor draft during same-selection refresh', {
           selectionType: this.props.video && this.props.video.id === 'batch' ? 'batch' : 'single',
           videoCount: this.props.video && this.props.video.id === 'batch' ?
@@ -755,11 +773,7 @@ class MynEditor extends MynOpenablePane {
     //   video={this.state.video}
     // />
 
-    const hasUnsavedChanges = Boolean(this.state.video) && (
-      this.state.saveHash !== hashObject(this.state.video) ||
-      this.state.resetFromFilenamePending ||
-      Object.keys(this.state.pendingFilenameResetPatches || {}).length > 0
-    );
+    const hasUnsavedChanges = this.hasPendingChanges();
     const navigationControls = this.isBatchEdit() ? null : (
       <div className={'editor-next-prev-btns ' + this.props.detailRowBoundaryFlag}>
         <div className='btn editor-prev-btn' onClick={()=>this.goToPrevious()}>
@@ -798,6 +812,7 @@ class MynEditor extends MynOpenablePane {
           savePending={this.state.savePending}
           changedFields={this.state.changed}
           batchBaseline={this.state.batchObjectUnedited}
+          removeArtwork={() => this.removeArtwork()}
           saveChanges={this.saveChanges}
           placeholderImage={this.state.placeholderImage}
           reportValid={this.reportValid}
@@ -815,18 +830,7 @@ class MynEditor extends MynOpenablePane {
 
     return super.render({
       jsx: this.createContentJSX(),
-      confirmExit: () => {
-        // console.log('EXITING EDITOR PANE!!! isEqual: ' + _.isEqual(this.props.video,this.state.video));
-        // console.log('props: ' + JSON.stringify(this.props.video));
-        // console.log('state: ' + JSON.stringify(this.state.video));
-        // return !_.isEqual(this.props.video,this.state.video);
-        // console.log('object when exiting:');
-        // console.log(this.state.video);
-
-        let newHash = this.state.video ? hashObject(this.state.video) : null;
-        return this.state.saveHash !== newHash ||
-          Object.keys(this.state.pendingFilenameResetPatches || {}).length > 0;
-      }, // boolean for whether or not to show confirmation dialog upon exiting the pane
+      confirmExit: () => this.hasPendingChanges(),
       confirmMsg: 'Are you sure you want to exit without saving? Your changes will be lost'
     });
   }
@@ -1199,7 +1203,8 @@ class MynEditorEdit extends React.Component {
 
     // whether the video has been changed since load or the last save
     const newHash = hashObject(this.props.video);
-    const saved = this.props.saveHash === newHash;
+    const saved = this.props.saveHash === newHash &&
+      !(this.props.video.id === 'batch' && this.props.changedFields && this.props.changedFields.size > 0);
     // console.log('video has changed since load/last save? ' + !saved);
     // console.log('\n' + this.props.saveHash + '\n' + newHash);
 
@@ -1466,6 +1471,10 @@ class MynEditorEdit extends React.Component {
           <MynEditArtwork
             movie={this.props.video}
             update={this.props.handleChange}
+            removeArtwork={this.props.removeArtwork}
+            hasArtwork={Boolean(this.props.video.artwork) ||
+              (this.props.video.id === 'batch' && !(this.props.changedFields || new Set()).has('artwork') &&
+                (this.props.batch || []).some(video => Boolean(video.artwork)))}
             placeholderImage={this.props.placeholderImage}
             placeholder={resetPlaceholder('artwork', 'Paste path/URL')}
           />
