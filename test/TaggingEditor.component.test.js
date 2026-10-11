@@ -31,6 +31,21 @@ const {MynEditor,MynEditorSearch}=loadFreshWithMocks(path.join(__dirname,'../src
   './SharedComponents.js':{MynOpenablePane:React.Component},
   './EditorFields.js':{}
 });
+const {MynEditArtwork}=loadFreshWithMocks(path.join(__dirname,'../src/renderer/EditorFields.js'),{
+  './RendererRuntime.js':{editorLog:quiet,artworkLog:quiet},'./SharedComponents.js':{}
+});
+function findControl(tree,selector) {
+  for(const element of React.Children.toArray(tree)) {
+    if(!React.isValidElement(element))continue;
+    const props=element.props;
+    const matches=selector.startsWith('#') ? props.id===selector.slice(1) :
+      String(props.className || '').split(/\s+/).includes(selector.slice(1));
+    if(typeof element.type==='string' && matches)return props;
+    const child=findControl(props.children,selector);
+    if(child)return child;
+  }
+  return null;
+}
 function editor(video) {
   const instance=new MynEditor({video});
   instance.state.video=JSON.parse(JSON.stringify(video));
@@ -143,27 +158,40 @@ suite.test('the manual journey waits for applied metadata when the entered IMDb 
   window.mynda.editor.select=()=>new Promise(resolve=>{complete=resolve;});
   try {
     const selecting=search.retrieveResult({myndaProposalID:'held-choice'});
-    const fields={'.edit-field-imdbID':'imdbID','#edit-field-description':'description','#edit-field-artwork':'artwork'};
-    // Supply a read-only form surface from the real editor draft. This tests
-    // the journey's completion check, not native rendering or DOM events.
+    const fields={'.edit-field-imdbID':'imdbID','#edit-field-description':'description'};
+    const artwork=new MynEditArtwork({movie:instance.state.video});
+    // Read actual rendered artwork controls: the paste input is deliberately
+    // independent of the video.artwork reference shown in File info. This is
+    // a component check, not native rendering or browser event coverage.
     const context=vm.createContext({document:{querySelector:selector=>{
-      assert(fields[selector],'Unknown form selector: '+selector);
-      return {value:instance.state.video[fields[selector]]};
+      if(fields[selector])return {value:instance.state.video[fields[selector]]};
+      artwork.props={...artwork.props,movie:instance.state.video};
+      return findControl(artwork.render(),selector);
     }}});
     const ui=browserDriver({webContents:{executeJavaScript:async source=>structuredClone(await vm.runInContext(source,context))}});
     let firstRead;
     const observed=new Promise(resolve=>{firstRead=resolve;});
     const inspect=ui.inspect;
     ui.inspect=async(...args)=>{const result=await inspect(...args);firstRead(result);return result;};
-    const waiting=waitForChosenMetadata(ui,imdbID,original.description,1000);
-    assert.strictEqual(await observed,false,'The typed ID must not allow the journey to Save before metadata arrives');
+    let readyToSave=false;
+    const waiting=waitForChosenMetadata(ui,imdbID,original.description,1000).then(()=>{readyToSave=true;});
+    const pending=await observed;
+    assert.strictEqual(pending.imdbID,imdbID);
+    assert.strictEqual(pending.descriptionChanged,false,'The typed ID must not allow Save before metadata arrives');
+    assert.strictEqual(pending.artworkPresent,false);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.strictEqual(readyToSave,false,'The journey must remain blocked until selection applies the metadata');
     const draft=instance.state.video;
     const evidence=Evidence.forMatch(draft,{imdbID,Title:'Selected title'},
       {kind:'explicit-id',requestedID:imdbID},{recordSelectionSource:'user'});
     complete({status:'matched',video:{...draft,title:'Selected title',description:'Downloaded catalog description',
       artwork:'/managed-artwork/selected.png',taggingEvidence:evidence,taggingDecision:null}});
     await selecting;
+    artwork.props={...artwork.props,movie:instance.state.video};
+    assert.strictEqual(findControl(artwork.render(),'#edit-field-artwork').value,'','The paste input stays empty after selection');
+    assert.strictEqual(findControl(artwork.render(),'.artwork-file-path').value,instance.state.video.artwork);
     await waiting;
+    assert.strictEqual(readyToSave,true);
     const saved=JSON.parse(JSON.stringify({...instance.state.video,autotag_tried:false}));
     assert.strictEqual(require('../src/tagging/TaggingReport').buildTaggingReport(saved).status,'matched');
     assert.strictEqual(saved.taggingEvidence.identities.record.origin,'user');

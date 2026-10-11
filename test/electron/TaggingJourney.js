@@ -9,13 +9,21 @@ const checks = require('./TaggingAssertions');
 async function waitForChosenMetadata(ui, imdbID, previousDescription, timeout = 15000) {
   // These journeys start with a placeholder description and no artwork. An
   // IMDb ID alone cannot signal completion: the user may have just typed it.
-  // Wait for the selected metadata and downloaded artwork to reach the form.
-  await wait(()=>ui.inspect((imdbID, previousDescription)=>{
-    const value=selector=>document.querySelector(selector)?.value || '';
-    const description=value('#edit-field-description');
-    return value('.edit-field-imdbID')===imdbID && description.trim()!=='' &&
-      description!==previousDescription && value('#edit-field-artwork')!=='';
-  },imdbID,previousDescription),'chosen metadata and artwork in draft',timeout);
+  // File info holds the artwork reference; the paste-path input stays empty.
+  let observed;
+  try {
+    await wait(async()=>{
+      observed=await ui.inspect(previousDescription=>{
+        const value=selector=>document.querySelector(selector)?.value || '';
+        const description=value('#edit-field-description');
+        return {imdbID:value('.edit-field-imdbID'),descriptionPresent:description.trim()!=='',
+          descriptionChanged:description!==previousDescription,artworkPresent:value('.artwork-file-path')!==''};
+      },previousDescription);
+      return observed.imdbID===imdbID && observed.descriptionPresent && observed.descriptionChanged && observed.artworkPresent;
+    },'chosen metadata and artwork in draft',timeout);
+  } catch(error) {
+    throw new Error(`${error.message}; observed draft: ${JSON.stringify(observed)}`);
+  }
 }
 
 async function run({window,scenario,phase,library,originals,dialogs,network,status,disk,stage}) {
