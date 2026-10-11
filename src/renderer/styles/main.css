@@ -176,7 +176,7 @@ textarea.invalid {
   box-shadow: var(--input-invalid-boxshadow);
 }
 
-button, input[type=submit] {
+button, input[type=submit], .artwork-file-details > summary {
   outline: none;
   cursor:pointer;
   color: var(--button-text);
@@ -191,7 +191,7 @@ button, input[type=submit] {
   border-radius: var(--button-borderradius);
 }
 
-button:hover, input[type=submit]:hover {
+button:hover, input[type=submit]:hover, .artwork-file-details > summary:hover {
   background: var(--button-bg-hover);
   background-color: var(--button-bgcolor-hover);
   color: var(--button-text-hover);
@@ -2396,6 +2396,11 @@ table.compact .movie-row {
   background: var(--dark-bg, #202126);
   line-height: normal;
 }
+#editor-pane .artwork-preview {
+  background: transparent;
+  border-radius: var(--editor-textinput-borderradius-radius) var(--editor-textinput-borderradius-radius) 0 0;
+  overflow: hidden;
+}
 .artwork-preview .artwork-preview-image {
   position: absolute;
   inset: 0;
@@ -2423,9 +2428,16 @@ table.compact .movie-row {
   gap: .4rem;
   padding: .3rem;
   border-radius: .25rem;
-  background: rgba(0, 0, 0, .75);
-  color: #eee;
+  background: var(--dark-bg);
+  color: var(--main-text);
   font-size: .8rem;
+}
+#editor-pane .artwork-unavailable {
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  border-radius: 0;
 }
 #edit-field-artwork-buttons {
   position: absolute;
@@ -2438,32 +2450,37 @@ table.compact .movie-row {
   gap: .3rem;
 }
 #edit-field-artwork-buttons .artwork-browse { margin-left: auto; }
-#edit-field-artwork-buttons .artwork-remove {
-  display: grid;
-  place-items: center;
-  min-width: 1.7rem;
-  min-height: 1.7rem;
-  padding: .25rem;
+#edit-field-artwork-buttons > button,
+#edit-field-artwork-buttons .artwork-file-details > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  line-height: 1.2;
+  gap: .2em;
 }
 .artwork-remove-icon {
   display: block;
-  width: .8rem;
-  height: .8rem;
+  width: .8em;
+  height: 1.2em;
   background: currentColor;
   mask: url('../../../images/x-icon_white.png') center / contain no-repeat;
 }
-.artwork-file-details { font-size: .8rem; }
-.artwork-file-details summary {
-  cursor: pointer;
-  padding: .25rem .4rem;
-  border-radius: .25rem;
-  background: rgba(0, 0, 0, .75);
-  color: #eee;
+#edit-field-artwork-buttons .artwork-file-details {
+  /* Override .openable-pane * so the popup spans the toolbar, not the
+     disclosure button's much narrower containing block. */
+  position: static;
+  flex-shrink: 0;
+  font-size: var(--button-fontsize);
 }
+.artwork-file-details > summary { list-style: none; }
+.artwork-file-details > summary::-webkit-details-marker { display: none; }
+.artwork-file-details > summary::before { content: '\25B8'; }
+.artwork-file-details[open] > summary::before { content: '\25BE'; }
 #edit-field-artwork-buttons button:focus-visible,
 .artwork-file-details summary:focus-visible,
 .artwork-unavailable button:focus-visible {
-  outline: 2px solid var(--bright-text, #eee);
+  outline: 2px solid var(--dim-text);
   outline-offset: 2px;
 }
 .artwork-file-popover {
@@ -2472,18 +2489,27 @@ table.compact .movie-row {
   bottom: calc(100% + .3rem);
   left: 0;
   right: 0;
+  box-sizing: border-box;
+  min-width: 0;
   padding: .6rem;
-  border: 1px solid var(--med-text, #888);
+  border: var(--button-border);
   border-radius: .3rem;
-  background: var(--dark-bg, #202126);
-  color: var(--bright-text, #eee);
+  background: var(--dark-bg);
+  color: var(--main-text);
   box-shadow: 0 .2rem .8rem #0008;
 }
+.artwork-file-popover label { display: block; }
 #editor-pane .artwork-file-path {
   display: block;
   box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 5em;
   margin-top: .4rem;
+  padding: .4em;
+  border-radius: var(--button-borderradius);
   font: inherit;
   line-height: 1.4;
   overflow-wrap: anywhere;
