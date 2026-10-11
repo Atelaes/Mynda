@@ -2,6 +2,8 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/TaggingJourneys.integration.test.js',title:'Tagging journey catalog and live-test safeguards',
+    protects:'raw HTTP fixtures through the real tagging engine, downloaded image bytes, live consent, request limits and secret redaction'},
   {category:'component',file:'test/ArtworkImage.component.test.js',title:'Artwork availability and placeholders',
     protects:'missing images, stable fallback, retry, stale image events and retained artwork references'},
   {category:'component',file:'test/ArtworkEditor.component.test.js',title:'Artwork editor file drops',
@@ -382,5 +384,15 @@ module.exports = [
     category:'end-to-end',file:'test/electron/run-electron-smoke.js',args:['--library','--asar'],
     title:'Library save workflows from ASAR',
     protects:'the complete library save/restart journey from an archived application with controlled external service/player fixtures'
+  },
+  {
+    category:'end-to-end',file:'test/electron/run-tagging.js',
+    title:'Tagging workflows through the native UI and restart',
+    protects:'movie and episode matching, manual choices, batch edits, selected series, concurrent edits, cancellation, service and disk errors, artwork and saved reports'
+  },
+  {
+    category:'end-to-end',file:'test/electron/run-tagging.js',args:['--asar'],
+    title:'Tagging workflows from ASAR',
+    protects:'the same ten tagging journeys and fresh-process persistence checks from an archived app; external HTTP responses are fixtures'
   }
 ];

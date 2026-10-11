@@ -53,68 +53,81 @@ function linkProjectDirectoryIfPresent(name, appDirectory) {
   );
 }
 
-function launchElectron(executable, appDirectory, userData, phase) {
+function launchElectron(executable, appDirectory, userData, phase, options = {}) {
   return new Promise((resolve, reject) => {
     const args = [];
     if (process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0) {
       args.push('--no-sandbox');
     }
     args.push(appDirectory);
+    const env = Object.assign({}, process.env, {
+      MYNDA_E2E_USER_DATA: userData,
+      MYNDA_E2E_PHASE: phase || '',
+      MYNDA_E2E_TIMEOUT_MS: '45000',
+      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+    }, options.env || {});
+    delete env.ELECTRON_RUN_AS_NODE;
     const child = spawn(executable, args, {
       // Launch from elsewhere to catch accidentally cwd-relative app paths.
       cwd: path.dirname(appDirectory),
-      env: Object.assign({}, process.env, {
-        MYNDA_E2E_USER_DATA: userData,
-        MYNDA_E2E_PHASE: phase || '',
-        MYNDA_E2E_TIMEOUT_MS: '45000',
-        ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
-      }),
+      env,
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let stdout = '';
     let stderr = '';
+    const clean = options.redact || (value => value);
+    function saveOutput() {
+      if (!options.diagnostics) return;
+      fs.writeFileSync(path.join(options.diagnostics,`${phase}-stdout.log`),clean(stdout));
+      fs.writeFileSync(path.join(options.diagnostics,`${phase}-stderr.log`),clean(stderr));
+    }
     let settled = false;
     const timeout = setTimeout(() => {
       if (settled) return;
       settled = true;
       try { child.kill(); } catch(err) {}
-      reject(new Error(`Electron smoke-test runner timed out.\n${tail(stdout)}\n${tail(stderr)}`));
-    }, libraryJourney ? 100000 : 60000);
+      saveOutput();
+      reject(new Error(clean(`Electron smoke-test runner timed out.\n${tail(stdout)}\n${tail(stderr)}`)));
+    }, options.timeoutMs || (libraryJourney ? 100000 : 60000));
 
+    // Redact assembled output at its output boundary; a credential can span
+    // chunks, and redacting the first chunk alone can leave its suffix behind.
     child.stdout.on('data', data => { stdout = tail(stdout + data.toString(), 100000); });
     child.stderr.on('data', data => { stderr = tail(stderr + data.toString(), 100000); });
     child.once('error', error => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      saveOutput();
       reject(error);
     });
     child.once('close', (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      saveOutput();
       const markerLine = stdout.split(/\r?\n/)
         .filter(line => line.startsWith('MYNDA_ELECTRON_SMOKE_RESULT:'))
         .pop();
       if (!markerLine) {
-        reject(new Error(
+        reject(new Error(clean(
           `Electron exited with ${signal ? `signal ${signal}` : `code ${code}`} without reporting a result.\n` +
           `STDOUT:\n${tail(stdout)}\nSTDERR:\n${tail(stderr)}`
-        ));
+        )));
         return;
       }
       let result;
       try {
         result = JSON.parse(markerLine.slice('MYNDA_ELECTRON_SMOKE_RESULT:'.length));
       } catch(err) {
-        reject(new Error(`Electron returned malformed smoke-test data: ${markerLine}`));
+        reject(new Error(clean(`Electron returned malformed smoke-test data: ${markerLine}`)));
         return;
       }
       if (code !== 0 || !result.ok) {
-        reject(new Error(
+        reject(new Error(clean(
           `Electron smoke test failed at ${result.stage || 'unknown stage'}: ` +
           `${JSON.stringify(result)}\nSTDERR:\n${tail(stderr)}`
-        ));
+        )));
         return;
       }
       resolve(result);
@@ -229,4 +242,5 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
   }
 });
 
-runSuite(suite);
+module.exports = {copyDirectory,launchElectron};
+if (require.main === module) runSuite(suite);

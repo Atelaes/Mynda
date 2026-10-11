@@ -4,7 +4,7 @@ This test suite is the safety net for modernizing Electron, React, and Mynda's o
 
 All automated tests use fixtures or disposable directories. They do **not** open, alter, or delete the real library in Electron's platform-specific `userData` directory. The Electron test creates a temporary copy of the application and points both of its processes at a temporary `userData` directory.
 
-Use `npm run test:list` for the current catalog and each test run's final summary for suite and case totals. The catalog includes fast tests and four Electron end-to-end suites: startup/assets and library-save workflows, each in source and ASAR form. Before media-tool setup, `npm run test:core` excludes the two fast suites that require native media tools. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
+Use `npm run test:list` for the current catalog and each test run's final summary for suite and case totals. The catalog includes fast tests and six Electron end-to-end suites: startup/assets, library-save workflows, and tagging workflows, each in source and ASAR form. The optional live tagging suite is separate. Before media-tool setup, `npm run test:core` excludes the two fast suites that require native media tools. Some named cases check entire fixture collections, including 2,657 episode-title pairs from both libraries.
 
 ## The first commands to learn
 
@@ -29,7 +29,10 @@ The complete command set is:
 | `npm run test:integration` | Integration tests | While changing storage, IPC-facing models, logs, or Share |
 | `npm run test:component` | React component tests | While changing renderer state or UI components |
 | `npm run test:renderer` | Same as `test:component` | A more memorable alias |
-| `npm run test:electron` | Real Electron startup/assets and library-save/restart workflows, from source and ASAR | After Electron, React, preload, bundle, or library-save changes |
+| `npm run test:electron` | Real Electron startup/assets, library-save, and tagging workflows, from source and ASAR | After Electron, React, preload, bundle, library-save, or tagging changes |
+| `npm run test:tagging` | Ten offline tagging journeys, each with a fresh-process restart | Focused tagging and editor regression checks |
+| `npm run test:tagging:asar` | Those tagging journeys from an actual ASAR archive | Check the production renderer and archived app layout |
+| `npm run test:tagging:live` | Small, separately confirmed live OMDb suite | Check the current provider contract and real artwork downloads |
 | `npm run test:all` | Fast tests plus Electron | Before committing an upgrade or preparing a release |
 | `npm run build:renderer` | Compiles the browser renderer and sandboxed preload | To check browser-only dependencies without launching Electron |
 | `npm run media:prepare` | Builds and stages the current machine's pinned native media sidecars | Once on each packaging platform, or after changing their versions |
@@ -69,6 +72,50 @@ To run one test file while working on a failure:
 ```bash
 node test/MovieSearch.unit.test.js
 ```
+
+## Tagging workflows
+
+The tagging runner creates its own tiny library, dummy media files and artwork. It drives the real editor and Auto-Tag controls through the production isolated renderer and IPC bridge. Search orchestration, acceptance policy, request caches, tagging evidence, metadata application, artwork downloads, library transactions and file writes all use production code. Routine tests replace only the external HTTP responses with raw catalog records and PNG streams, plus native dialog answers and the explicitly injected disk error. They do not supply prepared match decisions or change production tagging behavior.
+
+Each scenario has its own marked `userData` directory. After exercising the UI, the runner closes normally, checks the saved JSON, launches a **new Electron process**, and checks the saved records and editor values again. Restart is not allowed to fetch fresh catalog information. These tests need a graphical desktop but no API key, media tools, or existing library.
+
+| Scenario | What is checked |
+|---|---|
+| Movies | Correct identity, IMDb/Rotten Tomatoes/Metacritic rating mapping, downloaded artwork and New-list preference; ambiguous and missing matches preserve existing metadata. |
+| Episode parents | A later season's identifying episode resolves an earlier ambiguous season; a catalog coverage gap remains explained and unmatched. |
+| Episode numbering | Exact sibling matches establish a season offset for an unnamed episode; original and matched numbering survive in the evidence. |
+| Manual tagging | Movie and episode search, canceling a choice, choosing without saving, Revert, explicit IMDb-ID lookup, Save, and user provenance. A delayed response cannot overwrite another editor or discard a new draft rating/tag. |
+| Batch manual edits | Mixed fields stay untouched unless changed; explicit clearing, cast/tag additions and removals, ratings, and saved artwork removal affect only the selected videos. Original image files remain on disk. |
+| Selected-series tagging | Unsaved edits disable the action; canceling the parent choice changes nothing; confirming one parent tags only that batch and respects the New-list preference. |
+| Concurrent editing | A user save finishes while a catalog request is held; the eventual Auto-Tag result preserves the edit and records a retryable conflict. |
+| Service/artwork failures | Invalid credentials, quota exhaustion and timeout remain retryable with explanations; an artwork 404 does not discard a valid metadata match. |
+| Cancellation | Cancel finishes/saves the current movie, leaves the next untouched and restores the controls. |
+| Disk full | A failure in the actual atomic library replacement produces the out-of-space explanation, preserves committed records and allows a successful retry. |
+
+Run the focused suites with:
+
+```bash
+npm run test:tagging
+npm run test:tagging:asar
+```
+
+To diagnose just one journey, use `npm run test:tagging -- --case=manual`. Valid cases are `movies`, `episode-parents`, `episode-numbering`, `manual`, `batch`, `selected`, `concurrency`, `failures`, `cancel`, and `disk-full`. Add `--keep` to retain successful test files too. Failed runs retain their disposable library, application logs, request ledger, console/dialog diagnostics and a screenshot when a window could be captured, under `sandbox/test-results/`. An early native launch failure may only have stdout/stderr and the staged files. The runner prints the exact directory. These files are excluded from Git and release packages. An unexpected dialog fails immediately instead of requiring a person to dismiss it.
+
+The fast `TaggingJourneys.integration.test.js` validates the same raw fixtures through the real engine and manual editor service, including actual downloaded image bytes and artwork grants. It also checks live consent, the shared network budget, redaction and the no-network restart rule. Passing these checks does **not** certify native UI execution.
+
+### Optional live provider check
+
+```bash
+npm run test:tagging:live
+```
+
+This asks once before starting. It uses `OMDB_API_KEY` from the environment or the existing project `omdb.js` key, without copying the key into the staged app. It exercises movie Auto-Tag (The Matrix), manual movie tagging (Arrival), and selected-episode tagging (two Breaking Bad episodes), saves the real artwork, and verifies a fresh-process restart. Identities and parent/episode coordinates are checked; changing public rating scores are checked for sensible ranges rather than exact values. Stable rating-source mapping is covered by the offline fixtures.
+
+The entire live journey has a hard limit of **60 network requests**, including artwork and renderer thumbnails. Node and renderer requests share the same counter. Only OMDb and artwork URLs returned by it on the supported image hosts are allowed; Node redirects are rejected rather than silently bypassing the counter. Quota, authentication, transport, redirect and provider-response failures are recorded separately from application assertions in the request ledger. Keys are redacted from test diagnostics. A provider outage can fail this suite even when Mynda is working correctly.
+
+The live suite is never included in `npm test`, `test:electron`, or `test:all`. A noninteractive run requires explicit opt-in: `npm run test:tagging:live -- --yes`. `--asar` also works with the live command. Neither mode touches your personal library. If changing providers later, keep the UI journeys and replace the HTTP fixtures/live identities at the provider boundary.
+
+Validation on the editing host: the native launch stops before a window opens because an X display/local sockets are unavailable. Run the source and ASAR tagging suites on a supported desktop before treating these journeys as verified.
 
 ## Renderer and preload builds
 
@@ -122,6 +169,7 @@ A “test double” is simply a small, predictable substitute for something outs
 
 | Suite | Category | What it protects |
 |---|---|---|
+| `TaggingJourneys.integration.test.js` | Integration | real-engine HTTP fixtures, manual proposals and artwork grants, live consent, request caps, redaction and restart isolation |
 | `ArtworkEditor.component.test.js` | Component | modern File drops, native cancellation, inspection errors and stale responses |
 | `ArtworkImage.component.test.js` | Component | missing artwork, placeholders, retry, stale load events and retained references |
 | `ElectronConsole.unit.test.js` | Unit | warning/error diagnostics across console event API changes |
@@ -206,6 +254,8 @@ A “test double” is simply a small, predictable substitute for something outs
 | `electron/run-electron-smoke.js --asar` | End-to-end | the same UI/assets journey from an actual source-and-assets archive; separate from the full bundled-media packaging test |
 | `electron/run-electron-smoke.js --library` | End-to-end | rating, scan/edit concurrency, Auto-Tag conflict, batch scope, deferred preferences, playback history and restart durability |
 | `electron/run-electron-smoke.js --library --asar` | End-to-end | the complete library save/restart journey from an archived application with controlled external service/player fixtures |
+| `electron/run-tagging.js` | End-to-end | ten tagging/editor journeys, real matching, artwork, failures, saves, reports and fresh-process restart |
+| `electron/run-tagging.js --asar` | End-to-end | the same tagging journeys with the production renderer in an archived application |
 
 `npm run test:list` prints the same catalog from the file the runner itself uses, so the documentation and the executable selection are easy to compare.
 
