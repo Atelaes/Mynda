@@ -2506,6 +2506,8 @@ table.compact .movie-row {
   max-width: 100%;
   height: auto;
   min-height: 4.2em;
+  max-height: min(16.8em, 40vh);
+  field-sizing: content;
   margin: 0;
   padding: 0;
   border: 0;
@@ -2515,9 +2517,25 @@ table.compact .movie-row {
   font-size: var(--editor-path-font-size);
   line-height: 1.4;
   overflow-wrap: anywhere;
+  overflow-x: hidden;
+  overflow-y: auto;
   user-select: text;
-  resize: vertical;
+  resize: none;
+  scrollbar-width: auto;
 }
+/* Keep overflow discoverable despite the app-wide hidden scrollbar rule. */
+#editor-pane .artwork-file-path::-webkit-scrollbar {
+  display: block;
+  width: .3rem;
+}
+#editor-pane .artwork-file-path::-webkit-scrollbar-thumb {
+  background: var(--lighter-bg);
+  border-radius: .3rem;
+}
+#editor-pane .artwork-file-path::-webkit-scrollbar-thumb:hover {
+  background: var(--dim-text);
+}
+#editor-pane .artwork-file-path::-webkit-scrollbar-button { display: none; }
 
 .edit-field.ratings table {
   /* list-style-type: none;
