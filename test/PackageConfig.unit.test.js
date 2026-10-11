@@ -58,6 +58,17 @@ suite.test('ships node-mpv as a production dependency', () => {
   );
 });
 
+suite.test('keeps test transpilers out of production and removes unused legacy packages', () => {
+  for (const name of ['@babel/core','@babel/preset-react','@babel/register']) {
+    assert(devDependencies[name], `${name} is required by source tests`);
+    assert.strictEqual(dependencies[name], undefined);
+  }
+  for (const name of ['@babel/cli','request','fs-hard-drive','subtitle']) {
+    assert.strictEqual(dependencies[name], undefined);
+    assert.strictEqual(devDependencies[name], undefined);
+  }
+});
+
 suite.test('does not ship an opaque npm FFmpeg binary package', () => {
   assert.strictEqual(
     Object.prototype.hasOwnProperty.call(dependencies, 'ffmpeg-ffprobe-static'),

@@ -17,7 +17,8 @@ async function loadReactDeveloperTools({
   if (!app || app.isPackaged) return null;
 
   try {
-    const extension = await session.defaultSession.loadExtension(
+    const extensions = session.defaultSession.extensions || session.defaultSession;
+    const extension = await extensions.loadExtension(
       extensionPath,
       {allowFileAccess: true}
     );

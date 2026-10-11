@@ -103,8 +103,9 @@ app.on('browser-window-created',(_event,window)=>{
     }
     return send(channel,...args);
   };
-  window.webContents.on('console-message',(_event,level,message)=>{
-    if(level>=2) messages.push(String(message).slice(0,2000));
+  window.webContents.on('console-message',(...args)=>{
+    const entry = require('./ConsoleMessage').consoleMessage(...args);
+    if(['warning','error'].includes(entry.level)) messages.push(entry.message);
   });
   window.webContents.on('preload-error',(_event,_file,error)=>finish(false,{stage:'preload',error:error.stack}));
   window.webContents.on('did-finish-load',async()=>{

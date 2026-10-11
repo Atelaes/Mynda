@@ -491,15 +491,16 @@ class MynEditArtwork extends MynEdit {
     }
   }
 
-  async handleLocalFile(path) {
+  async handleLocalFile(file, {dropped = false} = {}) {
     const request = ++this._artworkRequest;
     const videoID = this.props.movie && this.props.movie.id;
     try {
-      const accepted = await window.mynda.editor.inspectArtwork(path);
+      const accepted = await (dropped ? window.mynda.editor.inspectDroppedArtwork(file) :
+        window.mynda.editor.inspectArtwork(file));
       if (accepted && this._isMounted && request === this._artworkRequest && videoID === this.props.movie.id) this.update(accepted);
     } catch (error) {
-      if (this._isMounted && request === this._artworkRequest) {
-        artworkLog.error('Could not read local editor artwork', {path, error});
+      if (this._isMounted && request === this._artworkRequest && videoID === this.props.movie.id) {
+        artworkLog.error('Could not read local editor artwork', {file: dropped ? file.name : file, error});
         this.showDownloadStatus(error.message || 'Could not read this image', false, 4000);
       }
     }
@@ -575,19 +576,18 @@ class MynEditArtwork extends MynEdit {
           fileCount: droppedFiles.length,
           files: droppedFiles.map(file => ({
             name: file.name,
-            path: file.path,
             type: file.type
           }))
         });
 
         try {
-          const files = event.dataTransfer.files;
+          const files = droppedFiles;
           if (files.length === 1) {
             if (/image/.test(files[0].type)) {
-              this.handleLocalFile(files[0].path);
+              return this.handleLocalFile(files[0], {dropped: true});
             } else {
               artworkLog.debug('Rejected dropped artwork with a non-image file type', {
-                path: files[0].path,
+                name: files[0].name,
                 type: files[0].type
               });
             }

@@ -1,10 +1,16 @@
 'use strict';
-const {contextBridge, ipcRenderer} = require('electron');
+const {contextBridge, ipcRenderer, webUtils} = require('electron');
 const {createBridge} = require('./Bridge');
 const libraryChannels = { 'library.snapshot':'library:snapshot', 'library.commit':'library:commit',
   'library.closeReady':'library:close-ready', 'external.open':'external:open' };
 const bridge = createBridge({
   platform:process.platform,
+  getPathForFile(file) {
+    if (webUtils) return webUtils.getPathForFile(file);
+    // Compatibility while this preparatory commit still runs on Electron 12.
+    if (typeof File === 'undefined' || !(file instanceof File)) throw new TypeError('Expected a dropped file.');
+    return file.path;
+  },
   async invoke(method, ...args) {
     if (Object.prototype.hasOwnProperty.call(libraryChannels, method)) return ipcRenderer.invoke(libraryChannels[method], ...args);
     const response = await ipcRenderer.invoke('mynda:invoke', method, args);

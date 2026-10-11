@@ -149,6 +149,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     copyDirectory(path.join(projectRoot, 'src'), path.join(appDirectory, 'src'), include);
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
     fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
+    fs.copyFileSync(path.join(__dirname, 'ConsoleMessage.js'), path.join(appDirectory, 'ConsoleMessage.js'));
     fs.copyFileSync(path.join(__dirname, 'ExternalContentJourney.js'), path.join(appDirectory, 'ExternalContentJourney.js'));
     fs.copyFileSync(path.join(__dirname, 'BrowserDriver.js'), path.join(appDirectory, 'BrowserDriver.js'));
     fs.copyFileSync(path.join(__dirname, 'LibraryJourneyFixtures.js'), path.join(appDirectory, 'LibraryJourneyFixtures.js'));

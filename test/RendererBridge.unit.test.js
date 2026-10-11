@@ -56,6 +56,33 @@ function fixture() {
   });
   return {calls,sender,request:(method,args,event={sender})=>handler(event,method,args)};
 }
+suite.test('the preload resolves a dropped File with webUtils and sends only its path through the existing approval operation',async()=>{
+  const file = new File(['pixels'], 'poster.png', {type:'image/png'}), calls=[];
+  let api;
+  loadFreshWithMocks(path.join(__dirname,'../src/preload/index.js'),{electron:{
+    webUtils:{getPathForFile(value){ assert.strictEqual(value,file); return '/images/poster.png'; }},
+    ipcRenderer:{invoke:async(...args)=>{calls.push(args);return {ok:true,value:'/approved/poster.png'};}},
+    contextBridge:{exposeInMainWorld:(_name,value)=>{api=value;}}
+  }});
+  assert.strictEqual(file.path,undefined,'a modern File has no Electron path property');
+  assert.strictEqual(await api.editor.inspectDroppedArtwork(file),'/approved/poster.png');
+  assert.deepStrictEqual(calls,[['mynda:invoke','editor.inspectArtwork',['/images/poster.png']]]);
+});
+suite.test('pathless or invalid dropped objects never reach main-process inspection',async()=>{
+  const calls=[];
+  const api=createBridge({invoke:(...args)=>calls.push(args),subscribe:()=>{},platform:'linux',
+    getPathForFile(file){if (!(file instanceof File)) throw new TypeError('Expected a File');return '';}});
+  await assert.rejects(api.editor.inspectDroppedArtwork(new File(['pixels'],'poster.png')),/not a file on disk/);
+  await assert.rejects(api.editor.inspectDroppedArtwork({path:'/private/file'}),/Expected a File/);
+  assert.deepStrictEqual(calls,[]);
+});
+suite.test('dropped-file inspection preserves native cancellation and errors',async()=>{
+  const options={subscribe:()=>{},platform:'win32',getPathForFile:()=> 'C:\\images\\poster.png'};
+  const canceled=createBridge({...options,invoke:async()=>null});
+  assert.strictEqual(await canceled.editor.inspectDroppedArtwork({}),null);
+  const failed=createBridge({...options,invoke:async()=>{throw new Error('Image too large');}});
+  await assert.rejects(failed.editor.inspectDroppedArtwork({}),/Image too large/);
+});
 suite.test('dispatches an approved operation with the original trusted sender',async()=>{
   const f=fixture();assert.deepStrictEqual(await f.request('playback.play',['id']),{ok:true,value:{videoId:'id'}});
   assert.deepStrictEqual(f.calls,[[f.sender,'id']]);

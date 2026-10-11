@@ -2,6 +2,10 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'component',file:'test/ArtworkEditor.component.test.js',title:'Artwork editor file drops',
+    protects:'modern DOM Files, native approval/cancellation, failed inspection and out-of-order editor changes'},
+  {category:'unit',file:'test/ElectronConsole.unit.test.js',title:'Electron console diagnostics',
+    protects:'warning and error capture across legacy and modern console event APIs'},
   {category:'integration',file:'test/MainBridge.integration.test.js',title:'Main application isolation wiring',
     protects:'real main composition, isolated window options, complete handler registration and privileged caller checks'},
   {category:'unit',file:'test/EditorArtworkDownload.unit.test.js',title:'Bounded artwork downloads',

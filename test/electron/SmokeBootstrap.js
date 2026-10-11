@@ -6,6 +6,7 @@ const path = require('path');
 const {pathToFileURL} = require('url');
 const {app, dialog, shell, BrowserWindow} = require('electron');
 const {browserDriver, wait} = require('./BrowserDriver');
+const {consoleMessage} = require('./ConsoleMessage');
 const {videos, ids} = require('./LibraryJourneyFixtures');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
 const {inspectExternalContent,observePermissionRequests} = require('./ExternalContentJourney.js');
@@ -289,13 +290,8 @@ app.on('browser-window-created', (event, window) => {
     observedSessions.add(session);
     observePermissionRequests(session, permissionDecisions);
   }
-  window.webContents.on('console-message', (consoleEvent, level, message, line, sourceId) => {
-    rendererConsole.push({
-      level,
-      message: String(message || '').slice(0, 2000),
-      line,
-      source: String(sourceId || '').slice(0, 1000)
-    });
+  window.webContents.on('console-message', (...args) => {
+    rendererConsole.push(consoleMessage(...args));
     if (rendererConsole.length > 100) rendererConsole.shift();
   });
   window.webContents.on('did-fail-load', (loadEvent, errorCode, errorDescription, validatedURL) => {

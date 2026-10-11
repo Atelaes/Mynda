@@ -50,6 +50,15 @@ async function run() {
   }]);
   assert.deepStrictEqual(warningEntries, []);
 
+  const modernExtensions = {async loadExtension(...args) {
+    assert.strictEqual(this, modernExtensions);
+    calls.push(args); return extension;
+  }};
+  assert.strictEqual(await loadReactDeveloperTools({app:{isPackaged:false},
+    session:{defaultSession:{extensions:modernExtensions,loadExtension(){throw new Error('Retired API');}}}, log}), extension);
+  assert.strictEqual(calls.length, 2);
+  assert.deepStrictEqual(calls[1], calls[0]);
+
   let packagedLoadAttempted = false;
   const packagedResult = await loadReactDeveloperTools({
     app: {isPackaged: true},
@@ -87,13 +96,13 @@ async function run() {
     }
   }]);
 
-  console.log('  PASS  3 React developer-tools loading scenarios');
+  console.log('  PASS  4 React developer-tools loading scenarios');
   console.log('MYNDA_TEST_RESULT:' + JSON.stringify({
     suite: 'React developer-tools loader',
     category: 'unit',
-    passed: 3,
+    passed: 4,
     failed: 0,
-    total: 3
+    total: 4
   }));
 }
 

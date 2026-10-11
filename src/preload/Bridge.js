@@ -2,7 +2,7 @@
 
 // This is the complete renderer capability surface. Channel names, Electron
 // events, file handles and unrestricted invoke/send never leave the preload.
-function createBridge({invoke, subscribe, platform}) {
+function createBridge({invoke, subscribe, platform, getPathForFile}) {
   const call = name => (...args) => invoke(name, ...args);
   const on = channel => callback => subscribe(channel, callback);
   return Object.freeze({
@@ -13,9 +13,17 @@ function createBridge({invoke, subscribe, platform}) {
       onCloseCanceled:on('library:close-canceled')}),
     playback:Object.freeze({play:call('playback.play'), stop:call('playback.stop'),
       getState:call('playback.getState'), onState:on('playback:state')}),
-    editor:Object.freeze(Object.fromEntries(['search','select','resetFromFilename','prepareArtwork',
+    editor:Object.freeze({...Object.fromEntries(['search','select','resetFromFilename','prepareArtwork',
       'inspectArtwork','downloadArtwork','chooseArtwork','chooseSubtitles','validateSubtitles','confirm']
-      .map(name => [name,call('editor.'+name)]))),
+      .map(name => [name,call('editor.'+name)])),
+      async inspectDroppedArtwork(file) {
+        // DOM Files cannot cross IPC. Resolve the native path inside preload,
+        // then use the same main-process approval and validation as typed paths.
+        const path = getPathForFile(file);
+        if (typeof path !== 'string' || !path) throw new Error('This image is not a file on disk. Use Browse to choose an image.');
+        return invoke('editor.inspectArtwork', path);
+      }
+    }),
     scan:Object.freeze({start:call('scan.start')}),
     tagging:Object.freeze({start:call('tagging.start'), startSelected:call('tagging.startSelected'), cancel:call('tagging.cancel')}),
     watchfolders:Object.freeze({choose:call('watchfolders.choose'), add:call('watchfolders.add'), remove:call('watchfolders.remove'),

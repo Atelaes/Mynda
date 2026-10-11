@@ -36,7 +36,6 @@ const {createPlaybackService} = require('./PlaybackService');
 const {createEditorService} = require('./EditorService');
 const {createDesktopService} = require('./DesktopService');
 const {createTaskMethods} = require('./TaskService');
-//const { lsDevices } = require('fs-hard-drive');
 const checkDiskSpace = require('check-disk-space').default
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
 const videoExtensions = [
