@@ -160,6 +160,12 @@ module.exports = [
   },
   {
     category: 'unit',
+    file: 'test/ReactDevToolsBackground.unit.test.js',
+    title: 'React DevTools background compatibility',
+    protects: 'React detection without browser toolbar APIs and preserved inspection message forwarding'
+  },
+  {
+    category: 'unit',
     file: 'test/BoxOffice.unit.test.js',
     title: 'Box-office parsing and formatting',
     protects: 'fixed-USD input, invalid values, locale presentation, and compact thresholds'

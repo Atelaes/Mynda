@@ -11,3 +11,17 @@ which could not use the current Manifest V3 Chrome Web Store build. The Electron
 apps. Confirm its Components/Profiler tabs during native development testing;
 the normal Chromium DevTools window opens independently of extension loading.
 The extension remains licensed under the included MIT license.
+
+## Local compatibility patch
+
+`build/background.js` checks that `chrome.browserAction.setIcon` and `setPopup`
+exist before updating the optional Chrome toolbar button. Electron does not
+provide that toolbar API; the upstream unconditional call threw when the
+content script reported that it had detected React. The guard leaves the
+inspection message bridge and DevTools panels intact. It does not suppress
+other extension errors or change the app's Dock icon.
+
+`test/ReactDevToolsBackground.unit.test.js` executes this bundled background
+script with and without toolbar support, including React detection and
+bidirectional inspection messages. Preserve this guard when rebuilding the
+extension unless the upstream version already handles the missing API.

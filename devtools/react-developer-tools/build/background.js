@@ -157,7 +157,14 @@ function doublePipe(one, two) {
 }
 
 function setIconAndPopup(reactBuildType, tabId) {
-  chrome.browserAction.setIcon({
+  // Mynda compatibility patch: Electron has no browser toolbar. React
+  // detection and the inspection bridge must work without this optional API.
+  const browserAction = chrome.browserAction;
+  if (!browserAction || typeof browserAction.setIcon !== 'function' ||
+      typeof browserAction.setPopup !== 'function') {
+    return;
+  }
+  browserAction.setIcon({
     tabId: tabId,
     path: {
       '16': 'icons/16-' + reactBuildType + '.png',
@@ -166,7 +173,7 @@ function setIconAndPopup(reactBuildType, tabId) {
       '128': 'icons/128-' + reactBuildType + '.png'
     }
   });
-  chrome.browserAction.setPopup({
+  browserAction.setPopup({
     tabId: tabId,
     popup: 'popups/' + reactBuildType + '.html'
   });
