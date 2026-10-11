@@ -10,8 +10,8 @@ the packaged application.
 
 | Target | Build host | MPV window path | Package target |
 |---|---|---|---|
-| `mac-arm64` | Apple Silicon macOS | `gpu-next` + Vulkan/`macvk` | macOS application |
-| `win-x64` | 64-bit Windows with MSYS2 UCRT64 | `gpu-next` + Direct3D 11 | NSIS installer |
+| `mac-arm64` | Apple Silicon, macOS 13+ | `gpu-next` + Vulkan/`macvk` | macOS application |
+| `win-x64` | Windows 10+ x64, MSYS2 UCRT64 for building | `gpu-next` + Direct3D 11 | NSIS installer |
 | `linux-x64` | Ubuntu 24.04 x64 | `gpu-next` + Wayland and X11 | AppImage |
 
 These are native builds, not cross-compiles. Windows ARM, Linux ARM, Intel

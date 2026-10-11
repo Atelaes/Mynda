@@ -1,6 +1,6 @@
 # Mynda source layout and process boundaries
 
-Mynda uses an Electron main process, an isolated sandboxed preload, and a browser-only React renderer. Electron remains pinned to 12.0.5 and React remains on its existing version. The renderer-isolation migration changes ownership and communication, not the saved library format or automatic tagging acceptance policy.
+Mynda uses an Electron main process, an isolated sandboxed preload, and a browser-only React renderer. Electron is pinned to 44.7.0 (Chromium 152, Node 24) and React remains on its existing version. The runtime upgrade preserves the saved library format and automatic tagging acceptance policy.
 
 ## Process ownership
 
@@ -18,7 +18,7 @@ Mynda uses an Electron main process, an isolated sandboxed preload, and a browse
 | Native desktop operations | `src/main/DesktopService.js` | Native dialogs, approved watchfolders/Share directories, owner-bound Share plans, library exports, and controlled file-manager reveals |
 | Logging | `src/renderer/RendererLogger.js`, `src/platform/Logger.js` | Browser logger sends named log requests; backend logger owns file output and rotation |
 
-The window has `nodeIntegration: false`, `contextIsolation: true`, `enableRemoteModule: false`, and `sandbox: true`. It also disables webviews, Node in subframes/workers, and insecure mixed content. Components use operations such as `window.mynda.playback.play(videoId)`; they cannot import Node or Electron, invoke arbitrary IPC channels, launch processes, or read/write files directly.
+The window has `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`. Electron no longer contains the old `remote` module, so its obsolete configuration flag is removed. The window also disables webviews, Node in subframes/workers, and insecure mixed content. Components use operations such as `window.mynda.playback.play(videoId)`; they cannot import Node or Electron, invoke arbitrary IPC channels, launch processes, or read/write files directly.
 
 Main validates the sender independently of the preload. Services resolve video IDs against the backend library instead of trusting renderer-supplied filenames or process options. Backend-only operations do not become public merely because a similarly named internal method exists.
 
@@ -27,6 +27,8 @@ Main validates the sender independently of the preload. Services resolve video I
 Selecting artwork, subtitles, watchfolders, or Share directories in a native chooser already supplies the relevant approval. Previously known library references can be retained. A new path pasted or dropped into the editor, a newly typed artwork URL, or a manually entered directory needs a native confirmation before backend access. Confirmations identify the requested file, URL, or directory; canceling leaves it unauthorized. These grants belong to the current application window, not an unrestricted renderer filesystem API.
 
 Reusing the same approved reference in that window does not ask for the same approval again. A native-picker selection does not need this extra confirmation. A different URL or directory is a separate authorization, and a changed directory identity invalidates its previous grant.
+
+Artwork drops pass the DOM `File` to `editor.inspectDroppedArtwork`. The preload resolves its disk path with Electron's `webUtils.getPathForFile` and invokes the existing `editor.inspectArtwork` operation. Only the path crosses IPC; the main process still owns approval and validation. Generated in-memory files and malformed objects cannot supply disk paths. The renderer never reads the removed `File.path` property.
 
 Artwork URLs obtained through the backend's catalog proposals are recognized separately. A redirect to a different origin requires approval unless its destination URL is already authorized. Downloaded or copied artwork must pass image-content and size checks. Share plan tokens belong to their originating window and reviewed directory; directory identity and import destinations are rechecked when the plan is used. New external resources may need approval again after restarting the application.
 
@@ -59,22 +61,38 @@ Only browser-safe helpers may cross into the renderer dependency graph. `Duplica
 
 ## Compiled artifacts and packaging
 
-Run `npm install` after applying this migration. The build host needs Node 18 or later. `scripts/build-renderer.js` uses pinned esbuild to create:
+Use Node 24 for development (`.nvmrc`), with Node 22.12 as the minimum required by the Electron and ASAR packages. After applying the upgrade, run `npm ci` and `npm run electron:install`. Electron 42+ downloads its executable on first use rather than during npm's postinstall; the explicit install command makes that step visible and repeatable. `scripts/build-renderer.js` uses pinned esbuild to create:
 
 | Generated artifact | Target | Runtime dependencies |
 |---|---|---|
-| `src/renderer/generated/renderer.js` | Browser IIFE, Chromium 89 | Bundled browser dependencies; no Node or Electron imports |
-| `src/preload/generated/preload.js` | CommonJS, Node 14 syntax | Only the Electron import allowed in the sandboxed preload |
+| `src/renderer/generated/renderer.js` | Browser IIFE, Chromium 152 | Bundled browser dependencies; no Node or Electron imports |
+| `src/preload/generated/preload.js` | CommonJS, Node 24 syntax | Only the Electron import allowed in the sandboxed preload |
 
 Generated output is excluded from Git and included in the application package. `npm start` rebuilds before launch; `npm run build:renderer` builds without launching. The native test runner builds before staging each source/ASAR app. `scripts/before-build.js` compiles production output before the existing media verifier, including direct electron-builder invocation. Development source maps include source contents; production maps omit them.
 
 `src/renderer/index.html` loads the external bundle with a restrictive CSP. Scripts are local-only; inline scripts and dynamic code generation are forbidden. Inline styles remain necessary for React and drag-and-drop. Artwork supports the existing local/data/blob/HTTPS sources. The renderer cannot make network requests or load embedded documents, workers, or plugins.
 
+Packaging pins electron-builder 26.17.0. Archive tests declare `@electron/asar` explicitly rather than relying on the builder's former transitive `asar` package. Babel is used only by development tests; unused `@babel/cli`, `request`, `fs-hard-drive`, and `subtitle` dependencies are removed. Existing media executables remain separate processes; the Electron upgrade does not replace the verified FFmpeg/FFprobe/MPV bundles.
+
+## Platform targets and maintenance
+
+| Mynda target | Runtime baseline | Release validation |
+|---|---|---|
+| `mac-arm64` | Apple Silicon, macOS 13+ | Run native journeys and packaged media checks on macOS |
+| `win-x64` | Windows 10+ x64; Windows 11 recommended for new installations | Run native journeys and NSIS/package checks on Windows |
+| `linux-x64` | Ubuntu 24.04 x64 with a graphical desktop | Run native journeys, AppImage, and media checks on Ubuntu |
+
+The macOS minimum is declared in electron-builder configuration. Electron also publishes Intel Mac and ARM Windows/Linux runtimes, but those are not Mynda targets until their native media bundles and tests exist. End users do not install Node; this requirement applies to development and packaging only. See [Electron's platform support](https://github.com/electron/electron/blob/v44.7.0/README.md) and [MEDIA_TOOLS.md](MEDIA_TOOLS.md).
+
+44.7.0 was the latest stable Electron release checked on 2026-10-11, not a beta or nightly. Electron supports only its latest three stable major lines and does not provide a long-term-support branch. Keep current with patches and schedule regular major upgrades; preserve exact pins and update the lockfile and build targets together. See [release history](https://releases.electronjs.org/releases/stable) and [support policy](https://www.electronjs.org/docs/latest/tutorial/electron-timelines).
+
 ## Verification status
 
 See [TESTING.md](TESTING.md) and `npm run test:list` for the executable suite catalog. Build tests reject privileged imports, exercise source updates with preserved timestamps, initialize the real compiled browser graph without Node or dynamic code generation, and verify exact bundle bytes inside an ASAR archive.
 
-Native journeys use the production preload and actual compiled UI. Dependency fixtures for metadata, catalog responses, and MPV remain in main; UI actions use browser DOM controls. They do not add a test preload or renderer test channel. These native journeys must still be run on supported machines for the isolation migration: the editing environment cannot start even a minimal Electron UI. Earlier Mac save-test results and a Windows build are pre-isolation baselines, not evidence that this refactor passes on either platform. Ubuntu remains unverified.
+Native journeys use the production preload and actual compiled UI. Dependency fixtures for metadata, catalog responses, and MPV remain in main; UI actions use browser DOM controls. They do not add a test preload or renderer test channel. Torgo confirmed that the isolation migration, editor-list fix, automated tests, and build worked before this upgrade (baseline commit `9071d28`). That is the rollback baseline, not evidence that Electron 44's native tests pass.
+
+For this upgrade, all 79 fast suites (2,929 checks) passed under Electron 44.7.0's embedded Node 24.21.0, including the browser build and real ASAR archive checks. Desktop execution remains unverified: the editing host cannot provide an X display or the required local sockets, and even a minimal window fails. Native source/ASAR journeys and release packaging must pass on the target machines. The startup journey now also covers a disk-backed File crossing the real preload, cancel/approve artwork inspection, an editor drop, and a saved artwork copy. The packaged media smoke test still requires each platform's verified media bundle.
 
 ## Historical fix77 cleanup
 

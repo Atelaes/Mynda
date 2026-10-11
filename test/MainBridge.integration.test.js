@@ -37,7 +37,7 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     assert.strictEqual(windows.length,1);
     const win=windows[0],prefs=win.options.webPreferences, sender=win.webContents;
     assert.strictEqual(prefs.nodeIntegration,false);assert.strictEqual(prefs.contextIsolation,true);
-    assert.strictEqual(prefs.enableRemoteModule,false);assert.strictEqual(prefs.sandbox,true);
+    assert.strictEqual(prefs.sandbox,true);
     assert.strictEqual(prefs.preload,path.join(root,'src/preload/generated/preload.js'));
     assert.deepStrictEqual([...handlers.keys()].sort(),['external:open','library:close-ready','library:commit','library:snapshot','mynda:invoke'].sort());
     assert.strictEqual(ipcMain.eventNames().length,0,'Legacy renderer IPC remained registered');

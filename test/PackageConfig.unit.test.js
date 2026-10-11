@@ -124,6 +124,15 @@ suite.test('declares native Windows and Linux distributable targets', () => {
   assert.strictEqual(packageJson.build.linux.category, 'AudioVideo');
 });
 
+suite.test('pins the upgraded runtime and packaging tools with a supported build host and macOS floor', () => {
+  for (const name of ['electron','electron-builder','@electron/asar']) {
+    assert(/^\d+\.\d+\.\d+$/.test(devDependencies[name]), `${name} must be an exact stable version`);
+  }
+  assert.strictEqual(packageJson.engines.node, '>=22.12.0');
+  assert.strictEqual(packageJson.build.mac.minimumSystemVersion, '13.0.0');
+  assert.strictEqual(packageJson.scripts['electron:install'], 'install-electron');
+});
+
 suite.test('runs the packaged dependency smoke check after building', () => {
   const command = packageJson.scripts && packageJson.scripts['test:package'];
   assert.strictEqual(packageJson.main, 'src/bootstrap.js');

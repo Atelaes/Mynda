@@ -1,16 +1,16 @@
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness');
-const {observePermissionRequests, assertGeolocationDenied} = require('./electron/ExternalContentJourney');
+const {observePermissionDecisions, assertGeolocationDenied} = require('./electron/ExternalContentJourney');
 const suite = createSuite('Electron permission smoke-test evidence', 'unit',
   'A real request must be denied by Mynda; OS denial, unavailable location and timeout cannot pass.');
 const denied = {code:1, message:'User denied Geolocation'};
 const decision = {contentsId:7, permission:'geolocation', allowed:false};
 
 suite.test('observes asynchronous decisions without changing the handler arguments or answer', async () => {
-  const session = {setPermissionRequestHandler(handler) {
+  const session = {setPermissionCheckHandler(){},setPermissionRequestHandler(handler) {
     assert.strictEqual(this, session); this.handler = handler;
   }};
   const decisions = [], contents = {id:7}, details = {requestingUrl:'file:///app/index.html'};
-  observePermissionRequests(session, decisions);
+  observePermissionDecisions(session, decisions);
   for (const allowed of [false, true]) {
     session.setPermissionRequestHandler(async (sender, permission, callback, receivedDetails) => {
       assert.strictEqual(sender, contents); assert.strictEqual(permission, 'geolocation');
@@ -23,6 +23,23 @@ suite.test('observes asynchronous decisions without changing the handler argumen
   assert.deepStrictEqual(decisions, [decision, {...decision, allowed:true}]);
   session.setPermissionRequestHandler(null);
   assert.strictEqual(session.handler, null);
+});
+
+suite.test('observes synchronous permission checks without changing arguments or the decision', () => {
+  const session={setPermissionRequestHandler(){},setPermissionCheckHandler(handler){
+    assert.strictEqual(this,session);this.check=handler;
+  }};
+  const decisions=[],contents={id:7},origin='file://',details={requestingUrl:'file:///app/index.html'};
+  observePermissionDecisions(session,decisions);
+  for(const allowed of [false,true]) {
+    session.setPermissionCheckHandler((sender,permission,receivedOrigin,receivedDetails)=>{
+      assert.strictEqual(sender,contents);assert.strictEqual(permission,'geolocation');
+      assert.strictEqual(receivedOrigin,origin);assert.strictEqual(receivedDetails,details);return allowed;
+    });
+    assert.strictEqual(session.check(contents,'geolocation',origin,details),allowed);
+  }
+  assert.deepStrictEqual(decisions,[decision,{...decision,allowed:true}]);
+  session.setPermissionCheckHandler(null);assert.strictEqual(session.check,null);
 });
 
 suite.test('accepts permission-denied only with the tested renderer\'s actual application denial', () => {

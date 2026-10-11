@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const {spawn} = require('child_process');
-const asar = require('asar');
+const asar = require('@electron/asar');
 const {buildRenderer} = require('../../scripts/build-renderer.js');
 const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
 const {
@@ -132,11 +132,11 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
   try {
     electronExecutable = require('electron');
   } catch(err) {
-    throw new Error(`Electron is not installed correctly; run npm install first. ${err.message}`);
+    throw new Error(`Electron is not installed correctly; run npm ci, then npm run electron:install. ${err.message}`);
   }
   assert(
     typeof electronExecutable === 'string' && fs.existsSync(electronExecutable),
-    'Electron\'s executable is missing; run npm install so Electron can finish downloading'
+    'Electron\'s executable is missing; run npm run electron:install to download the pinned runtime'
   );
 
   const temporaryRoot = temporaryDirectory('electron-smoke');
@@ -150,6 +150,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     fs.copyFileSync(path.join(__dirname, 'SmokeBootstrap.js'), path.join(appDirectory, 'SmokeBootstrap.js'));
     fs.copyFileSync(path.join(__dirname, 'SmokeLifecycle.js'), path.join(appDirectory, 'SmokeLifecycle.js'));
     fs.copyFileSync(path.join(__dirname, 'ConsoleMessage.js'), path.join(appDirectory, 'ConsoleMessage.js'));
+    fs.copyFileSync(path.join(__dirname, 'ArtworkDropJourney.js'), path.join(appDirectory, 'ArtworkDropJourney.js'));
     fs.copyFileSync(path.join(__dirname, 'ExternalContentJourney.js'), path.join(appDirectory, 'ExternalContentJourney.js'));
     fs.copyFileSync(path.join(__dirname, 'BrowserDriver.js'), path.join(appDirectory, 'BrowserDriver.js'));
     fs.copyFileSync(path.join(__dirname, 'LibraryJourneyFixtures.js'), path.join(appDirectory, 'LibraryJourneyFixtures.js'));
@@ -204,6 +205,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
       assert.strictEqual(result.externalContent[key], true, `Incomplete external-content check: ${key}`);
     }
     assert.strictEqual(result.libraryCreated, true);
+    assert.strictEqual(result.artworkDrop, true, 'The modern File/preload/native-approval artwork workflow did not complete');
     const savedLibrary = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
     assert.strictEqual(savedLibrary.videoIdScheme, 2, 'First launch must persist the new video ID scheme');
     assert.strictEqual(result.saveConfirmed,true,'The renderer edit must be acknowledged and persisted');

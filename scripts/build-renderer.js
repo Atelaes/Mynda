@@ -35,8 +35,8 @@ async function buildRenderer(options = {}) {
     bundle: true,
     platform: 'browser',
     format: 'iife',
-    // Electron 12 ships Chromium 89. Upgrade this only with the Electron pin.
-    target: 'chrome89',
+    // Electron 44 ships Chromium 152. Upgrade this only with the Electron pin.
+    target: 'chrome152',
     loader: {'.js': 'jsx'},
     define: {'process.env.NODE_ENV': JSON.stringify(mode)},
     minify: mode === 'production',
@@ -70,7 +70,7 @@ async function buildPreload({root = PROJECT_ROOT} = {}) {
     bundle: true,
     platform: 'node',
     format: 'cjs',
-    target: 'node14',
+    target: 'node24',
     external: ['electron'],
     metafile: true,
     write: false,
@@ -97,7 +97,7 @@ async function buildPreload({root = PROJECT_ROOT} = {}) {
 
 if (require.main === module) {
   buildRenderer({mode: process.argv.includes('--production') ? 'production' : 'development'})
-    .then(result => console.log(`Built ${path.relative(PROJECT_ROOT, result.outfile)} (${result.mode}, Chromium 89).`))
+    .then(result => console.log(`Built ${path.relative(PROJECT_ROOT, result.outfile)} (${result.mode}, Chromium 152).`))
     .catch(error => { console.error(error.message || error); process.exitCode = 1; });
 }
 

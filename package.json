@@ -29,7 +29,8 @@
     "test:paths": "npm run build:renderer && node test/SourceLayout.integration.test.js",
     "source:cleanup": "node scripts/finish-source-reorganization.js",
     "test:electron:asar": "npm run build:renderer && node test/electron/run-electron-smoke.js --asar",
-    "build:renderer": "node scripts/build-renderer.js"
+    "build:renderer": "node scripts/build-renderer.js",
+    "electron:install": "install-electron"
   },
   "author": "",
   "license": "ISC",
@@ -59,8 +60,9 @@
     "@babel/core": "^7.12.3",
     "@babel/preset-react": "^7.12.1",
     "@babel/register": "^7.12.1",
-    "electron": "12.0.5",
-    "electron-builder": "^22.7.0",
+    "@electron/asar": "4.3.1",
+    "electron": "44.7.0",
+    "electron-builder": "26.17.0",
     "esbuild": "0.25.12"
   },
   "build": {
@@ -100,7 +102,11 @@
     },
     "icon": "images/mynda-icon.png",
     "mac": {
-      "icon": "build/mynda.icns"
+      "icon": "build/mynda.icns",
+      "minimumSystemVersion": "13.0.0"
     }
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

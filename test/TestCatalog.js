@@ -356,7 +356,7 @@ module.exports = [
     category: 'end-to-end',
     file: 'test/electron/run-electron-smoke.js',
     title: 'Real Electron startup',
-    protects: 'startup/assets, Settings, renderer saves, approved browser links, blocked navigation/popups/frames and denied permissions'
+    protects: 'startup/assets, Settings, renderer saves, disk-backed artwork drops, approved browser links, blocked navigation/popups/frames and denied permissions'
   },
   {
     category: 'end-to-end',

@@ -7,9 +7,10 @@ const {pathToFileURL} = require('url');
 const {app, dialog, shell, BrowserWindow} = require('electron');
 const {browserDriver, wait} = require('./BrowserDriver');
 const {consoleMessage} = require('./ConsoleMessage');
+const {inspectArtworkDrop} = require('./ArtworkDropJourney');
 const {videos, ids} = require('./LibraryJourneyFixtures');
 const {createSmokeTerminator,rejectUnexpectedDialogs,closeAndVerify} = require('./SmokeLifecycle.js');
-const {inspectExternalContent,observePermissionRequests} = require('./ExternalContentJourney.js');
+const {inspectExternalContent,observePermissionDecisions} = require('./ExternalContentJourney.js');
 const browserLinks = [];
 const permissionDecisions = [];
 const observedSessions = new WeakSet();
@@ -158,6 +159,9 @@ async function inspectMainWindow(window) {
     const externalContent = await inspectExternalContent({app, BrowserWindow, window,
       opened:browserLinks, permissionDecisions, videoId:ids[0]});
 
+    activeStage='artwork-drop';
+    const artworkDrop = await inspectArtworkDrop({app, dialog, window, videoId:ids[0], userData, library});
+
     activeStage='open-settings';
     await window.webContents.executeJavaScript(
       `document.getElementById('settings-button').click(); true`
@@ -260,6 +264,7 @@ async function inspectMainWindow(window) {
         libraryCreated,
         assets,
         externalContent,
+        artworkDrop,
         rendererSave,
         shutdownSave,
         saveConfirmed:true,
@@ -288,7 +293,7 @@ app.on('browser-window-created', (event, window) => {
   const session = window.webContents.session;
   if (!observedSessions.has(session)) {
     observedSessions.add(session);
-    observePermissionRequests(session, permissionDecisions);
+    observePermissionDecisions(session, permissionDecisions);
   }
   window.webContents.on('console-message', (...args) => {
     rendererConsole.push(consoleMessage(...args));

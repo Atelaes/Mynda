@@ -7,13 +7,20 @@ const {browserDriver, wait} = require('./BrowserDriver');
 
 // Install before production registers its handler. Observe and forward its
 // actual decision unchanged; an OS-level denial alone must not pass this test.
-function observePermissionRequests(session, decisions) {
+function observePermissionDecisions(session, decisions) {
   const setHandler = session.setPermissionRequestHandler.bind(session);
   session.setPermissionRequestHandler = handler => setHandler(handler === null ? null :
     (contents, permission, callback, details) => handler(contents, permission, allowed => {
       decisions.push({contentsId: contents && contents.id, permission, allowed});
       callback(allowed);
     }, details));
+  const setCheckHandler = session.setPermissionCheckHandler.bind(session);
+  session.setPermissionCheckHandler = handler => setCheckHandler(handler === null ? null :
+    (contents, permission, origin, details) => {
+      const allowed = handler(contents, permission, origin, details);
+      decisions.push({contentsId:contents && contents.id, permission, allowed});
+      return allowed;
+    });
 }
 
 function assertGeolocationDenied(result, decisions, contentsId) {
@@ -29,7 +36,7 @@ async function inspectExternalContent({app, BrowserWindow, window, opened, permi
   const originalURL = contents.getURL();
   const preferences = contents.getLastWebPreferences();
   for (const [key, value] of Object.entries({nodeIntegration:false, contextIsolation:true,
-    enableRemoteModule:false, sandbox:true, webviewTag:false, nodeIntegrationInSubFrames:false,
+    sandbox:true, webviewTag:false, nodeIntegrationInSubFrames:false,
     nodeIntegrationInWorker:false, webSecurity:true, allowRunningInsecureContent:false})) {
     assert.strictEqual(preferences[key], value, 'Unsafe window preference: ' + key);
   }
@@ -90,8 +97,8 @@ async function inspectExternalContent({app, BrowserWindow, window, opened, permi
 
   const permissionStart = permissionDecisions.length;
   const restrictions = await contents.executeJavaScript(`(async () => {
-    // Electron 12.0.5 hard-codes GetPermissionStatus[ForFrame] to GRANTED.
-    // Querying status does not exercise the installed request handler.
+    // Exercise an actual location request. Current Chromium can deny it in
+    // the synchronous permission check before reaching the request callback.
     const permission = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Location permission request did not finish')), 5000);
       navigator.geolocation.getCurrentPosition(
@@ -140,4 +147,4 @@ async function inspectExternalContent({app, BrowserWindow, window, opened, permi
     blockedFrame:true, isolatedRenderer:true, blockedScripts:true};
 }
 
-module.exports = {inspectExternalContent, observePermissionRequests, assertGeolocationDenied};
+module.exports = {inspectExternalContent, observePermissionDecisions, assertGeolocationDenied};

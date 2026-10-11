@@ -216,6 +216,9 @@ async function start() {
   });
   backendLog.info('Mynda backend starting', {
     version: app.getVersion(),
+    electron: process.versions.electron,
+    chromium: process.versions.chrome,
+    node: process.versions.node,
     platform: process.platform,
     architecture: process.arch
   });
@@ -258,8 +261,7 @@ async function start() {
   // even if this session never performs another save.
   library.maybeCreateAutomaticBackup();
 
-  // Load the bundled Manifest V2 build while running from source. The current
-  // Chrome Web Store build requires a much newer Chromium than Electron 12.
+  // The optional React extension is development-only; packaged apps skip it.
   await loadReactDeveloperTools({
     app: app,
     session: electron.session,
@@ -485,7 +487,6 @@ async function createWindow() {
     webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        enableRemoteModule: false,
         sandbox: true,
         preload: path.join(app.getAppPath(), 'src', 'preload', 'generated', 'preload.js'),
         webviewTag: false,

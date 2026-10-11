@@ -5,16 +5,6 @@ const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const {formatBoxOffice, formatCompactBoxOffice} = require('../library/BoxOffice.js');
 const {getResolutionInfo} = require('../media/VideoResolution.js');
 
-// Electron 12 predates Object.hasOwn(), which current React Virtuoso uses in
-// its prop plumbing. Supply the standards-equivalent operation for that older
-// renderer without changing Mynda's React/Electron stack.
-if (typeof Object.hasOwn !== 'function') {
-  Object.defineProperty(Object, 'hasOwn', {
-    configurable: true,
-    writable: true,
-    value: (object, property) => Object.prototype.hasOwnProperty.call(object, property)
-  });
-}
 const {TableVirtuoso} = require('react-virtuoso');
 const {
   library,

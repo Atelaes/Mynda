@@ -6,10 +6,7 @@ const libraryChannels = { 'library.snapshot':'library:snapshot', 'library.commit
 const bridge = createBridge({
   platform:process.platform,
   getPathForFile(file) {
-    if (webUtils) return webUtils.getPathForFile(file);
-    // Compatibility while this preparatory commit still runs on Electron 12.
-    if (typeof File === 'undefined' || !(file instanceof File)) throw new TypeError('Expected a dropped file.');
-    return file.path;
+    return webUtils.getPathForFile(file);
   },
   async invoke(method, ...args) {
     if (Object.prototype.hasOwnProperty.call(libraryChannels, method)) return ipcRenderer.invoke(libraryChannels[method], ...args);
