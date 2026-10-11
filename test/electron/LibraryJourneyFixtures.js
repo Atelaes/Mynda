@@ -6,7 +6,8 @@ const ids = ['824025dafcaeaff5f3f845f5042d1ecfbcec2842b1d4e832905cb802a59f0543',
   '34e11df5b16c05e593962db60a053a6bb98eb0fc0a502606928384c13d7990ba',
   'ee9c2fc818545df608bace9de5ce625bdf481d3df3ded2fa921818e20af48f83'];
 const expected = {rating:4, description:'Manual description during scan',
-  title:'Personal Alpha', country:'Shared test country', position:321.3};
+  title:'Personal Alpha', country:'Shared test country', position:321.3,
+  cast:['Avery Example','Morgan Sample']};
 
 function videos(directory) {
   return ids.map((id,index)=>({id,title:['Alpha','Beta','Gamma'][index],year:2000+index,
@@ -28,6 +29,7 @@ function assertSaved(data) {
   assert.strictEqual(first.title,expected.title);
   assert.strictEqual(first.description,expected.description);
   assert.strictEqual(first.ratings.user,expected.rating);
+  assert.deepStrictEqual(first.cast,expected.cast);
   assert.strictEqual(first.ratings.imdb,8,'Manual rating must not change the catalog rating');
   assert.strictEqual(first.metadata.width,3840,'Scan metadata must survive manual saves');
   assert.strictEqual(first.taggingDecision.reason.code,'changed-during-lookup');

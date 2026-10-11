@@ -70,6 +70,41 @@ function editor(v = library.media[0], extra = {}) {
   instance.componentDidUpdate({video: null});
   return instance;
 }
+function inlineListEditor(instance, property) {
+  const {MynEditInlineAddListWidget, MynEditAddToList} = loadFreshWithMocks(
+    path.join(__dirname, '../src/renderer/EditorFields.js'), {
+      './RendererRuntime.js': runtime, './SharedComponents.js': {}
+    });
+  const widget = stateful(new MynEditInlineAddListWidget({object: instance.state.video, property,
+    update: instance.handleChange, validator: /.+/}));
+  widget.componentDidMount();
+  const inputElement = React.Children.toArray(widget.render().props.children)
+    .find(child => child.type === MynEditAddToList);
+  const input = stateful(new MynEditAddToList(inputElement.props));
+  input.componentDidMount();
+  // Simulate React delivering the next editor draft to both sibling controls.
+  // Keep the original props intact so an in-place draft mutation is observable.
+  function refresh() {
+    for (const component of [widget, input]) {
+      const previous = component.props;
+      component.props = {...previous, object: instance.state.video};
+      component.componentDidUpdate(previous);
+    }
+  }
+  return {
+    refresh,
+    items: () => React.Children.toArray(widget.render().props.children)
+      .filter(child => child.type === 'li').map(child => child.props.title),
+    add(value) {
+      const previousDocument = global.document;
+      global.document = {getElementById: () => ({value})};
+      try { input.addItem({preventDefault() {}}); }
+      finally { global.document = previousDocument; }
+      refresh();
+    },
+    async remove(index) { await widget.deleteItem(index, true); refresh(); }
+  };
+}
 function complete(request, error) {
   if (!error && request.kind === 'media') {
     const next = _.cloneDeep(library.media);
@@ -111,6 +146,59 @@ suite.test('a background refresh preserves an ordinary editor draft and its orig
   instance.revertChanges();
   assert.strictEqual(instance.state.video.title, 'Autotag result');
   assert.strictEqual(instance.state.originalVideo.position, 22);
+});
+for (const property of ['cast', 'tags', 'languages']) {
+  suite.test(`${property} additions and removals appear before Save without mutating the previous draft`, async () => {
+    reset([video('a', {[property]: ['Original']})]);
+    const instance = editor(), list = inlineListEditor(instance, property);
+    const previousDraft = instance.state.video;
+    list.add('Added One');
+    assert.deepStrictEqual(list.items(), ['Original', 'Added One']);
+    assert.deepStrictEqual(previousDraft[property], ['Original']);
+    list.add('Added Two');
+    assert.deepStrictEqual(list.items(), ['Original', 'Added One', 'Added Two']);
+    list.add('Added Two');
+    assert.deepStrictEqual(list.items(), ['Original', 'Added One', 'Added Two']);
+    await list.remove(1);
+    list.add('Added Three');
+    assert.deepStrictEqual(list.items(), ['Original', 'Added Two', 'Added Three']);
+    assert.deepStrictEqual(instance.state.video[property], list.items());
+    assert.deepStrictEqual(library.media[0][property], ['Original']);
+    assert.deepStrictEqual(instance.state.originalVideo[property], ['Original']);
+    assert.strictEqual(pending.length, 0, 'list changes remain unsaved drafts');
+    const saving = instance.saveChanges();
+    complete(pending.shift());
+    assert.strictEqual(await saving, true);
+    assert.deepStrictEqual(library.media[0][property], list.items());
+  });
+}
+suite.test('Revert immediately removes unsaved cast additions from both list controls', () => {
+  reset([video('a', {cast: ['Original']})]);
+  const instance = editor(), list = inlineListEditor(instance, 'cast');
+  list.add('Discarded');
+  assert.deepStrictEqual(list.items(), ['Original', 'Discarded']);
+  instance.revertChanges(); list.refresh();
+  assert.deepStrictEqual(list.items(), ['Original']);
+  list.add('Kept');
+  assert.deepStrictEqual(list.items(), ['Original', 'Kept']);
+  assert.deepStrictEqual(library.media[0].cast, ['Original']);
+  assert.strictEqual(pending.length, 0);
+});
+suite.test('batch cast additions appear before Save and preserve each video’s other cast members', async () => {
+  reset([video('a', {cast: ['Common', 'First']}), video('b', {cast: ['Common', 'Second']})]);
+  const instance = editor(videoFixture({id: 'batch', cast: ['Common']}), {batch: library.media});
+  const list = inlineListEditor(instance, 'cast');
+  list.add('Added');
+  assert.deepStrictEqual(list.items(), ['Common', 'Added']);
+  assert(instance.state.changed.has('cast'));
+  assert.deepStrictEqual(instance.state.batchObjectUnedited.cast, ['Common']);
+  assert.strictEqual(pending.length, 0);
+  const saving = instance.saveChanges();
+  complete(pending.shift());
+  assert.strictEqual(await saving, true);
+  assert.deepStrictEqual(library.media.map(video => video.cast), [
+    ['Common', 'First', 'Added'], ['Common', 'Second', 'Added']
+  ]);
 });
 suite.test('a single edit remains dirty until its own commit and includes used lists in the same transaction', async () => {
   reset(); const instance = editor(); instance.handleChange('title', 'My correction');

@@ -20,9 +20,11 @@ async function run({window, phase, library, playback, startupReady, armScan,
     const values = await ui.inspect(() => ({
       title:document.querySelector('#edit-container .edit-field-title').value,
       description:document.querySelector('#edit-field-description').value,
-      rating:document.querySelectorAll('#edit-container .rating .star.filled').length
+      rating:document.querySelectorAll('#edit-container .rating .star.filled').length,
+      cast:[...document.querySelectorAll('#edit-container .edit-field.cast .list-widget-item')].map(item => item.title)
     }));
-    assert.deepStrictEqual(values, {title:expected.title, description:expected.description, rating:expected.rating});
+    assert.deepStrictEqual(values, {title:expected.title, description:expected.description,
+      rating:expected.rating, cast:expected.cast});
     await ui.closeEditor();
     await ui.settings();
     assert(await ui.inspect(() => [...document.querySelectorAll('#settings-prefs-libraryexclusions input')]
@@ -36,10 +38,19 @@ async function run({window, phase, library, playback, startupReady, armScan,
     return {phase, restartVerified:true};
   }
 
-  stage('editor-rating');
+  stage('editor-cast-and-rating');
   await ui.edit(ids[0]);
+  for (let index = 0; index < expected.cast.length; index++) {
+    await ui.type('#list-widget-add-cast-input', expected.cast[index]);
+    await ui.click('#list-widget-add-cast .editor-inline-button');
+    assert.deepStrictEqual(await ui.inspect(() =>
+      [...document.querySelectorAll('#edit-container .edit-field.cast .list-widget-item')].map(item => item.title)),
+      expected.cast.slice(0, index + 1), 'A cast addition must be visible before Save');
+    assert.deepStrictEqual(first().cast, [], 'Typing cast members must not save the library');
+  }
   await ui.click('#edit-container .rating .star:nth-child(4)');
   await ui.save(() => first().ratings.user === expected.rating);
+  assert.deepStrictEqual(first().cast, expected.cast);
   await ui.closeEditor();
 
   // Hold the scanner outside the commit queue: a real editor save must finish

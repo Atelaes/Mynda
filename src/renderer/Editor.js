@@ -112,8 +112,9 @@ class MynEditor extends MynOpenablePane {
     // if we were passed two arguments, treat them as prop,value
     if (args.length == 2 && typeof args[0] === "string") {
       suppliedChanges = {[args[0]]: args[1]};
-      update = this.state.video;
-      update[args[0]] = args[1];
+      // Child fields compare their previous draft with the next one. Mutating
+      // this object also changes their old props and hides list additions.
+      update = {...this.state.video, ...suppliedChanges};
 
       updateEditorChangedField(
         this.state.changed,
