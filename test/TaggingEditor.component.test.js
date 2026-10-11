@@ -1,10 +1,13 @@
 const path=require('path');
 const React=require('react');
+const vm=require('vm');
 const {assert,createSuite,runSuite}=require('./helpers/TestHarness');
 const {loadFreshWithMocks}=require('./helpers/ModuleMocks');
 const {show}=require('./helpers/OmdbFixtures');
 const Evidence=require('../src/tagging/TaggingEvidence');
 const {createEditorService}=require('../src/main/EditorService');
+const {browserDriver}=require('./electron/BrowserDriver');
+const {waitForChosenMetadata}=require('./electron/TaggingJourney');
 require('@babel/register')({presets:[require.resolve('@babel/preset-react')],extensions:['.js'],ignore:[/node_modules/],cache:false});
 const suite=createSuite('Tagging editor provenance','component',
   'Exercises the real editor change and catalog-choice handlers; identity authorship survives the UI boundary.');
@@ -128,6 +131,43 @@ suite.test('a metadata response preserves draft edits and user ratings made whil
     assert.strictEqual(changes.tags, undefined);
     assert.deepStrictEqual(changes.ratings, {user: 5, imdb: 8});
   } finally { window.mynda.editor.select = priorSelect; }
+});
+suite.test('the manual journey waits for applied metadata when the entered IMDb ID already matches',async()=>{
+  const original=show({imdbID:'',description:'Original description',artwork:'',autotag_tried:false});
+  const instance=editor(original),imdbID='tt1234567';
+  instance.handleChange('imdbID',imdbID);
+  const search=new MynEditorSearch({video:instance.state.video,handleChange:instance.handleChange});
+  search.clearSearch=()=>{};
+  const priorSelect=window.mynda.editor.select;
+  let complete;
+  window.mynda.editor.select=()=>new Promise(resolve=>{complete=resolve;});
+  try {
+    const selecting=search.retrieveResult({myndaProposalID:'held-choice'});
+    const fields={'.edit-field-imdbID':'imdbID','#edit-field-description':'description','#edit-field-artwork':'artwork'};
+    // Supply a read-only form surface from the real editor draft. This tests
+    // the journey's completion check, not native rendering or DOM events.
+    const context=vm.createContext({document:{querySelector:selector=>{
+      assert(fields[selector],'Unknown form selector: '+selector);
+      return {value:instance.state.video[fields[selector]]};
+    }}});
+    const ui=browserDriver({webContents:{executeJavaScript:async source=>structuredClone(await vm.runInContext(source,context))}});
+    let firstRead;
+    const observed=new Promise(resolve=>{firstRead=resolve;});
+    const inspect=ui.inspect;
+    ui.inspect=async(...args)=>{const result=await inspect(...args);firstRead(result);return result;};
+    const waiting=waitForChosenMetadata(ui,imdbID,original.description,1000);
+    assert.strictEqual(await observed,false,'The typed ID must not allow the journey to Save before metadata arrives');
+    const draft=instance.state.video;
+    const evidence=Evidence.forMatch(draft,{imdbID,Title:'Selected title'},
+      {kind:'explicit-id',requestedID:imdbID},{recordSelectionSource:'user'});
+    complete({status:'matched',video:{...draft,title:'Selected title',description:'Downloaded catalog description',
+      artwork:'/managed-artwork/selected.png',taggingEvidence:evidence,taggingDecision:null}});
+    await selecting;
+    await waiting;
+    const saved=JSON.parse(JSON.stringify({...instance.state.video,autotag_tried:false}));
+    assert.strictEqual(require('../src/tagging/TaggingReport').buildTaggingReport(saved).status,'matched');
+    assert.strictEqual(saved.taggingEvidence.identities.record.origin,'user');
+  } finally {window.mynda.editor.select=priorSelect;}
 });
 suite.test('a changed identity while metadata loads requires a fresh search', async () => {
   const original = show();

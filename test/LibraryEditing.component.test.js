@@ -102,7 +102,14 @@ function inlineListEditor(instance, property) {
       finally { global.document = previousDocument; }
       refresh();
     },
-    async remove(index) { await widget.deleteItem(index, true); refresh(); }
+    async remove(index) {
+      const item=React.Children.toArray(widget.render().props.children).filter(child=>child.type==='li')[index];
+      const button=React.Children.toArray(item.props.children).find(child=>child.props.className?.includes('list-widget-delete-item'));
+      // Exercise the actual click handler, including its normal confirmation
+      // policy, rather than forcing the skip-dialog branch in the test.
+      await button.props.onClick();
+      refresh();
+    }
   };
 }
 function complete(request, error) {

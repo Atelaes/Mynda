@@ -5,6 +5,19 @@ const fs = require('fs');
 const {browserDriver,wait} = require('./BrowserDriver');
 const {copy} = require('./TaggingFixtures');
 const checks = require('./TaggingAssertions');
+
+async function waitForChosenMetadata(ui, imdbID, previousDescription, timeout = 15000) {
+  // These journeys start with a placeholder description and no artwork. An
+  // IMDb ID alone cannot signal completion: the user may have just typed it.
+  // Wait for the selected metadata and downloaded artwork to reach the form.
+  await wait(()=>ui.inspect((imdbID, previousDescription)=>{
+    const value=selector=>document.querySelector(selector)?.value || '';
+    const description=value('#edit-field-description');
+    return value('.edit-field-imdbID')===imdbID && description.trim()!=='' &&
+      description!==previousDescription && value('#edit-field-artwork')!=='';
+  },imdbID,previousDescription),'chosen metadata and artwork in draft',timeout);
+}
+
 async function run({window,scenario,phase,library,originals,dialogs,network,status,disk,stage}) {
   const ui = browserDriver(window);
   const ids = originals.map(video=>video.id);
@@ -16,6 +29,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
   const settled = async () => {await library.whenIdle(); assert.deepStrictEqual(saved(),current(),'Renderer save must reach disk');};
   async function report(index) {
     await all(); await ui.edit(ids[index]);
+    await wait(()=>ui.exists('#edit-autotag-report .folder-heading'),'saved tagging report heading');
     await ui.click('#edit-autotag-report .folder-heading');
     await wait(()=>ui.exists('.autotag-report-summary'),'readable tagging report');
     const text = await ui.inspect(()=>document.querySelector('.autotag-report-summary').textContent);
@@ -57,10 +71,11 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     assert.strictEqual(saved()[index].imdbID,originals[index].imdbID,'Searching must not save metadata');
   }
   async function choose(index, expected, response = 0) {
+    const previousDescription=await value('#edit-field-description');
     dialogs.expect(options=>/^Are you sure you want to choose /.test(options.message),response);
     await ui.click('#edit-search-results tbody tr');
     await dialogs.drained();
-    if (response === 0) await wait(async()=>await value('.edit-field-imdbID')===expected,'chosen metadata in draft',scenario==='live'?60000:15000);
+    if (response === 0) await waitForChosenMetadata(ui,expected,previousDescription,scenario==='live'?60000:15000);
     assert.strictEqual(saved()[index].imdbID,originals[index].imdbID,'Choosing must not save metadata');
   }
   async function revert() {
@@ -112,6 +127,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     assert.deepStrictEqual(saved(),originals);
     await ui.closeEditor();
     await manual(0,'tt19000002',true); await manual(1,'tt19000221',false);
+    checks.verify(scenario,current());
     await report(0);
   } else if (scenario === 'batch') {
     const untouched = copy(current()[2]);
@@ -125,7 +141,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     await ui.type('.edit-field-country','');
     await ui.click('.rating .star:nth-child(3)');
     for (const [field,item,added] of [['cast','Common Cast','Added Cast'],['tags','common','added']]) {
-      dialogs.expect(options=>options.message.includes("remove '"+item+"'"),0);
+      // Cast/tag removal is an immediate draft edit, with no native dialog.
       await ui.inspect((field,item)=>{
         const row=[...document.querySelectorAll('.edit-field.'+field+' .list-widget-item')].find(node=>node.title===item);
         if (!row) throw new Error('Missing common list item: '+item);
@@ -133,7 +149,6 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
         if (!remove) throw new Error('Missing list remove control');
         remove.click(); return true;
       },field,item);
-      await dialogs.drained();
       await wait(()=>ui.inspect((field,item)=>![...document.querySelectorAll('.edit-field.'+field+' .list-widget-item')]
         .some(node=>node.title===item),field,item),'removed list item disappears before Save');
       await ui.type('#list-widget-add-'+field+'-input',added);
@@ -199,4 +214,4 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
   await all(); await assertEditor(0);
   return {taggingVerified:true};
 }
-module.exports={run};
+module.exports={run,waitForChosenMetadata};
