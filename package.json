@@ -17,6 +17,7 @@
     "test:tagging": "node test/electron/run-tagging.js",
     "test:tagging:asar": "node test/electron/run-tagging.js --asar",
     "test:tagging:live": "node test/electron/run-tagging.js --live",
+    "test:metadata-server": "node scripts/test-metadata-server.js",
     "test:all": "npm run build:renderer && node test/run-tests.js all",
     "library:migrate": "node scripts/migrate-video-ids.js",
     "media:prepare": "node scripts/prepare-media-tools.js",
@@ -28,6 +29,7 @@
     "test:media": "npm run media:verify && node test/MediaDependencies.integration.test.js --require-bundled",
     "test:package": "npm run test:fast && npm run media:verify && electron-builder --dir --publish never && node test/package/run-packaged-media-smoke.js",
     "start": "npm run build:renderer && electron .",
+    "metadata:setup": "node scripts/setup-metadata-server.js",
     "dist": "npm run media:verify && electron-builder",
     "test:paths": "npm run build:renderer && node test/SourceLayout.integration.test.js",
     "source:cleanup": "node scripts/finish-source-reorganization.js",
@@ -92,7 +94,9 @@
       "!MIGRATING_VIDEO_IDS.md",
       "!src/legacy{,/**/*}",
       "!themes{,/**/*}",
-      "!SOURCE_LAYOUT.md"
+      "!SOURCE_LAYOUT.md",
+      "!metadata-server.local.json",
+      "!METADATA_SERVER.md"
     ],
     "win": {
       "target": "nsis",

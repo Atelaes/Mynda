@@ -43,7 +43,9 @@ suite.test('continues to exclude development-only files', () => {
     '!test/**/*',
     '!vendor/**/*',
     '!TESTING.md',
-    '!MEDIA_TOOLS.md'
+    '!MEDIA_TOOLS.md',
+    '!metadata-server.local.json',
+    '!METADATA_SERVER.md'
   ].forEach(pattern => {
     assert(buildFiles.includes(pattern), `missing production exclusion: ${pattern}`);
   });

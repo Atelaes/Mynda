@@ -2,6 +2,8 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/MetadataServer.integration.test.js',title:'Local metadata server integration',
+    protects:'authenticated v1 requests, legacy field translation, request reuse, service outcomes, private configuration and error redaction'},
   {category:'integration',file:'test/TaggingJourneys.integration.test.js',title:'Tagging journey catalog and live-test safeguards',
     protects:'raw HTTP fixtures through the real tagging engine, downloaded image bytes, live consent, request limits and secret redaction'},
   {category:'component',file:'test/ArtworkImage.component.test.js',title:'Artwork availability and placeholders',

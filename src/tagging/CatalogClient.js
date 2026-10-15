@@ -1,15 +1,20 @@
-// The sole OMDb HTTP boundary. Cache hits do not spend the operation's budget;
+// The sole metadata HTTP boundary. Cache hits do not spend the operation's budget;
 // every actual request, including nested probes and retries, spends it here.
 const {requestParametersForLog,summarizeOMDbResponse,summarizeError} = require('./TaggingDiagnostics');
 const {isNotFoundResponse} = require('./CatalogResponse');
 const {createRequestBudget,spendRequest} = require('./RequestBudget');
 const Limits = require('./TaggingLimits');
+const {createMetadataServerClient} = require('./MetadataServerClient');
 
 function createRequestSession() { return {responses:new Map(),requests:0,reused:0}; }
 
-function createCatalogClient({axios,omdb,log}) {
+function createCatalogClient({axios,omdb,log,server}) {
+  const serverRequest = server && createMetadataServerClient({axios,server});
+  const backend = serverRequest ? 'Metadata server' : 'OMDb';
   function createURLParts(parts) {
-    const url = [`https://www.omdbapi.com/?apikey=${encodeURIComponent(omdb.key)}`];
+    // Legacy callers still pass URL parts. In server mode they are only a
+    // parameter container; credentials are added to the actual POST privately.
+    const url = [serverRequest ? 'http://127.0.0.1/?' : `https://www.omdbapi.com/?apikey=${encodeURIComponent(omdb.key)}`];
     const names = {id:'i',title:'s',exactTitle:'t',year:'y',type:'type',series:'t',season:'Season',episode:'Episode',page:'page'};
     for (const [name,parameter] of Object.entries(names)) {
       if (parts[name] != null && parts[name] !== '') url.push(`${parameter}=${encodeURIComponent(parts[name])}`);
@@ -21,14 +26,17 @@ function createCatalogClient({axios,omdb,log}) {
     spendRequest(context.requestBudget,context.stage);
     observation.issued = true;
     if (context.requestSession) context.requestSession.requests++;
-    log.debug('OMDb request started',{searchID:context.searchID,stage:context.stage,parameters});
+    log.debug(`${backend} request started`,{searchID:context.searchID,stage:context.stage,parameters});
     try {
-      const response = await axios({method:'get',url:urlParts.join('&'),timeout:Limits.timeoutMs});
-      log.debug('OMDb response received',{searchID:context.searchID,stage:context.stage,
-        request:parameters,response:summarizeOMDbResponse(response)});
+      const response = serverRequest ? await serverRequest(parameters) :
+        await axios({method:'get',url:urlParts.join('&'),timeout:Limits.timeoutMs});
+      if (response && response.requestId) observation.requestId = response.requestId;
+      log.debug(`${backend} response received`,{searchID:context.searchID,stage:context.stage,
+        requestId:response && response.requestId,request:parameters,response:summarizeOMDbResponse(response)});
       return response;
     } catch(error) {
-      log.error('OMDb request failed',{searchID:context.searchID,stage:context.stage,
+      if (error.requestId) observation.requestId = error.requestId;
+      log.error(`${backend} request failed`,{searchID:context.searchID,stage:context.stage,
         request:parameters,error:summarizeError(error)});
       throw error;
     }
@@ -58,6 +66,7 @@ function createCatalogClient({axios,omdb,log}) {
     }
     try {
       const response = await pending;
+      if (response && response.requestId) observation.requestId = response.requestId;
       const data = response && response.data;
       const cacheable = response && response.status === 200 && data &&
         (isNotFoundResponse(data) || (data.Response === 'True' &&
@@ -71,6 +80,7 @@ function createCatalogClient({axios,omdb,log}) {
     } catch(error) {
       observation.outcome = 'service-error';
       observation.code = error.code || 'transport-error';
+      if (error.requestId) observation.requestId = error.requestId;
       if (session && session.responses.get(key) === pending) session.responses.delete(key);
       throw error;
     }

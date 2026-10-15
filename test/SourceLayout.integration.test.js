@@ -22,6 +22,8 @@ suite.test('resolves all relative imports and resource references in source, scr
   const inputs = Object.keys(build.metafile.inputs);
   assert(inputs.includes('src/renderer/Renderer.js'));
   assert(!inputs.some(name => /(?:^|\/)omdb\.js$/.test(name)), 'The API key must not be bundled into the renderer');
+  assert(!inputs.some(name => /(?:^|\/)MetadataServer(?:Client|Config)\.js$/.test(name)),
+    'Metadata server configuration and transport belong only to the main process');
   assert(!inputs.some(name => /^src\/(?:main|media|scanning)\//.test(name) && /(?:Service|Process|Tools)\.js$/.test(name)),
     'Backend process services must not be bundled into the renderer');
   audit = auditReferences(root);

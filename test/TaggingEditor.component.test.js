@@ -124,6 +124,77 @@ suite.test('previewing a candidate performs no application; confirming reuses th
   assert.deepStrictEqual(request.candidate.candidate.record,proposal.candidate.record);
   assert.strictEqual(request.options.recordSelectionSource,'user');
 });
+for (const field of ['dvd', 'metadata']) {
+  suite.test(`an unchanged editor draft can apply a candidate when the library has no ${field}`, async () => {
+    const original = show({id: 'a'.repeat(64)});
+    delete original[field];
+    backendLibrary.media = [original];
+    const originalCopy = JSON.parse(JSON.stringify(original));
+    const edit = editor(original);
+    edit.props = {...edit.props, settings: {preferences: {}}};
+    // Follow the real editor opening path, including its controlled-form
+    // defaults. Those defaults are not edits to the scanner-owned fields.
+    edit.componentDidUpdate({video: undefined});
+    assert.notDeepStrictEqual(Evidence.snapshot(edit.state.video), Evidence.snapshot(original));
+    lookups = 0; applied = 0;
+    proposal = {status: 'candidate', context: {originalInput: Evidence.snapshot(original)},
+      candidate: {video: {...original, title: 'Selected title', imdbID: 'tt666'},
+        record: {Title: 'Selected title', imdbID: 'tt666', Type: 'episode', Poster: 'N/A'}}};
+    const search = new MynEditorSearch({video: edit.state.video, handleChange: edit.handleChange});
+    search.setState = update => Object.assign(search.state, update);
+    let row;
+    search.chooseResult = movie => { row = movie; };
+    const oldAlert = global.alert, alerts = [];
+    global.alert = message => alerts.push(message);
+    try {
+      await search.handleSearch({preventDefault() {}});
+      assert.strictEqual(applied, 0);
+      search.state.results[0].props.onClick();
+      await search.retrieveResult(JSON.parse(JSON.stringify(row)));
+      assert.strictEqual(applied, 1, `Unchanged draft was rejected: ${alerts.join('; ')}`);
+      assert.strictEqual(lookups, 1, 'Selecting the preview must reuse its completed lookup');
+      assert.deepStrictEqual(alerts, []);
+      assert.strictEqual(edit.state.video.title, 'Selected title');
+      assert.strictEqual(edit.state.video.imdbID, 'tt666');
+      assert.deepStrictEqual(backendLibrary.media, [originalCopy], 'Only Save may change the library');
+    } finally { global.alert = oldAlert; }
+  });
+}
+for (const timing of ['during search', 'after preview']) {
+  suite.test(`an identity edit ${timing} still requires a fresh search`, async () => {
+    const original = show();
+    backendLibrary.media = [original];
+    proposal = {status: 'candidate', context: {originalInput: Evidence.snapshot(original)},
+      candidate: {video: original, record: {Title: 'Arrival', imdbID: 'tt666', Type: 'episode'}}};
+    const search = new MynEditorSearch({video: JSON.parse(JSON.stringify(original)),
+      handleChange: () => { throw Error('A stale result must not change the draft'); }});
+    search.setState = update => Object.assign(search.state, update);
+    let row, resume, selections = 0;
+    search.chooseResult = movie => { row = movie; };
+    const pending = new Promise(resolve => { resume = resolve; });
+    const priorSearch = window.mynda.editor.search, priorSelect = window.mynda.editor.select;
+    const oldAlert = global.alert, alerts = [];
+    window.mynda.editor.search = async draft => { await pending; return priorSearch(draft); };
+    window.mynda.editor.select = input => { selections++; return priorSelect(input); };
+    global.alert = message => alerts.push(message);
+    try {
+      const searching = search.handleSearch({preventDefault() {}});
+      if (timing === 'during search') search.props.video.episode = 9;
+      resume();
+      await searching;
+      if (timing === 'after preview') search.props.video.episode = 9;
+      search.state.results[0].props.onClick();
+      await search.retrieveResult(row);
+      assert.strictEqual(selections, 0, 'The renderer should catch the changed input before selection');
+      assert.strictEqual(search.state.results, null);
+      assert.deepStrictEqual(alerts, ['The video changed after this search. Search again before choosing a result.']);
+    } finally {
+      window.mynda.editor.search = priorSearch;
+      window.mynda.editor.select = priorSelect;
+      global.alert = oldAlert;
+    }
+  });
+}
 suite.test('a late confirmation cannot apply a choice to another video',async()=>{
   const instance=new MynEditorSearch({video:show({id:'current'}),handleChange:()=>{throw Error('stale apply');}});
   const before=applied;

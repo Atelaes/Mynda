@@ -64,7 +64,7 @@ function failureExplanation(status, reason) {
     if (/timeout|ECONNABORTED|ETIMEDOUT/i.test(code + ' ' + text(reason.message))) return ['A catalog request timed out before the attempt could finish.',
       'Try again later. This video remains eligible for retry.'];
     return ['A catalog service or connection error prevented the attempt from finishing.',
-      'Check the connection and OMDb settings, then retry. This video remains eligible for retry.'];
+      'Check the connection and metadata settings, then retry. This video remains eligible for retry.'];
   }
   return REASONS[code] || [message(reason.message) || 'This attempt ended without an accepted match. No more specific explanation was saved.',
     'Review the identifying fields and use Search to verify a record.'];

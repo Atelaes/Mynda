@@ -7,8 +7,10 @@ const {createArtworkService} = require('./ArtworkService');
 const {createTagApplier} = require('./TagApplier');
 const {createTaggingEngine} = require('./TaggingEngine');
 const Decision = require('./TaggingDecision');
+const {loadMetadataServerConfig} = require('./MetadataServerConfig');
 
-const client = createCatalogClient({axios:require('axios'),omdb:require('../../omdb'),log});
+const server = loadMetadataServerConfig();
+const client = createCatalogClient({axios:require('axios'),server,omdb:server ? null : require('../../omdb'),log});
 const path = require('path');
 const artwork = createArtworkService({...client,log,
   artworkDirectory:path.join(app.getPath('userData'),'Library','Artwork'),

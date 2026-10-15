@@ -33,6 +33,7 @@ for(const scenario of ['movies','episode-parents','episode-numbering','selected'
     try {
       const api=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
         electron:{app:{getPath:()=>directory}},'../../omdb':{key:'fixture-only'},
+        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>null},
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const videos=fixtures.videos(scenario,path.join(directory,'media'));
@@ -60,6 +61,7 @@ suite.test('manual movie and episode proposals apply real metadata and authorize
       const app={getPath:()=>directory};
       const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
         electron:{app},'../../omdb':{key:'fixture-only'},
+        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>null},
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const library={media:fixtures.videos('manual',path.join(directory,'media'))};
@@ -89,6 +91,7 @@ suite.test('a typed IMDb ID becomes completed match evidence only after selectio
       const app={getPath:()=>directory};
       const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
         electron:{app},'../../omdb':{key:'fixture-only'},
+        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>null},
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const library={media:fixtures.videos('manual',path.join(directory,'media'))};

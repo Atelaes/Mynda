@@ -1,0 +1,190 @@
+// Translate the v1 service contract at the existing catalog boundary. Matching,
+// discovery, caching and library updates remain with their existing owners.
+const {validateServerConfig, configurationMessage} = require('./MetadataServerConfig');
+const MESSAGES = {
+  UNAUTHORIZED: 'The metadata server rejected the development token. Check the local connection settings.',
+  PROVIDER_AUTH_ERROR: 'The metadata server could not authenticate with its provider.',
+  PROVIDER_QUOTA_EXCEEDED: 'The metadata provider usage limit has been reached. Try again later.',
+  PROVIDER_TIMEOUT: 'The metadata provider did not respond in time.',
+  PROVIDER_UNAVAILABLE: 'The metadata provider is temporarily unavailable.',
+  PROVIDER_INVALID_RESPONSE: 'The metadata provider returned invalid or inconsistent data.',
+  CONFIGURATION_ERROR: 'The metadata server is not configured correctly.',
+  BAD_REQUEST: 'The metadata server rejected the lookup parameters.',
+  UNSUPPORTED: 'The metadata server does not support this lookup.',
+};
+const safeID = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : undefined;
+function serviceError(code, message, response) {
+  const error = new Error(message);
+  error.name = 'MetadataServiceError';
+  error.code = code;
+  if (response) {
+    error.response = {status: response.status};
+    error.requestId = safeID(response.data && response.data.requestId);
+  }
+  return error;
+}
+function invalid() { throw serviceError('METADATA_INVALID_RESPONSE', 'The metadata server returned an invalid response.'); }
+const object = value => value && typeof value === 'object' && !Array.isArray(value);
+const imdbID = value => typeof value === 'string' && /^tt\d{7,12}$/.test(value);
+const integer = value => Number.isSafeInteger(value) && value >= 0;
+const optionalText = value => value === null || typeof value === 'string';
+const legacyText = value => value === null ? 'N/A' : value;
+function list(value) {
+  if (value === null) return 'N/A';
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) return invalid();
+  return value.join(', ');
+}
+function reference(value) {
+  if (!object(value) || typeof value.provider !== 'string' || !value.provider ||
+      typeof value.id !== 'string' || !value.id) return invalid();
+  return {...value};
+}
+function summary(data) {
+  if (!object(data) || !object(data.externalIds) || !imdbID(data.externalIds.imdb) ||
+      typeof data.title !== 'string' || !data.title.trim() ||
+      !['movie', 'series', 'episode'].includes(data.kind) || !Array.isArray(data.artwork)) return invalid();
+  const ref = reference(data.ref);
+  if (ref.provider === 'omdb' && ref.id !== data.externalIds.imdb) return invalid();
+  if (data.year !== null && (!object(data.year) || typeof data.year.text !== 'string' ||
+      ![data.year.start, data.year.end].every(value => value === null || integer(value)))) return invalid();
+  const poster = data.artwork.find(item => object(item) && item.type === 'poster');
+  let posterURL = 'N/A';
+  if (poster) {
+    let url;
+    try { url = new URL(poster.url); } catch (_) { return invalid(); }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return invalid();
+    posterURL = url.href;
+  }
+  return {Title: data.title, Type: data.kind, Year: data.year === null ? 'N/A' : data.year.text,
+    imdbID: data.externalIds.imdb, Poster: posterURL, catalogRef: ref};
+}
+function record(data) {
+  const result = {Response: 'True', ...summary(data)};
+  for (const [source, target] of Object.entries({released:'Released', plot:'Plot', contentRating:'Rated', boxOffice:'BoxOffice'})) {
+    if (!optionalText(data[source])) return invalid();
+    result[target] = legacyText(data[source]);
+  }
+  for (const [source, target] of Object.entries({genres:'Genre', directors:'Director', actors:'Actors', countries:'Country', languages:'Language'})) {
+    result[target] = list(data[source]);
+  }
+  if (data.runtimeMinutes !== null && (!Number.isFinite(data.runtimeMinutes) || data.runtimeMinutes <= 0)) return invalid();
+  result.Runtime = data.runtimeMinutes === null ? 'N/A' : `${data.runtimeMinutes} min`;
+  for (const [source, target] of Object.entries({season:'Season', episode:'Episode', totalSeasons:'totalSeasons'})) {
+    if (data[source] !== null && !integer(data[source])) return invalid();
+    result[target] = data[source] === null ? 'N/A' : String(data[source]);
+  }
+  if (!Array.isArray(data.ratings) || !Array.isArray(data.votes)) return invalid();
+  result.Ratings = data.ratings.map(rating => {
+    if (!object(rating) || typeof rating.source !== 'string' || typeof rating.value !== 'string') return invalid();
+    return {Source: rating.source, Value: rating.value};
+  });
+  const votes = data.votes.find(item => object(item) && item.source === 'imdb');
+  if (votes && !integer(votes.count)) return invalid();
+  result.imdbVotes = votes ? String(votes.count) : 'N/A';
+  if (data.series !== null) {
+    result.catalogSeriesRef = reference(data.series);
+    // Only OMDb's native IDs are known here to be IMDb IDs. Never place an
+    // arbitrary future provider's native ID into the legacy IMDb field.
+    if (data.series.provider === 'omdb' && imdbID(data.series.id)) result.seriesID = data.series.id;
+  }
+  result.catalogEpisodeOrder = data.episodeOrder;
+  return result;
+}
+function translate(data, route, body) {
+  if (!object(data) || !object(data.provenance) || typeof data.provenance.provider !== 'string') return invalid();
+  if (route === '/v1/search') {
+    if (!Array.isArray(data.items) || data.page !== (body.page || 1) ||
+        !(data.totalResults === null || integer(data.totalResults)) ||
+        ![true, false, null].includes(data.hasMore)) return invalid();
+    const Search = data.items.map(summary);
+    if (!Search.length) return {Response:'False', Error:'Movie not found!'};
+    return {Response:'True', Search, ...(data.totalResults === null ? {} : {totalResults:String(data.totalResults)}),
+      catalogHasMore:data.hasMore, catalogPage:data.page};
+  }
+  if (route === '/v1/season') {
+    const parent = reference(data.series);
+    if (!integer(data.season) || data.season !== body.season || !Array.isArray(data.episodes) ||
+        data.order !== 'provider' || !['complete', 'partial', 'unknown'].includes(data.completeness) ||
+        !(data.totalSeasons === null || integer(data.totalSeasons)) ||
+        (parent.provider === 'omdb' && parent.id !== body.series.id)) return invalid();
+    return {Response:'True', Season:String(data.season),
+      totalSeasons:data.totalSeasons === null ? 'N/A' : String(data.totalSeasons),
+      catalogSeriesRef:parent, catalogCompleteness:data.completeness,
+      Episodes:data.episodes.map(item => {
+        if (!object(item) || !object(item.externalIds) || !imdbID(item.externalIds.imdb) ||
+            typeof item.title !== 'string' || !(item.episode === null || integer(item.episode)) ||
+            !optionalText(item.released)) return invalid();
+        return {imdbID:item.externalIds.imdb, Title:item.title,
+          Episode:item.episode === null ? 'N/A' : String(item.episode), Released:legacyText(item.released),
+          catalogRef:reference(item.ref)};
+      })};
+  }
+  const result = record(data);
+  if ((route === '/v1/record' && result.imdbID !== body.ref.id) ||
+      (route === '/v1/title' && body.kind && result.Type !== body.kind) ||
+      (route === '/v1/episode' && (result.Type !== 'episode' || data.season !== body.season ||
+        data.episode !== body.episode || (result.seriesID && result.seriesID !== body.series.id)))) return invalid();
+  return result;
+}
+
+function lookup(parameters) {
+  const optional = {};
+  if (parameters.type) optional.kind = parameters.type;
+  if (parameters.y) optional.year = Number(parameters.y);
+  if (parameters.i) {
+    const ref = {externalSource:'imdb', id:parameters.i};
+    if (parameters.Season !== undefined) {
+      const body = {series:ref, season:Number(parameters.Season), order:'provider'};
+      if (parameters.Episode !== undefined) return {route:'/v1/episode', body:{...body, episode:Number(parameters.Episode)}};
+      return {route:'/v1/season', body};
+    }
+    return {route:'/v1/record', body:{ref}};
+  }
+  if (parameters.s) return {route:'/v1/search', body:{title:parameters.s, ...optional,
+    ...(parameters.page ? {page:Number(parameters.page)} : {})}};
+  if (parameters.t) return {route:'/v1/title', body:{title:parameters.t, ...optional}};
+  throw serviceError('METADATA_BAD_REQUEST', 'A metadata lookup requires a title or IMDb ID.');
+}
+
+function createMetadataServerClient({axios, server}) {
+  let config;
+  try { config = validateServerConfig(server); } catch (_) { /* Fail on lookup, not app startup. */ }
+  return async function request(parameters) {
+    if (!config) throw serviceError('METADATA_CONFIGURATION_ERROR', configurationMessage);
+    const {route, body} = lookup(parameters);
+    let response;
+    try {
+      response = await axios({method:'post', url:config.url + route, data:body,
+        headers:{Authorization:`Bearer ${config.token}`, 'Content-Type':'application/json'},
+        // The server can spend up to 20.1 seconds on its two provider attempts.
+        timeout:30000, maxRedirects:0, maxContentLength:1024 * 1024,
+        proxy:false, validateStatus:() => true});
+    } catch (error) {
+      // Axios errors retain the Authorization header and request config. Never
+      // pass the original error into logging, saved evidence, or renderer IPC.
+      const timeout = error && ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code);
+      throw serviceError(timeout ? 'METADATA_TIMEOUT' : 'METADATA_UNAVAILABLE', timeout ?
+        'The metadata server did not respond in time.' : 'Could not reach the metadata server. Confirm npm run dev is running.');
+    }
+    const envelope = response && response.data;
+    if (!object(envelope) || !safeID(envelope.requestId)) throw serviceError('METADATA_INVALID_RESPONSE',
+      'The metadata server returned an invalid response.', response);
+    if (response.status !== 200) {
+      const code = envelope.error && envelope.error.code;
+      if ((response.status === 404 && code === 'NOT_FOUND') || (response.status === 422 && code === 'TOO_MANY_RESULTS')) {
+        return {status:200, data:{Response:'False', Error:code === 'NOT_FOUND' ? 'Movie not found!' : 'Too many results.'},
+          requestId:envelope.requestId};
+      }
+      const known = Object.hasOwn(MESSAGES, code);
+      throw serviceError(known ? code : 'METADATA_SERVICE_ERROR',
+        known ? MESSAGES[code] : 'The metadata server could not complete the lookup.', response);
+    }
+    try {
+      return {status:200, data:translate(envelope.data, route, body), requestId:envelope.requestId};
+    } catch (error) {
+      throw serviceError('METADATA_INVALID_RESPONSE', 'The metadata server returned an invalid response.', response);
+    }
+  };
+}
+
+module.exports = {createMetadataServerClient};

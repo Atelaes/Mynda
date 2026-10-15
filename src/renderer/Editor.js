@@ -840,7 +840,7 @@ class MynEditor extends MynOpenablePane {
 class MynEditorSearch extends React.Component {
   constructor(props) {
     super(props)
-    this._proposals = new Map();
+    this._searchInputs = new Map();
 
     this.state = {
       results: null,
@@ -902,10 +902,16 @@ class MynEditorSearch extends React.Component {
     }
 
     this.setState({searching:true});
-    this._proposals.clear();
+    this._searchInputs.clear();
     const selection = editorSelectionKey(this.props.video,this.props.batch);
+    const submittedDraft = _.cloneDeep(this.props.video);
+    // Compare the editor with its own input, captured before the request. The
+    // backend keeps canonical scanner fields, while the form may fill missing
+    // dvd/metadata values. Comparing those two representations rejects an
+    // unchanged draft. The backend independently checks its stored proposal.
+    const input = TaggingEvidence.snapshot(submittedDraft);
     let resultsObject;
-    try { resultsObject = await window.mynda.editor.search(this.props.video); }
+    try { resultsObject = await window.mynda.editor.search(submittedDraft); }
     catch (error) {
       this.setState({searching: false});
       alert(`The catalog could not complete this request: ${error.message || error}`);
@@ -916,10 +922,9 @@ class MynEditorSearch extends React.Component {
     //console.log(results);
     let results;
     if (resultsObject.status === 'candidate') {
-      // Keep the unmodified proposal. Previewing a choice must neither apply
-      // metadata nor download artwork, and selecting it need not fetch it again.
+      // The backend retains the proposal. Previewing a choice must neither
+      // apply metadata nor download artwork, and selection reuses that lookup.
       const token = resultsObject.proposalID;
-      this._proposals.set(token,resultsObject);
       results = [{...resultsObject.candidate.record,myndaProposalID:token}];
     } else if (resultsObject.status === 'ambiguous' && resultsObject.choices.length) {
       results = resultsObject.choices;
@@ -950,6 +955,7 @@ class MynEditorSearch extends React.Component {
     }
 
     let movies = displayableResults.map((record) => {
+      if (record.myndaProposalID) this._searchInputs.set(record.myndaProposalID,input);
       // Only serializable row data travels through the confirmation dialog.
       const movie = {...record,myndaInputID:this.props.video.id};
 
@@ -992,9 +998,8 @@ class MynEditorSearch extends React.Component {
 
   async retrieveResult(movie) {
     if (movie.myndaInputID && movie.myndaInputID !== this.props.video.id) return;
-    const proposal = movie.myndaProposalID && this._proposals.get(movie.myndaProposalID);
-    if (proposal && JSON.stringify(proposal.context.originalInput) !==
-        JSON.stringify(TaggingEvidence.snapshot(this.props.video))) {
+    const input = movie.myndaProposalID && this._searchInputs.get(movie.myndaProposalID);
+    if (input && !_.isEqual(input, TaggingEvidence.snapshot(this.props.video))) {
       this.clearSearch();
       alert('The video changed after this search. Search again before choosing a result.');
       return;
@@ -1050,7 +1055,7 @@ class MynEditorSearch extends React.Component {
     const previousSelection = editorSelectionKey(previousProps.video, previousProps.batch);
     const currentSelection = editorSelectionKey(this.props.video, this.props.batch);
     if (previousSelection !== currentSelection && (this.state.results || this.state.searching)) {
-      this._proposals.clear();
+      this._searchInputs.clear();
       // Search rows belong to one concrete video. Never carry them into a
       // different video—or into a batch where selecting one row would apply a
       // single title's metadata to every selected item.

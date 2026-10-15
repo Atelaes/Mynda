@@ -32,6 +32,7 @@ function loadSearch(responder, options = {}) {
   };
   const api = loadFreshWithMocks(options.modulePath || path.join(__dirname,'../../src/tagging/OmdbHelper.js'), {
     '../../omdb':{key:'fixture-only'}, axios,
+    './MetadataServerConfig':{...require('../../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:() => null},
     electron:{app:{getPath:() => '/unused-fixture-user-data'}},
     '../platform/Logger.js':{child:() => logger},
     './EpisodeRuntime.js':{withEpisodeDuration:options.readDuration || (async video => video)},

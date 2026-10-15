@@ -22,6 +22,7 @@ function summarizeError(error) {
     name: source.name,
     message: source.message,
     code: source.code,
+    requestId: source.requestId,
     httpStatus: source.response && source.response.status,
     httpStatusText: source.response && source.response.statusText,
     stack: source.stack
