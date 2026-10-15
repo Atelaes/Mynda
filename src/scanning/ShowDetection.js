@@ -1,5 +1,7 @@
 // Filename/folder interpretation belongs to scanning and explicit Reset from Filename.
 // Auto-Tag consumes the resulting editable tags and never calls this module.
+const path = require('path');
+
 function titleCaseDetectedTitle(title) {
   // Preserve intentional capitalization in mixed-case titles and acronyms.
   // The filenames that need correction are the ones whose letters are all
@@ -143,7 +145,7 @@ function findEpisodeTitle(fileBasename, extrasDetected) {
 // Find the most specific watchfolder containing a video's current path. The
 // longest match matters when users configure nested watchfolders. path.relative
 // avoids false positives such as treating "/Movies 2" as part of "/Movies".
-function findContainingWatchfolder(filename, watchfolders = library.settings.watchfolders) {
+function findContainingWatchfolder(filename, watchfolders = []) {
   if (typeof filename !== 'string' || filename === '' || !Array.isArray(watchfolders)) {
     return null;
   }
@@ -361,4 +363,4 @@ function findSeasonEpisode(video, fileBasename) {
   return result;
 }
 
-module.exports = {findEpisodeTitle, findSeasonEpisode};
+module.exports = {findEpisodeTitle, findSeasonEpisode, findContainingWatchfolder};

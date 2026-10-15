@@ -1,8 +1,33 @@
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness.js');
-const {findSeasonEpisode: detect, findEpisodeTitle} = require('../src/scanning/ShowDetection.js');
+const path = require('path');
+const {findSeasonEpisode: detect, findEpisodeTitle, findContainingWatchfolder} = require('../src/scanning/ShowDetection.js');
 
 const suite = createSuite('Show detection for scans and filename resets', 'unit',
   'Uses the shared production detector for numbered episodes, extras, titles and folder grouping.');
+
+suite.test('filename resets choose the most specific watchfolder without changing settings order', () => {
+  const parent = {path: path.resolve('media'), kind: 'movie'};
+  const nested = {path: path.join(parent.path, 'Shows'), kind: 'show'};
+  const folders = [parent, nested];
+  assert.strictEqual(findContainingWatchfolder(path.join(nested.path, 'Series', 'S01E01.mkv'), folders), nested);
+  assert.strictEqual(findContainingWatchfolder(path.join(parent.path, 'Movie.mkv'), folders), parent);
+  assert.deepStrictEqual(folders, [parent, nested]);
+});
+
+suite.test('watchfolder matching respects path boundaries and normalized paths', () => {
+  const folder = {path: path.resolve('media', 'Movies'), kind: 'movie'};
+  assert.strictEqual(findContainingWatchfolder(path.join(folder.path + ' 2', 'Movie.mkv'), [folder]), null);
+  assert.strictEqual(findContainingWatchfolder(path.join(folder.path, '..', 'Elsewhere', 'Movie.mkv'), [folder]), null);
+  assert.strictEqual(findContainingWatchfolder(folder.path + path.sep + '.' + path.sep + 'Movie.mkv', [folder]), folder);
+});
+
+suite.test('missing watchfolders and malformed entries need no application globals', () => {
+  assert.strictEqual(findContainingWatchfolder(path.resolve('Movie.mkv')), null);
+  for (const folders of [null, {}, [null, {}, {path: ''}, {path: 42}]]) {
+    assert.strictEqual(findContainingWatchfolder(path.resolve('Movie.mkv'), folders), null);
+  }
+  for (const filename of [null, '', 42]) assert.strictEqual(findContainingWatchfolder(filename, []), null);
+});
 
 suite.test('detects ordinary filename and season-folder numbering', () => {
   for (const filename of ['Show.S02E03.Title', 'Show 2x03 - Title', '02.03 - Title', 'Season 2 Episode 3 - Title']) {

@@ -20,6 +20,8 @@ module.exports = [
     protects:'renderer result transfer, failed control selectors, original exceptions and execution failures'},
   {category:'integration',file:'test/MainBridge.integration.test.js',title:'Main application isolation wiring',
     protects:'real main composition, isolated window options, complete handler registration and privileged caller checks'},
+  {category:'integration',file:'test/FilenameReset.integration.test.js',title:'Filename reset through the main application',
+    protects:'production reset wiring, canonical filenames, nested watchfolders, batch resets, cancellation and unsaved user state'},
   {category:'unit',file:'test/EditorArtworkDownload.unit.test.js',title:'Bounded artwork downloads',
     protects:'HTTP protocols, size/time/redirect bounds, native redirect approval and temporary-file cleanup'},
   {category:'unit',file:'test/DesktopService.unit.test.js',title:'Main-process desktop authorization',
