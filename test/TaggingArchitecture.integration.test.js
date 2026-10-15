@@ -178,19 +178,19 @@ suite.test('global HTTP budgets stop nested probes and leave files retryable',as
 
 suite.test('concurrent requests cannot exceed the budget; cached responses remain free',async()=>{
   let calls=0;
-  const client=createCatalogClient({log,omdb:{key:'secret-not-for-logs'},axios:async()=>{
+  const client=createCatalogClient({log,transport:async()=>{
     calls++;return {status:200,data:series()};
   }});
   const context={requestSession:createRequestSession(),requestBudget:createRequestBudget(2),requestTrace:[]};
-  const replies=await Promise.allSettled([1,2,3,4].map(n=>client.pollOMDB(client.createURLParts({id:`tt${n}`}),context)));
+  const replies=await Promise.allSettled([1,2,3,4].map(n=>client.requestCatalog(client.createCatalogQuery({id:`tt${n}`}),context)));
   assert.strictEqual(replies.filter(row=>row.status==='fulfilled').length,2);
   assert.strictEqual(calls,2);
   assert.strictEqual(context.requestSession.requests,2);
-  await client.pollOMDB(client.createURLParts({id:'tt1'}),context);
+  await client.requestCatalog(client.createCatalogQuery({id:'tt1'}),context);
   assert.strictEqual(calls,2);
   assert.strictEqual(context.requestBudget.used,2);
   assert(!JSON.stringify(context.requestTrace).includes('secret-not-for-logs'));
-  await client.pollOMDB(client.createURLParts({id:'tt3'}),{...context,requestBudget:createRequestBudget(1)});
+  await client.requestCatalog(client.createCatalogQuery({id:'tt3'}),{...context,requestBudget:createRequestBudget(1)});
   assert.strictEqual(calls,3,'Budget errors must not poison the response cache');
 });
 

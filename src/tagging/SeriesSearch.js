@@ -80,7 +80,7 @@ function candidateRejection(query, candidate) {
   return null;
 }
 
-// An explicit region label must constrain even the original search: OMDb may
+// An explicit region label must constrain even the original search: catalog may
 // itself ignore "US" and return the UK adaptation as a fuzzy/contained hit.
 function regionRejection(parts, candidate) {
   const title = titleKey(cleanSeriesInput(parts).title);

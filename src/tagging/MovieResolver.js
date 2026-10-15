@@ -9,7 +9,7 @@ const MovieSearch = require('./MovieSearch');
 const MatchPolicy = require('./MatchPolicy');
 const Decision = require('./TaggingDecision');
 const Limits = require('./TaggingLimits');
-function createMovieResolver({log, pollOMDB, createURLParts}) {
+function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
 
   async function searchGeneralVideoByTitle(video, context) {
     const MAX_TITLE_REQUESTS = Limits.movie.titleQueries;
@@ -26,7 +26,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
     let sawAmbiguousResponse = false;
     let sawUnresolvedExactAmbiguity = false;
     let attemptedTitles = [];
-    let type = MovieSearch.omdbTypeForKind(video.kind || video.type);
+    let type = MovieSearch.catalogTypeForKind(video.kind || video.type);
     let fullResultCache = new Map();
     let deferredArticleGroups = [];
 
@@ -43,7 +43,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
         result.imdbID, context, fullResultCache, stage
       );
       if (!fetched.success) {
-        // A lightweight row can outlive its full OMDb record. Treat that one row
+        // A lightweight row can outlive its full catalog record. Treat that one row
         // as unusable and continue; authentication, transport, and other errors
         // still stop the operation so Auto-Tag can retry them later.
         return fetched.failure === 'No results' ? {} : {terminalResult: fetched};
@@ -154,7 +154,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
 
       let response;
       try {
-        response = await pollOMDB(createURLParts({
+        response = await requestCatalog(createCatalogQuery({
           title: queryTitle,
           year: requestYear || null,
           type: type || null
@@ -168,7 +168,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
           terminalResult: {
             success: false,
             failure: response ? response.status : 'Error',
-            data: response ? response.statusText : 'No response from OMDb'
+            data: response ? response.statusText : 'No response from the catalog'
           }
         };
       }
@@ -231,12 +231,12 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
           success: false,
           failure: 'Error',
           data: response.data && response.data.Error ?
-            response.data.Error : 'Unexpected OMDb response'
+            response.data.Error : 'Unexpected catalog response'
         }
       };
     }
 
-    // OMDb's list search can occasionally miss a correctly punctuated two-word
+    // The catalog's list search can occasionally miss a correctly punctuated two-word
     // possessive even with its known year (notably "Pan's Labyrinth"). After that
     // strict discovery request fails, spend the remaining discovery request on
     // the exact-title endpoint. Acceptance remains tied to the original parsed
@@ -248,7 +248,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
 
       let response;
       try {
-        response = await pollOMDB(createURLParts({
+        response = await requestCatalog(createCatalogQuery({
           exactTitle: queryTitle,
           year: candidate.year,
           type: type || null
@@ -262,7 +262,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
           terminalResult: {
             success: false,
             failure: response ? response.status : 'Error',
-            data: response ? response.statusText : 'No response from OMDb'
+            data: response ? response.statusText : 'No response from the catalog'
           }
         };
       }
@@ -290,7 +290,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
           success: false,
           failure: 'Error',
           data: response.data && response.data.Error ?
-            response.data.Error : 'Unexpected OMDb response'
+            response.data.Error : 'Unexpected catalog response'
         }
       };
     }
@@ -355,15 +355,15 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
         variantReason: plan.variantReason
       });
 
-      // A known year makes OMDb's title endpoint both precise and fast: it
-      // returns the full metadata record in the same request. If OMDb responds
+      // A known year makes the catalog's title endpoint both precise and fast: it
+      // returns the full metadata record in the same request. If the catalog responds
       // with a merely similar title, strict full-record validation rejects it and
       // the ordinary search below can still provide choices for manual selection.
       if (candidate.year && titleRequestCount < MAX_TITLE_REQUESTS) {
         titleRequestCount++;
         let exactResponse;
         try {
-          exactResponse = await pollOMDB(createURLParts({
+          exactResponse = await requestCatalog(createCatalogQuery({
             exactTitle: title,
             year: candidate.year,
             type: type || null
@@ -379,7 +379,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
           return {
             success: false,
             failure: exactResponse ? exactResponse.status : 'Error',
-            data: exactResponse ? exactResponse.statusText : 'No response from OMDb'
+            data: exactResponse ? exactResponse.statusText : 'No response from the catalog'
           };
         }
         if (exactResponse.data && exactResponse.data.Response === 'True') {
@@ -422,7 +422,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
             success: false,
             failure: 'Error',
             data: exactResponse.data && exactResponse.data.Error ?
-              exactResponse.data.Error : 'Unexpected OMDb response'
+              exactResponse.data.Error : 'Unexpected catalog response'
           };
         }
       }
@@ -458,7 +458,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
       }
     }
 
-    // OMDb can return "Movie not found" for a complete title merely because a
+    // The catalog can return "Movie not found" for a complete title merely because a
     // filename lost catalog punctuation: "Oceans Eleven" versus "Ocean's
     // Eleven", "310 to Yuma" versus "3:10 to Yuma", and dotted initialisms are
     // common examples. Spend at most two separately budgeted search requests on
@@ -571,10 +571,10 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
     if (sawAmbiguousResponse) {
       return predictableFailure(
         'Ambiguous results',
-        'OMDb found too many possible matches to choose one safely'
+        'The catalog found too many possible matches to choose one safely'
       );
     }
-    return predictableFailure('No results', 'OMDb found no safely matching title');
+    return predictableFailure('No results', 'The catalog found no safely matching title');
   }
 
   async function fetchGeneralVideoResult(imdbID, context, cache, stage) {
@@ -582,7 +582,7 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
 
     let response;
     try {
-      response = await pollOMDB(createURLParts({id: imdbID}), {...context,
+      response = await requestCatalog(createCatalogQuery({id: imdbID}), {...context,
         searchID: context.searchID,
         stage: stage || 'selected movie IMDb-ID lookup'
       });
@@ -595,26 +595,26 @@ function createMovieResolver({log, pollOMDB, createURLParts}) {
       return {
         success: false,
         failure: 'Error',
-        data: 'OMDb returned a different record than the selected IMDb ID'
+        data: 'The catalog returned a different record than the selected IMDb ID'
       };
     }
     cache.set(imdbID, response.data);
     return {success: true, data: response.data};
   }
 
-  function logFullMovieEvaluation(context, candidate, omdbData, evaluation, stage) {
+  function logFullMovieEvaluation(context, candidate, catalogData, evaluation, stage) {
     let details = {
       searchID: context.searchID,
       stage: stage,
       candidate: candidate,
-      imdbID: omdbData && omdbData.imdbID,
-      omdbTitle: omdbData && omdbData.Title,
-      omdbYear: omdbData && omdbData.Year,
+      imdbID: catalogData && catalogData.imdbID,
+      catalogTitle: catalogData && catalogData.Title,
+      catalogYear: catalogData && catalogData.Year,
       accepted: evaluation.confident,
       titleMatchKind: evaluation.matchKind,
       yearDifference: evaluation.yearDifference,
       localRuntimeMinutes: evaluation.plausibility.localRuntimeMinutes,
-      omdbRuntimeMinutes: evaluation.plausibility.omdbRuntimeMinutes,
+      catalogRuntimeMinutes: evaluation.plausibility.catalogRuntimeMinutes,
       imdbVotes: evaluation.plausibility.imdbVotes,
       splitFile: evaluation.plausibility.splitFile,
       reasons: evaluation.reasons

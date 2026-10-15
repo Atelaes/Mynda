@@ -44,7 +44,6 @@ function summary(data) {
       typeof data.title !== 'string' || !data.title.trim() ||
       !['movie', 'series', 'episode'].includes(data.kind) || !Array.isArray(data.artwork)) return invalid();
   const ref = reference(data.ref);
-  if (ref.provider === 'omdb' && ref.id !== data.externalIds.imdb) return invalid();
   if (data.year !== null && (!object(data.year) || typeof data.year.text !== 'string' ||
       ![data.year.start, data.year.end].every(value => value === null || integer(value)))) return invalid();
   const poster = data.artwork.find(item => object(item) && item.type === 'poster');
@@ -81,14 +80,21 @@ function record(data) {
   const votes = data.votes.find(item => object(item) && item.source === 'imdb');
   if (votes && !integer(votes.count)) return invalid();
   result.imdbVotes = votes ? String(votes.count) : 'N/A';
+  const parentID = seriesIMDbID(data);
   if (data.series !== null) {
     result.catalogSeriesRef = reference(data.series);
-    // Only OMDb's native IDs are known here to be IMDb IDs. Never place an
-    // arbitrary future provider's native ID into the legacy IMDb field.
-    if (data.series.provider === 'omdb' && imdbID(data.series.id)) result.seriesID = data.series.id;
+    if (parentID) result.seriesID = parentID;
   }
   result.catalogEpisodeOrder = data.episodeOrder;
   return result;
+}
+function seriesIMDbID(data) {
+  // Native catalog references are opaque. Only an explicit cross-reference
+  // from the server can establish the parent identity used by Mynda's library.
+  if (!object(data.seriesExternalIds)) return invalid();
+  const parentID = data.seriesExternalIds.imdb;
+  if (parentID !== undefined && (!imdbID(parentID) || data.series === null)) return invalid();
+  return parentID;
 }
 function translate(data, route, body) {
   if (!object(data) || !object(data.provenance) || typeof data.provenance.provider !== 'string') return invalid();
@@ -103,10 +109,11 @@ function translate(data, route, body) {
   }
   if (route === '/v1/season') {
     const parent = reference(data.series);
+    const parentID = seriesIMDbID(data);
     if (!integer(data.season) || data.season !== body.season || !Array.isArray(data.episodes) ||
         data.order !== 'provider' || !['complete', 'partial', 'unknown'].includes(data.completeness) ||
         !(data.totalSeasons === null || integer(data.totalSeasons)) ||
-        (parent.provider === 'omdb' && parent.id !== body.series.id)) return invalid();
+        (parentID && parentID !== body.series.id)) return invalid();
     return {Response:'True', Season:String(data.season),
       totalSeasons:data.totalSeasons === null ? 'N/A' : String(data.totalSeasons),
       catalogSeriesRef:parent, catalogCompleteness:data.completeness,
@@ -130,19 +137,19 @@ function translate(data, route, body) {
 function lookup(parameters) {
   const optional = {};
   if (parameters.type) optional.kind = parameters.type;
-  if (parameters.y) optional.year = Number(parameters.y);
-  if (parameters.i) {
-    const ref = {externalSource:'imdb', id:parameters.i};
-    if (parameters.Season !== undefined) {
-      const body = {series:ref, season:Number(parameters.Season), order:'provider'};
-      if (parameters.Episode !== undefined) return {route:'/v1/episode', body:{...body, episode:Number(parameters.Episode)}};
+  if (parameters.year) optional.year = Number(parameters.year);
+  if (parameters.id) {
+    const ref = {externalSource:'imdb', id:parameters.id};
+    if (parameters.season !== undefined) {
+      const body = {series:ref, season:Number(parameters.season), order:'provider'};
+      if (parameters.episode !== undefined) return {route:'/v1/episode', body:{...body, episode:Number(parameters.episode)}};
       return {route:'/v1/season', body};
     }
     return {route:'/v1/record', body:{ref}};
   }
-  if (parameters.s) return {route:'/v1/search', body:{title:parameters.s, ...optional,
+  if (parameters.title) return {route:'/v1/search', body:{title:parameters.title, ...optional,
     ...(parameters.page ? {page:Number(parameters.page)} : {})}};
-  if (parameters.t) return {route:'/v1/title', body:{title:parameters.t, ...optional}};
+  if (parameters.exactTitle) return {route:'/v1/title', body:{title:parameters.exactTitle, ...optional}};
   throw serviceError('METADATA_BAD_REQUEST', 'A metadata lookup requires a title or IMDb ID.');
 }
 

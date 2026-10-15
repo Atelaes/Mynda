@@ -118,7 +118,7 @@ function parseBoxOffice(value, options) {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
-function parseOmdbBoxOffice(value) {
+function parseCatalogBoxOffice(value) {
   if (typeof value === 'string' && value.trim().toUpperCase() === 'N/A') return 0;
   const amount = parseBoxOffice(value, {locale: 'en-US'});
   return amount === null ? 0 : Math.round(amount);
@@ -140,7 +140,7 @@ module.exports = {
   BOX_OFFICE_CURRENCY,
   DEFAULT_BOX_OFFICE_LOCALE,
   parseBoxOffice,
-  parseOmdbBoxOffice,
+  parseCatalogBoxOffice,
   formatBoxOffice,
   formatCompactBoxOffice
 };

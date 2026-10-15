@@ -67,7 +67,7 @@ async function runBatch(responder, options={}) {
     library:{settings:{preferences:{remove_autotagged_from_new:false}},whenIdle:async()=>{}},
     autoTagLog:Object.fromEntries(['info','warn','error','debug'].map(level=>[level,(message,data)=>logs.push({level,message,data})])),
     saveBatch:async (batch,options)=>{assert.strictEqual(new Set(batch.map(v=>v.id)).size,batch.length,'Duplicate IDs within one save batch');saves.push(_.cloneDeep(batch));saveOptions.push(_.cloneDeep(options));},
-    OmdbHelper:{createSeriesSearchSession:SeriesSearch.createSession,seriesSearchSummary:SeriesSearch.sessionSummary,
+    TaggingService:{createSeriesSearchSession:SeriesSearch.createSession,seriesSearchSummary:SeriesSearch.sessionSummary,
       resolve:async(input,searchOptions)=>{requests.push({input:_.cloneDeep(input),options:searchOptions});return responder(input,searchOptions,context);}}
   };
   const state = {running:false, cancelRequested:false, scope:'library', cancellationDecision:null};
@@ -75,7 +75,7 @@ async function runBatch(responder, options={}) {
     autoTagRunning:{get:()=>state.running},
     autoTagCancelRequested:{get:()=>state.cancelRequested,set:value=>{state.cancelRequested=value;}}
   });
-  const run=createAutoTagRunner({state, catalog:context.OmdbHelper, log:context.autoTagLog,
+  const run=createAutoTagRunner({state, catalog:context.TaggingService, log:context.autoTagLog,
     getCandidates:()=>[], save:context.saveBatch, notifyStatus:message=>messages.push({channel:'status-update',message}),
     chooseSeries:async()=>null, preferences:context.library.settings.preferences, whenIdle:context.library.whenIdle});
   const result=await run({videos:[video(1),video(2),video(3)],...options});

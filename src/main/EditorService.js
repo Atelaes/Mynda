@@ -151,7 +151,7 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   async function select({draft, choice} = {}, owner) {
     requireOwner(owner);
     const video = draftVideo(draft);
-    const token = choice && boundedText(choice.myndaProposalID, 'catalog choice', 128);
+    const token = choice && boundedText(choice.myndaProposalID, 'The catalog choice', 128);
     const stored = token && proposals.get(token);
     if (!stored || stored.owner !== owner || now() - stored.created > 30 * 60 * 1000 ||
         JSON.stringify(stored.input) !== JSON.stringify(Evidence.snapshot(video))) {
@@ -297,7 +297,7 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
         defaultId: 0, cancelId: 0, noLink: true, checkboxLabel: "Don't show this message again",
         message: patches.length === 1 ? 'Reset this video from its filename?' : `Reset ${patches.length} videos from their filenames?`,
         detail: 'Mynda will re-detect title, series, season, and episode from each filename and its folders. ' +
-          "It will restore the watchfolder's default kind, clear the IMDb ID, artwork reference, and other OMDb catalog fields, mark the video as New, and allow Auto-Tag to try it again.\n\n" +
+          "It will restore the watchfolder's default kind, clear the IMDb ID, artwork reference, and other catalog fields, mark the video as New, and allow Auto-Tag to try it again.\n\n" +
           'Tags, subtitles, watched status, playback position, technical metadata, and your rating will be kept. Nothing is written to the library until you click Save in the editor.' +
           (missing ? `\n\nFor ${missing} videos without a known watchfolder, Mynda will use the filename alone and keep the current kind.` : '')});
       confirmed = result.response === 1;

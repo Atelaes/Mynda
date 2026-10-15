@@ -1,7 +1,7 @@
 // Shared direct lookup and season-list/IMDb-ID fallback for every episode path.
 const {validImdbID,normalizeEpisodeNumber,requestFailure,episodeResponseMatches} = require('./CatalogResponse');
-const {summarizeOMDbResponse} = require('./TaggingDiagnostics');
-function createEpisodeLookup({log,pollOMDB,createURLParts}) {
+const {summarizeCatalogResponse} = require('./TaggingDiagnostics');
+function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
   function seasonEpisodeIndexKey(seriesID, season) {
     return `${seriesID}|${season}`;
   }
@@ -11,7 +11,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
     const cacheKey = seasonEpisodeIndexKey(seriesID, season);
     if (seasonEpisodeIndexCache.has(cacheKey)) {
       const cachedIndex = seasonEpisodeIndexCache.get(cacheKey);
-      log.debug('Using cached OMDb season episode index', {
+      log.debug('Using cached catalog season episode index', {
         searchID: context.searchID,
         seriesID: seriesID,
         season: season,
@@ -20,7 +20,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
       return {success: true, data: cachedIndex};
     }
 
-    const response = await pollOMDB(createURLParts({
+    const response = await requestCatalog(createCatalogQuery({
       id: seriesID,
       season: season
     }), {...context, searchID: context.searchID, stage: 'season episode index fallback'});
@@ -29,7 +29,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
       if (failure.failure === 'No results') {
         const emptyIndex = new Map();
         seasonEpisodeIndexCache.set(cacheKey, emptyIndex);
-        log.debug('OMDb had no season episode index for fallback', {
+        log.debug('The catalog had no season episode index for fallback', {
           searchID: context.searchID,
           seriesID: seriesID,
           season: season
@@ -42,10 +42,10 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
     const seasonData = response.data;
     if (!seasonData || normalizeEpisodeNumber(seasonData.Season) !== season ||
         !Array.isArray(seasonData.Episodes)) {
-      log.warn('OMDb season episode index did not match the fallback request', {
+      log.warn('The catalog season episode index did not match the fallback request', {
         searchID: context.searchID,
         expected: {seriesID: seriesID, season: season},
-        received: summarizeOMDbResponse(response)
+        received: summarizeCatalogResponse(response)
       });
       return {success: false, outcome:'invalid-record'};
     }
@@ -73,7 +73,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
     }
 
     seasonEpisodeIndexCache.set(cacheKey, episodeIndex);
-    log.debug('Cached OMDb season episode index for fallback', {
+    log.debug('Cached catalog season episode index for fallback', {
       searchID: context.searchID,
       seriesID: seriesID,
       season: season,
@@ -93,7 +93,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
 
     const episodeImdbID = indexResult.data.get(episode);
     if (!episodeImdbID) {
-      log.debug('OMDb season episode index did not contain the requested episode', {
+      log.debug('The catalog season episode index did not contain the requested episode', {
         searchID: context.searchID,
         seriesID: seriesID,
         season: season,
@@ -102,7 +102,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
       return {success: false};
     }
 
-    const response = await pollOMDB(createURLParts({id: episodeImdbID}), {...context,
+    const response = await requestCatalog(createCatalogQuery({id: episodeImdbID}), {...context,
       searchID: context.searchID,
       stage: 'season index exact episode fallback'
     });
@@ -114,17 +114,17 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
     const episodeData = response.data;
     if (!episodeResponseMatches(episodeData, seriesID, season, episode) ||
         episodeData.seriesID !== seriesID || episodeData.imdbID !== episodeImdbID) {
-      log.warn('OMDb season-index episode did not match the fallback request', {
+      log.warn('The catalog season-index episode did not match the fallback request', {
         searchID: context.searchID,
         seasonIndexImdbID: episodeImdbID,
         expected: {seriesID: seriesID, season: season, episode: episode},
-        received: summarizeOMDbResponse(response)
+        received: summarizeCatalogResponse(response)
       });
       return {success: false, outcome:'invalid-record',
         rejectedRecord:episodeData && {imdbID:episodeData.imdbID,Title:episodeData.Title}};
     }
 
-    log.info('Recovered episode through OMDb season index fallback', {
+    log.info('Recovered episode through catalog season index fallback', {
       searchID: context.searchID,
       seriesID: seriesID,
       season: season,
@@ -136,7 +136,7 @@ function createEpisodeLookup({log,pollOMDB,createURLParts}) {
   }
 
   async function lookup(seriesID, season, episode, context, stage = 'episode lookup') {
-    const response = await pollOMDB(createURLParts({id:seriesID,season,episode}),{...context,stage});
+    const response = await requestCatalog(createCatalogQuery({id:seriesID,season,episode}),{...context,stage});
     const failure = requestFailure(response);
     if (!failure) return {success:true,data:response.data,via:'direct'};
     if (failure.failure !== 'No results') return {success:false,requestFailure:failure,via:'direct'};

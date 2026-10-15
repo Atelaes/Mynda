@@ -3,7 +3,7 @@ const {fold} = require('./TitleNormalization');
 
 // Movie filenames commonly append a release description after the real title.
 // Once one of these tokens appears, everything after it is useful to a media
-// player but generally harmful to an OMDb title search.
+// player but generally harmful to a catalog title search.
 // JavaScript does not support a free-spacing regular-expression flag, so this
 // long expression stays compact and is compiled only once.
 const RELEASE_TOKEN_COMPACT = /^(?:360p|480p|576p|720p|1080p|1440p|2160p|4k|8k|uhd|blu-?ray|brrip|bdrip|bdremux|webrip|web-?dl|hdrip|dvdrip|dvd|hdtv|remux|cam|telesync|ts|proper|repack|internal|multi|mult[iy]|dual|dubbed|subbed|subs?|aac|ac3|eac3|ddp\d*(?:\.\d+)?|dd\+?\d*(?:\.\d+)?|dts(?:hd|x|ma|hdma)?|truehd|atmos|lpcm|xvid|divx|x26[45]|h\.?26[45]|hevc|avc|hdr(?:10|10\+)?|sdr|dovi|10bit|8bit|\d+(?:\.\d+)?ch|\d+(?:\.\d+)?gb|\d+mb|nf|amzn|hmax|hulu|criterion|stv|hq|eng|ita|fr|en|yify|rarbg)$/i;
@@ -28,8 +28,8 @@ function removeDiacritics(value) {
 }
 
 // This comparison form deliberately ignores punctuation, capitalization, and
-// the common "and" versus "&" discrepancy. It is used only to validate OMDb
-// choices; the original display title is still sent to OMDb and shown to users.
+// the common "and" versus "&" discrepancy. It is used only to validate catalog
+// choices; the original display title is still sent to the catalog and shown to users.
 function titleKey(value) {
   return removeDiacritics(value)
     .toLowerCase()
@@ -353,7 +353,7 @@ function replaceSequelNumber(title) {
   return '';
 }
 
-// Generates a few spelling/order alternatives that OMDb's search endpoint
+// Generates a few spelling/order alternatives that the catalog's search endpoint
 // does not consistently infer. These are discovery queries only: every result
 // still needs exact/canonical title evidence plus the normal year/type checks
 // and, for a canonical expansion, a tightly matching full-record runtime.
@@ -415,10 +415,10 @@ function buildTitleQueryVariants(value) {
   return variants;
 }
 
-// OMDb's search endpoint is unexpectedly sensitive to punctuation that our
+// The catalog's search endpoint is unexpectedly sensitive to punctuation that our
 // normal comparison intentionally ignores. For example, searches for
 // "Oceans Eleven" and "The Kings Speech" can return nothing even though the
-// catalog contains "Ocean's Eleven" and "The King's Speech". These variants
+// The catalog contains "Ocean's Eleven" and "The King's Speech". These variants
 // are used only after every ordinary title query has failed to expose an exact
 // normalized match. They broaden discovery, never acceptance: the caller must
 // still compare every returned row with the complete, unreduced candidate.
@@ -487,7 +487,7 @@ function buildNormalizedDiscoveryQueries(value) {
   }
   add(repaired, 'restored likely catalog punctuation');
 
-  // If the repaired full title is still too literal for OMDb, one compact
+  // If the repaired full title is still too literal for the catalog, one compact
   // keyword query can surface its row. This never authorizes a partial-title
   // match: the response must still equal the original full title after strict
   // normalization, and normal year/type/runtime checks still apply.
@@ -549,7 +549,7 @@ function deriveCandidates(value, source, explicitYear) {
 
   // Collection folders often look like "MI - 02 - Mission Impossible II".
   // Keep both the franchise-qualified and post-number forms because either can
-  // be OMDb's canonical title, while never deleting an unseparated title number.
+  // be the catalog's canonical title, while never deleting an unseparated title number.
   let numbered = title.match(/^(.*?)\s+[-–—]\s+\d+(?:\.\d+)?\s+[-–—]\s+(.+)$/);
   if (numbered) {
     add(`${numbered[1]} ${numbered[2]}`, 'without collection sequence number');
@@ -558,7 +558,7 @@ function deriveCandidates(value, source, explicitYear) {
 
   // A dash may separate a director/franchise label from the actual movie, or
   // append an actor/release note after it. Trying each edge is conservative;
-  // either still has to exactly match an OMDb result before auto-tag accepts it.
+  // either still has to exactly match a catalog result before auto-tag accepts it.
   let dashParts = title.split(/\s+[-–—]\s+/).map(part => part.trim()).filter(Boolean);
   if (dashParts.length > 1) {
     // In the uploaded corpus, a leading director/franchise label was more
@@ -668,12 +668,12 @@ function buildSearchCandidates(video) {
   return deduplicated;
 }
 
-function omdbTypeForKind(kind) {
+function catalogTypeForKind(kind) {
   return {movie: 'movie', show: 'episode', episode: 'episode', series: 'series'}[kind] || '';
 }
 
 function typeIsCompatible(result, video) {
-  let expected = omdbTypeForKind(video && (video.kind || video.type));
+  let expected = catalogTypeForKind(video && (video.kind || video.type));
   if (expected) return result.Type === expected;
 
   // A custom Mynda kind must survive tagging. Such a video can still consume
@@ -718,7 +718,7 @@ function scoreResult(result, candidate, video, options = {}) {
 // which in turn outrank explicitly enabled canonical expansions. A known year
 // must normally agree; an explicit relaxed path may permit a bounded regional
 // discrepancy. The full record must still pass runtime/vote validation in
-// OmdbHelper before unattended Auto-Tag can apply it.
+// TaggingService before unattended Auto-Tag can apply it.
 function evaluateSearchResults(results, candidate, video, options = {}) {
   let ranked = (Array.isArray(results) ? results : [])
     .filter(result => result && result.imdbID && result.Title && typeIsCompatible(result, video))
@@ -728,7 +728,7 @@ function evaluateSearchResults(results, candidate, video, options = {}) {
   let acceptable = ranked.filter(item => {
     if (!item.matchKind) return false;
     // Without a year, require one unique normalized-title match rather than
-    // requiring OMDb's entire result list to contain only one movie. The caller
+    // requiring the catalog's entire result list to contain only one movie. The caller
     // still retrieves and validates the full record (runtime and vote evidence)
     // before Auto-Tag may apply it.
     if (!item.candidateYear) return true;
@@ -788,28 +788,28 @@ function parseImdbVotes(value) {
   return /^\d+$/.test(normalized) ? Number(normalized) : null;
 }
 
-// Full OMDb records contain evidence that the lightweight search list lacks.
+// Full catalog records contain evidence that the lightweight search list lacks.
 // Use it as a veto against obviously impossible matches, not as a demand that
 // every edition have precisely the canonical runtime. The deliberately large
 // tolerance preserves extended/director cuts while rejecting a short, trailer,
 // sample, or compilation record for a feature-length local file.
 function evaluateFullResultPlausibility(result, video, options = {}) {
   let localMinutes = localDurationMinutes(video);
-  let omdbMinutes = parseRuntimeMinutes(result && result.Runtime);
+  let catalogMinutes = parseRuntimeMinutes(result && result.Runtime);
   let imdbVotes = parseImdbVotes(result && result.imdbVotes);
   let splitFile = isSplitFile(video);
   let reasons = [];
 
   if (localMinutes && localMinutes > 60 && /\bShort\b/i.test(String(result && result.Genre || ''))) {
-    reasons.push('OMDb classifies the result as a short, but the local video is feature-length');
+    reasons.push('The catalog classifies the result as a short, but the local video is feature-length');
   }
 
-  if (localMinutes && omdbMinutes) {
-    let difference = Math.abs(localMinutes - omdbMinutes);
-    let ratio = Math.max(localMinutes, omdbMinutes) / Math.min(localMinutes, omdbMinutes);
-    let plausibleSplitPart = splitFile && localMinutes < omdbMinutes;
+  if (localMinutes && catalogMinutes) {
+    let difference = Math.abs(localMinutes - catalogMinutes);
+    let ratio = Math.max(localMinutes, catalogMinutes) / Math.min(localMinutes, catalogMinutes);
+    let plausibleSplitPart = splitFile && localMinutes < catalogMinutes;
     if (difference > 45 && ratio > 1.5 && !plausibleSplitPart) {
-      reasons.push(`Local and OMDb runtimes differ implausibly (${Math.round(localMinutes)} vs ${Math.round(omdbMinutes)} minutes)`);
+      reasons.push(`Local and catalog runtimes differ implausibly (${Math.round(localMinutes)} vs ${Math.round(catalogMinutes)} minutes)`);
     }
 
     // Canonical-title expansions and two/three-year corrections are useful
@@ -818,13 +818,13 @@ function evaluateFullResultPlausibility(result, video, options = {}) {
     // exceptions never use this path because one part cannot closely match the
     // catalog's combined runtime.
     if (options.requireTightRuntime) {
-      let tightTolerance = Math.max(8, omdbMinutes * 0.1);
+      let tightTolerance = Math.max(8, catalogMinutes * 0.1);
       if (difference > tightTolerance) {
-        reasons.push(`A relaxed title/year match needs a close runtime (${Math.round(localMinutes)} vs ${Math.round(omdbMinutes)} minutes)`);
+        reasons.push(`A relaxed title/year match needs a close runtime (${Math.round(localMinutes)} vs ${Math.round(catalogMinutes)} minutes)`);
       }
     }
   } else if (options.requireTightRuntime) {
-    reasons.push('A relaxed title/year match needs comparable local and OMDb runtimes');
+    reasons.push('A relaxed title/year match needs comparable local and catalog runtimes');
   }
 
   // A yearless title such as "Se7en", or an exact title with a two/three-year
@@ -832,8 +832,8 @@ function evaluateFullResultPlausibility(result, video, options = {}) {
   // only when the runtimes can be compared and the record has enough audience
   // history to be trustworthy.
   if (options.requireStrongEvidence) {
-    if (!localMinutes || !omdbMinutes) {
-      reasons.push('A relaxed match needs comparable local and OMDb runtimes');
+    if (!localMinutes || !catalogMinutes) {
+      reasons.push('A relaxed match needs comparable local and catalog runtimes');
     }
     let minimumVotes = Number(options.minimumImdbVotes) || 1000;
     if (!imdbVotes || imdbVotes < minimumVotes) {
@@ -845,7 +845,7 @@ function evaluateFullResultPlausibility(result, video, options = {}) {
     plausible: reasons.length === 0,
     reasons: reasons,
     localRuntimeMinutes: localMinutes,
-    omdbRuntimeMinutes: omdbMinutes,
+    catalogRuntimeMinutes: catalogMinutes,
     imdbVotes: imdbVotes,
     splitFile: splitFile
   };
@@ -866,7 +866,7 @@ function evaluateFullResult(result, candidate, video, options = {}) {
     if (!scored.candidateYear) plausibilityOptions.requireStrongEvidence = true;
   }
 
-  // OMDb sometimes reports a regional/catalog release year two or three years
+  // The catalog sometimes reports a regional/catalog release year two or three years
   // after the year embedded in the local release. This path is intentionally
   // narrower than the existing one-year retry: exact normalized title, close
   // runtime, and a well-established IMDb record are all mandatory.
@@ -878,7 +878,7 @@ function evaluateFullResult(result, candidate, video, options = {}) {
   let plausibility = evaluateFullResultPlausibility(result, video, plausibilityOptions);
   let reasons = plausibility.reasons.slice();
   if (!titleYearConfident) {
-    reasons.unshift('OMDb title/year did not uniquely match the search candidate');
+    reasons.unshift('The catalog title/year did not uniquely match the search candidate');
   }
   return {
     confident: titleYearConfident && plausibility.plausible,
@@ -905,7 +905,7 @@ module.exports = {
   evaluateSearchResults,
   fullResultIsConfident,
   isSplitFile,
-  omdbTypeForKind,
+  catalogTypeForKind,
   parseRuntimeMinutes,
   pathContainsSampleArea,
   titleKey,

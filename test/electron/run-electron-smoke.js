@@ -176,7 +176,6 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
       fs.mkdirSync(userData,{recursive:true});
       fs.writeFileSync(path.join(userData,'.mynda-test-library'),'Disposable library workflow fixture');
     }
-    fs.writeFileSync(path.join(appDirectory, 'omdb.js'), "module.exports = {key: 'test-only-key'};\n");
     fs.writeFileSync(path.join(appDirectory, 'package.json'), JSON.stringify({
       name: 'mynda-electron-smoke',
       version: '1.0.0',

@@ -57,22 +57,26 @@ suite.test('represents zero-based release order and supporting corrections',()=>
   assert.match(fact(r,'Conflicting episodes'),/episode 0 → Season 1, episode 1/);
 });
 suite.test('explains runtime coverage without asserting an unproven combined episode',()=>{
-  const r=report({...input,taggingDecision:{status:'unmatched',reason:{code:'episode-coverage-mismatch'},
-    evidence:{...evidence,runtimeAssessment:{state:'compatible',localMinutes:91.23,omdbMinutes:44}}}});
-  assert.match(r.summary,/possible explanation/);
-  assert.strictEqual(fact(r,'Runtime'),'File: 91.2 min; OMDb: 44 min.');
+  for (const key of ['catalogMinutes','omdbMinutes']) {
+    const r=report({...input,taggingDecision:{status:'unmatched',reason:{code:'episode-coverage-mismatch'},
+      evidence:{...evidence,runtimeAssessment:{state:'compatible',localMinutes:91.23,[key]:44}}}});
+    assert.match(r.summary,/possible explanation/);
+    assert.strictEqual(fact(r,'Runtime'),'File: 91.2 min; Catalog: 44 min.');
+  }
 });
 suite.test('uses final title comparison before an older exact-title flag',()=>{
   const r=report(success({taggingEvidence:{...evidence,exactTitle:true,titleComparison:{matched:false}}}));
   assert.strictEqual(fact(r,'Exact title check'),'');
 });
 suite.test('shows movie title/year evidence and runtime without episode claims',()=>{
-  const r=report(success({kind:'movie',taggingEvidence:{kind:'movie',imdbID:'tt2000001',catalogTitle:'Orchard Signal',
-    original:{title:'Orchard.Signal.2000.mkv',kind:'movie'},movieAssessment:{matchKind:'exact',yearDifference:0,
-      plausibility:{localRuntimeMinutes:94,omdbRuntimeMinutes:95}}}}));
-  assert.strictEqual(fact(r,'Movie year check'),'The years agreed.');
-  assert.match(fact(r,'Runtime'),/94 min.*95 min/);
-  assert.strictEqual(fact(r,'Episode lookup'),'');
+  for (const key of ['catalogRuntimeMinutes','omdbRuntimeMinutes']) {
+    const r=report(success({kind:'movie',taggingEvidence:{kind:'movie',imdbID:'tt2000001',catalogTitle:'Orchard Signal',
+      original:{title:'Orchard.Signal.2000.mkv',kind:'movie'},movieAssessment:{matchKind:'exact',yearDifference:0,
+        plausibility:{localRuntimeMinutes:94,[key]:95}}}}));
+    assert.strictEqual(fact(r,'Movie year check'),'The years agreed.');
+    assert.match(fact(r,'Runtime'),/94 min.*95 min/);
+    assert.strictEqual(fact(r,'Episode lookup'),'');
+  }
 });
 suite.test('distinguishes user selection, saved automatic evidence and unknown ID origin',()=>{
   const user=report(success({taggingEvidence:{...evidence,identities:{record:{origin:'user'}}}}));
@@ -147,10 +151,13 @@ suite.test('describes every saved correction outcome without calling a proposal 
   }
 });
 suite.test('older request traces show that a probe ran without inventing its title result',()=>{
-  const r=report({...input,taggingDecision:{status:'unmatched',reason:{code:'episode-mismatch'},evidence:{requests:[
-    {stage:'adjacent season title probe',parameters:{i:'tt123',Season:'2',Episode:'4'},outcome:'response'},
-    {stage:'nearby episode title probe',parameters:{i:'tt123',Season:'1',Episode:'5'},outcome:'not-found'}]}}});
-  assert.match(r.corrections[0].detail,/not saved/);assert.match(r.corrections[1].detail,/No episode record/);
+  for (const parameters of [{i:'tt123',Season:'2',Episode:'4'},{id:'tt123',season:'2',episode:'4'}]) {
+    const r=report({...input,taggingDecision:{status:'unmatched',reason:{code:'episode-mismatch'},evidence:{requests:[
+      {stage:'adjacent season title probe',parameters,outcome:'response'},
+      {stage:'nearby episode title probe',parameters:{i:'tt123',Season:'1',Episode:'5'},outcome:'not-found'}]}}});
+    assert.match(r.corrections[0].detail,/not saved/);assert.match(r.corrections[1].detail,/No episode record/);
+    assert.match(r.corrections[0].label,/Season 2, episode 4/);
+  }
 });
 suite.test('long histories keep the latest correction visible and state the omitted count',()=>{
   const checks=Array.from({length:50},(_,i)=>({kind:'nearby-episode',probed:{season:'1',episode:String(i)},outcome:'title-mismatch'}));

@@ -29,24 +29,7 @@ function summarizeError(error) {
   };
 }
 
-function requestParametersForLog(urlParts) {
-  try {
-    let requestURL = new URL(urlParts.join('&'));
-    let parameters = {};
-    requestURL.searchParams.forEach((value, key) => {
-      if (key.toLowerCase() !== 'apikey') {
-        parameters[key] = value;
-      }
-    });
-    return parameters;
-  } catch(err) {
-    // The first array member contains the API key. Never include it in the
-    // fallback diagnostic representation.
-    return {unparsedParameters: urlParts.slice(1)};
-  }
-}
-
-function summarizeOMDbResponse(response) {
+function summarizeCatalogResponse(response) {
   let data = response && response.data ? response.data : {};
   let summary = {
     httpStatus: response && response.status,
@@ -85,4 +68,4 @@ function summarizeOMDbResponse(response) {
   return summary;
 }
 
-module.exports = {summarizeVideo, summarizeError, requestParametersForLog, summarizeOMDbResponse};
+module.exports = {summarizeVideo, summarizeError, summarizeCatalogResponse};

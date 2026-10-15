@@ -30,8 +30,9 @@ function loadSearch(responder, options = {}) {
     if (response instanceof Error) throw response;
     return {status:200, statusText:'OK', data:response || notFound};
   };
-  const api = loadFreshWithMocks(options.modulePath || path.join(__dirname,'../../src/tagging/OmdbHelper.js'), {
-    '../../omdb':{key:'fixture-only'}, axios,
+  const api = loadFreshWithMocks(options.modulePath || path.join(__dirname,'../../src/tagging/TaggingService.js'), {
+    axios,
+    './CatalogClient':{createCatalogClient:require('./CatalogFixtures').createFixtureCatalogClient},
     './MetadataServerConfig':{...require('../../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:() => null},
     electron:{app:{getPath:() => '/unused-fixture-user-data'}},
     '../platform/Logger.js':{child:() => logger},

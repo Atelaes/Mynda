@@ -5,6 +5,9 @@ const {assert,createSuite,runSuite,withTemporaryDirectory}=require('./helpers/Te
 const {loadFreshWithMocks}=require('./helpers/ModuleMocks');
 const fixtures=require('./electron/TaggingFixtures');
 const {createNetwork,redact}=require('./electron/TaggingNetwork');
+const metadata=require('./electron/MetadataFixtures');
+const lookup=(client,id='tt19000001')=>client.post(metadata.connection.url+'/v1/record',{ref:{externalSource:'imdb',id}},
+  {headers:{Authorization:`Bearer ${metadata.connection.token}`}});
 const {confirmLive}=require('./electron/LiveTaggingConsent');
 const checks=require('./electron/TaggingAssertions');
 const Evidence=require('../src/tagging/TaggingEvidence');
@@ -31,9 +34,9 @@ for(const scenario of ['movies','episode-parents','episode-numbering','selected'
       return stream;
     };
     try {
-      const api=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
-        electron:{app:{getPath:()=>directory}},'../../omdb':{key:'fixture-only'},
-        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>null},
+      const api=loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
+        electron:{app:{getPath:()=>directory}},
+        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>metadata.connection},
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const videos=fixtures.videos(scenario,path.join(directory,'media'));
@@ -59,9 +62,9 @@ suite.test('manual movie and episode proposals apply real metadata and authorize
     const network=createNetwork({axios,imageBytes:fs.readFileSync(path.join(__dirname,'..','images','qmark.png'))});
     try {
       const app={getPath:()=>directory};
-      const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
-        electron:{app},'../../omdb':{key:'fixture-only'},
-        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>null},
+      const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
+        electron:{app},
+        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>metadata.connection},
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const library={media:fixtures.videos('manual',path.join(directory,'media'))};
@@ -89,9 +92,9 @@ suite.test('a typed IMDb ID becomes completed match evidence only after selectio
     const network=createNetwork({axios,imageBytes:fs.readFileSync(path.join(__dirname,'..','images','qmark.png'))});
     try {
       const app={getPath:()=>directory};
-      const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/OmdbHelper.js'),{
-        electron:{app},'../../omdb':{key:'fixture-only'},
-        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>null},
+      const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
+        electron:{app},
+        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>metadata.connection},
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const library={media:fixtures.videos('manual',path.join(directory,'media'))};
@@ -130,12 +133,12 @@ suite.test('live consent is required in noninteractive runs; a declined prompt i
 suite.test('live HTTP and renderer requests share a hard budget and unknown hosts are blocked',async()=>{
   let requests=0;
   const client=axios.create({adapter:async config=>{requests++;return {status:200,headers:{},config,
-    data:JSON.stringify({...fixtures.records[0],Poster:'https://m.media-amazon.com/example.png'})};}});
+    data:JSON.stringify(metadata.response({...fixtures.records[0],Poster:'https://m.media-amazon.com/example.png'},{}).data)};}});
   const network=createNetwork({axios:client,imageBytes:Buffer.alloc(0),live:true,limit:2});
   try {
-    await client.get('https://www.omdbapi.com/?apikey=secret&i=tt19000001');
+    await lookup(client);
     network.begin('https://m.media-amazon.com/example.png','renderer');
-    await assert.rejects(client.get('https://www.omdbapi.com/?apikey=secret&i=tt19000002'),/limit/);
+    await assert.rejects(lookup(client,'tt19000002'),/limit/);
     assert.strictEqual(requests,1,'Budget exhaustion must happen before the real adapter');
     assert.throws(()=>network.begin('https://example.invalid/unknown'),'Unexpected host');
     assert.strictEqual(network.requests.length,2);
@@ -144,10 +147,10 @@ suite.test('live HTTP and renderer requests share a hard budget and unknown host
 });
 suite.test('provider failures are distinguished from application assertions without leaking credentials',async()=>{
   const key='fixture-secret-value';
-  const client=axios.create({adapter:async()=>{throw new Error('failure at https://www.omdbapi.com/?apikey='+key);}});
+  const client=axios.create({adapter:async()=>{throw new Error('failure with bearer token '+key);}});
   const network=createNetwork({axios:client,imageBytes:Buffer.alloc(0),live:true,secret:key});
   try {
-    await assert.rejects(client.get('https://www.omdbapi.com/?apikey='+key),error=>
+    await assert.rejects(lookup(client),error=>
       error.code==='MYNDA_TEST_PROVIDER' && !error.message.includes(key));
     assert.strictEqual(network.issues[0].category,'provider');
     assert(!JSON.stringify(network.issues).includes(key));
@@ -158,11 +161,11 @@ suite.test('retained request diagnostics redact credentials in poster URLs as we
   withTemporaryDirectory('tagging-ledger',async directory=>{
     const key='fixture-poster-secret',file=path.join(directory,'requests.json');
     const client=axios.create({adapter:async config=>({status:200,headers:{},config,
-      data:JSON.stringify({...fixtures.records[0],Poster:'https://img.omdbapi.com/image?apikey='+key})})});
+      data:JSON.stringify(metadata.response({...fixtures.records[0],Poster:'https://images.example.test/image?apikey='+key},{}).data)})});
     const network=createNetwork({axios:client,live:true,secret:key,file});
     try {
-      await client.get('https://www.omdbapi.com/?apikey='+key+'&i=tt19000001');
-      network.begin('https://img.omdbapi.com/image?apikey='+key,'renderer');
+      await lookup(client);
+      network.begin('https://images.example.test/image?apikey='+key,'renderer');
       const bytes=fs.readFileSync(file,'utf8');
       assert(!bytes.includes(key));assert.strictEqual(JSON.parse(bytes).requests.length,2);
       network.assertHealthy();
@@ -171,7 +174,7 @@ suite.test('retained request diagnostics redact credentials in poster URLs as we
 suite.test('restart validation cannot silently make fresh catalog requests',async()=>{
   const client=axios.create({adapter:async()=>{throw Error('Must not reach transport');}});
   const network=createNetwork({axios:client,imageBytes:Buffer.alloc(0),restart:true});
-  try {await assert.rejects(client.get('https://www.omdbapi.com/?i=tt19000001'),/Restart/);}
+  try {await assert.rejects(lookup(client),/Restart/);}
   finally {network.restore();}
 });
 runSuite(suite);

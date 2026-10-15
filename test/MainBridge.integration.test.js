@@ -30,7 +30,7 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
       electron:{app,ipcMain,BrowserWindow:Window,dialog:{showMessageBox:async()=>{throw Error('Unexpected dialog');}},shell:{}},
       [path.join(root,'src/platform/Logger.js')]:Logger,
       [path.join(root,'src/media/MediaTools.js')]:tools,
-      [path.join(root,'src/tagging/OmdbHelper.js')]:{},
+      [path.join(root,'src/tagging/TaggingService.js')]:{},
       './ReactDevTools.js':async()=>null
     });
     await start();

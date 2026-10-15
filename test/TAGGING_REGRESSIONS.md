@@ -312,7 +312,7 @@ Repeated titles with different local numbers are separate regression cases.
 
 ## Recorded search inventory
 
-Every row below is replayed through `OmdbHelper.search()`. The fixture includes
+Every row below is replayed through `TaggingService.search()`. The fixture includes
 the original current tags and recorded responses. A successful show case also
 checks preservation of the user's series label and local numbering. REJECT
 means a later safeguard must continue to block an old bad or unconfirmed match.

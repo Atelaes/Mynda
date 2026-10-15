@@ -51,7 +51,7 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
       return episodes.resolve(video,context,options.seriesImdbID,options.seasonOffsetHints);
     }
     if (!Decision.hasImdbID(video)) return movies.resolve(video,context);
-    const response = await client.pollOMDB(client.createURLParts({id:video.imdbID}),{...context,stage:'exact IMDb lookup'});
+    const response = await client.requestCatalog(client.createCatalogQuery({id:video.imdbID}),{...context,stage:'exact IMDb lookup'});
     const failure = requestFailure(response);
     if (failure) return failure;
     if (video.kind === 'show' && response.data.Type === 'series' && response.data.imdbID === video.imdbID.trim()) {

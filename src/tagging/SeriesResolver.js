@@ -10,12 +10,12 @@ const Limits = require('./TaggingLimits');
 const EpisodeMatch = require('./EpisodeMatch');
 const {episodeTitlesMatch} = EpisodeMatch;
 
-function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}) {
+function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchShowEpisode}) {
 
   async function disambiguateSeriesByEpisode(candidates, season, episode, localTitle, context, video) {
     let episodeMatches = [];
     for (let candidate of candidates) {
-      let response = await pollOMDB(createURLParts({
+      let response = await requestCatalog(createCatalogQuery({
         id: candidate.imdbID,
         season: season,
         episode: episode
@@ -50,7 +50,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
     });
 
     // A useful title tag is stronger evidence
-    // than episode existence. Kung Fu S1E6 exposed why: OMDb temporarily returned
+    // than episode existence. Kung Fu S1E6 exposed why: the catalog temporarily returned
     // no episode for the 1972 series and "Rage" for the 2021 series, while the
     // local title was "The Soul Is the Warrior". Existence alone selected and
     // cached the remake; a clear title disagreement must instead stay ambiguous.
@@ -92,13 +92,13 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
     };
   }
 
-  async function pollSeriesOMDB(parts, context, details = {}) {
+  async function requestSeriesCatalog(parts, context, details = {}) {
     const session = context.seriesSession;
     const key = JSON.stringify(parts);
     const traceIndex = context.requestTrace.length;
     // CatalogClient owns response reuse. Count the actual request observation,
     // including cache eviction, rather than treating a remembered query as a hit.
-    const pending = pollOMDB(createURLParts(parts),{...context,stage:details.stage});
+    const pending = requestCatalog(createCatalogQuery(parts),{...context,stage:details.stage});
     const observation = context.requestTrace[traceIndex];
     const reused = observation.reused;
     if (reused) session.reused++;
@@ -187,7 +187,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
         const parameters = {title:query.title, year:query.year, type:'series'};
         if (page > 1) parameters.page = page;
         spent++;
-        const response = await pollSeriesOMDB(parameters, context, {
+        const response = await requestSeriesCatalog(parameters, context, {
           stage:`series discovery: ${query.reason}`, fallback:true
         });
         const failure = requestFailure(response);
@@ -196,7 +196,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
           break;
         }
         const rows = response.data && response.data.Search;
-        if (!Array.isArray(rows)) return {success:false, failure:'Error', data:'OMDb returned a malformed series search'};
+        if (!Array.isArray(rows)) return {success:false, failure:'Error', data:'The catalog returned a malformed series search'};
         for (const candidate of rows) {
           const reason = SeriesSearch.candidateRejection(query, candidate);
           if (!reason) candidates.set(candidate.imdbID, candidate);
@@ -213,7 +213,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
       }
       if (!candidates.size && spent < SeriesSearch.MAX_REQUESTS) {
         spent++;
-        const response = await pollSeriesOMDB({series:query.title, year:query.year, type:'series'}, context,
+        const response = await requestSeriesCatalog({series:query.title, year:query.year, type:'series'}, context,
           {stage:`single-series discovery: ${query.reason}`, fallback:true});
         const failure = requestFailure(response);
         if (failure && failure.failure !== 'No results' && failure.failure !== 'Ambiguous results') return failure;
@@ -295,11 +295,11 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
     try {
       // Search series-only results first so that two shows with the same title
       // (for example, an original and a remake) are visible instead of silently
-      // accepting whichever one OMDb considers most popular. OMDb's search is
+      // accepting whichever one the catalog considers most popular. The catalog's search is
       // sensitive to "and" versus "&", so try that exact alternative before a
       // merely fuzzy result is trusted. If both full-title forms fail and the
       // stored title ends in an uppercase acronym, a later query may omit only
-      // that acronym to make OMDb surface possible expanded titles. Those wider
+      // that acronym to make the catalog surface possible expanded titles. Those wider
       // results still have to exactly match the complete original title or pass
       // seriesAcronymMatches(), so this changes discovery but not acceptance.
       let exactQueryTitles = [searchParts.title].concat(
@@ -350,7 +350,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
             });
           }
         }
-        let response = await pollSeriesOMDB({
+        let response = await requestSeriesCatalog({
           title: queryTitle,
           year: searchParts.year,
           type: 'series'
@@ -381,7 +381,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
           // full-title result or a validated acronym expansion can be accepted.
           currentMatches = {matchStrength: 'fuzzy', candidates: []};
         }
-        log.debug('Evaluated OMDb series candidates', {
+        log.debug('Evaluated catalog series candidates', {
           searchID: context.searchID,
           queryTitle: queryTitle,
           requestedTitle: searchParts.title,
@@ -469,7 +469,7 @@ function createSeriesResolver({log, pollOMDB, createURLParts, searchShowEpisode}
             nextTitle: queryTitle
           });
         }
-        let response = await pollSeriesOMDB({
+        let response = await requestSeriesCatalog({
           series: queryTitle,
           year: searchParts.year,
           type: 'series'

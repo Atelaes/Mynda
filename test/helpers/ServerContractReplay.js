@@ -18,7 +18,7 @@ Module._load = function(request, parent, isMain) {
   if (Module._resolveFilename(request, parent) !== clientPath) return result;
   return {...result, createCatalogClient(options) {
     const fixtureAxios = options.axios;
-    return result.createCatalogClient({...options, server:{url:'http://127.0.0.1:8787', token}, axios:async config => {
+    return result.createCatalogClient({...options, transport:undefined, server:{url:'http://127.0.0.1:8787', token}, axios:async config => {
       requests++;
       const provider = new OmdbProvider({apiKey:'fixture-only', fetch:async input => {
         providerRequests++;

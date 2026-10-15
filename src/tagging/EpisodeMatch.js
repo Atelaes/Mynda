@@ -18,7 +18,7 @@ function comparableEpisodeTitle(title) {
   let normalized = fold(title);
 
   // Some shows use an editorial chapter wrapper around the real episode title.
-  // Heroes, for example, is returned by OMDb as "Chapter One 'Genesis'" even
+  // Heroes, for example, is returned by the catalog as "Chapter One 'Genesis'" even
   // when the release filename contains only "Genesis". Treat the wrapper as
   // presentation text, but require a numeric/number-word chapter and either a
   // clear separator or balanced-looking quotation marks. This remains much
@@ -68,7 +68,7 @@ function comparableEpisodeTitle(title) {
 // Keep this deliberately narrower than the general filename parser. A suffix is
 // removable only when it starts with the standalone FS or WS release flag, and
 // every later token is also recognized technical metadata. Unknown trailing
-// words are preserved, so "Day One fan edit" cannot become a match for OMDb's
+// words are preserved, so "Day One fan edit" cannot become a match for the catalog's
 // "Day One" merely because the beginning happens to agree.
 function stripTrailingEpisodeReleaseFlags(title) {
   let original = String(title || '').trim();
@@ -83,7 +83,7 @@ function stripTrailingEpisodeReleaseFlags(title) {
 }
 
 // Some episode filenames identify the film or program shown in the episode by
-// appending its release year, while OMDb stores only the episode title. This is
+// appending its release year, while the catalog stores only the episode title. This is
 // especially common for anthology and hosted-film shows (for example,
 // "The Crawling Eye (1958)"). Remove only one final parenthesized/bracketed
 // four-digit year or year range, and use the result for comparison only. A year
@@ -98,13 +98,13 @@ function stripTrailingEpisodeReleaseYear(title) {
   return stripped ? stripped : original;
 }
 
-function strictEpisodeTitlesMatch(localTitle, omdbTitle) {
+function strictEpisodeTitlesMatch(localTitle, catalogTitle) {
   let local = comparableEpisodeTitle(localTitle);
-  let omdb = comparableEpisodeTitle(omdbTitle);
-  if (!local || !omdb) {
+  let catalog = comparableEpisodeTitle(catalogTitle);
+  if (!local || !catalog) {
     return false;
   }
-  if (local === omdb) {
+  if (local === catalog) {
     return true;
   }
 
@@ -124,18 +124,18 @@ function strictEpisodeTitlesMatch(localTitle, omdbTitle) {
   for (let variant of localVariants) {
     let comparableVariant = comparableEpisodeTitle(variant);
     if (comparableVariant.length >= 4 && comparableVariant !== local &&
-        comparableVariant === omdb) {
+        comparableVariant === catalog) {
       return true;
     }
   }
   return false;
 }
 
-function episodeTitleComparison(localTitle, omdbTitle, series = '') {
-  const annotations=TitleAnnotations.compare(localTitle,omdbTitle);
+function episodeTitleComparison(localTitle, catalogTitle, series = '') {
+  const annotations=TitleAnnotations.compare(localTitle,catalogTitle);
   const detail=annotations.normalized ? {annotations} : {};
   if (annotations.conflicts.length) return {matched:false,title:localTitle,...detail};
-  if (strictEpisodeTitlesMatch(localTitle,omdbTitle)) return {matched:true,title:localTitle,basis:'exact-normalized-title',...detail};
+  if (strictEpisodeTitlesMatch(localTitle,catalogTitle)) return {matched:true,title:localTitle,basis:'exact-normalized-title',...detail};
   if (annotations.normalized && strictEpisodeTitlesMatch(annotations.local.core,annotations.catalog.core)) {
     return {matched:true,title:annotations.local.core,basis:'catalog-title-annotation',...detail};
   }
@@ -145,8 +145,8 @@ function episodeTitleComparison(localTitle, omdbTitle, series = '') {
   return {matched:false,title:localTitle,...detail};
 }
 
-function episodeTitlesMatch(localTitle, omdbTitle, series = '') {
-  return episodeTitleComparison(localTitle,omdbTitle,series).matched;
+function episodeTitlesMatch(localTitle, catalogTitle, series = '') {
+  return episodeTitleComparison(localTitle,catalogTitle,series).matched;
 }
 
 // Cap comparison work for malformed tags. Normal episode titles are much
@@ -235,9 +235,9 @@ function sanityParts(value) {
   return {words, key: words.join(''), part, numbers: words.filter(word => /^\d+$/.test(word))};
 }
 
-function assessEpisodeTitle(localTitle, omdbTitle, series = '') {
+function assessEpisodeTitle(localTitle, suppliedTitle, series = '') {
   const original = usefulEpisodeTitle(localTitle, series);
-  const catalogTitle = usefulEpisodeTitle(omdbTitle);
+  const catalogTitle = usefulEpisodeTitle(suppliedTitle);
   // Whole-title agreement wins. Otherwise the same explicit prefix
   // interpretation must reach both strict correction and fuzzy assessment.
   const comparison = episodeTitleComparison(original,catalogTitle,series);
@@ -304,17 +304,17 @@ function assessEpisodeTitle(localTitle, omdbTitle, series = '') {
 function assessEpisodeRuntime(video, episodeData) {
   const seconds = Number(video && video.metadata && video.metadata.duration);
   const localMinutes = Number.isFinite(seconds) && seconds > 0 ? seconds / 60 : null;
-  const omdbMinutes = parseRuntimeMinutes(episodeData && episodeData.Runtime);
-  const result = {state: 'inconclusive', localMinutes, omdbMinutes};
-  if (!localMinutes || !omdbMinutes || (video && video.dvd)) return result;
+  const catalogMinutes = parseRuntimeMinutes(episodeData && episodeData.Runtime);
+  const result = {state: 'inconclusive', localMinutes, catalogMinutes};
+  if (!localMinutes || !catalogMinutes || (video && video.dvd)) return result;
   const title = titleText(video && video.title);
   // Split/combined evidence comes from current tags, not the original path.
   if (/\b(?:part|pt|cd|disc|disk)\s*[. -]?\s*(?:\d+|[ivx]+|one|two)\b/i.test(title) ||
       /\b(?:s\d+e\d+|\d{1,2}\.\d{1,3})\s*(?:[-&+]\s*)?(?:e\d+|\d{1,2}\.\d{1,3})\b/i.test(title)) {
     return {...result, reason: 'split or combined episode tag'};
   }
-  const difference = Math.abs(localMinutes - omdbMinutes);
-  const ratio = Math.max(localMinutes, omdbMinutes) / Math.min(localMinutes, omdbMinutes);
+  const difference = Math.abs(localMinutes - catalogMinutes);
+  const ratio = Math.max(localMinutes, catalogMinutes) / Math.min(localMinutes, catalogMinutes);
   // Deliberately broad: a five-minute gap AND more than a fourfold difference.
   // Ordinary edits, short cartoons, half pilots and double episodes survive.
   return {...result, state: difference > 5 && ratio > 4 ? 'contradiction' : 'compatible'};

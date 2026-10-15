@@ -229,7 +229,7 @@ function makeSeriesChoice(result) {
 function ambiguousSeriesFailure(series, candidates) {
   let failure = predictableFailure(
     'Ambiguous series',
-    `More than one OMDb series matches "${series}"`
+    `More than one catalog series matches "${series}"`
   );
   failure.choiceType = 'series';
   failure.choices = candidates.map(makeSeriesChoice);

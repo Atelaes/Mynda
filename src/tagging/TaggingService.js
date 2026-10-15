@@ -1,7 +1,7 @@
 // Electron composition and the legacy public result adapters. The engine and
 // batch runner use explicit decisions internally; neither depends on Electron.
 const {app} = require('electron');
-const log = require('../platform/Logger.js').child('OMDb');
+const log = require('../platform/Logger.js').child('Tagging');
 const {createCatalogClient} = require('./CatalogClient');
 const {createArtworkService} = require('./ArtworkService');
 const {createTagApplier} = require('./TagApplier');
@@ -10,7 +10,7 @@ const Decision = require('./TaggingDecision');
 const {loadMetadataServerConfig} = require('./MetadataServerConfig');
 
 const server = loadMetadataServerConfig();
-const client = createCatalogClient({axios:require('axios'),server,omdb:server ? null : require('../../omdb'),log});
+const client = createCatalogClient({axios:require('axios'),server,log});
 const path = require('path');
 const artwork = createArtworkService({...client,log,
   artworkDirectory:path.join(app.getPath('userData'),'Library','Artwork'),

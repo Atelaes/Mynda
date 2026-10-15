@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const configPath = path.resolve(__dirname, '../../metadata-server.local.json');
-const configurationMessage = 'Metadata server configuration is invalid. Check metadata-server.local.json and restart Mynda.';
+const configurationMessage = 'Metadata server connection settings are missing or invalid. Run npm run metadata:setup or check metadata-server.local.json, then restart Mynda.';
 
 function validateServerConfig(value) {
   const invalid = () => { throw new Error(configurationMessage); };
@@ -22,8 +22,8 @@ function loadMetadataServerConfig({file = configPath, readFile = fs.readFileSync
     return validateServerConfig(JSON.parse(readFile(file, 'utf8')));
   } catch (error) {
     if (error.code === 'ENOENT') return null;
-    // A broken opt-in config must neither prevent the app opening nor silently
-    // send requests directly to OMDb. Report the problem on the next lookup.
+    // Missing or broken settings must not prevent the app opening. Report the
+    // problem on the next lookup; metadata always goes through the server.
     return {configurationError: true};
   }
 }

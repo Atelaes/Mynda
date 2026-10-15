@@ -19,7 +19,13 @@ const root = app.getAppPath();
 const diagnostics = path.dirname(directory);
 const imageBytes = fs.readFileSync(path.join(root,'images/qmark.png'));
 const live = scenario === 'live';
-const network = createNetwork({axios:require('axios'),imageBytes,live,secret:process.env.MYNDA_TEST_API_KEY || '',
+// The disposable app receives only the server connection in memory. Production
+// code still uses its ordinary configuration loader; no provider key is staged.
+const config = require(path.join(root,'src/tagging/MetadataServerConfig'));
+const server = config.validateServerConfig(JSON.parse(process.env.MYNDA_TEST_METADATA_CONNECTION));
+config.loadMetadataServerConfig = () => server;
+delete process.env.MYNDA_TEST_METADATA_CONNECTION;
+const network = createNetwork({axios:require('axios'),imageBytes,live,server,
   file:path.join(diagnostics,'requests.json'),restart:phase==='restart'});
 let library,window,stage='startup',finished=false;
 const messages=[],dialogHistory=[],pendingDialogs=[];

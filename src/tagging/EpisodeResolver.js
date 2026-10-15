@@ -1,6 +1,6 @@
 const Response = require('./CatalogResponse');
 const {validSeriesImdbID, normalizeEpisodeNumber, predictableFailure, requestFailure, episodeResponseMatches} = Response;
-const {summarizeError, summarizeOMDbResponse} = require('./TaggingDiagnostics');
+const {summarizeError, summarizeCatalogResponse} = require('./TaggingDiagnostics');
 const Identity = require('./SeriesIdentity');
 const {seriesSearchPartsForVideo, seriesCacheKey, seriesTitlesMatch, localEpisodeTitleForVerification, seriesYearMatches, canInferSingleSeason} = Identity;
 
@@ -12,8 +12,8 @@ const Decision = require('./TaggingDecision');
 const Evidence = require('./TaggingEvidence');
 const Limits = require('./TaggingLimits');
 const Numbering = require('./EpisodeNumbering');
-function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, withEpisodeDuration}) {
-  const {lookup} = require('./EpisodeLookup').createEpisodeLookup({log,pollOMDB,createURLParts});
+function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolveSeries, withEpisodeDuration}) {
+  const {lookup} = require('./EpisodeLookup').createEpisodeLookup({log,requestCatalog,createCatalogQuery});
   // These observations survive both rejected discovery and accepted proposals.
   // The report distinguishes finding a candidate from actually applying it.
   async function probe(seriesID, requested, probed, localTitle, context, kind) {
@@ -47,7 +47,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
     const matches=[];
     const accept = match => {
       match.check.outcome='selected';
-      log.warn('Corrected shifted OMDb episode number using the local title', {
+      log.warn('Corrected shifted catalog episode number using the local title', {
         searchID:context.searchID,localTitle,requested:{season,episode},
         matched:{season,episode:match.episode,distance:match.distance,title:match.data.Title,imdbID:match.data.imdbID}
       });
@@ -64,10 +64,10 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
         if (!found.data) continue;
         const comparison = found.comparison;
         const titleMatches = comparison.matched;
-        log.debug('Compared nearby OMDb episode title', {
+        log.debug('Compared nearby catalog episode title', {
           searchID: context.searchID,
           localTitle: localTitle,
-          omdbTitle: found.data.Title,
+          catalogTitle: found.data.Title,
           season: season,
           episode: nearbyEpisode,
           distance: distance,
@@ -80,7 +80,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
 
       if (matches.length > 1) {
         matches.forEach(match=>{match.check.outcome='ambiguous-title';});
-        log.warn('More than one nearby OMDb episode matched the local title; retaining normal lookup behavior', {
+        log.warn('More than one nearby catalog episode matched the local title; retaining normal lookup behavior', {
           searchID: context.searchID,
           localTitle: localTitle,
           requested: {season: season, episode: episode},
@@ -107,7 +107,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
     let previousOffset = seasonOffsetHintFor(hints, seriesID);
     hints.set(seriesID, offset);
     if (previousOffset !== offset) {
-      log.debug('Remembered title-verified OMDb season offset for this tagging batch', {
+      log.debug('Remembered title-verified catalog season offset for this tagging batch', {
         searchID: context.searchID,
         seriesID: seriesID,
         previousOffset: previousOffset,
@@ -127,10 +127,10 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
     const found=await probe(seriesID,{season,episode},{season:adjacentSeason,episode},localTitle,context,'adjacent-season');
     if (!found.data) return found;
     let titleMatches = found.comparison.matched;
-    log.debug('Compared adjacent-season OMDb episode title', {
+    log.debug('Compared adjacent-season catalog episode title', {
       searchID: context.searchID,
       localTitle: localTitle,
-      omdbTitle: found.data.Title,
+      catalogTitle: found.data.Title,
       requested: {season: season, episode: episode},
       probed: {season: adjacentSeason, episode: episode},
       seasonOffset: offset,
@@ -169,7 +169,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
     if (matches.length !== 1) {
       matches.forEach(match=>{match.check.outcome='ambiguous-title';});
       if (matches.length > 1) {
-        log.warn('Both adjacent OMDb seasons matched the local episode title; retaining normal lookup behavior', {
+        log.warn('Both adjacent catalog seasons matched the local episode title; retaining normal lookup behavior', {
           searchID: context.searchID,
           localTitle: localTitle,
           requested: {season: season, episode: episode},
@@ -181,7 +181,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
 
     let match = matches[0];
     match.check.outcome='selected';
-    log.warn('Corrected shifted OMDb season using the local title', {
+    log.warn('Corrected shifted catalog season using the local title', {
       searchID: context.searchID,
       localTitle: localTitle,
       requested: {season: season, episode: episode},
@@ -216,7 +216,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
     const seriesID = seriesResult.data;
     let metadata = singleSeasonMetadataCache.get(seriesID);
     if (!metadata) {
-      const response = await pollOMDB(createURLParts({id: seriesID}), {...context,
+      const response = await requestCatalog(createCatalogQuery({id: seriesID}), {...context,
         searchID: context.searchID, stage: 'verify missing-season inference'
       });
       const failure = requestFailure(response);
@@ -266,9 +266,9 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
       let storedEpisode = String(video.episode).trim();
       let reason;
       if (String(video.season).toLowerCase() === 'extras') {
-        reason = 'OMDb does not assign ordinary season and episode numbers to Mynda extras';
+        reason = 'The catalog does not assign ordinary season and episode numbers to Mynda extras';
       } else if (/^\d+\.[1-9]$/.test(storedEpisode)) {
-        reason = `OMDb cannot search for fractional episode ${storedEpisode}. ` +
+        reason = `catalog cannot search for fractional episode ${storedEpisode}. ` +
           'Mynda can store and sort this episode position; tag it individually by entering its exact IMDb ID.';
       } else {
         reason = 'A show needs a series and whole-number season and episode values for auto-tagging';
@@ -310,10 +310,10 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
 
     let seriesID = seriesResult.data;
     try {
-      // OMDb supports Season+Episode with a series IMDb ID. Once a series has
+      // The catalog supports Season+Episode with a series IMDb ID. Once a series has
       // been resolved, its ID is cached so every later episode needs one request.
       // If ambiguity was just resolved by episode probes, reuse that full episode
-      // response instead of making the same OMDb request twice.
+      // response instead of making the same catalog request twice.
       let episodeData = seriesResult.episodeData;
       let matchedSeason = seriesResult.matchedSeason || season;
       let matchedEpisode = seriesResult.matchedEpisode || episode;
@@ -391,18 +391,18 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
       if (!episodeResponseMatches(
         episodeData, seriesID, matchedSeason, matchedEpisode
       )) {
-        log.warn('OMDb episode response did not match the request', {
+        log.warn('The catalog episode response did not match the request', {
           searchID: context.searchID,
           expected: {
             seriesID: seriesID,
             season: matchedSeason,
             episode: matchedEpisode
           },
-          received: summarizeOMDbResponse({status: 200, data: episodeData})
+          received: summarizeCatalogResponse({status: 200, data: episodeData})
         });
         return predictableFailure(
           'Episode mismatch',
-          `OMDb did not return a valid episode for ${series} S${season}E${episode}`
+          `catalog did not return a valid episode for ${series} S${season}E${episode}`
         );
       }
 
@@ -436,7 +436,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
             log.debug('No exact title correction found; checking episode plausibility', {
               searchID: context.searchID,
               localTitle: localTitle,
-              omdbTitle: episodeData.Title,
+              catalogTitle: episodeData.Title,
               season: season,
               episode: episode,
               nearbyProbeError: summarizeError(correction.requestFailure && correction.requestFailure.data),
@@ -454,7 +454,7 @@ function createEpisodeResolver({log, pollOMDB, createURLParts, resolveSeries, wi
         if (seriesIdCache.get(cacheKey)?.data === seriesID) seriesIdCache.delete(cacheKey);
         log.warn('Rejected implausible episode match', {
           searchID: context.searchID, videoID: video.id, series, seriesID,
-          season, episode, localTitle, omdbTitle: episodeData.Title,
+          season, episode, localTitle, catalogTitle: episodeData.Title,
           reason, policyReason, titleAssessment
         });
         return {...predictableFailure('Episode mismatch',reason),policyReason,

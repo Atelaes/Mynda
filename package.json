@@ -96,6 +96,7 @@
       "!themes{,/**/*}",
       "!SOURCE_LAYOUT.md",
       "!metadata-server.local.json",
+      "!omdb.js",
       "!METADATA_SERVER.md"
     ],
     "win": {

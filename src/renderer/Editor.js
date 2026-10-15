@@ -1,4 +1,4 @@
-// Editor pane, OMDb search workflow, and the complete edit form.
+// Editor pane, catalog search workflow, and the complete edit form.
 const React = require('react');
 const _ = require('lodash');
 const hashObject = require('object-hash');
@@ -164,7 +164,7 @@ class MynEditor extends MynOpenablePane {
 
     // seriesImdbID identifies the parent show represented by `series`. A
     // manual series rename makes the old ID unsafe, and changing a video's
-    // kind away from show makes it meaningless. Explicit OMDb results include
+    // kind away from show makes it meaningless. Explicit catalog results include
     // their own seriesImdbID and therefore are not cleared here.
     const suppliedSeries = Object.prototype.hasOwnProperty.call(suppliedChanges, 'series');
     const suppliedSeriesID = Object.prototype.hasOwnProperty.call(suppliedChanges, 'seriesImdbID');
@@ -1024,9 +1024,9 @@ class MynEditorSearch extends React.Component {
     }
     if (responseObject.status !== 'matched') {
       alert(movie.myndaChoiceType === 'series' ?
-        'OMDb could not find this episode in the selected series.' :
-        'OMDb could not retrieve the selected result.');
-      editorLog.warn('Could not retrieve the selected OMDb result', {
+        'The catalog could not find this episode in the selected series.' :
+        'The catalog could not retrieve the selected result.');
+      editorLog.warn('Could not retrieve the selected catalog result', {
         choiceType: movie.myndaChoiceType || 'result',
         imdbID: movie.imdbID,
         error:responseObject.reason
@@ -1091,7 +1091,7 @@ class MynEditorSearch extends React.Component {
     } else {
       searchBtn = this.state.searching ?
         (<img src='../../images/loading-icon.gif' className='loading-icon' />) :
-        (<button type='button' id='edit-search-button' onClick={this.handleSearch} title='Search OMDb for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
+        (<button type='button' id='edit-search-button' onClick={this.handleSearch} title='Search the catalog for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
     }
     return (
         <div id='edit-search'>

@@ -7,7 +7,7 @@ const {
   BOX_OFFICE_CURRENCY,
   DEFAULT_BOX_OFFICE_LOCALE,
   parseBoxOffice,
-  parseOmdbBoxOffice,
+  parseCatalogBoxOffice,
   formatBoxOffice,
   formatCompactBoxOffice
 } = require('../src/library/BoxOffice.js');
@@ -53,11 +53,11 @@ suite.test('rejects missing, negative, infinite, and non-USD text', () => {
 });
 
 suite.test('normalizes OMDb values to whole USD and makes unavailable values zero', () => {
-  assert.strictEqual(parseOmdbBoxOffice('$107,928,762'), 107928762);
-  assert.strictEqual(parseOmdbBoxOffice('$1,234.50'), 1235);
-  assert.strictEqual(parseOmdbBoxOffice('N/A'), 0);
-  assert.strictEqual(parseOmdbBoxOffice(undefined), 0);
-  assert.strictEqual(parseOmdbBoxOffice('-12'), 0);
+  assert.strictEqual(parseCatalogBoxOffice('$107,928,762'), 107928762);
+  assert.strictEqual(parseCatalogBoxOffice('$1,234.50'), 1235);
+  assert.strictEqual(parseCatalogBoxOffice('N/A'), 0);
+  assert.strictEqual(parseCatalogBoxOffice(undefined), 0);
+  assert.strictEqual(parseCatalogBoxOffice('-12'), 0);
 });
 
 suite.test('formats full U.S. dollar values without cents', () => {

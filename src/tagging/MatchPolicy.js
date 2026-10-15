@@ -24,20 +24,20 @@ function evaluateMovie(record, candidate, video, options) {
 
 function evaluateEpisode({localTitle, record, titleAssessment, runtimeAssessment, confidentSeries, remoteTitle, video}) {
   if (titleAssessment.state === 'contradiction') return {
-    accepted:false, reason:`Episode title mismatch: "${localTitle}" does not agree with OMDb's "${record.Title}".`
+    accepted:false, reason:`Episode title mismatch: "${localTitle}" does not agree with the catalog's "${record.Title}".`
   };
   if (!remoteTitle && !confidentSeries) return {
-    accepted:false, policyReason:'unconfirmed-series', reason:'OMDb returned a generic episode title for an unconfirmed series. Select the correct series before retrying.'
+    accepted:false, policyReason:'unconfirmed-series', reason:'The catalog returned a generic episode title for an unconfirmed series. Select the correct series before retrying.'
   };
   if (localTitle && titleAssessment.state === 'inconclusive') return {
     accepted:false, reason:'The current episode title could not be verified against the catalog record',
     policyReason:'unverified-episode-title'
   };
   if (runtimeAssessment && runtimeAssessment.state === 'contradiction') return {
-    accepted:false, reason:`Episode runtime mismatch: the video is ${runtimeAssessment.localMinutes.toFixed(1)} minutes, but OMDb reports ${runtimeAssessment.omdbMinutes} minutes.`
+    accepted:false, reason:`Episode runtime mismatch: the video is ${runtimeAssessment.localMinutes.toFixed(1)} minutes, but the catalog reports ${runtimeAssessment.catalogMinutes} minutes.`
   };
   if (runtimeAssessment && video && !video.dvd) {
-    const local = runtimeAssessment.localMinutes, remote = runtimeAssessment.omdbMinutes;
+    const local = runtimeAssessment.localMinutes, remote = runtimeAssessment.catalogMinutes;
     const explicitSplit = /\b(?:part|pt|cd|disc|disk)\s*[. -]?\s*(?:\d+|[ivx]+|one|two)\b/i.test(video.title || '');
     if (local && remote && Math.abs(local-remote)>5 &&
         (local/remote>1.65 || (remote/local>1.65 && !explicitSplit))) return {

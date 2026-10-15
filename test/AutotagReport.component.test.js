@@ -13,7 +13,7 @@ const {MynAutotagReport,LinkedReportText} = loadFreshWithMocks(path.join(__dirna
   './SharedComponents.js':shared
 });
 const {MynEditor,MynEditorEdit} = loadFreshWithMocks(path.join(__dirname,'../src/renderer/Editor.js'),{
-  electron:{ipcRenderer:{}},'../tagging/OmdbHelper.js':{},'./RendererRuntime.js':{},
+  electron:{ipcRenderer:{}},'../tagging/TaggingService.js':{},'./RendererRuntime.js':{},
   './SharedComponents.js':{...shared,MynOpenablePane:React.Component},'./EditorFields.js':{},
   './AutotagReport.js':{MynAutotagReport}
 });

@@ -20,7 +20,7 @@ const MediaMetadata = require('../media/MediaMetadata.js');
 if (MediaTools.ffmpegPath) ffmpeg.setFfmpegPath(MediaTools.ffmpegPath);
 if (MediaTools.ffprobePath) ffmpeg.setFfprobePath(MediaTools.ffprobePath);
 const Logger = require('../platform/Logger.js');
-const OmdbHelper = require('../tagging/OmdbHelper.js');
+const TaggingService = require('../tagging/TaggingService.js');
 const MovieSearch = require('../tagging/MovieSearch.js');
 const VideoExclusion = require('../scanning/VideoExclusion.js');
 const VideoRuntimeVerifier = require('../scanning/VideoRuntimeVerifier.js');
@@ -175,7 +175,7 @@ const shareService = new ShareService({
 const playback = createPlaybackService({library,log:Logger.child('Player'),publish:state => {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('playback:state',state);
 }});
-const editor = createEditorService({library,catalog:OmdbHelper,dialog,app,
+const editor = createEditorService({library,catalog:TaggingService,dialog,app,
   deriveFilenameResetChanges,isAutoTagRunning:()=>autoTagState.running,
   confirmationDialogIsDisabled,disableConfirmationDialog,log:backendLog});
 const desktop = createDesktopService({app,dialog,shell:electron.shell,library,getWindow:()=>win,
@@ -1404,7 +1404,7 @@ function getMetadataFromFFmpeg(filepath, id, options = {}) {
 
 // Build, but do not save, the changes for the editor's "Reset from Filename"
 // action. This deliberately starts identification from the file path instead
-// of the video's current title/series values, so a bad OMDb match cannot feed
+// of the video's current title/series values, so a bad catalog match cannot feed
 // back into the retry. It reuses findSeasonEpisode(), keeping manual and batch
 // reset behavior identical to the detector used when a show is first added.
 function deriveFilenameResetChanges(video, watchfolders = library.settings.watchfolders) {
@@ -1419,7 +1419,7 @@ function deriveFilenameResetChanges(video, watchfolders = library.settings.watch
   const folderParts = watchfolder ?
     path.relative(watchfolder.path, containingFolder).split(path.sep).filter(Boolean) : [];
 
-  // OMDb adds these catalog fields. Clear them so the next manual search or
+  // Tagging adds these catalog fields. Clear them so the next manual search or
   // Auto-Tag pass starts cleanly. User-owned state—tags, subtitles, watched
   // state, playback position, dates, and technical metadata—is absent from
   // this patch and therefore survives unchanged in the editor.
@@ -1481,10 +1481,10 @@ function normalizedBatchSeries(value) {
 }
 
 // Mynda may store manually interlaced episode positions such as 3.5, but
-// OMDb's season/episode endpoint accepts only whole-number coordinates. Keep
+// The metadata server's season/episode endpoint accepts only whole-number coordinates. Keep
 // those videos valid in the library while excluding them from coordinate-based
 // Auto-Tag requests that could otherwise target the wrong ordinary episode.
-function hasUsableOMDbShowEpisodeFields(video) {
+function hasUsableEpisodeCoordinates(video) {
   return Boolean(video && video.kind === 'show' &&
     String(video.series || '').trim() &&
     /^\d+$/.test(String(video.season).trim()) &&
@@ -1603,7 +1603,7 @@ async function requestAutoTag() {
       cancelId: 0,
       title: 'Auto-Tag',
       message: `Auto-tag ${eligibleCount} video${plural}?`,
-      detail: "Mynda will search OMDb for every video in the 'New' playlist (unless it has already been auto-tagged). Successful matches will overwrite most existing metadata. This may take a very long time when many videos are eligible."
+      detail: "Mynda will search the catalog for every video in the 'New' playlist (unless it has already been auto-tagged). Successful matches will overwrite most existing metadata. This may take a very long time when many videos are eligible."
     });
 
     if (result.response === 1) {
@@ -1731,7 +1731,7 @@ async function requestSelectedAutoTag(videoIDs) {
 
     const seriesBatch = sameSeriesShowBatch(selected);
     const incompleteShows = selected.filter(video =>
-      video.kind === 'show' && !hasUsableOMDbShowEpisodeFields(video)
+      video.kind === 'show' && !hasUsableEpisodeCoordinates(video)
     ).length;
     const keepInNew = !library.settings.preferences.remove_autotagged_from_new;
     let detail =
@@ -1740,12 +1740,12 @@ async function requestSelectedAutoTag(videoIDs) {
       `Successfully tagged videos will ${keepInNew ? 'remain in' : 'be removed from'} New.`;
 
     if (seriesBatch) {
-      detail += `\n\nAll selected videos are episodes of “${seriesBatch.series}”. Before processing any episode, Mynda will settle on one parent series ID for the whole batch. If OMDb finds more than one matching series, Mynda will ask you once; if the series cannot be resolved, no selected videos will be changed.`;
+      detail += `\n\nAll selected videos are episodes of “${seriesBatch.series}”. Before processing any episode, Mynda will settle on one parent series ID for the whole batch. If the catalog finds more than one matching series, Mynda will ask you once; if the series cannot be resolved, no selected videos will be changed.`;
     } else {
       detail += '\n\nBecause this is not a single-series show batch, ambiguous matches will be skipped without another prompt.';
     }
     if (incompleteShows > 0) {
-      detail += `\n\n${incompleteShows} selected show${incompleteShows === 1 ? '' : 's'} currently lack${incompleteShows === 1 ? 's' : ''} a usable series or whole-number season/episode for OMDb and cannot be tagged by coordinates. Tag a fractional episode individually by entering its exact IMDb ID.`;
+      detail += `\n\n${incompleteShows} selected show${incompleteShows === 1 ? '' : 's'} currently lack${incompleteShows === 1 ? 's' : ''} a usable series or whole-number season/episode for catalog lookups and cannot be tagged by coordinates. Tag a fractional episode individually by entering its exact IMDb ID.`;
     }
 
     const confirmation = await dialog.showMessageBox({
@@ -1837,7 +1837,7 @@ function requestAutoTagCancellation() {
 
 async function autoTag(options = {}) {
   return createAutoTagRunner({
-    state: autoTagState, catalog: OmdbHelper, log: autoTagLog,
+    state: autoTagState, catalog: TaggingService, log: autoTagLog,
     getCandidates: getAutoTagCandidates, save: saveBatch,
     getLibraryVideos: () => library.media,
     notifyStatus: status => win.webContents.send('status-update', status),

@@ -1,8 +1,8 @@
 const Response = require('./CatalogResponse');
 const {requestFailure} = Response;
-const {summarizeError, summarizeOMDbResponse} = require('./TaggingDiagnostics');
+const {summarizeError, summarizeCatalogResponse} = require('./TaggingDiagnostics');
 
-function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, dl, fs, path}) {
+function createArtworkService({log, requestCatalog, createCatalogQuery, artworkDirectory, dl, fs, path}) {
   const seriesArtworkCache = new Map();
   const failedArtworkURLs = new Set();
   function usablePosterURL(poster) {
@@ -25,7 +25,7 @@ function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, 
     }
 
     try {
-      let response = await pollOMDB(createURLParts({id: seriesID}), {...context,
+      let response = await requestCatalog(createCatalogQuery({id: seriesID}), {...context,
         searchID: context.searchID,
         stage: 'series artwork fallback'
       });
@@ -48,7 +48,7 @@ function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, 
         log.warn('Series artwork fallback response did not match the requested series', {
           searchID: context.searchID,
           seriesID: seriesID,
-          received: summarizeOMDbResponse(response)
+          received: summarizeCatalogResponse(response)
         });
         return '';
       }
@@ -104,7 +104,7 @@ function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, 
       return '';
     }
     if (failedArtworkURLs.has(url)) {
-      log.debug('Skipping OMDb artwork URL that previously returned 404', {
+      log.debug('Skipping catalog artwork URL that previously returned 404', {
         searchID: context.searchID,
         artworkSource: source,
         artworkHost: artworkHostname(url)
@@ -123,7 +123,7 @@ function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, 
           seriesArtworkCache.set(seriesID, '');
         }
       }
-      log.warn('Could not download OMDb artwork', {
+      log.warn('Could not download catalog artwork', {
         searchID: context.searchID,
         artworkSource: source,
         artworkHost: artworkHostname(url),
@@ -183,12 +183,12 @@ function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, 
     return new Promise(function(resolve, reject) {
       let fileExt = path.extname(url)
       let fileName = path.basename(url, fileExt);
-      log.debug('Preparing OMDb artwork download', {searchID: context.searchID, sourceFilename: fileName});
+      log.debug('Preparing catalog artwork download', {searchID: context.searchID, sourceFilename: fileName});
       fileName = fileName.replace(/[\*\."/\\\[\]:;\|,]/g, '') + fileExt;
-      log.debug('Prepared local OMDb artwork filename', {searchID: context.searchID, localFilename: fileName});
+      log.debug('Prepared local catalog artwork filename', {searchID: context.searchID, localFilename: fileName});
       let filePath = path.join(artworkDirectory, fileName);
       if (fs.existsSync(filePath)) {
-        log.debug('Reusing existing OMDb artwork file', {
+        log.debug('Reusing existing catalog artwork file', {
           searchID: context.searchID,
           destination: filePath
         });
@@ -199,7 +199,7 @@ function createArtworkService({log, pollOMDB, createURLParts, artworkDirectory, 
         try {
           // if successful, we'll receive an object with the path at "path"
           if (args && Object.prototype.hasOwnProperty.call(args, 'path')) {
-            log.debug('OMDb artwork download finished', {
+            log.debug('The catalog artwork download finished', {
               searchID: context.searchID,
               artworkSource: context.artworkSource,
               destination: args.path

@@ -25,7 +25,7 @@ function record(overrides = {}) {
     countries:['United States'], languages:['English', 'French'], boxOffice:'$4,219,709',
     ratings:[{source:'Internet Movie Database', value:'8.5/10', provider:'omdb'},
       {source:'Rotten Tomatoes', value:'99%', provider:'omdb'}, {source:'Metacritic', value:'100/100', provider:'omdb'}],
-    votes:[{source:'imdb', count:662325, provider:'omdb'}], series:null, season:null, episode:null,
+    votes:[{source:'imdb', count:662325, provider:'omdb'}], seriesExternalIds:{}, series:null, season:null, episode:null,
     episodeOrder:null, totalSeasons:null, provenance, ...overrides};
 }
 function search(items = [record()], overrides = {}) {
@@ -68,14 +68,14 @@ async function withServer(responder, operation) {
 suite.test('all five operations send authenticated POSTs with the intended filters and preserve metadata fields', async () => {
   const parent = 'tt4574334';
   await withServer((route, body) => ({data:route === '/v1/search' ? search([record()], {page:body.page, totalResults:31, hasMore:true}) :
-    route === '/v1/season' ? {series:ref(parent), season:0, order:'provider', totalSeasons:null,
+    route === '/v1/season' ? {series:ref(parent), seriesExternalIds:{imdb:parent}, season:0, order:'provider', totalSeasons:null,
       completeness:'unknown', provenance, episodes:[{ref:ref('tt7654321'), externalIds:{imdb:'tt7654321'}, title:'Special', episode:0, released:null}]} :
     route === '/v1/episode' ? record({ref:ref('tt7654321'), externalIds:{imdb:'tt7654321'}, kind:'episode',
-      series:ref(parent), season:0, episode:0, episodeOrder:'provider'}) : record()}), async (client, calls) => {
+      series:ref(parent), seriesExternalIds:{imdb:parent}, season:0, episode:0, episodeOrder:'provider'}) : record()}), async (client, calls) => {
     const requests = [{title:'Casablanca & Co', type:'movie', year:1943, page:3}, {exactTitle:'Casablanca', type:'movie'},
       {id:'tt0034583'}, {id:parent, season:0}, {id:parent, season:0, episode:0}];
     const replies = [];
-    for (const query of requests) replies.push(await client.pollOMDB(client.createURLParts(query)));
+    for (const query of requests) replies.push(await client.requestCatalog(client.createCatalogQuery(query)));
     assert.deepStrictEqual(calls, [
       {route:'/v1/search', body:{title:'Casablanca & Co', kind:'movie', year:1943, page:3}},
       {route:'/v1/title', body:{title:'Casablanca', kind:'movie'}},
@@ -114,21 +114,46 @@ suite.test('unknown values and year ranges survive translation; native provider 
   const client = createCatalogClient({log, server:{url:'http://127.0.0.1:8787', token}, axios:async () => ({status:200, data:{requestId,
     data:record({year:{text:'2020–', start:2020, end:null}, artwork:[], runtimeMinutes:null, genres:null,
       ratings:[], votes:[], series:{provider:'other', id:'native-parent'}, ref:{provider:'other', id:'native-record'}})}})});
-  const response = await client.pollOMDB(client.createURLParts({id:'tt0034583'}));
+  const response = await client.requestCatalog(client.createCatalogQuery({id:'tt0034583'}));
   assert.strictEqual(response.data.Year, '2020–'); assert.strictEqual(response.data.Runtime, 'N/A');
   assert.strictEqual(response.data.Poster, 'N/A'); assert.strictEqual(response.data.imdbVotes, 'N/A');
   assert.strictEqual(response.data.seriesID, undefined); assert.strictEqual(response.data.imdbID, 'tt0034583');
   assert.deepStrictEqual(response.data.catalogSeriesRef, {provider:'other', id:'native-parent'});
 });
 
+suite.test('explicit parent cross-references work with opaque native IDs and reject conflicting or malformed evidence', async () => {
+  const parent = 'tt4574334';
+  const series = {provider:'another-catalog',id:'parent-42'};
+  const episode = record({ref:{provider:'another-catalog',id:'episode-42'},kind:'episode',series,
+    seriesExternalIds:{imdb:parent},season:1,episode:2});
+  await withServer(() => ({data:episode}), async client => {
+    const response = await client.requestCatalog({id:parent,season:1,episode:2});
+    assert.strictEqual(response.data.seriesID,parent);
+    assert.deepStrictEqual(response.data.catalogSeriesRef,series);
+  });
+  for (const seriesExternalIds of [{imdb:'tt1111111'},{imdb:'native-parent'},null,undefined]) {
+    await withServer(() => ({data:{...episode,seriesExternalIds}}), async client => {
+      await assert.rejects(client.requestCatalog({id:parent,season:1,episode:2}),{code:'METADATA_INVALID_RESPONSE'});
+    });
+  }
+  await withServer(() => ({data:{...episode,series:{provider:'another-catalog',id:parent},seriesExternalIds:{}}}), async client => {
+    const response = await client.requestCatalog({id:parent,season:1,episode:2});
+    assert.strictEqual(response.data.seriesID,undefined,'An IMDb-looking native ID is still opaque');
+  });
+  await withServer(() => ({data:{series,seriesExternalIds:{imdb:'tt1111111'},season:1,order:'provider',
+    totalSeasons:null,episodes:[],completeness:'unknown',provenance}}), async client => {
+    await assert.rejects(client.requestCatalog({id:parent,season:1}),{code:'METADATA_INVALID_RESPONSE'});
+  });
+});
+
 suite.test('concurrent and cached requests reuse one result and one budget charge, with separate queries remaining separate', async () => {
   await withServer((route, body) => ({data:search([], {page:body.page || 1, totalResults:null})}), async (client, calls) => {
     const context = {requestSession:createRequestSession(), requestBudget:createRequestBudget(2), requestTrace:[]};
-    const query = client.createURLParts({title:'Missing'});
-    await Promise.all([client.pollOMDB(query, context), client.pollOMDB(query, context)]);
-    await client.pollOMDB(query, context);
-    await client.pollOMDB(client.createURLParts({title:'Missing', page:2}), context);
-    await assert.rejects(client.pollOMDB(client.createURLParts({title:'Other'}), context), {code:'request-budget-exhausted'});
+    const query = client.createCatalogQuery({title:'Missing'});
+    await Promise.all([client.requestCatalog(query, context), client.requestCatalog(query, context)]);
+    await client.requestCatalog(query, context);
+    await client.requestCatalog(client.createCatalogQuery({title:'Missing', page:2}), context);
+    await assert.rejects(client.requestCatalog(client.createCatalogQuery({title:'Other'}), context), {code:'request-budget-exhausted'});
     assert.strictEqual(calls.length, 2); assert.strictEqual(context.requestBudget.used, 2);
     assert(context.requestTrace.slice(0, 4).every(row => row.requestId === requestId));
   });
@@ -150,9 +175,9 @@ suite.test('only an explicit missing-record code is unmatched; route errors, quo
 suite.test('too-many-results remains ambiguous while failed requests are evicted for a later retry', async () => {
   await withServer((route, body, count) => count === 1 ?
     {status:503, error:{code:'PROVIDER_QUOTA_EXCEEDED'}} : {status:422, error:{code:'TOO_MANY_RESULTS'}}, async (client, calls) => {
-    const context = {requestSession:createRequestSession()}, query = client.createURLParts({title:'Broad search'});
-    await assert.rejects(client.pollOMDB(query, context), {code:'PROVIDER_QUOTA_EXCEEDED'});
-    const response = await client.pollOMDB(query, context);
+    const context = {requestSession:createRequestSession()}, query = client.createCatalogQuery({title:'Broad search'});
+    await assert.rejects(client.requestCatalog(query, context), {code:'PROVIDER_QUOTA_EXCEEDED'});
+    const response = await client.requestCatalog(query, context);
     assert.strictEqual(require('../src/tagging/CatalogResponse').requestFailure(response).failure, 'Ambiguous results');
     assert.strictEqual(calls.length, 2);
   });
@@ -181,7 +206,7 @@ suite.test('malformed records, missing IMDb IDs, and contradictory episode evide
     });
   }
   await withServer(() => ({data:record({kind:'episode', series:ref('tt1111111'), season:1, episode:2})}), async client => {
-    await assert.rejects(client.pollOMDB(client.createURLParts({id:'tt4574334', season:1, episode:1})), {code:'METADATA_INVALID_RESPONSE'});
+    await assert.rejects(client.requestCatalog(client.createCatalogQuery({id:'tt4574334', season:1, episode:1})), {code:'METADATA_INVALID_RESPONSE'});
   });
 });
 
@@ -195,7 +220,7 @@ suite.test('redirects are rejected without contacting their destination', async 
   await new Promise(resolve => redirect.listen(0, '127.0.0.1', resolve));
   try {
     const client = createCatalogClient({axios, log, server:{url:`http://127.0.0.1:${redirect.address().port}`, token}});
-    await assert.rejects(client.pollOMDB(client.createURLParts({id:'tt0034583'})), {code:'METADATA_INVALID_RESPONSE'});
+    await assert.rejects(client.requestCatalog(client.createCatalogQuery({id:'tt0034583'})), {code:'METADATA_INVALID_RESPONSE'});
     assert.strictEqual(destinationCalls, 0);
   } finally {
     destination.closeAllConnections(); redirect.closeAllConnections();
@@ -211,11 +236,11 @@ suite.test('local configuration rejects remote or credential-bearing URLs and ma
   const broken = loadMetadataServerConfig({readFile:() => 'invalid ' + token});
   assert.deepStrictEqual(broken, {configurationError:true});
   const client = createCatalogClient({server:broken, log, axios:async () => { throw new Error('Must not request'); }});
-  await assert.rejects(client.pollOMDB(client.createURLParts({id:'tt0034583'})), {code:'METADATA_CONFIGURATION_ERROR'});
+  await assert.rejects(client.requestCatalog(client.createCatalogQuery({id:'tt0034583'})), {code:'METADATA_CONFIGURATION_ERROR'});
 });
 
 suite.test('main composition in server mode does not load the direct provider key', async () => {
-  const api = loadFreshWithMocks(path.join(__dirname, '../src/tagging/OmdbHelper.js'), {
+  const api = loadFreshWithMocks(path.join(__dirname, '../src/tagging/TaggingService.js'), {
     electron:{app:{getPath:() => '/unused-fixture-directory'}},
     './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:() => ({url:'http://127.0.0.1:8787', token})},
     '../../omdb':new Proxy({}, {get:() => { throw new Error('Direct key accessed'); }}),
@@ -224,6 +249,23 @@ suite.test('main composition in server mode does not load the direct provider ke
   });
   const result = await api.resolve({id:'movie', kind:'movie', imdbID:'tt0034583'});
   assert.strictEqual(result.status, 'candidate');
+});
+
+suite.test('missing and invalid connection settings leave tagging retryable without issuing any HTTP requests', async () => {
+  for (const server of [null,undefined,{configurationError:true}]) {
+    let requests = 0;
+    const api = loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
+      electron:{app:{getPath:() => '/unused-fixture-directory'}},
+      './MetadataServerConfig':{loadMetadataServerConfig:() => server},
+      axios:async () => { requests++; throw Error('Unexpected request'); },
+      '../platform/Logger.js':{child:() => log}
+    });
+    const result = await api.tag({id:'movie',kind:'movie',imdbID:'tt0034583'});
+    assert.strictEqual(result.status,'service-error');
+    assert.strictEqual(result.retryable,true);
+    assert.strictEqual(result.reason.code,'METADATA_CONFIGURATION_ERROR');
+    assert.strictEqual(requests,0);
+  }
 });
 
 suite.test('setup copies only the selected token, uses private permissions, and never overwrites existing settings', () =>
@@ -248,14 +290,16 @@ suite.test('setup copies only the selected token, uses private permissions, and 
     assert.strictEqual(fs.readFileSync(file, 'utf8'), contents);
   }));
 
-suite.test('the actual application file filter excludes the local credential file', () =>
+suite.test('the actual application file filter excludes current and obsolete local credential files', () =>
   withTemporaryDirectory('metadata-package', directory => {
     const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
     const rules = require('../package.json').build.files;
-    const file = path.join(directory, 'metadata-server.local.json');
-    fs.writeFileSync(file, JSON.stringify({url:'http://127.0.0.1:8787', token}));
     const include = new FileMatcher(directory, path.join(directory, 'package'), value => value, rules).createFilter();
-    assert.strictEqual(include(file, fs.statSync(file)), false);
+    for (const name of ['metadata-server.local.json','omdb.js']) {
+      const file = path.join(directory,name);
+      fs.writeFileSync(file,'synthetic credentials');
+      assert.strictEqual(include(file, fs.statSync(file)), false,name);
+    }
   }));
 
 runSuite(suite);

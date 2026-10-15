@@ -130,7 +130,7 @@
     },
     {
       "from": "src/OmdbHelper.js",
-      "to": "src/tagging/OmdbHelper.js",
+      "to": "src/tagging/TaggingService.js",
       "text": true,
       "before": "36693e4bfc6c85ef057ccd6b5c8cc8a59c30738360bf74ec7d5533785100d340",
       "after": "2f272afe9e49fa92d80af95718c31d83e998307a24a715d647f96ede720543ef"

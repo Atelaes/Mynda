@@ -32,7 +32,7 @@ const library = {...libraryFixture(),
 const runtime = {library, editorLog: quiet, artworkLog: quiet, playerLog: quiet,
   libraryViewLog: quiet, settingsLog: quiet, sendLocalStatusUpdate: value => statuses.push(value)};
 const {MynEditor} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
-  electron: {ipcRenderer: ipc}, '../tagging/OmdbHelper.js': {}, './RendererRuntime.js': runtime,
+  electron: {ipcRenderer: ipc}, '../tagging/TaggingService.js': {}, './RendererRuntime.js': runtime,
   './SharedComponents.js': {MynOpenablePane: React.Component}, './EditorFields.js': {}
 });
 const {MynSettings, MynSettingsFolders} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Settings.js'), {
@@ -392,7 +392,7 @@ suite.test('actual frozen LibraryClient records remain untouched by editor and l
   assert(Object.isFrozen(client.media[0]));
   assert(Object.isFrozen(client.settings.used.kinds));
   const {MynEditor: ActualClientEditor} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
-    electron: {ipcRenderer: ipc}, '../tagging/OmdbHelper.js': {},
+    electron: {ipcRenderer: ipc}, '../tagging/TaggingService.js': {},
     './RendererRuntime.js': {...runtime, library: client},
     './SharedComponents.js': {MynOpenablePane: React.Component}, './EditorFields.js': {}
   });
@@ -425,7 +425,7 @@ suite.test('closing waits for an explicit editor save even while artwork copy pr
   window.mynda.editor.prepareArtwork = source => new Promise(resolve => { finishCopy = () => resolve('/tmp/mynda-managed.png'); });
   const {MynEditor: ArtworkEditor} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
     electron: {ipcRenderer: ipc, app: {getPath: () => '/tmp/mynda-component-fixture'}},
-    '../tagging/OmdbHelper.js': {}, './RendererRuntime.js': runtime,
+    '../tagging/TaggingService.js': {}, './RendererRuntime.js': runtime,
     './SharedComponents.js': {MynOpenablePane: React.Component}, './EditorFields.js': {}
   });
   const instance = stateful(new ArtworkEditor({video: library.media[0], settings: library.settings}));

@@ -6,7 +6,7 @@ const Evidence = require('./TaggingEvidence');
 const {requestFailure,episodeResponseMatches} = require('./CatalogResponse');
 const Limits = require('./TaggingLimits');
 
-function createSeriesStructureResolver({pollOMDB,createURLParts,log}) {
+function createSeriesStructureResolver({requestCatalog,createCatalogQuery,log}) {
   return async function resolve(profile,choices,context) {
     const eligible=[...new Map(choices.filter(choice=>Structure.eligibleChoice(profile,choice))
       .map(choice=>[choice.imdbID,choice])).values()].sort((a,b)=>a.imdbID.localeCompare(b.imdbID));
@@ -25,7 +25,7 @@ function createSeriesStructureResolver({pollOMDB,createURLParts,log}) {
     const observations=[];
     for (const choice of eligible) {
       if (context.canContinue && !await context.canContinue()) return {status:'canceled'};
-      const response=await pollOMDB(createURLParts({id:choice.imdbID}),{...context,stage:'series structure metadata'});
+      const response=await requestCatalog(createCatalogQuery({id:choice.imdbID}),{...context,stage:'series structure metadata'});
       const failure=requestFailure(response);
       if (failure && failure.failure !== 'No results') return {failure};
       const metadata=response && response.data;
@@ -47,7 +47,7 @@ function createSeriesStructureResolver({pollOMDB,createURLParts,log}) {
       for (const local of profile.seasons) {
         if (context.canContinue && !await context.canContinue()) return {status:'canceled'};
         if (observation.totalSeasons && local.season > observation.totalSeasons) continue;
-        const listed=await pollOMDB(createURLParts({id:choice.imdbID,season:local.season}),
+        const listed=await requestCatalog(createCatalogQuery({id:choice.imdbID,season:local.season}),
           {...context,stage:'series structure season list'});
         const listFailure=requestFailure(listed);
         if (listFailure && listFailure.failure!=='No results') return {failure:listFailure};
@@ -55,7 +55,7 @@ function createSeriesStructureResolver({pollOMDB,createURLParts,log}) {
         // A season list can omit its tail. Check the actual observed position
         // before excluding a candidate on that list's apparent upper bound.
         if (season.count !== null && local.maxEpisode > season.count) {
-          const boundary=await pollOMDB(createURLParts({id:choice.imdbID,season:local.season,episode:local.maxEpisode}),
+          const boundary=await requestCatalog(createCatalogQuery({id:choice.imdbID,season:local.season,episode:local.maxEpisode}),
             {...context,stage:'series structure boundary episode'});
           const boundaryFailure=requestFailure(boundary);
           if (boundaryFailure && boundaryFailure.failure!=='No results') return {failure:boundaryFailure};

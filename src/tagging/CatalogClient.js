@@ -1,6 +1,6 @@
 // The sole metadata HTTP boundary. Cache hits do not spend the operation's budget;
 // every actual request, including nested probes and retries, spends it here.
-const {requestParametersForLog,summarizeOMDbResponse,summarizeError} = require('./TaggingDiagnostics');
+const {summarizeCatalogResponse,summarizeError} = require('./TaggingDiagnostics');
 const {isNotFoundResponse} = require('./CatalogResponse');
 const {createRequestBudget,spendRequest} = require('./RequestBudget');
 const Limits = require('./TaggingLimits');
@@ -8,44 +8,41 @@ const {createMetadataServerClient} = require('./MetadataServerClient');
 
 function createRequestSession() { return {responses:new Map(),requests:0,reused:0}; }
 
-function createCatalogClient({axios,omdb,log,server}) {
-  const serverRequest = server && createMetadataServerClient({axios,server});
-  const backend = serverRequest ? 'Metadata server' : 'OMDb';
-  function createURLParts(parts) {
-    // Legacy callers still pass URL parts. In server mode they are only a
-    // parameter container; credentials are added to the actual POST privately.
-    const url = [serverRequest ? 'http://127.0.0.1/?' : `https://www.omdbapi.com/?apikey=${encodeURIComponent(omdb.key)}`];
-    const names = {id:'i',title:'s',exactTitle:'t',year:'y',type:'type',series:'t',season:'Season',episode:'Episode',page:'page'};
-    for (const [name,parameter] of Object.entries(names)) {
-      if (parts[name] != null && parts[name] !== '') url.push(`${parameter}=${encodeURIComponent(parts[name])}`);
+function createCatalogClient({axios,log,server,transport = createMetadataServerClient({axios,server})}) {
+  function createCatalogQuery(parts) {
+    // Detached, whitelisted metadata inputs are also safe to use in diagnostics.
+    // Credentials and HTTP details belong exclusively to MetadataServerClient.
+    const query = {};
+    for (const name of ['id','title','exactTitle','year','type','season','episode','page']) {
+      if (parts[name] != null && parts[name] !== '') query[name] = String(parts[name]);
     }
-    return url;
+    if (parts.series != null && parts.series !== '') query.exactTitle = String(parts.series);
+    return query;
   }
 
-  async function request(urlParts,context,parameters,observation) {
+  async function request(context,parameters,observation) {
     spendRequest(context.requestBudget,context.stage);
     observation.issued = true;
     if (context.requestSession) context.requestSession.requests++;
-    log.debug(`${backend} request started`,{searchID:context.searchID,stage:context.stage,parameters});
+    log.debug('Metadata server request started',{searchID:context.searchID,stage:context.stage,parameters});
     try {
-      const response = serverRequest ? await serverRequest(parameters) :
-        await axios({method:'get',url:urlParts.join('&'),timeout:Limits.timeoutMs});
+      const response = await transport(parameters);
       if (response && response.requestId) observation.requestId = response.requestId;
-      log.debug(`${backend} response received`,{searchID:context.searchID,stage:context.stage,
-        requestId:response && response.requestId,request:parameters,response:summarizeOMDbResponse(response)});
+      log.debug('Metadata server response received',{searchID:context.searchID,stage:context.stage,
+        requestId:response && response.requestId,request:parameters,response:summarizeCatalogResponse(response)});
       return response;
     } catch(error) {
       if (error.requestId) observation.requestId = error.requestId;
-      log.error(`${backend} request failed`,{searchID:context.searchID,stage:context.stage,
+      log.error('Metadata server request failed',{searchID:context.searchID,stage:context.stage,
         request:parameters,error:summarizeError(error)});
       throw error;
     }
   }
 
-  async function pollOMDB(urlParts,context = {}) {
+  async function requestCatalog(query,context = {}) {
     const session = context.requestSession;
     context.requestBudget = context.requestBudget || createRequestBudget();
-    const parameters = requestParametersForLog(urlParts);
+    const parameters = createCatalogQuery(query);
     const key = JSON.stringify(Object.keys(parameters).sort().map(name => [name,parameters[name]]));
     const cached = session && session.responses.has(key);
     const observation = {stage:context.stage,parameters,reused:Boolean(cached)};
@@ -58,7 +55,7 @@ function createCatalogClient({axios,omdb,log,server}) {
     } else {
       // The async request charges synchronously before its first await, so
       // concurrent distinct probes cannot race past the shared limit.
-      pending = request(urlParts,context,parameters,observation);
+      pending = request(context,parameters,observation);
       if (session) {
         if (session.responses.size >= Limits.cachedResponses) session.responses.delete(session.responses.keys().next().value);
         session.responses.set(key,pending);
@@ -85,6 +82,6 @@ function createCatalogClient({axios,omdb,log,server}) {
       throw error;
     }
   }
-  return {createURLParts,pollOMDB};
+  return {createCatalogQuery,requestCatalog};
 }
 module.exports = {createCatalogClient,createRequestSession};

@@ -40,7 +40,7 @@ function requestFailure(response) {
     return {
       success: false,
       failure: response ? response.status : 'Error',
-      data: response ? response.statusText : 'No response from OMDb'
+      data: response ? response.statusText : 'No response from the catalog'
     };
   }
   if (response.data && response.data.Response === 'True') {
@@ -55,7 +55,7 @@ function requestFailure(response) {
   return {
     success: false,
     failure: 'Error',
-    data: response.data && response.data.Error ? response.data.Error : 'Unexpected OMDb response'
+    data: response.data && response.data.Error ? response.data.Error : 'Unexpected catalog response'
   };
 }
 

@@ -28,7 +28,7 @@ function message(value) {
 const REASONS = {
   'changed-during-lookup': ['The video was edited while Auto-Tag was looking it up. The proposed tags were not applied, so your saved changes were preserved.',
     'Review the current tags. Run Auto-Tag again if you still want an automatic lookup using the updated information.'],
-  'no-results': ['The searches and lookups performed did not find a safe match. This does not establish that the record is absent from OMDb.',
+  'no-results': ['The searches and lookups performed did not find a safe match. This does not establish that the record is absent from the catalog.',
     'Check the title, year and episode numbers, or select a verified record in Search.'],
   'not-enough-data': ['The available identification was not usable for automatic tagging.',
     'Check the video kind and identifying fields. Extras or disc images may need manual tags.'],
@@ -59,7 +59,7 @@ function failureExplanation(status, reason) {
   if (status === 'service-error') {
     if (code === 'request-budget-exhausted') return ['The attempt reached its lookup limit before it could finish establishing a match.',
       'Add a more specific title, year or series selection before retrying. This video remains eligible for retry.'];
-    if (code === 'malformed-catalog-record') return ['OMDb returned an incomplete or invalid record, so the attempt could not finish.',
+    if (code === 'malformed-catalog-record') return ['The catalog returned an incomplete or invalid record, so the attempt could not finish.',
       'Try again later. This video remains eligible for retry.'];
     if (/timeout|ECONNABORTED|ETIMEDOUT/i.test(code + ' ' + text(reason.message))) return ['A catalog request timed out before the attempt could finish.',
       'Try again later. This video remains eligible for retry.'];
@@ -126,7 +126,9 @@ function correctionDetails(e) {
   const checks=saved.length ? saved : array(e.requests).filter(r=>r &&
     ['nearby episode title probe','adjacent season title probe'].includes(r.stage)).map(r=>({
       kind:r.stage.startsWith('nearby') ? 'nearby-episode' : 'adjacent-season',
-      seriesID:object(r.parameters).i,probed:{season:object(r.parameters).Season,episode:object(r.parameters).Episode},
+      seriesID:object(r.parameters).id || object(r.parameters).i,
+      probed:{season:object(r.parameters).season ?? object(r.parameters).Season,
+        episode:object(r.parameters).episode ?? object(r.parameters).Episode},
       outcome:r.outcome === 'not-found' ? 'not-found' : 'legacy-response'}));
   const names={'nearby-episode':'Nearby episode','adjacent-season':'Adjacent season','sibling-numbering':'Sibling-supported numbering'};
   const outcomes={
@@ -226,8 +228,10 @@ function buildTaggingReport(video) {
   const runtime = object(e.runtimeAssessment), movie = object(e.movieAssessment || e.evaluation);
   const plausibility = object(movie.plausibility);
   const localRuntime = minutes(runtime.localMinutes || plausibility.localRuntimeMinutes);
-  const catalogRuntime = minutes(runtime.omdbMinutes || plausibility.omdbRuntimeMinutes);
-  if (localRuntime || catalogRuntime) fact('Runtime', `File: ${localRuntime || 'unknown'}; OMDb: ${catalogRuntime || 'unknown'}.`);
+  // Retain reports saved before provider-neutral evidence names were introduced.
+  const catalogRuntime = minutes(runtime.catalogMinutes || plausibility.catalogRuntimeMinutes ||
+    runtime.omdbMinutes || plausibility.omdbRuntimeMinutes);
+  if (localRuntime || catalogRuntime) fact('Runtime', `File: ${localRuntime || 'unknown'}; Catalog: ${catalogRuntime || 'unknown'}.`);
   if (movie.matchKind) fact('Movie title check', {exact:'Exact title agreement.',fuzzy:'Fuzzy title agreement.',canonical:'Expanded or alternate title considered.'}[movie.matchKind] || 'Title comparison recorded.');
   if (movie.yearDifference != null) fact('Movie year check', Number(movie.yearDifference) === 0 ? 'The years agreed.' : `${text(movie.yearDifference)} year difference recorded.`);
   if (array(movie.reasons).length) fact('Movie checks', movie.reasons.map(message).filter(Boolean).join('; '));

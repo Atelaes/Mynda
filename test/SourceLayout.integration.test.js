@@ -94,10 +94,10 @@ suite.test('packages relocated modules, themes, fonts, and images at their refer
       }
     }
     fs.writeFileSync(path.join(stage, 'package.json'), JSON.stringify(config));
-    fs.writeFileSync(path.join(stage, 'omdb.js'), "module.exports = {key: 'fixture-only'};\n");
-    included.push('package.json', 'omdb.js');
+    included.push('package.json');
     await asar.createPackage(stage, archive);
     const packaged = new Set(asar.listPackage(archive).map(name => name.replace(/^[/\\]/, '').replace(/\\/g, '/')));
+    assert(!packaged.has('omdb.js'), 'The application must not need a provider-key module');
     assert(packaged.has(OUTPUT_PATH), 'ASAR omitted the compiled renderer');
     assert(packaged.has(PRELOAD_PATH), 'ASAR omitted the sandboxed preload');
     for (const filename of [OUTPUT_PATH, PRELOAD_PATH]) {

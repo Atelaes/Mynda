@@ -22,15 +22,17 @@ The setup command reads your individual development token from the server's `.de
 
 The file is ignored by Git and excluded from application builds. Keep it out of diagnostic uploads, library exports, and shared ZIPs. The main process reads it at startup; the renderer and library never receive its token. Restart Mynda after changing it. Only a local HTTP server address is accepted in this milestone.
 
-When this file is absent, Mynda uses its existing direct OMDb configuration. When it is present, all metadata queries use the server; server errors do not trigger a direct-provider fallback. Mynda can start without `omdb.js` in server mode. A malformed connection file is reported on lookup instead of preventing the app from opening.
+All metadata queries use the server. Missing or malformed connection settings are reported on lookup, while Mynda can still open and use the library. Server failures leave tagging retryable; there is no direct-provider fallback. The old desktop `omdb.js` is unused and excluded from application builds. Provider credentials belong only in the server configuration.
 
-To opt out, move `metadata-server.local.json` out of the project folder and restart Mynda with its existing `omdb.js` configuration.
+The provider-neutral cleanup requires the server's `seriesExternalIds` addition. Apply that server update first and restart the server, then update Mynda. Existing connection settings do not need to change.
 
 ## What to test
 
 Use a copy of your library for the first comparison. Start with a movie search, a manual IMDb selection, and a small set of episodes with a known parent. Confirm titles, ratings, artwork, and episode identities, then compare a controlled Auto-Tag run with the previous results. A full re-tag can consume substantial provider requests; the smoke test already confirms basic live provider access.
 
 Mynda continues to own matching, ambiguity, numbering corrections, operation budgets, response reuse, and saves. The new adapter translates the service contract for existing callers and retains native catalog references separately from IMDb IDs. Unknown parent identity is not filled from the request. Season completeness remains explicit, and the existing season reasoning retains its own incomplete-list checks.
+
+`src/tagging/TaggingService.js` assembles those desktop responsibilities. `CatalogClient.js` accepts structured queries, manages budgets and reuse, and calls `MetadataServerClient.js` for HTTP requests. The latter converts the public server data into the existing internal catalog record shape (`Title`, `Runtime`, and related fields) to preserve the matching engine's behavior. Those internal field names do not select a provider. Parent IMDb identity comes only from `seriesExternalIds.imdb`; native references remain opaque. Saved reports from before this rename still render correctly.
 
 The desktop budget counts requests to the local server. Each metadata request can cause up to two OMDb attempts under the server's bounded retry policy. The desktop waits up to 30 seconds and adds no transport retries. It reuses successful responses and definitive missing-record responses within the existing session, and evicts service failures. Artwork URLs are still downloaded by Mynda.
 

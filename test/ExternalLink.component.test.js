@@ -60,7 +60,7 @@ suite.test('catalog search results use the same component and refuse malformed r
   window.mynda.editor = {search: async () => ({status: 'ambiguous', choices: records})};
   const {MynEditorSearch} = loadFreshWithMocks(path.join(__dirname, '../src/renderer/Editor.js'), {
     electron: {ipcRenderer: {}}, './ExternalLink.js': links,
-    '../tagging/OmdbHelper.js': {resolve: async () => ({status: 'ambiguous', choices: records})},
+    '../tagging/TaggingService.js': {resolve: async () => ({status: 'ambiguous', choices: records})},
     './RendererRuntime.js': {}, './SharedComponents.js': {MynOpenablePane: React.Component},
     './EditorFields.js': {}, './AutotagReport.js': {}
   });
