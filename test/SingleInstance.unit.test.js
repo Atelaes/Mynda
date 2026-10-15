@@ -33,7 +33,7 @@ suite.test('the real bootstrap cannot import main before acquiring the lock', ()
   for (const granted of [true,false]) {
     const calls=[];
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/bootstrap.js'),'utf8'),{
-      process:{env:{}}, require:name=>{
+      process:{env:{},argv:[]}, require:name=>{
         if(name==='electron') return {app:{requestSingleInstanceLock:()=>{calls.push('lock');return granted;},
           quit:()=>calls.push('quit'),on:()=>{}},BrowserWindow:{getAllWindows:()=>[]}};
         if(name==='./main/SingleInstance.js') return {startSingleInstance};
@@ -48,7 +48,7 @@ suite.test('the real bootstrap cannot import main before acquiring the lock', ()
 suite.test('packaged media diagnostics stay separate from user-library startup', () => {
   const calls=[];
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/bootstrap.js'),'utf8'),{
-    process:{env:{MYNDA_PACKAGED_MEDIA_SMOKE:'1'}},require:name=>calls.push(name)
+    process:{env:{MYNDA_PACKAGED_MEDIA_SMOKE:'1'},argv:[]},require:name=>calls.push(name)
   });
   assert.deepStrictEqual(calls,['./main/PackagedMediaSmoke.js']);
 });

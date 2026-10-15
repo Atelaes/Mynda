@@ -4,7 +4,7 @@ const {validateServerConfig, configurationMessage} = require('./MetadataServerCo
 const {capacityWait,waitForCapacity,canceled} = require('./CapacityWait');
 let nextWaitID = 0;
 const MESSAGES = {
-  UNAUTHORIZED: 'The metadata server rejected the development token. Check the local connection settings.',
+  UNAUTHORIZED: 'Mynda’s license key was not accepted. Open Settings → License to check activation.',
   PROVIDER_AUTH_ERROR: 'The metadata server could not authenticate with its provider.',
   PROVIDER_QUOTA_EXCEEDED: 'The metadata provider usage limit has been reached. Try again later.',
   PROVIDER_TIMEOUT: 'The metadata provider did not respond in time.',
@@ -156,10 +156,11 @@ function lookup(parameters) {
   throw serviceError('METADATA_BAD_REQUEST', 'A metadata lookup requires a title or IMDb ID.');
 }
 
-function createMetadataServerClient({axios, server, wait = waitForCapacity, now = Date.now}) {
-  let config;
-  try { config = validateServerConfig(server); } catch (_) { /* Fail on lookup, not app startup. */ }
+function createMetadataServerClient({axios, server, onUnauthorized, wait = waitForCapacity, now = Date.now}) {
   return async function request(parameters, control = {}) {
+    let config;
+    try { config = validateServerConfig(typeof server === 'function' ? await server() : server); }
+    catch (_) { /* Fail on lookup, not app startup. */ }
     if (!config) throw serviceError('METADATA_CONFIGURATION_ERROR', configurationMessage);
     const {route, body} = lookup(parameters);
     const waitID = ++nextWaitID;
@@ -167,7 +168,18 @@ function createMetadataServerClient({axios, server, wait = waitForCapacity, now 
     try {
       while (true) {
         if (control.signal && control.signal.aborted) throw canceled();
-        const response = await send(route, body, ticket, control);
+        if (waiting && typeof server === 'function') {
+          let latest;
+          try { latest = await server(); } catch (_) { /* Access was removed or became unavailable. */ }
+          if (!latest || latest.url !== config.url || latest.token !== config.token) {
+            throw serviceError('METADATA_CONFIGURATION_CHANGED', 'Mynda’s activation changed while this lookup was waiting. Try the lookup again.');
+          }
+        }
+        const response = await send(config, route, body, ticket, control);
+        if (response && [401,403].includes(response.status)) {
+          if (onUnauthorized) await onUnauthorized(config);
+          throw serviceError('UNAUTHORIZED', MESSAGES.UNAUTHORIZED, response);
+        }
         const envelope = response && response.data;
         if (!object(envelope) || !safeID(envelope.requestId)) throw serviceError('METADATA_INVALID_RESPONSE',
           'The metadata server returned an invalid response.', response);
@@ -202,7 +214,7 @@ function createMetadataServerClient({axios, server, wait = waitForCapacity, now 
     }
   };
 
-  async function send(route, body, ticket, control) {
+  async function send(config, route, body, ticket, control) {
     let response;
     const signal = control.signal;
     const source = axios.CancelToken && axios.CancelToken.source();
@@ -226,7 +238,7 @@ function createMetadataServerClient({axios, server, wait = waitForCapacity, now 
       // pass the original error into logging, saved evidence, or renderer IPC.
       const timeout = error && ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code);
       throw serviceError(timeout ? 'METADATA_TIMEOUT' : 'METADATA_UNAVAILABLE', timeout ?
-        'The metadata server did not respond in time.' : 'Could not reach the metadata server. Confirm npm run dev is running.');
+        'The metadata server did not respond in time.' : 'Could not reach the metadata server. Check your connection and metadata server settings.');
     } finally {
       if (signal && abort) signal.removeEventListener('abort', abort);
     }

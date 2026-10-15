@@ -179,6 +179,15 @@
   --dimmer-text: #4f5259;
   --colorful-text: #7d91b3;
   --error-text: #ff2222;
+  --activation-active-text: #9bd7ac;
+  --activation-active-bg: rgba(58, 149, 82, .18);
+  --activation-active-border: rgba(104, 191, 128, .7);
+  --activation-pending-text: #e4c57f;
+  --activation-pending-bg: rgba(182, 136, 43, .16);
+  --activation-pending-border: rgba(200, 165, 87, .65);
+  --activation-error-text: #edaaaa;
+  --activation-error-bg: rgba(182, 66, 66, .17);
+  --activation-error-border: rgba(205, 110, 110, .7);
 
   /* other colors */
   --glow-bright: rgba(220,225,255,.2);

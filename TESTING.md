@@ -109,7 +109,7 @@ The fast `TaggingJourneys.integration.test.js` validates the same raw fixtures t
 npm run test:tagging:live
 ```
 
-This asks once before starting. It uses `metadata-server.local.json` and requires the local server to be running. Only the development server connection is passed in memory to the disposable app; no provider key is read or staged. It exercises movie Auto-Tag (The Matrix), manual movie tagging (Arrival), and selected-episode tagging (two Breaking Bad episodes), saves the real artwork, and verifies a fresh-process restart. Identities and parent/episode coordinates are checked; changing public rating scores are checked for sensible ranges rather than exact values. Stable rating-source mapping is covered by the offline fixtures.
+This asks once before starting. Quit Mynda first. It reads the encrypted connection through a private Electron helper and requires the configured server to be reachable. Only the selected server connection is passed in memory to the disposable app; no provider key is read or staged. It exercises movie Auto-Tag (The Matrix), manual movie tagging (Arrival), and selected-episode tagging (two Breaking Bad episodes), saves the real artwork, and verifies a fresh-process restart. Identities and parent/episode coordinates are checked; changing public rating scores are checked for sensible ranges rather than exact values. Stable rating-source mapping is covered by the offline fixtures.
 
 The entire live journey has a hard limit of **60 desktop network requests**, including artwork and renderer thumbnails. A metadata request can cause up to two provider attempts under the server retry policy. Node and renderer requests share the same counter. Only the configured local metadata server and HTTPS artwork URLs explicitly returned by it are allowed; Node redirects are rejected rather than silently bypassing the counter. Quota, authentication, transport, redirect and provider-response failures are recorded separately from application assertions in the request ledger. Tokens and credential-bearing image URLs are redacted from test diagnostics. A provider outage can fail this suite even when Mynda is working correctly.
 
@@ -503,3 +503,17 @@ See [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) for the current process boundaries, fol
 `npm run test:electron` runs source and ASAR startup checks followed by source and ASAR library-save/restart journeys. All launch from outside the application directory. The startup checks cover the interface, Settings, images, fonts, theme stylesheets, and theme icon variables; the save journeys cover the workflows above. `npm run test:electron:asar` runs only the production-bundle ASAR startup check. `test:all` includes all four suites.
 
 The ASAR journey deliberately shares installed npm dependencies from the temporary parent directory. It verifies source/resource paths inside an archive; `npm run test:package` separately assembles the complete native application and checks its bundled media dependencies.
+
+## Metadata credentials and packaged connections
+
+`npm run test:credentials` runs real Electron license-activation and restart journeys
+from source layout and an ASAR archive. It uses disposable profiles and synthetic
+tokens. See `METADATA_SERVER.md` for OS keychain behavior and headless storage-only
+commands. The UI journeys are included in `test:all`; credential storage, migration,
+CLI transport, and component checks are included in `test:core`.
+
+The License UI automatically verifies a saved key when opened. Its component
+checks distinguish an accepted key, a missing key, an explicitly rejected key,
+and an unavailable service; a network failure never deletes saved activation.
+The native source and ASAR journeys exercise activation, automatic verification
+on restart, explicit rechecking, and local deactivation.

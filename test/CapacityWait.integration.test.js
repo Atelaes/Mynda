@@ -202,4 +202,15 @@ suite.test('closing an editor owner aborts its pending lookup and stops status d
   assert.strictEqual(updates.length,count);
 });
 
+suite.test('removing or replacing credentials during a capacity wait stops the old request before another HTTP attempt',async()=>{
+  for(const next of [null,{...server,token:'synthetic-replacement-token-0123456789'}, {...server,url:'https://another.example'}]) {
+    let current=server,calls=0;const updates=[];
+    const request=createMetadataServerClient({server:async()=>{
+      if(!current) throw Error('Saved access removed');return current;
+    },axios:async()=>{calls++;return pause();},wait:async()=>{current=next;}});
+    await assert.rejects(request({id:'tt1234567'},{onCapacityWait:status=>updates.push(status)}),{code:'METADATA_CONFIGURATION_CHANGED'});
+    assert.strictEqual(calls,1);assert.strictEqual(updates.at(-1).waiting,false);
+  }
+});
+
 runSuite(suite);

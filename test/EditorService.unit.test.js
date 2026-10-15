@@ -242,9 +242,11 @@ suite.test('a modified or replaced file cannot reuse a previous grant', async ()
   assert.strictEqual(service.authorizeSubtitle(subtitle, 10), false);
 });
 suite.test('a search finishing after window teardown cannot recreate a proposal', async () => {
-  let finish;
-  const {service, source} = setup({catalog: {resolve: () => new Promise(resolve => { finish = resolve; })}});
+  let finish,started;
+  const entered=new Promise(resolve=>{started=resolve;});
+  const {service, source} = setup({catalog: {resolve: () => new Promise(resolve => { finish = resolve;started(); })}});
   const searching = service.search(source, 10);
+  await entered;
   service.dispose(10);
   finish({status: 'candidate', candidate: {record: {imdbID: 'tt123', Poster: 'N/A'}}});
   assert.deepStrictEqual(await searching, {status:'canceled'});

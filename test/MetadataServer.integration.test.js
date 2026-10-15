@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const https = require('https');
 const {spawnSync} = require('child_process');
 const axios = require('axios');
 const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness');
@@ -10,8 +11,8 @@ const {createRequestBudget} = require('../src/tagging/RequestBudget');
 const {createTaggingEngine} = require('../src/tagging/TaggingEngine');
 const {createTagApplier} = require('../src/tagging/TagApplier');
 const {loadMetadataServerConfig, validateServerConfig} = require('../src/tagging/MetadataServerConfig');
-const suite = createSuite('Local metadata server integration', 'integration',
-  'Exercises the real HTTP client, tagging engine, private settings and service failures against loopback fixtures; no provider access.');
+const suite = createSuite('Metadata server integration', 'integration',
+  'Exercises the real HTTP/HTTPS client, tagging engine, private settings and service failures against loopback fixtures; no provider access.');
 const token = 'synthetic-development-token-for-tests-only';
 const requestId = '12345678-1234-4123-8123-123456789abc';
 const log = {debug(){}, info(){}, warn(){}, error(){}};
@@ -228,8 +229,18 @@ suite.test('redirects are rejected without contacting their destination', async 
   }
 });
 
-suite.test('local configuration rejects remote or credential-bearing URLs and malformed files without silently disabling server mode', async () => {
-  for (const url of ['https://example.com', 'http://127.0.0.1/path', 'http://user:password@localhost', 'http://localhost/?token=secret']) {
+suite.test('configuration accepts hosted HTTPS and retains local HTTP development', () => {
+  for (const url of ['https://mynda-server-dev.example.workers.dev', 'https://metadata.example.org:8443/',
+    'http://127.0.0.1:8787', 'http://localhost:8787', 'http://[::1]:8787']) {
+    assert.deepStrictEqual(validateServerConfig({url, token}), {url:new URL(url).origin, token});
+  }
+});
+
+suite.test('configuration rejects remote HTTP, credential-bearing URLs and malformed files without silently disabling server mode', async () => {
+  for (const url of ['http://example.com', 'http://localhost.example.com', 'https:example.com',
+    'http://127.0.0.1/path', 'http://user:password@localhost', 'http://localhost/?token=secret',
+    'https://example.org/path', 'https://user:secret@example.org', 'https://example.org/?token=secret',
+    'https://example.org/#secret', 'ftp://example.org', null]) {
     assert.throws(() => validateServerConfig({url, token}));
   }
   assert.strictEqual(loadMetadataServerConfig({readFile:() => { const error = new Error('missing'); error.code = 'ENOENT'; throw error; }}), null);
@@ -239,10 +250,39 @@ suite.test('local configuration rejects remote or credential-bearing URLs and ma
   await assert.rejects(client.requestCatalog(client.createCatalogQuery({id:'tt0034583'})), {code:'METADATA_CONFIGURATION_ERROR'});
 });
 
+suite.test('HTTPS uses certificate verification and translates a response from a trusted TLS endpoint', async () => {
+  const certificate = fs.readFileSync(path.join(__dirname, 'fixtures/metadata-tls/cert.pem'));
+  const key = fs.readFileSync(path.join(__dirname, 'fixtures/metadata-tls/key.pem'));
+  const received = [];
+  const server = https.createServer({cert:certificate, key}, (req, res) => {
+    received.push({url:req.url, authorization:req.headers.authorization, encrypted:req.socket.encrypted});
+    res.writeHead(200, {'Content-Type':'application/json'});
+    res.end(JSON.stringify({requestId, data:record()}));
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const connection = {url:`https://127.0.0.1:${server.address().port}`, token};
+  const agent = new https.Agent({ca:certificate});
+  try {
+    const untrusted = createCatalogClient({axios, server:connection, log});
+    await assert.rejects(untrusted.requestCatalog(untrusted.createCatalogQuery({id:'tt0034583'})), {code:'METADATA_UNAVAILABLE'});
+    assert.strictEqual(received.length, 0, 'An untrusted certificate must fail before sending credentials');
+    // Trust only this disposable test certificate; production does not supply
+    // a custom agent or turn off the operating runtime's TLS verification.
+    const trusted = createCatalogClient({axios:options => axios({...options, httpsAgent:agent}), server:connection, log});
+    const response = await trusted.requestCatalog(trusted.createCatalogQuery({id:'tt0034583'}));
+    assert.strictEqual(response.data.Title, 'Casablanca');
+    assert.deepStrictEqual(received, [{url:'/v1/record', authorization:`Bearer ${token}`, encrypted:true}]);
+  } finally {
+    agent.destroy(); server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 suite.test('main composition in server mode does not load the direct provider key', async () => {
   const api = loadFreshWithMocks(path.join(__dirname, '../src/tagging/TaggingService.js'), {
     electron:{app:{getPath:() => '/unused-fixture-directory'}},
-    './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:() => ({url:'http://127.0.0.1:8787', token})},
+    '../main/MetadataConnection':{getConfig:async () => ({url:'http://127.0.0.1:8787', token})},
+    '../main/FeatureAccess':require('./helpers/ActivatedFeatureAccess'),
     '../../omdb':new Proxy({}, {get:() => { throw new Error('Direct key accessed'); }}),
     axios:async () => ({status:200, data:{requestId, data:record()}}),
     '../platform/Logger.js':{child:() => log}
@@ -251,51 +291,70 @@ suite.test('main composition in server mode does not load the direct provider ke
   assert.strictEqual(result.status, 'candidate');
 });
 
-suite.test('missing and invalid connection settings leave tagging retryable without issuing any HTTP requests', async () => {
+suite.test('missing and unreadable activation blocks tagging before any HTTP requests', async () => {
   for (const server of [null,undefined,{configurationError:true}]) {
     let requests = 0;
     const api = loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
       electron:{app:{getPath:() => '/unused-fixture-directory'}},
-      './MetadataServerConfig':{loadMetadataServerConfig:() => server},
+      '../main/MetadataConnection':{getConfig:async () => server},
+      '../main/FeatureAccess':require('../src/platform/FeatureAccess').createFeatureAccess({requireActivation:async()=>{
+        throw Object.assign(new Error('Unavailable credentials'),{code:server ? 'STORAGE_READ' : 'ACCESS_MISSING'});
+      }}),
       axios:async () => { requests++; throw Error('Unexpected request'); },
       '../platform/Logger.js':{child:() => log}
     });
-    const result = await api.tag({id:'movie',kind:'movie',imdbID:'tt0034583'});
-    assert.strictEqual(result.status,'service-error');
-    assert.strictEqual(result.retryable,true);
-    assert.strictEqual(result.reason.code,'METADATA_CONFIGURATION_ERROR');
+    await assert.rejects(api.tag({id:'movie',kind:'movie',imdbID:'tt0034583'}),
+      {code:server ? 'ACTIVATION_UNAVAILABLE' : 'ACTIVATION_REQUIRED'});
     assert.strictEqual(requests,0);
   }
 });
 
-suite.test('setup copies only the selected token, uses private permissions, and never overwrites existing settings', () =>
-  withTemporaryDirectory('metadata-setup', directory => {
-    const root = path.resolve(__dirname, '..'), server = path.join(directory, 'server');
-    fs.mkdirSync(server);
-    for (const file of ['scripts/setup-metadata-server.js', 'src/tagging/MetadataServerConfig.js']) {
-      fs.mkdirSync(path.dirname(path.join(directory, file)), {recursive:true});
-      fs.copyFileSync(path.join(root, file), path.join(directory, file));
-    }
+suite.test('setup sends only the selected token to encrypted storage without writing a plaintext file', () =>
+  withTemporaryDirectory('metadata-setup', async directory => {
     const other = 'second-development-token-for-tests-only', apiKey = 'provider-secret-not-to-be-copied';
-    fs.writeFileSync(path.join(server, '.dev.vars'), `OMDB_API_KEY=${apiKey}\nDEV_CLIENT_TOKENS='${JSON.stringify({torgo:token, atelaes:other})}'\n`);
-    const args = [path.join(directory, 'scripts/setup-metadata-server.js'), server, 'atelaes'];
-    const result = spawnSync(process.execPath, args, {encoding:'utf8'});
-    assert.strictEqual(result.status, 0, result.stderr);
-    const file = path.join(directory, 'metadata-server.local.json'), contents = fs.readFileSync(file, 'utf8');
-    assert.deepStrictEqual(JSON.parse(contents), {url:'http://127.0.0.1:8787', token:other});
-    assert(!contents.includes(apiKey)); assert(!contents.includes(token));
-    assert(!`${result.stdout}${result.stderr}`.includes(other));
-    if (process.platform !== 'win32') assert.strictEqual(fs.statSync(file).mode & 0o777, 0o600);
-    assert.strictEqual(spawnSync(process.execPath, args, {encoding:'utf8'}).status, 1);
-    assert.strictEqual(fs.readFileSync(file, 'utf8'), contents);
+    fs.writeFileSync(path.join(directory, '.dev.vars'), `OMDB_API_KEY=${apiKey}\nDEV_CLIENT_TOKENS='${JSON.stringify({torgo:token, atelaes:other})}'\n`);
+    const calls = [];
+    const {setup} = require('../scripts/setup-metadata-server');
+    await setup(directory, 'atelaes', {execute:async command=>{calls.push(command);}});
+    assert.deepStrictEqual(calls,[{action:'setup',config:{url:'http://127.0.0.1:8787',token:other}}]);
+    assert(!JSON.stringify(calls).includes(apiKey));
+    assert(!fs.existsSync(path.join(directory,'metadata-server.local.json')));
+    await assert.rejects(setup(directory, 'missing', {execute:()=>assert.fail('must not execute')}), /Could not read a valid/);
   }));
 
-suite.test('the actual application file filter excludes current and obsolete local credential files', () =>
+suite.test('connect validates the destination before invoking encrypted storage and sends no token in the command', async () => {
+  const {connect} = require('../scripts/connect-metadata-server');
+  const calls = [], execute=async command=>{calls.push(command);return {url:command.url};};
+  for (const url of ['http://example.org','https://example.org/path','https://example.org/?token='+token]) {
+    await assert.rejects(connect(url,{execute}), /Use an HTTPS/);
+  }
+  assert.strictEqual(calls.length,0);
+  for (const url of ['https://mynda-server-dev.example.workers.dev','http://127.0.0.1:8787']) await connect(url,{execute});
+  assert(calls.every(command=>Object.keys(command).sort().join(',')==='action,url'));
+});
+
+suite.test('request clients pick up credential changes and removal without restarting', async () => {
+  let current={url:'https://first.example',token};
+  const calls=[];
+  const client=createCatalogClient({server:async()=>current,log,axios:async options=>{
+    calls.push(options);return {status:200,data:{requestId,data:record()}};
+  }});
+  await client.requestCatalog({id:'tt0034583'});
+  current={url:'https://second.example',token:'a-different-synthetic-token-for-test'};
+  await client.requestCatalog({id:'tt0034583'});
+  current=null;
+  await assert.rejects(client.requestCatalog({id:'tt0034583'}),{code:'METADATA_CONFIGURATION_ERROR'});
+  assert.strictEqual(calls.length,2);
+  assert.strictEqual(calls[0].url,'https://first.example/v1/record');
+  assert.strictEqual(calls[1].headers.Authorization,'Bearer a-different-synthetic-token-for-test');
+});
+
+suite.test('the actual application file filter excludes current, temporary and obsolete local credential files', () =>
   withTemporaryDirectory('metadata-package', directory => {
     const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
     const rules = require('../package.json').build.files;
     const include = new FileMatcher(directory, path.join(directory, 'package'), value => value, rules).createFilter();
-    for (const name of ['metadata-server.local.json','omdb.js']) {
+    for (const name of ['metadata-server.local.json','.metadata-server-synthetic.tmp','metadata-credentials.json','.metadata-credentials-synthetic.tmp','omdb.js']) {
       const file = path.join(directory,name);
       fs.writeFileSync(file,'synthetic credentials');
       assert.strictEqual(include(file, fs.statSync(file)), false,name);

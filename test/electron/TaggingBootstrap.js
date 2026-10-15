@@ -21,9 +21,13 @@ const imageBytes = fs.readFileSync(path.join(root,'images/qmark.png'));
 const live = scenario === 'live';
 // The disposable app receives only the server connection in memory. Production
 // code still uses its ordinary configuration loader; no provider key is staged.
-const config = require(path.join(root,'src/tagging/MetadataServerConfig'));
-const server = config.validateServerConfig(JSON.parse(process.env.MYNDA_TEST_METADATA_CONNECTION));
-config.loadMetadataServerConfig = () => server;
+const config = require(path.join(root,'src/main/MetadataConnection'));
+const {validateServerConfig}=require(path.join(root,'src/tagging/MetadataServerConfig'));
+const server = validateServerConfig(JSON.parse(process.env.MYNDA_TEST_METADATA_CONNECTION));
+config.getConfig = async () => server;
+// This journey starts activated; activation itself is exercised by the
+// credential UI journey and feature-access integration tests.
+config.requireActivation = async () => {};
 delete process.env.MYNDA_TEST_METADATA_CONNECTION;
 const network = createNetwork({axios:require('axios'),imageBytes,live,server,
   file:path.join(diagnostics,'requests.json'),restart:phase==='restart'});

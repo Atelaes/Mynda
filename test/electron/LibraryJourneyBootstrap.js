@@ -79,6 +79,8 @@ metadata.retrieveMetadata=async options=>{
   return {...options.previous,width:3840,checked:true,video_stream_checked:true};
 };
 const catalog=require(path.join(root,'src/tagging/TaggingService.js'));
+// This persistence journey starts activated; it replaces catalog discovery.
+require(path.join(root,'src/main/MetadataConnection.js')).requireActivation=async()=>{};
 catalog.resolve=async video=>{
   assert(phase==='exercise' && video.id===ids[0] && ++tagRequests===1,'Unexpected catalog lookup');
   tagStarted.resolve();await tagRelease.promise;

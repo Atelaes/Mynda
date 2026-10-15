@@ -11,7 +11,8 @@ const {redact} = require('./TaggingNetwork');
 const {verify} = require('./TaggingAssertions');
 const {definitions} = require('./TaggingFixtures');
 const {connection} = require('./MetadataFixtures');
-const {loadMetadataServerConfig,validateServerConfig} = require('../../src/tagging/MetadataServerConfig');
+const {validateServerConfig} = require('../../src/tagging/MetadataServerConfig');
+const {runCredentialCommand} = require('../../scripts/metadata-credentials-cli');
 const root = path.resolve(__dirname,'../..');
 const testFiles = ['TaggingBootstrap.js','TaggingJourney.js','TaggingFixtures.js','TaggingAssertions.js',
   'TaggingNetwork.js','MetadataFixtures.js','BrowserDriver.js','SmokeLifecycle.js','ConsoleMessage.js'];
@@ -63,7 +64,7 @@ async function main() {
       terminal.question(question,answer=>{terminal.close();resolve(answer);});
     })});
     if(!approved){console.log('Live tests canceled. No API requests were made.');process.exitCode=2;return;}
-    server = validateServerConfig(loadMetadataServerConfig());
+    server = validateServerConfig((await runCredentialCommand({action:'read-for-test'})).connection);
   }
   await buildRenderer({mode:useAsar?'production':'development'});
   const suite=createSuite(`Electron tagging workflows${live?' with LIVE metadata server':''}${useAsar?' from ASAR':''}`,'end-to-end',

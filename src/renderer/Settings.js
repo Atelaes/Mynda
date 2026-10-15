@@ -1,5 +1,6 @@
 // Settings pane and its major settings views.
 const React = require('react');
+const {LicenseActivation} = require('./LicenseActivation');
 const _ = require('lodash');
 const {reportSaveFailure} = require('./LibraryEdits.js');
 const {v4: uuidv4} = require('uuid');
@@ -75,7 +76,8 @@ class MynSettings extends MynOpenablePane {
       // themes :      (<MynSettingsThemes       save={this.save} themes={this.props.settings.themes} />),
       preferences : (<MynSettingsPrefs        save={this.save} settings={this.props.settings} displayColumnName={this.props.displayColumnName} />),
       share : (<MynSettingsShare              settings={this.props.settings} videos={this.props.videos} />),
-      library : (<MynSettingsLibrary          videos={this.props.videos} />)
+      library : (<MynSettingsLibrary          videos={this.props.videos} />),
+      license : (<LicenseActivation />)
     }
     this.setState({views:views},callback);
   }

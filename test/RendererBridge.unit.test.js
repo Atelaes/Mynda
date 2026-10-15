@@ -42,10 +42,14 @@ suite.test('the real preload forwards named methods and never exposes native eve
 suite.test('preload preserves service failure information instead of returning a successful result',async()=>{
   let api;
   loadFreshWithMocks(path.join(__dirname,'../src/preload/index.js'),{electron:{
-    ipcRenderer:{invoke:async()=>({ok:false,error:{code:'NO_FILE',message:'File unavailable'}})},
+    ipcRenderer:{invoke:async()=>({ok:false,error:{code:'NO_FILE',message:'File unavailable',privateDetails:'not for the renderer'}})},
     contextBridge:{exposeInMainWorld:(_name,value)=>{api=value;}}
   }});
-  await assert.rejects(api.editor.prepareArtwork('/some/file'),error=>error.code==='NO_FILE'&&error.message==='File unavailable');
+  await assert.rejects(api.editor.prepareArtwork('/some/file'),error=>{
+    assert.strictEqual(Object.getPrototypeOf(error),Object.prototype,'native Errors lose custom codes in contextBridge');
+    assert.deepStrictEqual(error,{code:'NO_FILE',message:'File unavailable'});
+    return true;
+  });
 });
 
 function fixture() {

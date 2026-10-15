@@ -34,6 +34,24 @@ const {MynEditor,MynEditorSearch}=loadFreshWithMocks(path.join(__dirname,'../src
 const {MynEditArtwork}=loadFreshWithMocks(path.join(__dirname,'../src/renderer/EditorFields.js'),{
   './RendererRuntime.js':{editorLog:quiet,artworkLog:quiet},'./SharedComponents.js':{}
 });
+for (const action of ['search','select']) {
+  suite.test(`${action} shows activation failures explicitly and clears the busy state`,async()=>{
+    const oldAPI=window.mynda.editor,oldAlert=global.alert;
+    try {
+      for (const code of ['ACTIVATION_REQUIRED','ACTIVATION_REJECTED','ACTIVATION_UNAVAILABLE','ACTIVATION_CHECK_FAILED']) {
+        const alerts=[],message='Activate Mynda to use tagging. Open Settings → License and enter your license key.';
+        window.mynda.editor={[action]:async()=>{throw Object.assign(new Error(message),{code});}};
+        global.alert=value=>alerts.push(value);
+        const search=new MynEditorSearch({video:show(),handleChange:()=>assert.fail('Blocked result applied')});
+        search.setState=update=>Object.assign(search.state,update);
+        if(action==='search') await search.handleSearch({preventDefault(){}});
+        else await search.retrieveResult({imdbID:'tt0034583'});
+        assert.deepStrictEqual(alerts,[message]);assert.strictEqual(search.state.searching,false);
+      }
+    } finally {window.mynda.editor=oldAPI;global.alert=oldAlert;}
+  });
+}
+
 function findControl(tree,selector) {
   for(const element of React.Children.toArray(tree)) {
     if(!React.isValidElement(element))continue;

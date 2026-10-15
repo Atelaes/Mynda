@@ -8,6 +8,9 @@ react-dom.development.js
 babel.min.js
 omdb.js
 metadata-server.local.json
+metadata-credentials.json
+.metadata-credentials-*.tmp
+.metadata-server-*.tmp
 src/CollectionsOld.js
 src/Collection.js
 .babelrc

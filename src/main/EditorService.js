@@ -32,7 +32,7 @@ function imageExtension(bytes) {
 function createEditorService({library, catalog, dialog, app, downloadFile = createArtworkDownloader(),
   deriveFilenameResetChanges, isAutoTagRunning = () => false,
   confirmationDialogIsDisabled = () => false, disableConfirmationDialog = () => {},
-  now = Date.now, notifyLookup = () => {}}) {
+  now = Date.now, notifyLookup = () => {}, requireFeature = async()=>{}}) {
   const proposals = new Map();
   const grants = new Map();
   const closedOwners = new Set();
@@ -56,6 +56,9 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
         notify();
       }};
     try {
+      await requireFeature('tagging');
+      if (current.controller.signal.aborted) return {status:'canceled'};
+      requireOwner(owner);
       const result = await operation(control);
       return current.controller.signal.aborted ? {status:'canceled'} : result;
     } catch (error) {

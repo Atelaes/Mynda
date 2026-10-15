@@ -9,7 +9,8 @@ const {createMetadataServerClient} = require('./MetadataServerClient');
 
 function createRequestSession() { return {responses:new Map(),requests:0,reused:0}; }
 
-function createCatalogClient({axios,log,server,transport = createMetadataServerClient({axios,server})}) {
+function createCatalogClient({axios,log,server,onUnauthorized,
+  transport = createMetadataServerClient({axios,server,onUnauthorized})}) {
   function createCatalogQuery(parts) {
     // Detached, whitelisted metadata inputs are also safe to use in diagnostics.
     // Credentials and HTTP details belong exclusively to MetadataServerClient.

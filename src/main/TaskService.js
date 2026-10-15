@@ -2,9 +2,10 @@ const {isVideoID} = require('../library/VideoIdentity');
 
 // Starting work acknowledges the request immediately. The task owns its
 // progress and terminal failure; scans/lookups never occupy the save queue.
-function createTaskMethods({scan,startTagging,startSelectedTagging,cancelTagging,reportFailure}) {
+function createTaskMethods({scan,startTagging,startSelectedTagging,cancelTagging,reportFailure,
+  requireFeature = async()=>{}}) {
   const launch = (operation,scope) => {
-    Promise.resolve().then(operation).catch(error=>reportFailure(error,scope));
+    Promise.resolve().then(()=>requireFeature('tagging')).then(operation).catch(error=>reportFailure(error,scope));
     return {accepted:true};
   };
   return {

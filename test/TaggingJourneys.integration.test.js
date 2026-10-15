@@ -36,7 +36,8 @@ for(const scenario of ['movies','episode-parents','episode-numbering','selected'
     try {
       const api=loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
         electron:{app:{getPath:()=>directory}},
-        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>metadata.connection},
+        '../main/MetadataConnection':{getConfig:async()=>metadata.connection},
+        '../main/FeatureAccess':require('./helpers/ActivatedFeatureAccess'),
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const videos=fixtures.videos(scenario,path.join(directory,'media'));
@@ -64,7 +65,8 @@ suite.test('manual movie and episode proposals apply real metadata and authorize
       const app={getPath:()=>directory};
       const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
         electron:{app},
-        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>metadata.connection},
+        '../main/MetadataConnection':{getConfig:async()=>metadata.connection},
+        '../main/FeatureAccess':require('./helpers/ActivatedFeatureAccess'),
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const library={media:fixtures.videos('manual',path.join(directory,'media'))};
@@ -94,7 +96,8 @@ suite.test('a typed IMDb ID becomes completed match evidence only after selectio
       const app={getPath:()=>directory};
       const catalog=loadFreshWithMocks(path.join(__dirname,'../src/tagging/TaggingService.js'),{
         electron:{app},
-        './MetadataServerConfig':{...require('../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:()=>metadata.connection},
+        '../main/MetadataConnection':{getConfig:async()=>metadata.connection},
+        '../main/FeatureAccess':require('./helpers/ActivatedFeatureAccess'),
         [path.join(__dirname,'../src/platform/Logger.js')]:{child:()=>quiet}
       });
       const library={media:fixtures.videos('manual',path.join(directory,'media'))};

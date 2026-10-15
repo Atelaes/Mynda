@@ -21,6 +21,8 @@ if (MediaTools.ffmpegPath) ffmpeg.setFfmpegPath(MediaTools.ffmpegPath);
 if (MediaTools.ffprobePath) ffmpeg.setFfprobePath(MediaTools.ffprobePath);
 const Logger = require('../platform/Logger.js');
 const TaggingService = require('../tagging/TaggingService.js');
+const {requireFeature} = require('./FeatureAccess');
+const MetadataConnection = require('./MetadataConnection');
 const MovieSearch = require('../tagging/MovieSearch.js');
 const VideoExclusion = require('../scanning/VideoExclusion.js');
 const VideoRuntimeVerifier = require('../scanning/VideoRuntimeVerifier.js');
@@ -175,7 +177,7 @@ const shareService = new ShareService({
 const playback = createPlaybackService({library,log:Logger.child('Player'),publish:state => {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('playback:state',state);
 }});
-const editor = createEditorService({library,catalog:TaggingService,dialog,app,
+const editor = createEditorService({library,catalog:TaggingService,dialog,app,requireFeature,
   deriveFilenameResetChanges,isAutoTagRunning:()=>autoTagState.running,
   notifyLookup:(owner,status) => {
     const contents = electron.webContents.fromId(owner);
@@ -189,8 +191,8 @@ library.validateRendererCommit = (request,event) => validateRendererCommit(reque
   authorizeSubtitle:file=>editor.authorizeSubtitle(file,event.sender.id),
   authorizeArtwork:file=>editor.authorizeArtwork(file,event.sender.id)});
 installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,log:backendLog,
-  methods:{...desktop.methods,
-    ...createTaskMethods({scan:requestWatchfolderScan,startTagging:requestAutoTag,
+  methods:{...desktop.methods, ...MetadataConnection.methods,
+    ...createTaskMethods({scan:requestWatchfolderScan,startTagging:requestAutoTag,requireFeature,
       startSelectedTagging:requestSelectedAutoTag,cancelTagging:requestAutoTagCancellation,
       reportFailure:reportAutoTagFailure}),
     ...Object.fromEntries(['search','select','cancelSearch','resetFromFilename','prepareArtwork','inspectArtwork',
@@ -213,6 +215,7 @@ installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,l
 app.whenReady().then(start);
 
 async function start() {
+  await MetadataConnection.initialize();
   Logger.initialize({
     app: app,
     ipcMain: ipcMain,
@@ -1843,7 +1846,7 @@ function requestAutoTagCancellation() {
 
 async function autoTag(options = {}) {
   return createAutoTagRunner({
-    state: autoTagState, catalog: TaggingService, log: autoTagLog,
+    state: autoTagState, catalog: TaggingService, log: autoTagLog, requireFeature,
     getCandidates: getAutoTagCandidates, save: saveBatch,
     getLibraryVideos: () => library.media,
     notifyStatus: status => win.webContents.send('status-update', status),

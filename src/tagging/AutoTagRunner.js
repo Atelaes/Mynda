@@ -10,14 +10,18 @@ const Limits = require('./TaggingLimits');
 const {createRequestBudget} = require('./RequestBudget');
 const {validSeriesImdbID} = require('./CatalogResponse');
 const {canceled} = require('./CapacityWait');
+const {isFeatureAccessError} = require('../platform/FeatureAccess');
 
 function shouldDefer(result) {
   return result.status === 'candidate' && result.candidate.evidence.kind === 'episode' &&
     (!result.candidate.evidence.localTitle || result.candidate.evidence.exactTitle === false);
 }
 
-function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,save,notifyStatus,chooseSeries,preferences,whenIdle}) {
+function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,save,notifyStatus,chooseSeries,preferences,whenIdle,
+  requireFeature = async()=>{}}) {
   return async function autoTag(options = {}) {
+    if (state.running) return;
+    await requireFeature('tagging');
     if (state.running) return;
     const videos = _.cloneDeep(Array.isArray(options.videos) ? options.videos : getCandidates());
     // Lookups run outside the library commit queue. Keep the record they were
@@ -117,7 +121,10 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     async function resolve(video,settings) {
       let result;
       try { result = await catalog.resolve(video,settings); }
-      catch(error) { result = Decision.fromDiscovery({failure:'Error',data:error},video,{}); }
+      catch(error) {
+        if (isFeatureAccessError(error)) throw error;
+        result = Decision.fromDiscovery({failure:'Error',data:error},video,{});
+      }
       checkLookup();
       return result;
     }
@@ -176,7 +183,10 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       if (seriesBatch && !sharedID) {
         let preflight;
         try { preflight = await catalog.preflight(videos,{seriesSearchSession:session,requestBudgetLimit:options.requestBudgetLimit}); }
-        catch(error) { preflight = Decision.fromDiscovery({failure:'Error',data:error},videos[0] || {},{}); }
+        catch(error) {
+          if (isFeatureAccessError(error)) throw error;
+          preflight = Decision.fromDiscovery({failure:'Error',data:error},videos[0] || {},{});
+        }
         checkLookup();
         if (preflight.status === 'parent-resolved') {
           sharedID = preflight.seriesID;
@@ -293,6 +303,13 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         videoResults:[...outcomes].map(([i,disposition]) => `${videos[i].title}: ${disposition}`).sort()});
       return {statistics,canceled:state.cancelRequested,seriesSelectionCanceled,seriesPreflightFailure};
     } catch (error) {
+      if (isFeatureAccessError(error)) {
+        // Keep already completed work, but do not record a tagging attempt or
+        // failure on the blocked video (or continue through the rest of a batch).
+        await flush();
+        await whenIdle();
+        throw error;
+      }
       if (!error || error.code !== 'METADATA_CANCELED') throw error;
       state.cancelRequested = true;
       await flush();

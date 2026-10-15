@@ -1,5 +1,6 @@
 // One terminal notification for both whole-library and selected Auto-Tag.
 // A per-video catalog miss is handled by the runner and does not reach here.
+const {isFeatureAccessError} = require('../platform/FeatureAccess');
 function causes(error) {
   const result=[],seen=new Set();
   for(let item=error;item && result.length<8 && !seen.has(item);item=item.cause) {
@@ -10,6 +11,10 @@ function causes(error) {
 
 function describeFailure(error, libraryPath) {
   const chain=causes(error);
+  const access=chain.find(isFeatureAccessError);
+  if (access) return {code:access.code,options:{type:'warning',buttons:['OK'],defaultId:0,cancelId:0,
+    title:access.code === 'ACTIVATION_REQUIRED' ? 'Activation required' : 'Check Mynda activation',
+    message:access.message,detail:''}};
   const context=chain.find(item=>item.autoTagFailure)?.autoTagFailure;
   const saveFailed=context && context.stage==='save';
   const location=chain.find(item=>typeof item.libraryPath==='string')?.libraryPath || libraryPath;

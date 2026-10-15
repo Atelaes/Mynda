@@ -12,9 +12,13 @@ const bridge = createBridge({
     if (Object.prototype.hasOwnProperty.call(libraryChannels, method)) return ipcRenderer.invoke(libraryChannels[method], ...args);
     const response = await ipcRenderer.invoke('mynda:invoke', method, args);
     if (!response || response.ok !== true) {
-      const error = new Error(response && response.error && response.error.message || 'Mynda could not complete this request.');
-      error.code = response && response.error && response.error.code;
-      throw error;
+      // contextBridge copies native Error objects without custom properties.
+      // Reject with the main process's small, plain error contract so `code`
+      // survives in the page (activation and other actionable failures use it).
+      throw Object.freeze({
+        code:response && response.error && response.error.code || 'APP_REQUEST_FAILED',
+        message:response && response.error && response.error.message || 'Mynda could not complete this request.'
+      });
     }
     return response.value;
   },

@@ -8,10 +8,10 @@ const suite=createSuite('Main application bridge wiring','integration',
 
 suite.test('startup installs isolation and the complete named API, rejecting unrelated windows and unsafe library edits',()=>
   withTemporaryDirectory('main-bridge',async directory=>{
-    const root=path.resolve(__dirname,'..'), handlers=new Map(),windows=[],logs=[];
+    const root=path.resolve(__dirname,'..'), handlers=new Map(),windows=[],logs=[],dialogs=[];
     const ipcMain=new EventEmitter();ipcMain.handle=(name,fn)=>{assert(!handlers.has(name),'Duplicate handler '+name);handlers.set(name,fn);};
     const app=new EventEmitter();Object.assign(app,{isPackaged:true,getAppPath:()=>root,
-      getPath:()=>directory,getVersion:()=> 'test',quit:()=>{}});
+      getPath:()=>directory,getVersion:()=> 'test',quit:()=>{},isReady:()=>true});
     let start;app.whenReady=()=>({then:callback=>{start=callback;}});
     class Window extends EventEmitter {
       constructor(options) {
@@ -27,7 +27,10 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     const Logger={child:()=>quiet,initialize:()=>{},receiveRenderer:()=>{},flush:async()=>{}};
     const tools={ffmpegPath:null,ffprobePath:null,status:()=>({ffmpeg:{available:true},ffprobe:{available:true}})};
     loadFreshWithMocks(path.join(root,'src/main/index.js'),{
-      electron:{app,ipcMain,BrowserWindow:Window,dialog:{showMessageBox:async()=>{throw Error('Unexpected dialog');}},shell:{}},
+      electron:{app,ipcMain,BrowserWindow:Window,webContents:{fromId:id=>windows.find(win=>win.webContents.id===id)?.webContents},
+        dialog:{showMessageBox:async(...args)=>{
+        dialogs.push(args.at(-1));return {response:0};
+      }},shell:{}},
       [path.join(root,'src/platform/Logger.js')]:Logger,
       [path.join(root,'src/media/MediaTools.js')]:tools,
       [path.join(root,'src/tagging/TaggingService.js')]:{},
@@ -48,8 +51,21 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     const bridge=handlers.get('mynda:invoke');
     assert.strictEqual((await bridge(event,'playback.getState',[])).value.status,'idle');
     assert.strictEqual((await bridge(event,'share.getState',[])).value.ok,true);
+    const access=await bridge(event,'metadata.getStatus',[]);
+    assert.strictEqual(access.ok,true); assert.strictEqual(access.value.hasCredential,false);
+    assert.strictEqual(access.value.token,undefined);
+    assert.strictEqual((await bridge({sender:{},senderFrame:sender.mainFrame},'metadata.save',[{token:'secret'}])).error.code,'APP_UNAUTHORIZED');
     const failed=await bridge(event,'editor.select',[{draft:{id:'a'.repeat(64)},choice:{myndaProposalID:'forged'}},999]);
     assert.strictEqual(failed.ok,false);
+    assert.strictEqual(failed.error.code,'ACTIVATION_REQUIRED');
+    assert.strictEqual((await bridge(event,'editor.search',[{id:'a'.repeat(64)}])).error.code,'ACTIVATION_REQUIRED');
+    assert.deepStrictEqual(dialogs,[]);
+    await bridge(event,'tagging.start',[]);
+    await bridge(event,'tagging.startSelected',[['a'.repeat(64)]]);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.strictEqual(dialogs.length,2);
+    assert(dialogs.every(item=>item.title==='Activation required'&&/Activate Mynda to use tagging/.test(item.message)),
+      'activation must precede eligibility checks and batch confirmation');
     const stranger={...sender};
     assert.throws(()=>handlers.get('library:snapshot')({sender:stranger,senderFrame:sender.mainFrame}),/application window/);
     assert.strictEqual((await bridge({sender:stranger,senderFrame:sender.mainFrame},'share.getState',[])).error.code,'APP_UNAUTHORIZED');

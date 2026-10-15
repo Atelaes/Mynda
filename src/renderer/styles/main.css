@@ -37,7 +37,7 @@ body ::-webkit-scrollbar {
 }
 
 :focus {
-  outline: rgba(0,0,0,0) auto 0px;
+  outline: none;
 }
 
 /* Interactive controls should have a pointer cursor and not have selectable text. */
@@ -46,7 +46,7 @@ select, .movie-table th, #nav-playlists li, .edit-widget *, .movie-row, input[ty
   user-select: none;
 }
 
-input[type=text], select, textarea {
+input:is([type=text], [type=password], [type=url]), select, textarea {
   font-family: var(--textinput-font);
   font-size: var(--textinput-font-size);
   font-weight: var(--textinput-font-weight);
@@ -59,17 +59,17 @@ input[type=text], select, textarea {
   border-radius: var(--textinput-borderradius);
   padding: var(--textinput-padding);
 }
-input[type=text].no-clear {
+input:is([type=text], [type=password], [type=url]).no-clear {
   padding: var(--textinput-padding-noclear);
 }
-input[type=text].uneditable {
+input:is([type=text], [type=password], [type=url]).uneditable {
   opacity: .6;
   user-select: none !important;
   cursor:default;
 }
 
 
-input[type=text]::placeholder {
+input:is([type=text], [type=password], [type=url])::placeholder {
   color:var(--textinput-text-placeholder);
   /* opacity: var(--textinput-text-placeholder-opacity); */
 }
@@ -1535,19 +1535,100 @@ table.compact .movie-row {
   font-weight: bold;
 }
 
-/* Share is a three-stage removable-drive workflow. Keep its controls in the
-   Settings pane, but give the request, fulfillment, and import preflights
-   enough structure to remain readable with custom kinds and long paths. */
-#settings-share {
+/* Share and License use the same compact Settings typography. */
+#settings-share,
+.license-activation {
   font-size: .8em;
   max-width: 58rem;
 }
 
-#settings-share p {
+#settings-share p,
+.license-activation p {
   margin: 0 0 .6em 0;
   font-weight: 300;
 }
 
+/* License uses the standard Settings subsection, field and button styles. */
+.license-activation label {
+  display: block;
+  margin: .6em 0 .25em;
+}
+
+.license-activation input {
+  width: 100%;
+}
+
+.license-activation details {
+  margin-top: .6em;
+}
+
+.license-activation summary {
+  cursor: pointer;
+}
+
+.license-activation details input {
+  margin-bottom: .6em;
+}
+
+.license-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4em;
+  margin: .6em 0;
+}
+
+.license-status {
+  margin-bottom: 1em;
+}
+
+.license-status-badge {
+  display: inline-block;
+  padding: .25em .65em;
+  margin-bottom: .5em;
+  border: 1px solid;
+  border-radius: .4em;
+  font-weight: 600;
+}
+
+.license-status-badge.active {
+  color: var(--activation-active-text);
+  background-color: var(--activation-active-bg);
+  border-color: var(--activation-active-border);
+}
+
+.license-status-badge.pending {
+  color: var(--activation-pending-text);
+  background-color: var(--activation-pending-bg);
+  border-color: var(--activation-pending-border);
+}
+
+.license-status-badge.error {
+  color: var(--activation-error-text);
+  background-color: var(--activation-error-bg);
+  border-color: var(--activation-error-border);
+}
+
+.license-activation .license-message {
+  color: var(--activation-error-text);
+}
+
+.license-activation .license-key-change,
+.license-activation .license-details {
+  margin-top: 1em;
+}
+
+.license-details summary {
+  margin-bottom: .5em;
+}
+
+.license-server-address {
+  overflow-wrap: anywhere;
+}
+
+/* Share is a three-stage removable-drive workflow. Keep its controls in the
+   Settings pane, but give the request, fulfillment, and import preflights
+   enough structure to remain readable with custom kinds and long paths. */
 #settings-share .share-directory-controls,
 #settings-share .share-actions,
 #settings-share .share-kind-actions,
@@ -2477,12 +2558,6 @@ table.compact .movie-row {
 .artwork-file-details > summary::-webkit-details-marker { display: none; }
 .artwork-file-details > summary::before { content: '\25B8'; }
 .artwork-file-details[open] > summary::before { content: '\25BE'; }
-#edit-field-artwork-buttons button:focus-visible,
-.artwork-file-details summary:focus-visible,
-.artwork-unavailable button:focus-visible {
-  outline: 2px solid var(--dim-text);
-  outline-offset: 2px;
-}
 .artwork-file-popover {
   position: absolute;
   z-index: 2;
@@ -2659,16 +2734,11 @@ table.compact .movie-row {
   text-align: left;
   cursor: pointer;
 }
-#editor-pane #edit-autotag-report .folder-heading:focus-visible {
-  outline: 2px solid var(--bright-text);
-  outline-offset: 3px;
-}
 #editor-pane #edit-autotag-report .twirl-icon { font-size: .7em; opacity: .65; }
 #editor-pane #edit-autotag-report a { color: var(--colorful-text); text-decoration: none; }
 #editor-pane #edit-autotag-report a:hover {
   color: var(--bright-text);
 }
-#editor-pane #edit-autotag-report a:focus-visible { outline: 2px solid var(--bright-text); outline-offset: 2px; }
 #editor-pane #edit-autotag-report .paragraph { user-select: text; }
 #editor-pane #edit-autotag-report p { margin: .6em 0; }
 #editor-pane #edit-autotag-report dl { margin: 1em 0; }

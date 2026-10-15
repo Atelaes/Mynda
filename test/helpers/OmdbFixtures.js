@@ -33,7 +33,8 @@ function loadSearch(responder, options = {}) {
   const api = loadFreshWithMocks(options.modulePath || path.join(__dirname,'../../src/tagging/TaggingService.js'), {
     axios,
     './CatalogClient':{createCatalogClient:require('./CatalogFixtures').createFixtureCatalogClient},
-    './MetadataServerConfig':{...require('../../src/tagging/MetadataServerConfig'), loadMetadataServerConfig:() => null},
+    '../main/MetadataConnection':{getConfig:async()=>null},
+    '../main/FeatureAccess':require('./ActivatedFeatureAccess'),
     electron:{app:{getPath:() => '/unused-fixture-user-data'}},
     '../platform/Logger.js':{child:() => logger},
     './EpisodeRuntime.js':{withEpisodeDuration:options.readDuration || (async video => video)},

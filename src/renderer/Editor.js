@@ -5,6 +5,7 @@ const hashObject = require('object-hash');
 const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const TaggingEvidence = require('../tagging/TaggingEvidence');
 const {capacityMessage} = require('../tagging/CapacityWait');
+const {isFeatureAccessError} = require('../platform/FeatureAccess');
 const {MynAutotagReport} = require('./AutotagReport.js');
 const {ImdbLink} = require('./ExternalLink.js');
 const {parseBoxOffice, formatBoxOffice} = require('../library/BoxOffice.js');
@@ -951,7 +952,7 @@ class MynEditorSearch extends React.Component {
     try { resultsObject = await window.mynda.editor.search({...submittedDraft,lookupID}); }
     catch (error) {
       if (!this.finishLookup(lookupID)) return;
-      alert(`The catalog could not complete this request: ${error.message || error}`);
+      alert(isFeatureAccessError(error) ? error.message : `The catalog could not complete this request: ${error.message || error}`);
       return;
     }
     if (!this.finishLookup(lookupID) || selection !== editorSelectionKey(this.props.video,this.props.batch)) return;
@@ -1051,7 +1052,7 @@ class MynEditorSearch extends React.Component {
       responseObject = await window.mynda.editor.select({draft: submittedDraft, choice: movie, lookupID});
     } catch (error) {
       if (!this.finishLookup(lookupID)) return;
-      alert(`Mynda could not retrieve this result: ${error.message || error}`);
+      alert(isFeatureAccessError(error) ? error.message : `Mynda could not retrieve this result: ${error.message || error}`);
       return;
     }
     if (!this.finishLookup(lookupID) || responseObject.status === 'canceled') return;
