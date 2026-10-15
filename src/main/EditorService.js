@@ -32,10 +32,47 @@ function imageExtension(bytes) {
 function createEditorService({library, catalog, dialog, app, downloadFile = createArtworkDownloader(),
   deriveFilenameResetChanges, isAutoTagRunning = () => false,
   confirmationDialogIsDisabled = () => false, disableConfirmationDialog = () => {},
-  now = Date.now}) {
+  now = Date.now, notifyLookup = () => {}}) {
   const proposals = new Map();
   const grants = new Map();
   const closedOwners = new Set();
+  const lookups = new Map();
+  async function runLookup(owner, lookupID, videoID, operation) {
+    requireOwner(owner);
+    if (lookupID === undefined) lookupID = randomBytes(16).toString('hex');
+    if (typeof lookupID !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(lookupID)) throw new TypeError('Invalid lookup ID');
+    const previous = lookups.get(owner);
+    if (previous) previous.controller.abort();
+    const current = {lookupID,controller:new AbortController(),waits:new Map()};
+    lookups.set(owner,current);
+    const notify = () => {
+      if (lookups.get(owner) === current && !closedOwners.has(owner)) notifyLookup(owner,
+        {lookupID,videoID,capacityWait:current.waits.size ? current.waits.values().next().value : null});
+    };
+    const control = {workload:'interactive',signal:current.controller.signal,
+      onCapacityWait:status => {
+        if (status.waiting) current.waits.set(status.waitID,status);
+        else current.waits.delete(status.waitID);
+        notify();
+      }};
+    try {
+      const result = await operation(control);
+      return current.controller.signal.aborted ? {status:'canceled'} : result;
+    } catch (error) {
+      if (current.controller.signal.aborted) return {status:'canceled'};
+      throw error;
+    } finally {
+      current.waits.clear();
+      notify();
+      if (lookups.get(owner) === current) lookups.delete(owner);
+    }
+  }
+  function cancelSearch(input, owner) {
+    const current = lookups.get(owner);
+    if (!current || !input || current.lookupID !== input.lookupID) return {canceled:false};
+    current.controller.abort();
+    return {canceled:true};
+  }
   function requireOwner(owner) {
     if (closedOwners.has(owner)) throw new Error('The editor window has closed.');
   }
@@ -129,9 +166,14 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   }
 
   async function search(draft, owner) {
+    return runLookup(owner, draft && draft.lookupID, draft && draft.id,
+      control => searchLookup(draft, owner, control));
+  }
+  async function searchLookup(draft, owner, control) {
     requireOwner(owner);
     const video = draftVideo(draft);
-    const result = await catalog.resolve(video);
+    const result = await catalog.resolve(video, {requestControl:control});
+    if (control.signal.aborted) return {status:'canceled'};
     if (result.status === 'candidate') {
       catalogArtwork(owner, result.candidate.record);
       const proposalID = remember(owner, video, {proposal: result});
@@ -148,7 +190,11 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
     return {status: result.status, reason: copy(result.reason || {})};
   }
 
-  async function select({draft, choice} = {}, owner) {
+  async function select({draft, choice, lookupID} = {}, owner) {
+    return runLookup(owner, lookupID, draft && draft.id,
+      control => selectLookup({draft,choice}, owner, control));
+  }
+  async function selectLookup({draft, choice}, owner, control) {
     requireOwner(owner);
     const video = draftVideo(draft);
     const token = choice && boundedText(choice.myndaProposalID, 'The catalog choice', 128);
@@ -165,13 +211,13 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
       const identity = new Set(Object.keys(Evidence.snapshot(video)).concat('metadata','dvd'));
       const latest = {...proposal.candidate.video};
       for (const [field, value] of Object.entries(video)) if (!identity.has(field)) latest[field] = value;
-      return acceptArtwork(await catalog.applyMatch({...proposal, candidate: {...proposal.candidate, video: latest}},
+      return acceptArtwork(await catalog.applyMatch({...proposal, context:{...proposal.context,requestControl:control}, candidate: {...proposal.candidate, video: latest}},
         {recordSelectionSource: 'user'}), video, owner);
     }
     const row = stored.choice;
     const result = await (row.myndaChoiceType === 'series' ?
-      catalog.tag(video, {seriesImdbID: row.imdbID, seriesSelectionSource: 'user'}) :
-      catalog.tag({...video, imdbID: row.imdbID}, {imdbIDSource: 'user'}));
+      catalog.tag(video, {seriesImdbID: row.imdbID, seriesSelectionSource: 'user',requestControl:control}) :
+      catalog.tag({...video, imdbID: row.imdbID}, {imdbIDSource: 'user',requestControl:control}));
     return acceptArtwork(result, video, owner);
   }
 
@@ -308,10 +354,12 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
 
   function dispose(owner) {
     closedOwners.add(owner);
+    if (lookups.has(owner)) lookups.get(owner).controller.abort();
+    lookups.delete(owner);
     for (const [key, value] of proposals) if (value.owner === owner) proposals.delete(key);
     grants.delete(owner);
   }
-  return {search, select, inspectArtwork, prepareArtwork, downloadArtwork, chooseArtwork,
+  return {search, select, cancelSearch, inspectArtwork, prepareArtwork, downloadArtwork, chooseArtwork,
     chooseSubtitles, validateSubtitles, confirm, resetFromFilename, authorizeArtwork, authorizeSubtitle, dispose};
 }
 

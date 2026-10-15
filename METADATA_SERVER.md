@@ -34,9 +34,13 @@ Mynda continues to own matching, ambiguity, numbering corrections, operation bud
 
 `src/tagging/TaggingService.js` assembles those desktop responsibilities. `CatalogClient.js` accepts structured queries, manages budgets and reuse, and calls `MetadataServerClient.js` for HTTP requests. The latter converts the public server data into the existing internal catalog record shape (`Title`, `Runtime`, and related fields) to preserve the matching engine's behavior. Those internal field names do not select a provider. Parent IMDb identity comes only from `seriesExternalIds.imdb`; native references remain opaque. Saved reports from before this rename still render correctly.
 
-The desktop budget counts requests to the local server. Each metadata request can cause up to two OMDb attempts under the server's bounded retry policy. The desktop waits up to 30 seconds and adds no transport retries. It reuses successful responses and definitive missing-record responses within the existing session, and evicts service failures. Artwork URLs are still downloaded by Mynda.
+The desktop candidate budget counts logical catalog lookups. Each admitted server lookup can cause up to two OMDb attempts under the server's bounded retry policy; the server charges each attempt against its shared allowance. Each desktop HTTP request has a 30-second timeout. Successful responses and definitive missing records are reused within the existing session; service failures are evicted. Artwork URLs are still downloaded by Mynda.
 
-Server downtime, access failures, quota exhaustion, invalid data, and timeouts remain retryable service outcomes in the tagging workflow. Only the explicit `NOT_FOUND` error becomes a missing record; `TOO_MANY_RESULTS` remains an ambiguous search. Neither a generic HTTP 404 nor a provider failure is treated as a missing movie or empty season.
+An explicit HTTP 429 `CAPACITY_WAIT` response pauses the pending lookup. Mynda validates and honors its `Retry-After`, carries the queue ticket forward, displays a capacity message, and retries the same input. These polls do not consume the candidate-search budget or produce unmatched reports. Auto-Tag saves completed videos before waiting. Cancel stops a capacity wait immediately and leaves the pending video unchanged; canceling ordinary active tagging keeps the established finish-current-video behavior. Search and result selection now have Cancel controls too. Changing the editor selection or closing it cancels its pending lookup and ignores late responses.
+
+Long allowance/provider pauses display a retry time. The app must remain open to resume automatically; already saved results survive closing and unprocessed videos remain eligible for another run. Generic failures still follow the normal error path. This milestone adds no shared server metadata cache.
+
+Server downtime, access failures, invalid data, and timeouts remain service outcomes in the tagging workflow. An older server's quota error also retains that behavior; automatic capacity pauses require updating both repositories. Only the explicit `NOT_FOUND` error becomes a missing record; `TOO_MANY_RESULTS` remains an ambiguous search. Neither a generic HTTP 404 nor a provider failure is treated as a missing movie or empty season.
 
 ## Diagnostics and automated checks
 
@@ -55,3 +59,11 @@ npm run test:metadata-server -- /Volumes/2TB-SSD/Coding/mynda-server
 ```
 
 This compiles the server's router and OMDb adapter into a temporary test bundle, routes the original recorded responses through both contracts, and checks the original expected identities. Network access is disabled. The server does not need to be running and no real API key or development token is used.
+
+Run the capacity contract through a temporary local Worker, real SQLite storage and the desktop HTTP client:
+
+```bash
+npm run test:capacity-server -- /Volumes/2TB-SSD/Coding/mynda-server
+```
+
+Install the server's dependencies first (`npm ci` in its checkout). This test gives a synthetic provider three daily requests and one request per second. It checks automatic batch waiting/resuming, saved results, a second client's shared allowance, immediate cancellation, and persistence across a complete Worker runtime restart. Provider traffic is intercepted locally; the test does not read your credentials, use provider quota, or alter your normal local server storage.

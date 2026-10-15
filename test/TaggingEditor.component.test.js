@@ -98,7 +98,9 @@ suite.test('a series choice is passed as a parent, with explicit user provenance
   const result = await service.search(original, 1);
   await instance.retrieveResult(result.choices[0]);
   assert.deepStrictEqual(request.video,original);
-  assert.deepStrictEqual(request.options,{seriesImdbID:'tt555',seriesSelectionSource:'user'});
+  const {requestControl,...identityOptions}=request.options;
+  assert.deepStrictEqual(identityOptions,{seriesImdbID:'tt555',seriesSelectionSource:'user'});
+  assert.strictEqual(requestControl.workload,'interactive');
 });
 suite.test('previewing a candidate performs no application; confirming reuses the proposal',async()=>{
   const original=show();
@@ -120,7 +122,10 @@ suite.test('previewing a candidate performs no application; confirming reuses th
   await instance.retrieveResult(JSON.parse(JSON.stringify(row)));
   assert.strictEqual(applied,1);
   assert.strictEqual(lookups,1);
-  assert.strictEqual(request.candidate.context,proposal.context);
+  const {requestControl,...context}=request.candidate.context;
+  assert.deepStrictEqual(context,proposal.context);
+  assert.strictEqual(context.originalInput,proposal.context.originalInput);
+  assert.strictEqual(requestControl.workload,'interactive');
   assert.deepStrictEqual(request.candidate.candidate.record,proposal.candidate.record);
   assert.strictEqual(request.options.recordSelectionSource,'user');
 });

@@ -13,9 +13,10 @@ function createBridge({invoke, subscribe, platform, getPathForFile}) {
       onCloseCanceled:on('library:close-canceled')}),
     playback:Object.freeze({play:call('playback.play'), stop:call('playback.stop'),
       getState:call('playback.getState'), onState:on('playback:state')}),
-    editor:Object.freeze({...Object.fromEntries(['search','select','resetFromFilename','prepareArtwork',
+    editor:Object.freeze({...Object.fromEntries(['search','select','cancelSearch','resetFromFilename','prepareArtwork',
       'inspectArtwork','downloadArtwork','chooseArtwork','chooseSubtitles','validateSubtitles','confirm']
       .map(name => [name,call('editor.'+name)])),
+      onLookupStatus:on('editor:lookup-status'),
       async inspectDroppedArtwork(file) {
         // DOM Files cannot cross IPC. Resolve the native path inside preload,
         // then use the same main-process approval and validation as typed paths.

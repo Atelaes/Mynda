@@ -2,6 +2,10 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'component',file:'test/CapacityWait.component.test.js',title:'Metadata capacity waiting UI',
+    protects:'batch pause messages, editor cancellation, stale responses, selection changes and preload status subscriptions'},
+  {category:'integration',file:'test/CapacityWait.integration.test.js',title:'Metadata capacity waits and cancellation',
+    protects:'validated retry timing, fair-queue tickets, unchanged candidate budgets, batch progress, cancellation, storage failures and editor ownership'},
   {category:'integration',file:'test/MetadataServer.integration.test.js',title:'Local metadata server integration',
     protects:'authenticated v1 requests, legacy field translation, request reuse, service outcomes, private configuration and error redaction'},
   {category:'integration',file:'test/TaggingJourneys.integration.test.js',title:'Tagging journey catalog and live-test safeguards',

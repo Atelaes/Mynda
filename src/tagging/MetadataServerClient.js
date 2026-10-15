@@ -1,6 +1,8 @@
 // Translate the v1 service contract at the existing catalog boundary. Matching,
 // discovery, caching and library updates remain with their existing owners.
 const {validateServerConfig, configurationMessage} = require('./MetadataServerConfig');
+const {capacityWait,waitForCapacity,canceled} = require('./CapacityWait');
+let nextWaitID = 0;
 const MESSAGES = {
   UNAUTHORIZED: 'The metadata server rejected the development token. Check the local connection settings.',
   PROVIDER_AUTH_ERROR: 'The metadata server could not authenticate with its provider.',
@@ -9,6 +11,7 @@ const MESSAGES = {
   PROVIDER_UNAVAILABLE: 'The metadata provider is temporarily unavailable.',
   PROVIDER_INVALID_RESPONSE: 'The metadata provider returned invalid or inconsistent data.',
   CONFIGURATION_ERROR: 'The metadata server is not configured correctly.',
+  CAPACITY_UNAVAILABLE: 'The metadata server cannot check its shared capacity. Please try again later.',
   BAD_REQUEST: 'The metadata server rejected the lookup parameters.',
   UNSUPPORTED: 'The metadata server does not support this lookup.',
 };
@@ -153,45 +156,82 @@ function lookup(parameters) {
   throw serviceError('METADATA_BAD_REQUEST', 'A metadata lookup requires a title or IMDb ID.');
 }
 
-function createMetadataServerClient({axios, server}) {
+function createMetadataServerClient({axios, server, wait = waitForCapacity, now = Date.now}) {
   let config;
   try { config = validateServerConfig(server); } catch (_) { /* Fail on lookup, not app startup. */ }
-  return async function request(parameters) {
+  return async function request(parameters, control = {}) {
     if (!config) throw serviceError('METADATA_CONFIGURATION_ERROR', configurationMessage);
     const {route, body} = lookup(parameters);
-    let response;
+    const waitID = ++nextWaitID;
+    let ticket, waiting = false;
     try {
-      response = await axios({method:'post', url:config.url + route, data:body,
-        headers:{Authorization:`Bearer ${config.token}`, 'Content-Type':'application/json'},
+      while (true) {
+        if (control.signal && control.signal.aborted) throw canceled();
+        const response = await send(route, body, ticket, control);
+        const envelope = response && response.data;
+        if (!object(envelope) || !safeID(envelope.requestId)) throw serviceError('METADATA_INVALID_RESPONSE',
+          'The metadata server returned an invalid response.', response);
+        const capacity = capacityWait(response);
+        if (capacity) {
+          ticket = capacity.ticket;
+          if (control.isCanceled && control.isCanceled()) throw canceled();
+          waiting = true;
+          if (control.onCapacityWait) await control.onCapacityWait({waiting:true,waitID,
+            reason:capacity.reason,retryAfterSeconds:capacity.retryAfterSeconds,retryAt:now() + capacity.retryAfterSeconds * 1000});
+          await wait(capacity.retryAfterSeconds * 1000, control.signal);
+          continue;
+        }
+        if (response.status !== 200) {
+          const code = envelope.error && envelope.error.code;
+          if ((response.status === 404 && code === 'NOT_FOUND') || (response.status === 422 && code === 'TOO_MANY_RESULTS')) {
+            return {status:200, data:{Response:'False', Error:code === 'NOT_FOUND' ? 'Movie not found!' : 'Too many results.'},
+              requestId:envelope.requestId};
+          }
+          const known = Object.hasOwn(MESSAGES, code);
+          throw serviceError(known ? code : 'METADATA_SERVICE_ERROR',
+            known ? MESSAGES[code] : 'The metadata server could not complete the lookup.', response);
+        }
+        try {
+          return {status:200, data:translate(envelope.data, route, body), requestId:envelope.requestId};
+        } catch (error) {
+          throw serviceError('METADATA_INVALID_RESPONSE', 'The metadata server returned an invalid response.', response);
+        }
+      }
+    } finally {
+      if (waiting && control.onCapacityWait) await control.onCapacityWait({waiting:false,waitID});
+    }
+  };
+
+  async function send(route, body, ticket, control) {
+    let response;
+    const signal = control.signal;
+    const source = axios.CancelToken && axios.CancelToken.source();
+    let abort;
+    try {
+      const interrupted = new Promise((_, reject) => {
+        abort = () => { if (source) source.cancel(); reject(canceled()); };
+        if (signal) signal.addEventListener('abort', abort, {once:true});
+      });
+      const operation = axios({method:'post', url:config.url + route, data:body,
+        headers:{Authorization:`Bearer ${config.token}`, 'Content-Type':'application/json',
+          'X-Metadata-Workload':control.workload === 'batch' ? 'batch' : 'interactive',
+          ...(ticket ? {'X-Metadata-Ticket':ticket} : {})},
         // The server can spend up to 20.1 seconds on its two provider attempts.
         timeout:30000, maxRedirects:0, maxContentLength:1024 * 1024,
-        proxy:false, validateStatus:() => true});
+        proxy:false, ...(source ? {cancelToken:source.token} : {}), validateStatus:() => true});
+      response = await Promise.race([operation, interrupted]);
     } catch (error) {
+      if (signal && signal.aborted) throw canceled();
       // Axios errors retain the Authorization header and request config. Never
       // pass the original error into logging, saved evidence, or renderer IPC.
       const timeout = error && ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code);
       throw serviceError(timeout ? 'METADATA_TIMEOUT' : 'METADATA_UNAVAILABLE', timeout ?
         'The metadata server did not respond in time.' : 'Could not reach the metadata server. Confirm npm run dev is running.');
+    } finally {
+      if (signal && abort) signal.removeEventListener('abort', abort);
     }
-    const envelope = response && response.data;
-    if (!object(envelope) || !safeID(envelope.requestId)) throw serviceError('METADATA_INVALID_RESPONSE',
-      'The metadata server returned an invalid response.', response);
-    if (response.status !== 200) {
-      const code = envelope.error && envelope.error.code;
-      if ((response.status === 404 && code === 'NOT_FOUND') || (response.status === 422 && code === 'TOO_MANY_RESULTS')) {
-        return {status:200, data:{Response:'False', Error:code === 'NOT_FOUND' ? 'Movie not found!' : 'Too many results.'},
-          requestId:envelope.requestId};
-      }
-      const known = Object.hasOwn(MESSAGES, code);
-      throw serviceError(known ? code : 'METADATA_SERVICE_ERROR',
-        known ? MESSAGES[code] : 'The metadata server could not complete the lookup.', response);
-    }
-    try {
-      return {status:200, data:translate(envelope.data, route, body), requestId:envelope.requestId};
-    } catch (error) {
-      throw serviceError('METADATA_INVALID_RESPONSE', 'The metadata server returned an invalid response.', response);
-    }
-  };
+    return response;
+  }
 }
 
 module.exports = {createMetadataServerClient};

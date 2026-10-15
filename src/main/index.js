@@ -177,6 +177,10 @@ const playback = createPlaybackService({library,log:Logger.child('Player'),publi
 }});
 const editor = createEditorService({library,catalog:TaggingService,dialog,app,
   deriveFilenameResetChanges,isAutoTagRunning:()=>autoTagState.running,
+  notifyLookup:(owner,status) => {
+    const contents = electron.webContents.fromId(owner);
+    if (contents && !contents.isDestroyed()) contents.send('editor:lookup-status',status);
+  },
   confirmationDialogIsDisabled,disableConfirmationDialog,log:backendLog});
 const desktop = createDesktopService({app,dialog,shell:electron.shell,library,getWindow:()=>win,
   scan:checkWatchFolders,removeWatchfolder,shareService,
@@ -189,7 +193,7 @@ installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,l
     ...createTaskMethods({scan:requestWatchfolderScan,startTagging:requestAutoTag,
       startSelectedTagging:requestSelectedAutoTag,cancelTagging:requestAutoTagCancellation,
       reportFailure:reportAutoTagFailure}),
-    ...Object.fromEntries(['search','select','resetFromFilename','prepareArtwork','inspectArtwork',
+    ...Object.fromEntries(['search','select','cancelSearch','resetFromFilename','prepareArtwork','inspectArtwork',
       'downloadArtwork','validateSubtitles','confirm']
       .map(name=>['editor.'+name,(event,input)=>editor[name](input,event.sender.id)])),
     'editor.chooseArtwork':event=>editor.chooseArtwork(event.sender.id),
@@ -1793,8 +1797,9 @@ function requestAutoTagCancellation() {
     }
 
     autoTagState.cancelRequested = true;
+    const canceledWait = autoTagState.cancelCapacityWait && autoTagState.cancelCapacityWait();
     autoTagLog.info('Automatic tagging cancellation requested by user');
-    win.webContents.send('status-update', {action: 'autotag', cancelRequested: true});
+    win.webContents.send('status-update', {action: 'autotag', cancelRequested: true, canceledWait:Boolean(canceledWait)});
     return true;
   };
 
@@ -1810,7 +1815,8 @@ function requestAutoTagCancellation() {
     title: 'Cancel Auto-Tag',
     message: 'Cancel auto-tagging?',
     checkboxLabel: `Don't show this message again`,
-    detail: autoTagState.scope === 'selected' ?
+    detail: autoTagState.capacityWaiting ?
+      'Mynda will stop waiting and keep the results already saved. The pending video and remaining videos will be left unchanged and can be tagged again later.' : autoTagState.scope === 'selected' ?
       'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Unprocessed selected videos will be left unchanged; select them and use Auto-Tag Selected again if you want to continue.' :
       'Mynda will finish and save the video currently being processed, then stop. It may continue to say Canceling briefly while those saves finish synchronizing. Videos that have not been processed will remain eligible for the next Auto-Tag run, which will pick up where it left off.'
   }).then(result => {

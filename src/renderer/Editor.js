@@ -4,6 +4,7 @@ const _ = require('lodash');
 const hashObject = require('object-hash');
 const {videoEdit, reportSaveFailure} = require('./LibraryEdits.js');
 const TaggingEvidence = require('../tagging/TaggingEvidence');
+const {capacityMessage} = require('../tagging/CapacityWait');
 const {MynAutotagReport} = require('./AutotagReport.js');
 const {ImdbLink} = require('./ExternalLink.js');
 const {parseBoxOffice, formatBoxOffice} = require('../library/BoxOffice.js');
@@ -841,10 +842,13 @@ class MynEditorSearch extends React.Component {
   constructor(props) {
     super(props)
     this._searchInputs = new Map();
+    this._lookupSequence = 0;
+    this._activeLookupID = null;
 
     this.state = {
       results: null,
-      searching: false
+      searching: false,
+      capacityWait: null
     }
 
     this.handleSearch = this.handleSearch.bind(this);
@@ -877,6 +881,39 @@ class MynEditorSearch extends React.Component {
     };
   }
 
+  beginLookup() {
+    const lookupID = `${Date.now()}-${++this._lookupSequence}`;
+    this._activeLookupID = lookupID;
+    this.setState({searching:true,capacityWait:null});
+    return lookupID;
+  }
+  finishLookup(lookupID) {
+    if (this._unmounted || this._activeLookupID !== lookupID) return false;
+    this._activeLookupID = null;
+    this.setState({searching:false,capacityWait:null});
+    return true;
+  }
+  cancelLookup(update = true) {
+    const lookupID = this._activeLookupID;
+    this._activeLookupID = null;
+    if (update && !this._unmounted) this.setState({searching:false,capacityWait:null});
+    if (lookupID && window.mynda.editor.cancelSearch) {
+      Promise.resolve(window.mynda.editor.cancelSearch({lookupID})).catch(error =>
+        editorLog.warn('Could not cancel the pending metadata lookup',{error}));
+    }
+  }
+  componentDidMount() {
+    if (window.mynda.editor.onLookupStatus) this._removeLookupStatus = window.mynda.editor.onLookupStatus(status => {
+      if (!this._unmounted && status.lookupID === this._activeLookupID && status.videoID === this.props.video.id)
+        this.setState({capacityWait:status.capacityWait});
+    });
+  }
+  componentWillUnmount() {
+    this._unmounted = true;
+    this.cancelLookup(false);
+    if (this._removeLookupStatus) this._removeLookupStatus();
+  }
+
   // search online movie database to auto-fill fields
   async handleSearch(event) {
     event.preventDefault();
@@ -901,7 +938,7 @@ class MynEditorSearch extends React.Component {
       return;
     }
 
-    this.setState({searching:true});
+    const lookupID = this.beginLookup();
     this._searchInputs.clear();
     const selection = editorSelectionKey(this.props.video,this.props.batch);
     const submittedDraft = _.cloneDeep(this.props.video);
@@ -911,14 +948,14 @@ class MynEditorSearch extends React.Component {
     // unchanged draft. The backend independently checks its stored proposal.
     const input = TaggingEvidence.snapshot(submittedDraft);
     let resultsObject;
-    try { resultsObject = await window.mynda.editor.search(submittedDraft); }
+    try { resultsObject = await window.mynda.editor.search({...submittedDraft,lookupID}); }
     catch (error) {
-      this.setState({searching: false});
+      if (!this.finishLookup(lookupID)) return;
       alert(`The catalog could not complete this request: ${error.message || error}`);
       return;
     }
-    if (selection !== editorSelectionKey(this.props.video,this.props.batch)) return;
-    this.setState({searching:false});
+    if (!this.finishLookup(lookupID) || selection !== editorSelectionKey(this.props.video,this.props.batch)) return;
+    if (resultsObject.status === 'canceled') return;
     //console.log(results);
     let results;
     if (resultsObject.status === 'candidate') {
@@ -1008,13 +1045,16 @@ class MynEditorSearch extends React.Component {
     this.clearSearch();
 
     const submittedDraft = _.cloneDeep(this.props.video);
+    const lookupID = this.beginLookup();
     let responseObject;
     try {
-      responseObject = await window.mynda.editor.select({draft: submittedDraft, choice: movie});
+      responseObject = await window.mynda.editor.select({draft: submittedDraft, choice: movie, lookupID});
     } catch (error) {
+      if (!this.finishLookup(lookupID)) return;
       alert(`Mynda could not retrieve this result: ${error.message || error}`);
       return;
     }
+    if (!this.finishLookup(lookupID) || responseObject.status === 'canceled') return;
     // The request is asynchronous. Never put its response into another video
     // or replace edits made while the backend was fetching metadata/artwork.
     if (submittedDraft.id !== this.props.video.id) return;
@@ -1055,6 +1095,7 @@ class MynEditorSearch extends React.Component {
     const previousSelection = editorSelectionKey(previousProps.video, previousProps.batch);
     const currentSelection = editorSelectionKey(this.props.video, this.props.batch);
     if (previousSelection !== currentSelection && (this.state.results || this.state.searching)) {
+      this.cancelLookup();
       this._searchInputs.clear();
       // Search rows belong to one concrete video. Never carry them into a
       // different video—or into a batch where selecting one row would apply a
@@ -1090,7 +1131,11 @@ class MynEditorSearch extends React.Component {
       }
     } else {
       searchBtn = this.state.searching ?
-        (<img src='../../images/loading-icon.gif' className='loading-icon' />) :
+        (<span className='edit-search-pending'>
+          <img src='../../images/loading-icon.gif' className='loading-icon' />
+          <button type='button' id='edit-search-cancel' onClick={() => this.cancelLookup()}>Cancel</button>
+          {this.state.capacityWait ? <span role='status'>{capacityMessage(this.state.capacityWait)}</span> : null}
+        </span>) :
         (<button type='button' id='edit-search-button' onClick={this.handleSearch} title='Search the catalog for video information. Shows use series, season, and episode; other videos use IMDb ID, title, year, or filename. You can choose a result and edit it afterwards.'>Search</button>);
     }
     return (

@@ -18,6 +18,7 @@
     "test:tagging:asar": "node test/electron/run-tagging.js --asar",
     "test:tagging:live": "node test/electron/run-tagging.js --live",
     "test:metadata-server": "node scripts/test-metadata-server.js",
+    "test:capacity-server": "node scripts/test-capacity-server.js",
     "test:all": "npm run build:renderer && node test/run-tests.js all",
     "library:migrate": "node scripts/migrate-video-ids.js",
     "media:prepare": "node scripts/prepare-media-tools.js",

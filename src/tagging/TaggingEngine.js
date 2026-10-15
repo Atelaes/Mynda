@@ -19,6 +19,7 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
     const seriesSession = options.seriesSearchSession || SeriesSearch.createSession();
     return {searchID:`${process.pid}-${++nextSearchNumber}`,seriesSession,
       requestSession:seriesSession.catalog,requestTrace:[],
+      requestControl:options.requestControl,
       requestBudget:options.requestBudget || createRequestBudget(options.requestBudgetLimit),
       seriesSelectionSource:options.seriesSelectionSource || 'user',
       selectedSeriesID:options.seriesImdbID,deferSeriesEvidence:Boolean(options.deferSeriesEvidence),
@@ -41,6 +42,10 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
   }
 
   function logDecision(video,result,context) {
+    if (result.reason && result.reason.code === 'METADATA_CANCELED') {
+      log.debug('Tagging lookup canceled',{searchID:context.searchID,videoID:video.id});
+      return;
+    }
     const level = result.status === 'matched' ? 'info' : result.status === 'service-error' ? 'error' : 'warn';
     log[level]('Tagging decision',{searchID:context.searchID,videoID:video.id,filename:video.filename,
       status:result.status,reason:result.reason,evidence:result.evidence});

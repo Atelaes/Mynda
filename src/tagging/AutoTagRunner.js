@@ -9,6 +9,7 @@ const Decision = require('./TaggingDecision');
 const Limits = require('./TaggingLimits');
 const {createRequestBudget} = require('./RequestBudget');
 const {validSeriesImdbID} = require('./CatalogResponse');
+const {canceled} = require('./CapacityWait');
 
 function shouldDefer(result) {
   return result.status === 'candidate' && result.candidate.evidence.kind === 'episode' &&
@@ -30,6 +31,35 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     state.scope = options.scope === 'selected' ? 'selected' : 'library';
     const seriesBatch = options.seriesBatch;
     const session = catalog.createSeriesSearchSession();
+    const controller = new AbortController();
+    const waits = new Map();
+    let currentProgress = {action:'autotag'}, waitFailure;
+    state.capacityWaiting = false;
+    state.cancelCapacityWait = () => {
+      if (!state.capacityWaiting) return false;
+      controller.abort();
+      return true;
+    };
+    const requestControl = {workload:'batch',signal:controller.signal,
+      isCanceled:() => {
+        if (state.cancelRequested) controller.abort();
+        return state.cancelRequested;
+      },
+      onCapacityWait:async status => {
+        if (status.waiting) {
+          state.capacityWaiting = true;
+          if (!waits.size) {
+            try { await flush(); }
+            catch (error) { waitFailure = error; controller.abort(); throw error; }
+          }
+          waits.set(status.waitID,status);
+          if (state.cancelRequested) controller.abort();
+        } else waits.delete(status.waitID);
+        state.capacityWaiting = waits.size > 0;
+        notifyStatus({...currentProgress,...(waits.size ? {capacityWait:waits.values().next().value} : {})});
+      }};
+    session.catalog = session.catalog || {};
+    session.catalog.control = requestControl;
     const ledger = BatchEvidence.createEvidence(videos,getLibraryVideos ? getLibraryVideos() : []);
     const seasonOffsetHints = new Map();
     const retryCandidates = [], pendingMatches = [], outcomes = new Map(), attempts = new Map();
@@ -38,6 +68,12 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     let sharedID = seriesBatch && validSeriesImdbID(seriesBatch.storedSeriesImdbID) ? seriesBatch.storedSeriesImdbID.trim() : '';
     let sharedSource = sharedID ? 'stored' : 'batch', sharedEvidence;
     let seriesSelectionCanceled = false, seriesPreflightFailure = null;
+
+    function checkLookup() {
+      if (waitFailure) throw waitFailure;
+      if (controller.signal.aborted) throw canceled();
+    }
+    function progress(status) { currentProgress = status; notifyStatus(status); }
 
     async function flush() {
       if (!batchSave.length) return;
@@ -79,15 +115,22 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         ...(sharedID ? {seriesImdbID:sharedID,seriesSelectionSource:sharedSource,parentEvidence:sharedEvidence} : {})};
     }
     async function resolve(video,settings) {
-      try { return await catalog.resolve(video,settings); }
-      catch(error) { return Decision.fromDiscovery({failure:'Error',data:error},video,{}); }
+      let result;
+      try { result = await catalog.resolve(video,settings); }
+      catch(error) { result = Decision.fromDiscovery({failure:'Error',data:error},video,{}); }
+      checkLookup();
+      return result;
     }
     async function finish(video,result) {
-      return result.status === 'candidate' ? catalog.applyMatch(result,{anchors:ledger.anchorsFor(video,result)}) : result;
+      checkLookup();
+      const finished = result.status === 'candidate' ? await catalog.applyMatch(result,{anchors:ledger.anchorsFor(video,result)}) : result;
+      checkLookup();
+      return finished;
     }
     // Every pass uses this one outcome recorder. Retries replace a disposition;
     // a service failure never marks the file permanently attempted.
     async function record(video,result,index,retry = false,parent) {
+      checkLookup();
       attempts.set(index,{video,result,index,parent});
       const previous = outcomes.get(index);
       if (previous) statistics[previous]--;
@@ -127,13 +170,14 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     }
 
     try {
-      notifyStatus({action:'autotag'});
+      progress({action:'autotag'});
       log.info('Automatic tagging batch started',{totalVideos:videos.length,scope:state.scope,
         sameSeriesShowBatch:Boolean(seriesBatch),series:seriesBatch && seriesBatch.series});
       if (seriesBatch && !sharedID) {
         let preflight;
         try { preflight = await catalog.preflight(videos,{seriesSearchSession:session,requestBudgetLimit:options.requestBudgetLimit}); }
         catch(error) { preflight = Decision.fromDiscovery({failure:'Error',data:error},videos[0] || {},{}); }
+        checkLookup();
         if (preflight.status === 'parent-resolved') {
           sharedID = preflight.seriesID;
           sharedEvidence = preflight.evidence;
@@ -156,7 +200,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       }
       for (let index = 0; !seriesSelectionCanceled && !seriesPreflightFailure && index < videos.length; index++) {
         if (!await canContinue()) break;
-        notifyStatus({action:'autotag',numCurrent:index+1,numTotal:videos.length});
+        progress({action:'autotag',numCurrent:index+1,numTotal:videos.length});
         const video = videos[index];
         let result = await resolve(video,searchOptions(index));
         if (BatchEvidence.canRetry(result)) retryCandidates.push({video,result,index});
@@ -173,6 +217,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       // Freeze independent parent decisions before dependent retries supply any
       // additional order observations. No retry can bootstrap another parent.
       const {retries,structureChecks} = await planRecovery({pending:retryCandidates,ledger,catalog,session,budgets,canContinue});
+      checkLookup();
       if (structureChecks) statistics.seriesStructureChecks=structureChecks;
       for (const pending of retries) {
         if (!await canContinue()) break;
@@ -247,10 +292,21 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       log.debug('Automatic tagging batch diagnostics',{scope:state.scope,status,statistics,
         videoResults:[...outcomes].map(([i,disposition]) => `${videos[i].title}: ${disposition}`).sort()});
       return {statistics,canceled:state.cancelRequested,seriesSelectionCanceled,seriesPreflightFailure};
+    } catch (error) {
+      if (!error || error.code !== 'METADATA_CANCELED') throw error;
+      state.cancelRequested = true;
+      await flush();
+      await whenIdle();
+      statistics.processedVideos = outcomes.size;
+      statistics.remainingVideos = videos.length - outcomes.size;
+      log.info('Automatic tagging canceled while waiting for metadata capacity',{scope:state.scope,statistics});
+      return {statistics,canceled:true,seriesSelectionCanceled:false,seriesPreflightFailure:null};
     } finally {
       state.running = false;
       state.cancelRequested = false;
       state.scope = 'library';
+      state.capacityWaiting = false;
+      state.cancelCapacityWait = null;
       notifyStatus({action:''});
     }
   };

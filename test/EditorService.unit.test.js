@@ -40,7 +40,7 @@ suite.test('preview keeps promises and policy evidence in the backend and never 
   assert.strictEqual(result.context.cache, undefined);
   assert.deepStrictEqual(calls.map(call => call[0]), ['resolve']);
 });
-suite.test('selection reuses the exact proposal context, preserves numbering and takes latest unrelated drafts', async () => {
+suite.test('selection reuses proposal evidence and caches with fresh request controls, preserving numbering and latest unrelated drafts', async () => {
   const {service, source, proposal, calls, library} = setup();
   const result = await service.search(source, 10);
   const matched = await service.select({draft: {...source, tags: ['unsaved'], ratings: {user: 5}},
@@ -49,7 +49,10 @@ suite.test('selection reuses the exact proposal context, preserves numbering and
   assert.deepStrictEqual(matched.video.tags, ['unsaved']);
   assert.strictEqual(matched.video.ratings.user, 5);
   const application = calls.find(call => call[0] === 'apply');
-  assert.strictEqual(application[1].context, proposal.context);
+  const {requestControl,...context} = application[1].context;
+  assert.deepStrictEqual(context, proposal.context);
+  for (const key of Object.keys(proposal.context)) assert.strictEqual(context[key], proposal.context[key]);
+  assert.strictEqual(requestControl.workload, 'interactive');
   assert.strictEqual(application[1].candidate.record.imdbID, 'tt123', 'renderer cannot replace the chosen record');
   assert.deepStrictEqual(application[2], {recordSelectionSource: 'user'});
   assert.deepStrictEqual(library.media[0], original(), 'selection must not save');
@@ -98,7 +101,9 @@ suite.test('ambiguous parent choices use the stored row and mark selection as us
   }});
   const result = await service.search(source, 10);
   await service.select({draft: source, choice: {...result.choices[0], imdbID: 'tt999', myndaChoiceType: 'record'}}, 10);
-  assert.deepStrictEqual(calls[0].options, {seriesImdbID: 'tt222', seriesSelectionSource: 'user'});
+  const {requestControl,...identityOptions} = calls[0].options;
+  assert.deepStrictEqual(identityOptions, {seriesImdbID: 'tt222', seriesSelectionSource: 'user'});
+  assert.strictEqual(requestControl.workload, 'interactive');
 });
 suite.test('malformed drafts fail before starting catalog work', async () => {
   const {service, source, calls} = setup();
@@ -242,7 +247,8 @@ suite.test('a search finishing after window teardown cannot recreate a proposal'
   const searching = service.search(source, 10);
   service.dispose(10);
   finish({status: 'candidate', candidate: {record: {imdbID: 'tt123', Poster: 'N/A'}}});
-  await assert.rejects(searching, /window has closed/);
+  assert.deepStrictEqual(await searching, {status:'canceled'});
+  await assert.rejects(service.search(source, 10), /window has closed/);
 });
 suite.test('real tagging-engine decisions crossing the bridge retain evidence and only cloneable data', async () => {
   const fixtures = require('./helpers/OmdbFixtures');

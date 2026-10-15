@@ -1,5 +1,6 @@
 // The sole metadata HTTP boundary. Cache hits do not spend the operation's budget;
-// every actual request, including nested probes and retries, spends it here.
+// each logical lookup spends it here. Capacity polling stays inside the transport;
+// provider attempts (including retries) are accounted for by the server.
 const {summarizeCatalogResponse,summarizeError} = require('./TaggingDiagnostics');
 const {isNotFoundResponse} = require('./CatalogResponse');
 const {createRequestBudget,spendRequest} = require('./RequestBudget');
@@ -26,14 +27,16 @@ function createCatalogClient({axios,log,server,transport = createMetadataServerC
     if (context.requestSession) context.requestSession.requests++;
     log.debug('Metadata server request started',{searchID:context.searchID,stage:context.stage,parameters});
     try {
-      const response = await transport(parameters);
+      const response = await transport(parameters, context.requestControl ||
+        (context.requestSession && context.requestSession.control) || {});
       if (response && response.requestId) observation.requestId = response.requestId;
       log.debug('Metadata server response received',{searchID:context.searchID,stage:context.stage,
         requestId:response && response.requestId,request:parameters,response:summarizeCatalogResponse(response)});
       return response;
     } catch(error) {
       if (error.requestId) observation.requestId = error.requestId;
-      log.error('Metadata server request failed',{searchID:context.searchID,stage:context.stage,
+      log[error.code === 'METADATA_CANCELED' ? 'debug' : 'error'](
+        error.code === 'METADATA_CANCELED' ? 'Metadata lookup canceled' : 'Metadata server request failed',{searchID:context.searchID,stage:context.stage,
         request:parameters,error:summarizeError(error)});
       throw error;
     }

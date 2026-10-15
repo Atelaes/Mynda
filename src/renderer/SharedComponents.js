@@ -1,5 +1,6 @@
 // Reusable renderer UI shared by the major feature component groups.
 const React = require('react');
+const {capacityMessage} = require('../tagging/CapacityWait');
 const {v4: uuidv4} = require('uuid');
 const {
   frontendLog,
@@ -76,7 +77,12 @@ class MynNotify extends React.Component {
 
   messageFor(status) {
     if (status.action === 'autotag' && status.cancelRequested) {
+      if (status.canceledWait) return 'Canceling auto-tagging and finishing saves';
       return 'Finishing the current video before canceling auto-tagging';
+    }
+    if (status.action === 'autotag' && status.capacityWait) {
+      const position = status.numCurrent && status.numTotal ? ` (video ${status.numCurrent} of ${status.numTotal})` : '';
+      return capacityMessage(status.capacityWait) + position;
     }
 
     if (status.action === 'add') {
