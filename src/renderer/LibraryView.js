@@ -340,7 +340,7 @@ class MynLibSeries extends React.Component {
 
     if (!_.isEqual(this.props.columns,oldProps.columns)) {
       this.state.columns = _.cloneDeep(this.props.columns);
-      this.addEpisodeToColumns();
+      this.state.columns = this.addEpisodeToColumns();
       needsRender = true;
     }
 

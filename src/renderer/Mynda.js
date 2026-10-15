@@ -999,29 +999,7 @@ class Mynda extends React.Component {
         frontendLog.debug('Refreshing renderer state after a settings edit', {
           address: address
         });
-        this.setState({settings : this.props.library.settings}, () => {
-          // if (address === 'settings.preferences.defaultcolumns') {
-          //
-          // }
-
-          // if the user changed the pref for including the user rating in the average rating calculation
-          // if (address === 'settings.preferences.include_user_rating_in_avg') {
-          //   console.log('HEEYYYYYY, USER RATING IN AVG SETTING CHANGED')
-          //   // first test if the current playlist displays the average;
-          //   // if it doesn't, we don't need to do anything
-          //   let currentPlaylist = this.state.playlists.filter(p => p.id === this.state.currentPlaylistID)[0];
-          //   console.log('current playlist: ' + JSON.stringify(currentPlaylist));
-          //   if (currentPlaylist && currentPlaylist.columns.includes('ratings_avg')) {
-          //     console.log('resetting playlist!')
-          //     // if it does, reload the playlist
-          //     this.setPlaylist(this.state.currentPlaylistID);
-          //   }
-          // }
-
-          if (address === 'settings.preferences.include_new_vids_in_playlists'){
-            this.setPlaylistLengths();
-          }
-        });
+        this.setState({settings: this.props.library.settings});
       }
     };
   }
@@ -1061,14 +1039,18 @@ class Mynda extends React.Component {
     }
   }
 
-  componentDidUpdate(oldProps) {
-    // console.log('UPDATING MYNDA');
-    // console.log('lastUpdate: ' + this.props.lastUpdate);
-    // // console.log('results: ' + this.state.filteredVideos.map((video) => video.title));
-    // if (oldProps.lastUpdate !== this.props.lastUpdate) {
-    //   console.log('Mynda props.library.media changed!!!');
-    //   this.setPlaylist(this.state.currentPlaylistID);
-    // }
+  componentDidUpdate(oldProps, oldState) {
+    // Filtering reads React state. Compare committed values so individual edits,
+    // whole-settings resyncs and rapidly queued toggles all use the latest pref.
+    // Rating and description changes reach their components directly as props.
+    const includeNewChanged = Boolean(oldState.settings.preferences.include_new_vids_in_playlists) !==
+      Boolean(this.state.settings.preferences.include_new_vids_in_playlists);
+    if (includeNewChanged) {
+      // Refresh the displayed rows as well as the tab counts. Reusing this
+      // playlist preserves its current search and temporary flat/series view.
+      if (this.state.currentPlaylistID !== null) this.setPlaylist(this.state.currentPlaylistID);
+      this.setPlaylistLengths();
+    }
   }
 
   render () {
