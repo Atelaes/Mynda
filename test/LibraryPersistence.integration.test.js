@@ -43,7 +43,8 @@ suite.test('atomically writes and reads a complete library', () => withTemporary
   'persistence-roundtrip',
   directory => {
     const filePath = path.join(directory, 'nested', 'library.json');
-    const expected = libraryFixture({media: [videoFixture()]});
+    const expected = libraryFixture({media: [videoFixture({catalogRef:{provider:'fixture',id:'episode:42'},
+      catalogSeriesRef:{provider:'fixture',id:'series:42'},imdbID:'',seriesImdbID:''})]});
     Persistence.writeLibraryFile(filePath, expected);
 
     const loaded = Persistence.readLibraryFile(filePath);

@@ -2,7 +2,8 @@
 // Only independent, accepted exact-title observations may establish it.
 const {scopeFor} = require('./SeriesCollection');
 const Match = require('./EpisodeMatch');
-const {normalizeEpisodeNumber,validImdbID} = require('./CatalogResponse');
+const CatalogIdentity = require('./CatalogIdentity');
+const {normalizeEpisodeNumber} = require('./CatalogResponse');
 const {copy} = require('./TaggingEvidence');
 const Limits = require('./TaggingLimits');
 
@@ -11,10 +12,10 @@ function assess(video, seriesID, anchors = [], requested = video) {
   const required = Limits.episode.offsetWitnesses;
   const result = {state:'insufficient',required,seriesID,localSeason:season,
     directoryKey:scope && scope.directoryKey,support:[]};
-  if (!scope || season === null || !validImdbID(seriesID)) return result;
+  if (!scope || season === null || !CatalogIdentity.valid(seriesID)) return result;
   const witnesses = anchors.filter(a => a.independentNumbering && a.directoryKey === scope.directoryKey &&
     a.localSeason === season && a.videoID !== video.id && a.filename !== video.filename &&
-    validImdbID(a.id) && Match.episodeTitleComparison(a.originalTitle,a.catalogTitle,video.series).matched);
+    CatalogIdentity.valid(a.id) && Match.episodeTitleComparison(a.originalTitle,a.catalogTitle,video.series).matched);
   result.support = copy(witnesses).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
   if (!witnesses.length) return result;
   const values = witnesses.map(a => [a.localSeason,a.localEpisode,a.catalogSeason,a.catalogEpisode]

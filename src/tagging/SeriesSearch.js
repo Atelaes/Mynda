@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Fallback discovery only. Queries may change spelling/presentation; a result
 // must still equal the full requested title or an explicitly reviewed alias.
 // Never use this module to rewrite stored tags or to relax episode validation.
@@ -72,7 +73,7 @@ function buildQueries(parts) {
 }
 
 function candidateRejection(query, candidate) {
-  if (!candidate || candidate.Type !== 'series' || !/^tt\d+$/.test(candidate.imdbID || '')) return 'not a series record';
+  if (!candidate || candidate.Type !== 'series' || !CatalogIdentity.recordKey(candidate)) return 'not a series record';
   if (query.year && !String(candidate.Year || '').startsWith(String(query.year))) return 'different requested premiere year';
   if (query.imdbID && candidate.imdbID !== query.imdbID) return 'different reviewed alias identity';
   if (query.aliasYear && !String(candidate.Year || '').startsWith(query.aliasYear)) return 'different reviewed alias year';

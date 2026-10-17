@@ -105,5 +105,19 @@ suite.test('rejects circular, prototype-bearing, overly deep or oversized input 
   assert.strictEqual({}.injected, undefined);
 });
 
-if (require.main === module) runSuite(suite);
+if (require.main === module) suite.test('native references are validated and replaced as one guarded identity',()=>{
+  validate(patch({catalogRef:{provider:'fixture',id:'movie:42'}}));
+  validate(patch({catalogRef:null,catalogSeriesRef:null}));
+  for(const changes of [{'catalogRef.id':'42'},{catalogRef:{provider:'fixture',id:'42',extra:true}},
+    {catalogSeriesRef:{provider:'fixture',id:'../unsafe'}}])rejected(patch(changes));
+  const before={...video,catalogRef:{provider:'fixture',id:'movie:1'}};
+  const replacement={...before,catalogRef:{provider:'fixture',id:'movie:2'}};
+  const op=Operations.prepareOperation({...data,media:[before]}, {opType:'patch-media',patches:[{id:before.id,baseline:before,replacement}]});
+  assert.deepStrictEqual(op.patches[0].fields.map(f=>f.path),['catalogRef']);
+  const result=Operations.applyOperations({...data,media:[before]},[op],{actor:'renderer'});
+  assert.deepStrictEqual(result.data.media[0].catalogRef,replacement.catalogRef);
+  assert.throws(()=>Operations.applyOperations({...data,media:[{...before,catalogRef:{provider:'other',id:'movie:1'}}]},[op],{actor:'renderer'}),
+    error=>error.code==='LIBRARY_CONFLICT');
+});
+runSuite(suite);
 module.exports = suite;

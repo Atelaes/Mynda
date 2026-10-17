@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 const path = require('path');
 const {fold} = require('./TitleNormalization');
 
@@ -717,11 +718,11 @@ function scoreResult(result, candidate, video, options = {}) {
 // full records. Exact normalized titles outrank leading-article equivalents,
 // which in turn outrank explicitly enabled canonical expansions. A known year
 // must normally agree; an explicit relaxed path may permit a bounded regional
-// discrepancy. The full record must still pass runtime/vote validation in
+// discrepancy. The full record must still pass runtime validation in
 // TaggingService before unattended Auto-Tag can apply it.
 function evaluateSearchResults(results, candidate, video, options = {}) {
   let ranked = (Array.isArray(results) ? results : [])
-    .filter(result => result && result.imdbID && result.Title && typeIsCompatible(result, video))
+    .filter(result => result && CatalogIdentity.recordKey(result) && result.Title && typeIsCompatible(result, video))
     .map(result => scoreResult(result, candidate, video, options))
     .sort((left, right) => right.score - left.score);
 
@@ -729,7 +730,7 @@ function evaluateSearchResults(results, candidate, video, options = {}) {
     if (!item.matchKind) return false;
     // Without a year, require one unique normalized-title match rather than
     // requiring the catalog's entire result list to contain only one movie. The caller
-    // still retrieves and validates the full record (runtime and vote evidence)
+    // still retrieves and validates the full record (runtime evidence)
     // before Auto-Tag may apply it.
     if (!item.candidateYear) return true;
     if (!item.resultYear) return false;
@@ -817,29 +818,18 @@ function evaluateFullResultPlausibility(result, video, options = {}) {
     // edition tolerance. They require a close runtime match. Split-file
     // exceptions never use this path because one part cannot closely match the
     // catalog's combined runtime.
-    if (options.requireTightRuntime) {
+    if (options.requireTightRuntime || options.requireStrongEvidence) {
       let tightTolerance = Math.max(8, catalogMinutes * 0.1);
       if (difference > tightTolerance) {
         reasons.push(`A relaxed title/year match needs a close runtime (${Math.round(localMinutes)} vs ${Math.round(catalogMinutes)} minutes)`);
       }
     }
-  } else if (options.requireTightRuntime) {
+  } else if (options.requireTightRuntime || options.requireStrongEvidence) {
     reasons.push('A relaxed title/year match needs comparable local and catalog runtimes');
   }
 
-  // A yearless title such as "Se7en", or an exact title with a two/three-year
-  // discrepancy, can expose an obscure duplicate. Auto-select such a result
-  // only when the runtimes can be compared and the record has enough audience
-  // history to be trustworthy.
-  if (options.requireStrongEvidence) {
-    if (!localMinutes || !catalogMinutes) {
-      reasons.push('A relaxed match needs comparable local and catalog runtimes');
-    }
-    let minimumVotes = Number(options.minimumImdbVotes) || 1000;
-    if (!imdbVotes || imdbVotes < minimumVotes) {
-      reasons.push(`A relaxed match needs at least ${minimumVotes} IMDb votes`);
-    }
-  }
+  // Relaxed title/year matching requires close, comparable runtimes above.
+  // Audience popularity is not identity evidence and is never an acceptance gate.
 
   return {
     plausible: reasons.length === 0,
@@ -869,7 +859,7 @@ function evaluateFullResult(result, candidate, video, options = {}) {
   // The catalog sometimes reports a regional/catalog release year two or three years
   // after the year embedded in the local release. This path is intentionally
   // narrower than the existing one-year retry: exact normalized title, close
-  // runtime, and a well-established IMDb record are all mandatory.
+  // runtime, and a unique qualifying candidate are all mandatory.
   if (scored.yearDifference !== null && scored.yearDifference >= 2) {
     plausibilityOptions.requireTightRuntime = true;
     plausibilityOptions.requireStrongEvidence = true;

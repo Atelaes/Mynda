@@ -40,6 +40,8 @@ function summarizeCatalogResponse(response) {
     year: data.Year,
     type: data.Type,
     imdbID: data.imdbID,
+    catalogRef: data.catalogRef,
+    catalogSeriesRef: data.catalogSeriesRef,
     runtime: data.Runtime,
     genre: data.Genre,
     imdbVotes: data.imdbVotes,
@@ -53,7 +55,8 @@ function summarizeCatalogResponse(response) {
       title: result.Title,
       year: result.Year,
       type: result.Type,
-      imdbID: result.imdbID
+      imdbID: result.imdbID,
+      catalogRef: result.catalogRef
     }));
   }
   if (Array.isArray(data.Episodes)) {
@@ -62,7 +65,8 @@ function summarizeCatalogResponse(response) {
       title: result.Title,
       released: result.Released,
       episode: result.Episode,
-      imdbID: result.imdbID
+      imdbID: result.imdbID,
+      catalogRef: result.catalogRef
     }));
   }
   return summary;

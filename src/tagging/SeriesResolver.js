@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 const Response = require('./CatalogResponse');
 const {validSeriesImdbID, normalizeEpisodeNumber, predictableFailure, requestFailure, episodeResponseMatches} = Response;
 const {summarizeVideo, summarizeError} = require('./TaggingDiagnostics');
@@ -16,7 +17,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     let episodeMatches = [];
     for (let candidate of candidates) {
       let response = await requestCatalog(createCatalogQuery({
-        id: candidate.imdbID,
+        id: CatalogIdentity.recordKey(candidate),
         season: season,
         episode: episode
       }), {...context,
@@ -24,7 +25,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
         stage: 'series disambiguation episode probe'
       });
       let failure = requestFailure(response);
-      if (!failure && episodeResponseMatches(response.data, candidate.imdbID, season, episode)) {
+      if (!failure && episodeResponseMatches(response.data, CatalogIdentity.recordKey(candidate), season, episode)) {
         episodeMatches.push({
           candidate: candidate,
           episodeData: response.data,
@@ -43,7 +44,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       matchingCandidates: episodeMatches.map(match => ({
         title: match.candidate.Title,
         year: match.candidate.Year,
-        imdbID: match.candidate.imdbID,
+        recordID: CatalogIdentity.recordKey(match.candidate),
         episodeTitle: match.episodeData.Title,
         episodeTitleMatches: match.titleMatches
       }))
@@ -61,13 +62,13 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     // this choice, and no speculative candidate may seed the series cache.
     if (localTitle && decisiveMatches.length === 0 && video && candidates.length <= SeriesSearch.MAX_CANDIDATES) {
       for (const candidate of candidates) {
-        const direct = episodeMatches.find(match=>match.candidate.imdbID === candidate.imdbID);
+        const direct = episodeMatches.find(match=>CatalogIdentity.recordKey(match.candidate) === CatalogIdentity.recordKey(candidate));
         const check = await searchShowEpisode(video, context, undefined, undefined, {
-          seriesResult:{success:true, data:candidate.imdbID, confidentSeries:false,
+          seriesResult:{success:true, data:CatalogIdentity.recordKey(candidate), confidentSeries:false,
             episodeData:direct && direct.episodeData}, validateOnly:true, speculative:true
         });
         if (!check.success && !check.permanentFailure) return {success:false, requestFailure:check};
-        if (check.success && check.exactTitle && check.episodeData.seriesID === candidate.imdbID) {
+        if (check.success && check.exactTitle && CatalogIdentity.matchesParent(check.episodeData,CatalogIdentity.recordKey(candidate))) {
           decisiveMatches.push({candidate, episodeData:check.episodeData,
             matchedSeason:check.matchedSeason, matchedEpisode:check.matchedEpisode});
         }
@@ -117,7 +118,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     const failure = requestFailure(response);
     const data = response && response.data;
     const cacheable = failure ? failure.failure === 'No results' :
-      data && (Array.isArray(data.Search) || (data.Type === 'series' && validSeriesImdbID(data.imdbID)));
+      data && (Array.isArray(data.Search) || (data.Type === 'series' && CatalogIdentity.valid(CatalogIdentity.recordKey(data))));
     if (session) {
       if (cacheable) session.queries.set(key, true);
       else session.queries.delete(key);
@@ -126,7 +127,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       query:parts, reused:Boolean(reused), stage:details.stage,
       failure:failure && failure.failure, totalResults:data && data.totalResults,
       returned:(data && Array.isArray(data.Search) ? data.Search : data && data.Type ? [data] : [])
-        .slice(0, 10).map(row => ({title:row.Title, year:row.Year, type:row.Type, imdbID:row.imdbID}))
+        .slice(0, 10).map(row => ({title:row.Title, year:row.Year, type:row.Type, recordID:CatalogIdentity.recordKey(row)}))
     });
     return response;
   }
@@ -154,14 +155,14 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           requestedYear:parts.year, yearSource:parts.yearSource,
           representative:{title:video.title, season:video.season, episode:video.episode},
           queries:traced.seriesTrace, success:result.success,
-          seriesImdbID:result.success ? result.data : undefined,
+          seriesID:result.success ? result.data : undefined,
           failure:result.failure, fallback:Boolean(result.discovery)
         });
       }
     }
     if (result.success) {
       const catalogYears = [...new Set(traced.seriesTrace.flatMap(trace => trace.returned || [])
-        .filter(row => row.imdbID === result.data).map(row => String(row.year || '').match(/^(?:19|20)\d{2}/))
+        .filter(row => row.recordID === result.data).map(row => String(row.year || '').match(/^(?:19|20)\d{2}/))
         .filter(Boolean).map(match => match[0]))];
       result.parentEvidence = {...result.parentEvidence,
         ...(catalogYears.length === 1 ? {catalogYear:catalogYears[0]} : {}),
@@ -199,10 +200,10 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
         if (!Array.isArray(rows)) return {success:false, failure:'Error', data:'The catalog returned a malformed series search'};
         for (const candidate of rows) {
           const reason = SeriesSearch.candidateRejection(query, candidate);
-          if (!reason) candidates.set(candidate.imdbID, candidate);
+          if (!reason) candidates.set(CatalogIdentity.recordKey(candidate), candidate);
         }
         const trace = context.seriesTrace[context.seriesTrace.length-1];
-        trace.evaluation = rows.slice(0,10).map(row => ({imdbID:row.imdbID,
+        trace.evaluation = rows.slice(0,10).map(row => ({recordID:CatalogIdentity.recordKey(row),
           rejectedBecause:SeriesSearch.candidateRejection(query,row)}));
         incomplete = Number(response.data.totalResults) > page * 10;
         if (!incomplete) break;
@@ -217,11 +218,11 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           {stage:`single-series discovery: ${query.reason}`, fallback:true});
         const failure = requestFailure(response);
         if (failure && failure.failure !== 'No results' && failure.failure !== 'Ambiguous results') return failure;
-        if (!failure && !SeriesSearch.candidateRejection(query, response.data)) candidates.set(response.data.imdbID, response.data);
+        if (!failure && !SeriesSearch.candidateRejection(query, response.data)) candidates.set(CatalogIdentity.recordKey(response.data), response.data);
       }
       if (candidates.size === 1) {
         const candidate = [...candidates.values()][0];
-        return {success:true, data:candidate.imdbID, confidentSeries:Boolean(query.year), discovery:true,
+        return {success:true, data:CatalogIdentity.recordKey(candidate), confidentSeries:Boolean(query.year), discovery:true,
           parentEvidence:{basis:query.year?'series-title-and-year':'unique-series-title',confident:Boolean(query.year)}};
       }
       if (candidates.size > 1) {
@@ -232,11 +233,11 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           // Use the actual episode workflow, including the historical MST3K
           // season correction. Speculative probes never seed the parent cache.
           const check = await searchShowEpisode(video, context, undefined, undefined, {
-            seriesResult:{success:true, data:candidate.imdbID, confidentSeries:false},
+            seriesResult:{success:true, data:CatalogIdentity.recordKey(candidate), confidentSeries:false},
             validateOnly:true, speculative:true
           });
           if (!check.success && !check.permanentFailure) return check;
-          if (check.success && check.exactTitle && check.episodeData.seriesID === candidate.imdbID) verified.push(check);
+          if (check.success && check.exactTitle && CatalogIdentity.matchesParent(check.episodeData,CatalogIdentity.recordKey(candidate))) verified.push(check);
         }
         if (verified.length !== 1) return ambiguousSeriesFailure(video.series, choices);
         return {...verified[0], confidentSeries:true, discovery:true,
@@ -265,14 +266,14 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     }
 
     let cacheKey = seriesCacheKey(searchParts,video);
-    if (!options.ignoreStoredSeriesImdbID && validSeriesImdbID(video.seriesImdbID)) {
-      let storedID = video.seriesImdbID.trim();
+    if (!options.ignoreStoredSeriesImdbID && CatalogIdentity.valid(CatalogIdentity.parentKey(video))) {
+      let storedID = CatalogIdentity.parentKey(video);
       const storedEvidence = Evidence.storedParent(video);
-      log.debug('Using stored IMDb series ID', {
+      log.debug('Using stored catalog series ID', {
         searchID: context.searchID,
         queryTitle: searchParts.title,
         queryYear: searchParts.year,
-        imdbID: storedID
+        seriesID: storedID
       });
       return {success:true, data:storedID, confidentSeries:storedEvidence.confident, parentEvidence:storedEvidence};
     }
@@ -283,11 +284,11 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     if (!localTitle && !context.deferSeriesEvidence && !options.ignoreSeriesCache && seriesIdCache.has(cacheKey)) {
       let cached = seriesIdCache.get(cacheKey);
       let cachedID = cached.data;
-      log.debug('Using cached IMDb series ID', {
+      log.debug('Using cached catalog series ID', {
         searchID: context.searchID,
         queryTitle: searchParts.title,
         queryYear: searchParts.year,
-        imdbID: cachedID
+        seriesID: cachedID
       });
       return {success:true, ...Evidence.copy(cached)};
     }
@@ -390,7 +391,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           matchingCandidates: currentMatches.candidates.map(candidate => ({
             title: candidate.Title,
             year: candidate.Year,
-            imdbID: candidate.imdbID
+            recordID: CatalogIdentity.recordKey(candidate)
           }))
         });
 
@@ -413,7 +414,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       if (candidates.length === 1) {
         let result = candidates[0];
         // A single search hit is provisional until the episode checks pass.
-        return {success: true, data: result.imdbID, confidentSeries: Boolean(searchParts.year),
+        return {success: true, data: CatalogIdentity.recordKey(result), confidentSeries: Boolean(searchParts.year),
           parentEvidence:{basis:searchParts.year?'series-title-and-year':'unique-series-title',confident:Boolean(searchParts.year)}};
       }
       if (candidates.length > 1) {
@@ -432,7 +433,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
 
             return {
               success: true,
-              data: episodeResult.candidate.imdbID,
+              data: CatalogIdentity.recordKey(episodeResult.candidate),
               confidentSeries: Boolean(localTitle || searchParts.year),
               parentEvidence:{basis:'verified-episode-title',confident:true},
               episodeData: episodeResult.episodeData,
@@ -449,7 +450,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           candidates: candidates.map(candidate => ({
             title: candidate.Title,
             year: candidate.Year,
-            imdbID: candidate.imdbID
+            recordID: CatalogIdentity.recordKey(candidate)
           }))
         });
         return ambiguousSeriesFailure(series, candidates);
@@ -487,10 +488,10 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
         }
 
         let result = response.data;
-        if (result.Type === 'series' && result.imdbID && !SeriesSearch.regionRejection(searchParts, result) &&
+        if (result.Type === 'series' && CatalogIdentity.recordKey(result) && !SeriesSearch.regionRejection(searchParts, result) &&
             seriesYearMatches(searchParts.year, result.Year) &&
             seriesTitlesMatch(searchParts.title, result.Title, false)) {
-          return {success: true, data: result.imdbID, confidentSeries: Boolean(searchParts.year),
+          return {success: true, data: CatalogIdentity.recordKey(result), confidentSeries: Boolean(searchParts.year),
           parentEvidence:{basis:searchParts.year?'series-title-and-year':'unique-series-title',confident:Boolean(searchParts.year)}};
         }
 
@@ -503,7 +504,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           returnedTitle: result.Title,
           returnedYear: result.Year,
           returnedType: result.Type,
-          returnedImdbID: result.imdbID
+          returnedRecordID: CatalogIdentity.recordKey(result)
         });
       }
 
@@ -590,18 +591,18 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       }
     }
     if (!result.success && result.permanentFailure && ambiguousResult) {
-      const choices=[...new Map(ambiguousRepresentatives.flatMap(item=>item.choices).map(choice=>[choice.imdbID,choice])).values()];
+      const choices=[...new Map(ambiguousRepresentatives.flatMap(item=>item.choices).map(choice=>[CatalogIdentity.recordKey(choice),choice])).values()];
       result={...ambiguousResult,choices,seriesChoiceConstraints:ambiguousRepresentatives
         .filter(item=>item.choices.length < choices.length)
-        .map(item=>({videoID:item.videoID,title:item.title,candidates:item.choices.map(choice=>choice.imdbID)}))};
+        .map(item=>({videoID:item.videoID,title:item.title,candidates:item.choices.map(choice=>CatalogIdentity.recordKey(choice))}))};
     }
-    if (result.success && validSeriesImdbID(result.data)) {
+    if (result.success && CatalogIdentity.valid(result.data)) {
       const success = {success:true, data:result.data.trim(), context,
         evidence:Evidence.envelope(representative.video,result.evidence,context)};
       log.info('Selected-batch series preflight finished', {
         searchID: context.searchID,
         series: representative.video.series,
-        seriesImdbID: success.data
+        seriesID: success.data
       });
       return success;
     }

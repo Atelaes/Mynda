@@ -1,3 +1,4 @@
+const CatalogIdentity = require('../tagging/CatalogIdentity');
 // Privileged editor operations. Drafts are never committed by this service;
 // the renderer's normal revision-aware Save remains the only commit boundary.
 const fs = require('fs');
@@ -138,6 +139,12 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
       video[field] = value;
       if (value !== source[field]) edited[field] = value;
     }
+    for (const field of ['catalogRef','catalogSeriesRef']) {
+      if (!Object.hasOwn(draft,field)) continue;
+      if(draft[field]!==null && !CatalogIdentity.native(draft[field]))throw new TypeError(`Invalid ${field}`);
+      video[field]=CatalogIdentity.native(draft[field]);
+      if(JSON.stringify(video[field])!==JSON.stringify(source[field] || null))edited[field]=video[field];
+    }
     for (const field of arrayFields) {
       if (!Object.prototype.hasOwnProperty.call(draft, field)) continue;
       if (!Array.isArray(draft[field]) || draft[field].length > 2000) throw new TypeError(`Invalid ${field}`);
@@ -219,8 +226,9 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
     }
     const row = stored.choice;
     const result = await (row.myndaChoiceType === 'series' ?
-      catalog.tag(video, {seriesImdbID: row.imdbID, seriesSelectionSource: 'user',requestControl:control}) :
-      catalog.tag({...video, imdbID: row.imdbID}, {imdbIDSource: 'user',requestControl:control}));
+      catalog.tag(video, {seriesID: CatalogIdentity.recordKey(row), seriesSelectionSource: 'user',requestControl:control}) :
+      catalog.tag({...video,...CatalogIdentity.recordFields(row),
+        ratings:CatalogIdentity.sameRecord(video,row) ? video.ratings : {user:video.ratings?.user ?? '',imdb:'',rt:'',mc:''}}, {imdbIDSource: 'user',requestControl:control}));
     return acceptArtwork(result, video, owner);
   }
 
@@ -346,7 +354,7 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
         defaultId: 0, cancelId: 0, noLink: true, checkboxLabel: "Don't show this message again",
         message: patches.length === 1 ? 'Reset this video from its filename?' : `Reset ${patches.length} videos from their filenames?`,
         detail: 'Mynda will re-detect title, series, season, and episode from each filename and its folders. ' +
-          "It will restore the watchfolder's default kind, clear the IMDb ID, artwork reference, and other catalog fields, mark the video as New, and allow Auto-Tag to try it again.\n\n" +
+          "It will restore the watchfolder's default kind, clear catalog identities, the artwork reference, and other catalog fields, mark the video as New, and allow Auto-Tag to try it again.\n\n" +
           'Tags, subtitles, watched status, playback position, technical metadata, and your rating will be kept. Nothing is written to the library until you click Save in the editor.' +
           (missing ? `\n\nFor ${missing} videos without a known watchfolder, Mynda will use the filename alone and keep the current kind.` : '')});
       confirmed = result.response === 1;

@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Parent identity belongs to a physical series collection. Episode order
 // belongs to a season within one directory/release. Neither scope can turn a
 // generated title or a dependent recovery into independent identity evidence.
@@ -16,6 +17,21 @@ const sorted = anchors => copy(anchors).sort((a,b) => {
 
 function createEvidence(videos = [], savedVideos = []) {
   const collections = new Map(), directories = new Map();
+  // Only provider-supplied cross-references can bridge an old IMDb-only library
+  // to native IDs. Conflicting cross-references remain separate identities.
+  const aliases = new Map();
+  const learn = video => {
+    for (const [legacy,ref] of [[video.imdbID,video.catalogRef],[video.seriesImdbID,video.catalogSeriesRef]]) {
+      const key=CatalogIdentity.keyFromRef(ref);
+      if (!CatalogIdentity.imdb(legacy) || !key) continue;
+      if (!aliases.has(legacy)) aliases.set(legacy,new Set());
+      aliases.get(legacy).add(key);
+    }
+  };
+  const canonical = key => aliases.get(key)?.size===1 ? [...aliases.get(key)][0] : key;
+  const parents = group => [...new Set([...group.parents].map(canonical))];
+  const normalized = (anchors,target) => anchors.map(anchor=>({...anchor,id:canonical(anchor.id),
+    parent:target && canonical(target)===canonical(anchor.parent) ? target : canonical(anchor.parent)}));
   const selectedIDs=new Set(videos.map(v=>v.id));
   const selectedScopes=new Set(videos.map(scopeFor).filter(Boolean).map(s=>s.key));
   const savedSiblings=savedVideos.filter(v=>!selectedIDs.has(v.id) && selectedScopes.has(scopeFor(v)?.key));
@@ -26,11 +42,12 @@ function createEvidence(videos = [], savedVideos = []) {
   // Inspect declarations before processing starts, including records that may
   // fail lookup later. Conflict handling must not depend on enumeration order.
   for (const video of [...videos,...savedSiblings]) {
+    learn(video);
     const scope = scopeFor(video);
     if (!scope) continue;
     const group = collection(scope);
     group.members.push(video);
-    if (validSeriesImdbID(video.seriesImdbID)) group.parents.add(video.seriesImdbID.trim());
+    if (CatalogIdentity.valid(CatalogIdentity.parentKey(video))) group.parents.add(CatalogIdentity.parentKey(video));
     scope.years.forEach(year => group.years.add(year));
   }
 
@@ -39,8 +56,9 @@ function createEvidence(videos = [], savedVideos = []) {
     const tagged = result.video, detail = result.evidence;
     const scope = scopeFor(video);
     if (!tagged || !scope || (detail && detail.kind !== 'episode')) return;
-    const parent = tagged.seriesImdbID;
-    if (!validSeriesImdbID(parent) || !/^tt\d+$/.test(tagged.imdbID || '')) return;
+    learn(tagged);
+    const parent = CatalogIdentity.parentKey(tagged);
+    if (!CatalogIdentity.valid(parent) || !CatalogIdentity.recordKey(tagged)) return;
     const group = collection(scope);
     group.parents.add(parent);
     scope.years.forEach(year => group.years.add(year));
@@ -53,11 +71,11 @@ function createEvidence(videos = [], savedVideos = []) {
     const requested = detail && detail.requested || {season:video.season,episode:video.episode};
     const matched = detail && detail.matched || requested;
     const anchor = {
-      parent,id:tagged.imdbID,videoID:video.id,filename:video.filename,
+      parent,id:CatalogIdentity.recordKey(tagged),videoID:video.id,filename:video.filename,
       directoryKey:scope.directoryKey,
       independentNumbering:Boolean(detail && !detail.numberingMapping &&
         detail.identities && detail.identities.record && detail.identities.record.origin === 'automatic' &&
-        detail.identities.record.value === tagged.imdbID &&
+        CatalogIdentity.matchesRecord(tagged,detail.identities.record.value) &&
         original.id === video.id && original.filename === video.filename && original.series === video.series &&
         normalizeEpisodeNumber(video.season) === normalizeEpisodeNumber(requested.season) &&
         normalizeEpisodeNumber(video.episode) === normalizeEpisodeNumber(requested.episode) &&
@@ -83,7 +101,7 @@ function createEvidence(videos = [], savedVideos = []) {
     const detail=video.taggingEvidence, original=detail && detail.original;
     if (!detail || !original || video.taggingDecision || detail.kind !== 'episode' ||
         detail.numberingMapping || detail.identities?.record?.origin !== 'automatic' ||
-        detail.imdbID !== video.imdbID || detail.seriesID !== video.seriesImdbID ||
+        !CatalogIdentity.matchesRecord(video,detail.recordID || detail.imdbID) || !CatalogIdentity.matchesParent(video,detail.seriesID) ||
         detail.catalogTitle !== video.title || original.id !== video.id || original.filename !== video.filename ||
         original.series !== video.series || !detail.requested ||
         normalizeEpisodeNumber(video.season) !== normalizeEpisodeNumber(detail.requested.season) ||
@@ -96,23 +114,23 @@ function createEvidence(videos = [], savedVideos = []) {
     if (Match.assessEpisodeTitle(video.title,'Episode #0.0',video.series).state === 'contradiction') return null;
     const scope = scopeFor(video);
     const group = scope && collections.get(scope.key);
-    if (!group || !group.anchors.length || group.parents.size !== 1 || group.years.size > 1) return null;
-    const parent = [...group.parents][0];
-    if (video.seriesImdbID && video.seriesImdbID.trim() !== parent) return null;
+    if (!group || !group.anchors.length || parents(group).length !== 1 || group.years.size > 1) return null;
+    const parent = parents(group)[0];
+    if (CatalogIdentity.parentKey(video) && canonical(CatalogIdentity.parentKey(video)) !== parent) return null;
     const choices = Array.isArray(failure.choices) ? failure.choices : [];
-    const selected = choices.find(choice => choice.imdbID === parent);
+    const selected = choices.find(choice => canonical(CatalogIdentity.recordKey(choice)) === parent);
     if (choices.length && !selected) return null;
     const candidateYear = selected && String(selected.Year || '').match(/^(?:19|20)\d{2}/);
     const knownYears = new Set([...group.years,...(candidateYear ? [candidateYear[0]] : [])]);
     if (knownYears.size > 1 || scope.years.some(year => !knownYears.has(year))) return null;
-    return {seriesID:parent,evidence:sorted(group.anchors)};
+    return {seriesID:parent,evidence:sorted(normalized(group.anchors,parent))};
   }
 
   function anchorsFor(video, result) {
     const {evidence} = result.candidate;
     if (evidence.kind !== 'episode') return [];
-    return sorted((directories.get(directoryKey(video)) || [])
-      .filter(anchor => anchor.localSeason === normalizeEpisodeNumber(evidence.requested.season)));
+    return sorted(normalized((directories.get(directoryKey(video)) || [])
+      .filter(anchor => anchor.localSeason === normalizeEpisodeNumber(evidence.requested.season)),evidence.seriesID));
   }
   function structureGroups(pending) {
     const groups=new Map();
@@ -121,7 +139,7 @@ function createEvidence(videos = [], savedVideos = []) {
       const scope=scopeFor(item.video), group=scope && collections.get(scope.key);
       // Counts cannot overrule conflicting independently named episodes or
       // contradict explicit declarations, including failed input records.
-      if (!group || group.anchors.length || group.parents.size > 1 || group.years.size > 1) continue;
+      if (!group || group.anchors.length || parents(group).length > 1 || group.years.size > 1) continue;
       if (!groups.has(scope.key)) {
         const profile=profileFor(group.members);
         if (!profile) continue;
@@ -132,15 +150,15 @@ function createEvidence(videos = [], savedVideos = []) {
     return [...groups.values()].sort((a,b)=>a.profile.key.localeCompare(b.profile.key));
   }
   function numberingFor(video,result) {
-    if (video.kind !== 'show' || video.imdbID) return null;
+    if (video.kind !== 'show' || CatalogIdentity.recordKey(video)) return null;
     const scope=scopeFor(video), group=scope && collections.get(scope.key);
-    if (!group || group.parents.size !== 1 || group.years.size > 1) return null;
-    const seriesID=[...group.parents][0];
+    if (!group || parents(group).length !== 1 || group.years.size > 1) return null;
+    const seriesID=parents(group)[0];
     const detail=result.status === 'candidate' ? result.candidate.evidence : result.evidence || {};
-    if ((video.seriesImdbID && video.seriesImdbID !== seriesID) || (detail.seriesID && detail.seriesID !== seriesID)) return null;
+    if ((CatalogIdentity.parentKey(video) && canonical(CatalogIdentity.parentKey(video)) !== seriesID) || (detail.seriesID && canonical(detail.seriesID) !== seriesID)) return null;
     if (result.status === 'ambiguous' && (!parentFor(video,result) ||
-        (result.choices || []).some(c=>c.imdbID === seriesID) === false)) return null;
-    const assessment=Numbering.assess(video,seriesID,directories.get(scope.directoryKey) || [],detail.requested || video);
+        (result.choices || []).some(c=>canonical(CatalogIdentity.recordKey(c)) === seriesID) === false)) return null;
+    const assessment=Numbering.assess(video,seriesID,normalized(directories.get(scope.directoryKey) || []),detail.requested || video);
     // The same independent records prove both the parent and the offset. Do
     // not carry an earlier, inconclusive parent lookup into this new proposal.
     const parentEvidence=sorted(assessment.support);

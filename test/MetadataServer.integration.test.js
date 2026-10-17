@@ -118,7 +118,7 @@ suite.test('unknown values and year ranges survive translation; native provider 
   const response = await client.requestCatalog(client.createCatalogQuery({id:'tt0034583'}));
   assert.strictEqual(response.data.Year, '2020–'); assert.strictEqual(response.data.Runtime, 'N/A');
   assert.strictEqual(response.data.Poster, 'N/A'); assert.strictEqual(response.data.imdbVotes, 'N/A');
-  assert.strictEqual(response.data.seriesID, undefined); assert.strictEqual(response.data.imdbID, 'tt0034583');
+  assert.strictEqual(response.data.seriesID, 'other:native-parent'); assert.strictEqual(response.data.seriesImdbID, ''); assert.strictEqual(response.data.imdbID, 'tt0034583');
   assert.deepStrictEqual(response.data.catalogSeriesRef, {provider:'other', id:'native-parent'});
 });
 
@@ -138,8 +138,9 @@ suite.test('explicit parent cross-references work with opaque native IDs and rej
     });
   }
   await withServer(() => ({data:{...episode,series:{provider:'another-catalog',id:parent},seriesExternalIds:{}}}), async client => {
-    const response = await client.requestCatalog({id:parent,season:1,episode:2});
-    assert.strictEqual(response.data.seriesID,undefined,'An IMDb-looking native ID is still opaque');
+    await assert.rejects(client.requestCatalog({id:parent,season:1,episode:2}),{code:'METADATA_INVALID_RESPONSE'});
+    const response = await client.requestCatalog({id:'another-catalog:'+parent,season:1,episode:2});
+    assert.strictEqual(response.data.seriesImdbID,'','An IMDb-looking native ID is still opaque');
   });
   await withServer(() => ({data:{series,seriesExternalIds:{imdb:'tt1111111'},season:1,order:'provider',
     totalSeasons:null,episodes:[],completeness:'unknown',provenance}}), async client => {
@@ -360,5 +361,147 @@ suite.test('the actual application file filter excludes current, temporary and o
       assert.strictEqual(include(file, fs.statSync(file)), false,name);
     }
   }));
+
+const Identity=require('../src/tagging/CatalogIdentity');
+const Evidence=require('../src/tagging/TaggingEvidence');
+const nativeRef=id=>({provider:'fixture',id});
+const nativeRecord=overrides=>record({ref:nativeRef('movie:42'),externalIds:{},artwork:[],ratings:[],votes:[],
+  provenance:{...provenance,provider:'fixture'},...overrides});
+
+suite.test('native-only records survive all five operations, including season zero and missing ratings',async()=>{
+  const parent=nativeRef('series:42'), movie=nativeRecord(), ep=nativeRecord({ref:nativeRef('episode:42'),kind:'episode',
+    series:parent,season:0,episode:0,episodeOrder:'provider'});
+  await withServer((route)=>({data:route==='/v1/search'?search([movie]):route==='/v1/episode'?ep:
+    route==='/v1/season'?{series:parent,seriesExternalIds:{},season:0,order:'provider',totalSeasons:null,
+      completeness:'partial',provenance,episodes:[{ref:ep.ref,externalIds:{},title:'Special',episode:0,released:null}]}:movie}),async(client,calls)=>{
+    const queries=[{title:'Casablanca',type:'movie'},{exactTitle:'Casablanca',type:'movie'},
+      {id:'fixture:movie:42'},{id:'fixture:series:42',season:0},{id:'fixture:series:42',season:0,episode:0}];
+    const replies=[];for(const q of queries)replies.push((await client.requestCatalog(q)).data);
+    assert.strictEqual(replies[0].Search[0].imdbID,'');
+    for(const r of [replies[1],replies[2],replies[4]])assert.strictEqual(r.imdbID,'');
+    assert.strictEqual(replies[4].seriesImdbID,'');assert.deepStrictEqual(replies[4].catalogSeriesRef,parent);
+    assert.deepStrictEqual(calls[2].body.ref,movie.ref);assert.deepStrictEqual(calls[4].body.series,parent);
+    assert.strictEqual(replies[3].catalogCompleteness,'partial');
+    assert.strictEqual(replies[3].Episodes[0].imdbID,'');
+  });
+});
+
+suite.test('native movie selection, serialized refresh and reports work without an IMDb ID',async()=>{
+  const data=nativeRecord();
+  await withServer(route=>({data:route==='/v1/search'?search([data]):data}),async(client,calls)=>{
+    const api=engine(client);
+    const original={id:'movie',kind:'movie',filename:'/Movies/Casablanca.1943.mkv',title:'Casablanca',year:1943,
+      ratings:{user:0,imdb:9,rt:98,mc:90},metadata:{duration:102*60}};
+    const library={media:[original]};
+    const editor=require('../src/main/EditorService').createEditorService({library,catalog:api,app:{getPath:()=>'/tmp'},dialog:{}});
+    const proposal=await editor.search(original,'native-window');assert.strictEqual(proposal.status,'candidate');
+    const result=await editor.select({draft:original,choice:{myndaProposalID:proposal.proposalID}},'native-window');
+    assert.strictEqual(result.status,'matched');assert.deepStrictEqual(result.video.catalogRef,data.ref);
+    assert.deepStrictEqual(result.video.ratings,{user:0,imdb:'',rt:'',mc:''});assert.strictEqual(result.video.imdbID,'');
+    const saved=JSON.parse(JSON.stringify(result.video));
+    const refreshed=await api.tag(saved);assert.strictEqual(refreshed.status,'matched');
+    assert.strictEqual(refreshed.evidence.identities.record.origin,'user');
+    assert.strictEqual(refreshed.evidence.recordID,'fixture:movie:42');
+    assert.strictEqual(require('../src/tagging/TaggingReport').buildTaggingReport(refreshed.video).status,'matched');
+    assert.deepStrictEqual(calls.at(-1).body.ref,data.ref);assert.strictEqual(library.media[0],original);
+  });
+});
+
+suite.test('choosing a native-only row uses the stored choice and clears ratings from the previous work',async()=>{
+  const a=nativeRecord(),b=nativeRecord({ref:nativeRef('movie:43')});
+  await withServer((route,body)=>route==='/v1/title'?{status:404,error:{code:'NOT_FOUND'}}:
+    {data:route==='/v1/search'?search([a,b]):body.ref.id===a.ref.id?a:b},async client=>{
+    const original={id:'choice',kind:'movie',title:'Casablanca',year:1943,filename:'/Movies/Casablanca.1943.mkv',
+      metadata:{duration:6120},ratings:{user:0,imdb:9,rt:99,mc:99}};
+    const editor=require('../src/main/EditorService').createEditorService({library:{media:[original]},catalog:engine(client),app:{getPath:()=>'/tmp'},dialog:{}});
+    const proposal=await editor.search(original,'window');assert.strictEqual(proposal.status,'ambiguous');
+    const choice=proposal.choices.find(row=>row.catalogRef.id==='movie:43');assert(choice);
+    const result=await editor.select({draft:original,choice:{...choice,catalogRef:nativeRef('movie:forged')}},'window');
+    assert.strictEqual(result.status,'matched');assert.deepStrictEqual(result.video.catalogRef,b.ref);
+    assert.deepStrictEqual(result.video.ratings,{user:0,imdb:'',rt:'',mc:''});
+  });
+});
+
+suite.test('native episode batches retain parent references and independent numbering evidence',async()=>{
+  const parent=nativeRef('series:42');
+  const titles=['First Story','Second Story','Third Story'];
+  await withServer((route,body)=>({data:route==='/v1/search'?search([nativeRecord({ref:parent,kind:'series',title:'Native Show'})]):
+    nativeRecord({ref:nativeRef('episode:'+body.episode),kind:'episode',title:titles[body.episode-1],runtimeMinutes:45,
+      series:parent,season:1,episode:body.episode,episodeOrder:'provider'})}),async client=>{
+    const videos=titles.map((title,i)=>({id:'ep'+i,filename:'/Shows/Native Show/Season 1/'+title+'.mkv',kind:'show',
+      title:i===2?'Native Show S01E03':title,series:'Native Show',season:'1',episode:String(i+1),metadata:{duration:2700},ratings:{user:0}}));
+    const saved=new Map();
+    const run=require('../src/tagging/AutoTagRunner').createAutoTagRunner({state:{running:false},catalog:engine(client),log,
+      getCandidates:()=>videos,getLibraryVideos:()=>videos,save:async batch=>batch.forEach(v=>saved.set(v.id,v)),
+      notifyStatus(){},chooseSeries:async()=>null,preferences:{},whenIdle:async()=>{}});
+    await run({videos});assert.strictEqual(saved.size,3);
+    for(const v of saved.values()){
+      assert.deepStrictEqual(v.catalogSeriesRef,parent);assert.strictEqual(v.seriesImdbID,'');
+      assert.strictEqual(v.imdbID,'');assert(Identity.recordKey(v).startsWith('fixture:episode:'));
+      assert(!v.taggingDecision || v.taggingDecision.status==='matched');
+    }
+  });
+});
+
+suite.test('native season-list fallback verifies the retrieved episode identity and parent',async()=>{
+  const parent=nativeRef('series:42'),ep=nativeRecord({ref:nativeRef('episode:7'),kind:'episode',title:'Story',
+    series:parent,season:1,episode:1,episodeOrder:'provider',runtimeMinutes:45});
+  for(const wrongParent of [false,true]) await withServer(route=>route==='/v1/episode'?
+    {status:404,error:{code:'NOT_FOUND'}}:{data:route==='/v1/season'?{
+      series:parent,seriesExternalIds:{},season:1,order:'provider',totalSeasons:1,completeness:'complete',provenance,
+      episodes:[{ref:ep.ref,externalIds:{},title:'Story',episode:1,released:null}]}:
+      {...ep,series:wrongParent?nativeRef('series:99'):parent}},async client=>{
+    const result=await engine(client).tag({id:'show',kind:'show',title:'Story',series:'Native Show',season:'1',episode:'1',
+      catalogSeriesRef:parent,metadata:{duration:2700},ratings:{}});
+    if(wrongParent)assert.notStrictEqual(result.status,'matched');
+    else assert.strictEqual(result.status,'matched');
+    if(!wrongParent)assert.deepStrictEqual(result.video.catalogRef,ep.ref);
+  });
+});
+
+suite.test('native IDs cannot collide across providers or be manufactured as IMDb cross-references',async()=>{
+  assert.notStrictEqual(Identity.recordKey({catalogRef:{provider:'one',id:'42'}}),Identity.recordKey({catalogRef:{provider:'two',id:'42'}}));
+  assert.deepStrictEqual(Identity.lookup('fixture:episode:42'),nativeRef('episode:42'));
+  assert.deepStrictEqual(Identity.parentKeys([{seriesImdbID:'tt1234567'},{catalogSeriesRef:nativeRef('series:1'),seriesImdbID:'tt1234567'}]),['fixture:series:1']);
+  assert.strictEqual(Identity.parentKeys([{catalogSeriesRef:nativeRef('series:1'),seriesImdbID:'tt1234567'},
+    {catalogSeriesRef:nativeRef('series:2'),seriesImdbID:'tt1234567'}]).length,2);
+  for(const ref of [{provider:'',id:'42'},{provider:'fixture',id:'../unsafe'},{provider:'fixture',id:'x',extra:true}])assert.strictEqual(Identity.native(ref),null);
+  await withServer(()=>({data:nativeRecord({ref:nativeRef('tt0034583')})}),async client=>{
+    await assert.rejects(client.requestCatalog({id:'tt0034583'}),{code:'METADATA_INVALID_RESPONSE'});
+    const reply=await client.requestCatalog({id:'fixture:tt0034583'});assert.strictEqual(reply.data.imdbID,'');
+    await assert.rejects(client.requestCatalog({id:'other:tt0034583'}),{code:'METADATA_INVALID_RESPONSE'});
+  });
+});
+
+suite.test('legacy saved IMDb authorship survives upgrading to native references',async()=>{
+  const prior={id:'legacy',kind:'movie',title:'Old title',imdbID:'tt0034583',ratings:{user:0,imdb:7},
+    taggingEvidence:{kind:'movie',imdbID:'tt0034583',original:{title:'Original filename'},
+      identities:{record:{value:'tt0034583',origin:'automatic',basis:'movie'}}}};
+  await withServer(()=>({data:record({ratings:[]})}),async client=>{
+    const api=engine(client);const first=await api.tag(prior);assert.strictEqual(first.status,'matched');
+    assert.deepStrictEqual(first.video.catalogRef,ref('tt0034583'));assert.strictEqual(first.video.ratings.imdb,7);
+    const next=await api.tag(JSON.parse(JSON.stringify(first.video)));
+    assert.strictEqual(next.evidence.identities.record.origin,'automatic');
+    assert.deepStrictEqual(next.evidence.original,prior.taggingEvidence.original);
+  });
+});
+
+suite.test('manual IMDb and parent edits clear stale native references while preserving personal ratings',()=>{
+  const base={kind:'show',catalogRef:nativeRef('episode:1'),catalogSeriesRef:nativeRef('series:1'),
+    imdbID:'tt0034583',seriesImdbID:'tt1234567',ratings:{user:0,imdb:9},series:'Original'};
+  const edited=Evidence.markUserEdit({...base,imdbID:'tt9999999'},{imdbID:'tt9999999'});
+  assert.strictEqual(edited.catalogRef,null);assert.strictEqual(edited.ratings.user,0);assert.strictEqual(edited.ratings.imdb,'');
+  for(const changes of [{series:'New show'},{kind:'movie'}]){
+    const result=Evidence.markUserEdit({...base,...changes},changes);
+    assert.strictEqual(result.catalogSeriesRef,null);assert.strictEqual(result.seriesImdbID,'');
+  }
+});
+
+suite.test('partial and unknown season lists cannot establish complete episode counts',()=>{
+  const season={Response:'True',Season:'1',catalogSeriesRef:nativeRef('series:1'),Episodes:[1,2].map(n=>({Episode:String(n),catalogRef:nativeRef('episode:'+n)}))};
+  const assess=require('../src/tagging/SeriesStructure').seasonEvidence;
+  for(const catalogCompleteness of ['partial','unknown'])assert.strictEqual(assess({...season,catalogCompleteness},1,'fixture:series:1').count,null);
+  assert.strictEqual(assess({...season,catalogCompleteness:'complete'},1,'fixture:series:1').count,2);
+});
 
 runSuite(suite);

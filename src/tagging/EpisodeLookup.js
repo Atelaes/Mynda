@@ -1,4 +1,5 @@
-// Shared direct lookup and season-list/IMDb-ID fallback for every episode path.
+const CatalogIdentity = require('./CatalogIdentity');
+// Shared direct lookup and season-list/record-ID fallback for every episode path.
 const {validImdbID,normalizeEpisodeNumber,requestFailure,episodeResponseMatches} = require('./CatalogResponse');
 const {summarizeCatalogResponse} = require('./TaggingDiagnostics');
 function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
@@ -55,21 +56,21 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
     let unusableEntries = 0;
     for (const listedEpisode of seasonData.Episodes) {
       const listedNumber = normalizeEpisodeNumber(listedEpisode && listedEpisode.Episode);
-      const listedImdbID = listedEpisode && typeof listedEpisode.imdbID === 'string' ?
-        listedEpisode.imdbID.trim() : '';
-      if (listedNumber === null || !validImdbID(listedImdbID)) {
+      const listedRecordID = listedEpisode && typeof CatalogIdentity.recordKey(listedEpisode) === 'string' ?
+        CatalogIdentity.recordKey(listedEpisode).trim() : '';
+      if (listedNumber === null || !CatalogIdentity.valid(listedRecordID)) {
         unusableEntries++;
         continue;
       }
       if (ambiguousEpisodes.has(listedNumber)) {
         continue;
       }
-      if (episodeIndex.has(listedNumber) && episodeIndex.get(listedNumber) !== listedImdbID) {
+      if (episodeIndex.has(listedNumber) && episodeIndex.get(listedNumber) !== listedRecordID) {
         episodeIndex.delete(listedNumber);
         ambiguousEpisodes.add(listedNumber);
         continue;
       }
-      episodeIndex.set(listedNumber, listedImdbID);
+      episodeIndex.set(listedNumber, listedRecordID);
     }
 
     seasonEpisodeIndexCache.set(cacheKey, episodeIndex);
@@ -91,8 +92,8 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
       return indexResult;
     }
 
-    const episodeImdbID = indexResult.data.get(episode);
-    if (!episodeImdbID) {
+    const episodeRecordID = indexResult.data.get(episode);
+    if (!episodeRecordID) {
       log.debug('The catalog season episode index did not contain the requested episode', {
         searchID: context.searchID,
         seriesID: seriesID,
@@ -102,7 +103,7 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
       return {success: false};
     }
 
-    const response = await requestCatalog(createCatalogQuery({id: episodeImdbID}), {...context,
+    const response = await requestCatalog(createCatalogQuery({id: episodeRecordID}), {...context,
       searchID: context.searchID,
       stage: 'season index exact episode fallback'
     });
@@ -113,15 +114,15 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
 
     const episodeData = response.data;
     if (!episodeResponseMatches(episodeData, seriesID, season, episode) ||
-        episodeData.seriesID !== seriesID || episodeData.imdbID !== episodeImdbID) {
+        !CatalogIdentity.matchesParent(episodeData,seriesID) || !CatalogIdentity.matchesRecord(episodeData,episodeRecordID)) {
       log.warn('The catalog season-index episode did not match the fallback request', {
         searchID: context.searchID,
-        seasonIndexImdbID: episodeImdbID,
+        seasonIndexRecordID: episodeRecordID,
         expected: {seriesID: seriesID, season: season, episode: episode},
         received: summarizeCatalogResponse(response)
       });
       return {success: false, outcome:'invalid-record',
-        rejectedRecord:episodeData && {imdbID:episodeData.imdbID,Title:episodeData.Title}};
+        rejectedRecord:episodeData && {...CatalogIdentity.recordFields(episodeData),Title:episodeData.Title}};
     }
 
     log.info('Recovered episode through catalog season index fallback', {
@@ -129,7 +130,7 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
       seriesID: seriesID,
       season: season,
       episode: episode,
-      imdbID: episodeData.imdbID,
+      recordID: CatalogIdentity.recordKey(episodeData),
       title: episodeData.Title
     });
     return {success: true, data: episodeData};

@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Owns batch lifecycle and persistence. Discovery and final acceptance belong
 // to the engine; this runner consumes only its typed decision contract.
 const _ = require('lodash');
@@ -69,7 +70,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     const retryCandidates = [], pendingMatches = [], outcomes = new Map(), attempts = new Map();
     const statistics = {totalVideos:videos.length};
     let batchSave = [], processed = 0, canceledPending = 0;
-    let sharedID = seriesBatch && validSeriesImdbID(seriesBatch.storedSeriesImdbID) ? seriesBatch.storedSeriesImdbID.trim() : '';
+    let sharedID = seriesBatch && CatalogIdentity.valid((seriesBatch.storedSeriesID || seriesBatch.storedSeriesImdbID)) ? (seriesBatch.storedSeriesID || seriesBatch.storedSeriesImdbID).trim() : '';
     let sharedSource = sharedID ? 'stored' : 'batch', sharedEvidence;
     let seriesSelectionCanceled = false, seriesPreflightFailure = null;
 
@@ -116,7 +117,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     }
     function searchOptions(index) {
       return {seasonOffsetHints,seriesSearchSession:session,requestBudget:budgets[index],deferSeriesEvidence:true,
-        ...(sharedID ? {seriesImdbID:sharedID,seriesSelectionSource:sharedSource,parentEvidence:sharedEvidence} : {})};
+        ...(sharedID ? {seriesID:sharedID,seriesSelectionSource:sharedSource,parentEvidence:sharedEvidence} : {})};
     }
     async function resolve(video,settings) {
       let result;
@@ -193,8 +194,8 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
           sharedEvidence = preflight.evidence;
         } else if (preflight.status === 'ambiguous' && preflight.choiceType === 'series' && preflight.choices.length) {
           const selected = await chooseSeries(seriesBatch,preflight.choices,videos.length);
-          if (selected && validSeriesImdbID(selected.imdbID)) {
-            sharedID = selected.imdbID.trim();
+          if (selected && CatalogIdentity.valid(CatalogIdentity.recordKey(selected))) {
+            sharedID = CatalogIdentity.recordKey(selected);
             sharedSource = 'user';
             sharedEvidence = {choice:Evidence.copy(selected)};
           } else seriesSelectionCanceled = true;
@@ -204,7 +205,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         // Keep each source record intact for provenance. The established parent
         // is attached to a failed saved attempt too, as in selected-batch tagging.
         if (sharedSource === 'stored') {
-          const source = videos.find(video => video.seriesImdbID === sharedID);
+          const source = videos.find(video => CatalogIdentity.parentKey(video) === sharedID);
           if (source) sharedEvidence = Evidence.storedParent(source);
         }
       }
@@ -239,7 +240,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
           continue;
         }
         const result = await resolve(pending.video,{seasonOffsetHints,seriesSearchSession:session,requestBudget:budgets[pending.index],
-          seriesImdbID:parent.seriesID,seriesSelectionSource:parent.source || 'siblings',parentEvidence:parent.evidence,
+          seriesID:parent.seriesID,seriesSelectionSource:parent.source || 'siblings',parentEvidence:parent.evidence,
           priorCorrectionChecks:pending.result.evidence && pending.result.evidence.correctionChecks});
         statistics.seriesRetries = (statistics.seriesRetries || 0) + 1;
         if (shouldDefer(result)) {
@@ -249,7 +250,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         const finished = await finish(pending.video,result);
         await record(pending.video,finished,pending.index,true,parent);
         log.info('Automatic tagging series retry finished',{id:pending.video.id,filename:pending.video.filename,
-          seriesImdbID:parent.seriesID,success:finished.status === 'matched',reason:finished.reason});
+          seriesID:parent.seriesID,success:finished.status === 'matched',reason:finished.reason});
       }
       // Freeze a separate numbering plan after independent exact matches and
       // parent retries. Later fuzzy recoveries cannot create additional votes.
@@ -263,7 +264,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         const {seriesID}=pending.numberingEvidence;
         const previous=pending.result.evidence;
         const result=await resolve(pending.video,{...searchOptions(pending.index),
-          seriesImdbID:seriesID,seriesSelectionSource:'siblings',parentEvidence:pending.parentEvidence,
+          seriesID:seriesID,seriesSelectionSource:'siblings',parentEvidence:pending.parentEvidence,
           numberingEvidence:pending.numberingEvidence,priorCorrectionChecks:previous && previous.correctionChecks});
         statistics.numberingRetries=(statistics.numberingRetries || 0)+1;
         const finished=await finish(pending.video,result);
@@ -294,7 +295,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       statistics.processedVideos = processed - canceledPending;
       statistics.remainingVideos = videos.length - statistics.processedVideos;
       if (canceledPending) statistics.unreviewedCandidates = canceledPending;
-      if (sharedID) statistics.seriesImdbID = sharedID;
+      if (sharedID) statistics.seriesID = sharedID;
       log.info('Automatic tagging series discovery summary',catalog.seriesSearchSummary(session));
       const status = seriesSelectionCanceled ? 'series-selection-canceled' : seriesPreflightFailure ?
         'series-preflight-failed' : state.cancelRequested ? 'canceled' : 'finished';

@@ -117,7 +117,7 @@ suite.test('a series choice is passed as a parent, with explicit user provenance
   await instance.retrieveResult(result.choices[0]);
   assert.deepStrictEqual(request.video,original);
   const {requestControl,...identityOptions}=request.options;
-  assert.deepStrictEqual(identityOptions,{seriesImdbID:'tt555',seriesSelectionSource:'user'});
+  assert.deepStrictEqual(identityOptions,{seriesID:'tt555',seriesSelectionSource:'user'});
   assert.strictEqual(requestControl.workload,'interactive');
 });
 suite.test('previewing a candidate performs no application; confirming reuses the proposal',async()=>{

@@ -1,3 +1,4 @@
+const Identity = require('./CatalogIdentity');
 // Translate the v1 service contract at the existing catalog boundary. Matching,
 // discovery, caching and library updates remain with their existing owners.
 const {validateServerConfig, configurationMessage} = require('./MetadataServerConfig');
@@ -38,12 +39,11 @@ function list(value) {
   return value.join(', ');
 }
 function reference(value) {
-  if (!object(value) || typeof value.provider !== 'string' || !value.provider ||
-      typeof value.id !== 'string' || !value.id) return invalid();
-  return {...value};
+  const ref=Identity.native(value);
+  return ref || invalid();
 }
 function summary(data) {
-  if (!object(data) || !object(data.externalIds) || !imdbID(data.externalIds.imdb) ||
+  if (!object(data) || !object(data.externalIds) || (data.externalIds.imdb !== undefined && !imdbID(data.externalIds.imdb)) ||
       typeof data.title !== 'string' || !data.title.trim() ||
       !['movie', 'series', 'episode'].includes(data.kind) || !Array.isArray(data.artwork)) return invalid();
   const ref = reference(data.ref);
@@ -58,7 +58,7 @@ function summary(data) {
     posterURL = url.href;
   }
   return {Title: data.title, Type: data.kind, Year: data.year === null ? 'N/A' : data.year.text,
-    imdbID: data.externalIds.imdb, Poster: posterURL, catalogRef: ref};
+    imdbID: data.externalIds.imdb || '', Poster: posterURL, catalogRef: ref};
 }
 function record(data) {
   const result = {Response: 'True', ...summary(data)};
@@ -86,7 +86,8 @@ function record(data) {
   const parentID = seriesIMDbID(data);
   if (data.series !== null) {
     result.catalogSeriesRef = reference(data.series);
-    if (parentID) result.seriesID = parentID;
+    result.seriesID = parentID || Identity.keyFromRef(result.catalogSeriesRef);
+    result.seriesImdbID = parentID || '';
   }
   result.catalogEpisodeOrder = data.episodeOrder;
   return result;
@@ -116,24 +117,24 @@ function translate(data, route, body) {
     if (!integer(data.season) || data.season !== body.season || !Array.isArray(data.episodes) ||
         data.order !== 'provider' || !['complete', 'partial', 'unknown'].includes(data.completeness) ||
         !(data.totalSeasons === null || integer(data.totalSeasons)) ||
-        (parentID && parentID !== body.series.id)) return invalid();
+        !Identity.matchesParent({catalogSeriesRef:parent,seriesImdbID:parentID},body.series)) return invalid();
     return {Response:'True', Season:String(data.season),
       totalSeasons:data.totalSeasons === null ? 'N/A' : String(data.totalSeasons),
-      catalogSeriesRef:parent, catalogCompleteness:data.completeness,
+      catalogSeriesRef:parent, seriesID:parentID || Identity.keyFromRef(parent), seriesImdbID:parentID || '', catalogCompleteness:data.completeness,
       Episodes:data.episodes.map(item => {
-        if (!object(item) || !object(item.externalIds) || !imdbID(item.externalIds.imdb) ||
+        if (!object(item) || !object(item.externalIds) || (item.externalIds.imdb !== undefined && !imdbID(item.externalIds.imdb)) ||
             typeof item.title !== 'string' || !(item.episode === null || integer(item.episode)) ||
             !optionalText(item.released)) return invalid();
-        return {imdbID:item.externalIds.imdb, Title:item.title,
+        return {imdbID:item.externalIds.imdb || '', Title:item.title,
           Episode:item.episode === null ? 'N/A' : String(item.episode), Released:legacyText(item.released),
           catalogRef:reference(item.ref)};
       })};
   }
   const result = record(data);
-  if ((route === '/v1/record' && result.imdbID !== body.ref.id) ||
+  if ((route === '/v1/record' && !Identity.matchesRecord(result,body.ref)) ||
       (route === '/v1/title' && body.kind && result.Type !== body.kind) ||
       (route === '/v1/episode' && (result.Type !== 'episode' || data.season !== body.season ||
-        data.episode !== body.episode || (result.seriesID && result.seriesID !== body.series.id)))) return invalid();
+        data.episode !== body.episode || !Identity.matchesParent(result,body.series)))) return invalid();
   return result;
 }
 
@@ -142,7 +143,8 @@ function lookup(parameters) {
   if (parameters.type) optional.kind = parameters.type;
   if (parameters.year) optional.year = Number(parameters.year);
   if (parameters.id) {
-    const ref = {externalSource:'imdb', id:parameters.id};
+    const ref = Identity.lookup(parameters.id);
+    if (!ref) throw serviceError('METADATA_BAD_REQUEST','A metadata lookup requires a valid catalog reference or IMDb ID.');
     if (parameters.season !== undefined) {
       const body = {series:ref, season:Number(parameters.season), order:'provider'};
       if (parameters.episode !== undefined) return {route:'/v1/episode', body:{...body, episode:Number(parameters.episode)}};
@@ -153,7 +155,7 @@ function lookup(parameters) {
   if (parameters.title) return {route:'/v1/search', body:{title:parameters.title, ...optional,
     ...(parameters.page ? {page:Number(parameters.page)} : {})}};
   if (parameters.exactTitle) return {route:'/v1/title', body:{title:parameters.exactTitle, ...optional}};
-  throw serviceError('METADATA_BAD_REQUEST', 'A metadata lookup requires a title or IMDb ID.');
+  throw serviceError('METADATA_BAD_REQUEST', 'A metadata lookup requires a title or catalog identity.');
 }
 
 function createMetadataServerClient({axios, server, onUnauthorized, wait = waitForCapacity, now = Date.now}) {

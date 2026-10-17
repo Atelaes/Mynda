@@ -26,7 +26,12 @@ function record(row) {
 }
 function fixtureQuery(route, body) {
   const query = {};
-  if (body.ref || body.series) query.i = (body.ref || body.series).id;
+  if (body.ref || body.series) {
+    const requested=body.ref || body.series;
+    if (requested.externalSource==='imdb') query.i=requested.id;
+    else if (requested.provider==='fixture' && requested.id.startsWith('native-')) query.i=requested.id.slice(7);
+    else throw new Error('Unexpected fixture reference');
+  }
   if (body.title) query[route === '/v1/search' ? 's' : 't'] = body.title;
   for (const [name,key] of Object.entries({kind:'type',year:'y',page:'page',season:'Season',episode:'Episode'})) {
     if (body[name] !== undefined) query[key] = String(body[name]);

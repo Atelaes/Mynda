@@ -44,7 +44,7 @@ suite.test('Band of Brothers: an incomplete batch prefix cannot hide a usable re
   const input=Array.from({length:12},()=>show({series:'Band of Brothers',season:'',episode:''}));
   input.push(show({title:'Currahee',series:'Band of Brothers'}));
   const result=await api.resolveSeriesForBatch(input);
-  assert(result.success,JSON.stringify(result));assert.strictEqual(result.data,right.imdbID);
+  assert(result.success,JSON.stringify(result));assert.strictEqual(result.data,process.env.MYNDA_SERVER_TEST_BUNDLE?'omdb:'+right.imdbID:right.imdbID);
   assert(input.every(v=>v.seriesImdbID===''), 'Preflight itself must not mutate the selection');
 });
 

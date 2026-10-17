@@ -1,10 +1,11 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // One terminal contract. Only the public compatibility adapter translates it into the older
 // success/data API. A candidate is a discovery proposal, never authorization.
 const Evidence = require('./TaggingEvidence');
 const STATUSES = Object.freeze(['matched','ambiguous','unmatched','service-error']);
 
-function hasImdbID(video) {
-  return video && typeof video.imdbID === 'string' && video.imdbID.trim() !== '';
+function hasIdentity(video) {
+  return Boolean(CatalogIdentity.recordKey(video));
 }
 
 function decision(status, reason, evidence, fields = {}) {
@@ -48,4 +49,4 @@ function toLegacy(result) {
     ...(result.choices && result.choices.length ? {choices:result.choices,choiceType:result.choiceType} : {})};
 }
 
-module.exports = {STATUSES,hasImdbID,candidate,decision,fromDiscovery,toLegacy};
+module.exports = {STATUSES,hasIdentity,candidate,decision,fromDiscovery,toLegacy};

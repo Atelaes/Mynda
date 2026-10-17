@@ -183,7 +183,7 @@ suite.test('a verified exact movie remains automatic while a wrong explicit-ID r
   assert.strictEqual((await fixture.api.search(original)).data.imdbID,right.imdbID);
   const mismatched = await fixture.api.search({...original,imdbID:'tt0999999'});
   assert.strictEqual(mismatched.success,false);
-  assert(/different IMDb identity/.test(mismatched.data));
+  assert(/different catalog identity/.test(mismatched.data));
 });
 
 runSuite(suite);

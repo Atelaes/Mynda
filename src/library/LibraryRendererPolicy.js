@@ -1,4 +1,5 @@
 'use strict';
+const CatalogIdentity = require('../tagging/CatalogIdentity');
 
 // Main-process input validation for the renderer's public edit commands. File
 // references are capabilities: a draft may retain an existing reference, but
@@ -86,6 +87,9 @@ function validateRendererCommit(request, {library, authorizeSubtitle = () => fal
     for (const field of entries) {
       const keys = address(field.path), root = keys[0];
       if (SCANNER_FIELDS.has(root)) invalid('This field is maintained by the library scanner.');
+      if (['catalogRef','catalogSeriesRef'].includes(root)) {
+        if(keys.length!==1 || (!field.remove && field.value!==null && !CatalogIdentity.native(field.value)))invalid('Invalid catalog reference.');
+      }
       if (root === 'subtitles') {
         if (keys.length !== 1) invalid('Subtitle edits must replace the visible subtitle list.');
         if (field.remove) continue;

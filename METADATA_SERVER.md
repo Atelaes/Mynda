@@ -203,3 +203,41 @@ npm run test:capacity-server -- /Volumes/2TB-SSD/Coding/mynda-server
 ```
 
 Install the server's dependencies first (`npm ci` in its checkout). This test gives a synthetic provider three daily requests and one request per second. It checks automatic batch waiting/resuming, saved results, a second client's shared allowance, immediate cancellation, and persistence across a complete Worker runtime restart. Provider traffic is intercepted locally; the test does not read your credentials, use provider quota, or alter your normal local server storage.
+
+## Provider-native identities
+
+Mynda saves `catalogRef: {provider, id}` for the selected movie or episode and
+`catalogSeriesRef: {provider, id}` for its parent series. These references drive
+search choices, refreshes, request reuse, batch recovery, episode numbering,
+artwork fallback and saved explanations. The adapter owns the opaque `id`; if
+its catalog reuses numbers across kinds, it must namespace them (for example,
+`movie:42` and `series:42`). Mynda does not parse the adapter's namespace.
+
+`imdbID` and `seriesImdbID` remain optional, real IMDb cross-references, used for
+IMDb links and existing libraries. Old records continue to resolve by IMDb;
+a successful refresh adds the returned native reference. Native IDs are never
+put into IMDb fields. Provider-supplied cross-references can bridge old and new
+saved evidence; conflicting identities remain separate. Reset from Filename
+clears both kinds of identity. Manual IMDb or series changes invalidate the
+corresponding native reference. Native references are saved atomically and
+included in concurrent-edit and stale-search checks.
+
+IMDb vote counts no longer affect acceptance. Relaxed title/year searches need
+comparable runtimes within `max(8 minutes, 10% of catalog runtime)`, in addition
+to the existing title, kind, ambiguity and episode checks. Exact title/year
+matches keep their existing broader edition tolerance. Ratings are optional:
+existing scores can survive a verified same-work refresh, but selecting another
+work clears old provider scores while preserving the user's rating. Unknown
+cast/languages remain empty, rather than becoming a literal `N/A` entry.
+
+Partial or explicitly unknown season coverage cannot establish an episode total.
+The three deliberately changed historical movie outcomes are recorded separately
+in `test/fixtures/NativeIdentityPolicyChanges.json`; their original recordings
+and correct selectable identities remain intact.
+
+This step keeps OMDb as the deployed provider. It does not add a TheTVDB adapter,
+change activation or capacity settings, choose alternate episode orders, or
+mirror a provider database. Native-only test fixtures exercise the groundwork
+without provider credentials or live requests. Reviewed aliases that explicitly
+name an IMDb identity still require that cross-reference; they do not silently
+apply to an unrelated native-only record.

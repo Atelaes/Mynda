@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // The sole metadata HTTP boundary. Cache hits do not spend the operation's budget;
 // each logical lookup spends it here. Capacity polling stays inside the transport;
 // provider attempts (including retries) are accounted for by the server.
@@ -72,7 +73,7 @@ function createCatalogClient({axios,log,server,onUnauthorized,
       const cacheable = response && response.status === 200 && data &&
         (isNotFoundResponse(data) || (data.Response === 'True' &&
           (Array.isArray(data.Search) || Array.isArray(data.Episodes) ||
-           (/^tt\d+$/.test(data.imdbID || '') && typeof data.Title === 'string' && data.Title.trim() &&
+           (CatalogIdentity.recordKey(data) && typeof data.Title === 'string' && data.Title.trim() &&
              ['series','episode','movie'].includes(data.Type)))));
       observation.outcome = data && data.Response === 'True' ? 'response' :
         isNotFoundResponse(data) ? 'not-found' : 'service-error';

@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Pure, serializable series-structure evidence. Local maxima are lower bounds.
 // Two distinct season totals may favor a shorter candidate; one observed
 // position beyond an alternative's reported bounds can exclude that alternative.
@@ -23,7 +24,7 @@ function profileFor(videos) {
   const members = videos.map(video => ({video,scope:scopeFor(video)})).filter(item=>item.scope);
   if (!members.length || new Set(members.map(item=>item.scope.key)).size !== 1) return null;
   const years = [...new Set(members.flatMap(item=>item.scope.years))].sort();
-  const parents = [...new Set(members.filter(({video})=>validImdbID(video.seriesImdbID)).map(({video})=>video.seriesImdbID.trim()))].sort();
+  const parents = CatalogIdentity.parentKeys(members.map(({video})=>video)).sort();
   if (years.length > 1 || parents.length > 1) return null;
   const seasons = new Map(), numberingScopes=new Map();
   let inferredSeason=false;
@@ -52,7 +53,7 @@ function profileFor(videos) {
 }
 
 function eligibleChoice(profile,choice) {
-  if (!choice || choice.Type !== 'series' || !validImdbID(choice.imdbID)) return false;
+  if (!choice || choice.Type !== 'series' || !CatalogIdentity.valid(CatalogIdentity.recordKey(choice))) return false;
   const parts={title:profile.series,year:profile.year};
   if (!Identity.seriesYearMatches(profile.year,choice.Year) || Search.regionRejection(parts,choice)) return false;
   const matching=Identity.matchingSeriesResults(profile.series,profile.year,[choice]);
@@ -63,12 +64,12 @@ function eligibleChoice(profile,choice) {
 function seasonEvidence(data,season,seriesID) {
   const unknown = reason => ({season,status:'unknown',reason,invalid:Boolean(data),positions:[],count:null,maxEpisode:null});
   if (!data || data.Response !== 'True' || number(data.Season) !== season || !Array.isArray(data.Episodes) ||
-      (data.imdbID && data.imdbID !== seriesID) || (data.seriesID && data.seriesID !== seriesID)) return unknown('missing or mismatched season list');
+      (CatalogIdentity.recordKey(data) && !CatalogIdentity.matchesRecord(data,seriesID)) || (CatalogIdentity.parentKey(data) && !CatalogIdentity.matchesParent(data,seriesID))) return unknown('missing or mismatched season list');
   const entries = new Map(), ids = new Map();
   let malformed=false;
   for (const row of data.Episodes) {
-    const ep=number(row && row.Episode), id=row && row.imdbID;
-    if (!ep || !validImdbID(id) || (row.Type && row.Type !== 'episode')) {malformed=true;continue;}
+    const ep=number(row && row.Episode), id=row && CatalogIdentity.recordKey(row);
+    if (!ep || !CatalogIdentity.valid(id) || (row.Type && row.Type !== 'episode')) {malformed=true;continue;}
     if ((entries.has(ep) && entries.get(ep)!==id) || (ids.has(id) && ids.get(id)!==ep)) malformed=true;
     entries.set(ep,id);ids.set(id,ep);
   }
@@ -77,7 +78,7 @@ function seasonEvidence(data,season,seriesID) {
   // Sparse/invalid lists never imply that a season ends at their last row.
   // A contiguous list is a reported total, not certainty about provider coverage.
   return {season,status:malformed?'unknown':'listed',invalid:malformed,positions:malformed?[]:positions,
-    count:!malformed && contiguous?positions.length:null,
+    count:!malformed && contiguous && data.catalogCompleteness!=='partial' && data.catalogCompleteness!=='unknown'?positions.length:null,
     maxEpisode:!malformed && positions.length?positions[positions.length-1]:null,
     reason:malformed?'conflicting or invalid season rows':!contiguous?'incomplete season list':'contiguous season list'};
 }

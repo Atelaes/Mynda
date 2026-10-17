@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Catalog observations for the pure structural comparison. Uses the existing
 // client/session/budget; it never applies tags or treats a missing row as a zero.
 const Structure = require('./SeriesStructure');
@@ -9,10 +10,10 @@ const Limits = require('./TaggingLimits');
 function createSeriesStructureResolver({requestCatalog,createCatalogQuery,log}) {
   return async function resolve(profile,choices,context) {
     const eligible=[...new Map(choices.filter(choice=>Structure.eligibleChoice(profile,choice))
-      .map(choice=>[choice.imdbID,choice])).values()].sort((a,b)=>a.imdbID.localeCompare(b.imdbID));
+      .map(choice=>[CatalogIdentity.recordKey(choice),choice])).values()].sort((a,b)=>CatalogIdentity.recordKey(a).localeCompare(CatalogIdentity.recordKey(b)));
     // Never narrow an unreviewed/fuzzy candidate list by silently dropping a
     // competing identity. Discovery must establish the full-title candidates.
-    if (eligible.length < 2 || eligible.length !== new Set(choices.map(choice=>choice.imdbID)).size ||
+    if (eligible.length < 2 || eligible.length !== new Set(choices.map(choice=>CatalogIdentity.recordKey(choice))).size ||
         eligible.length > Limits.series.structureCandidates) {
       const assessment={selectedID:null,basis:eligible.length > Limits.series.structureCandidates ?
         'structure-candidate-limit':'ineligible-structure-candidates',profile,
@@ -25,14 +26,14 @@ function createSeriesStructureResolver({requestCatalog,createCatalogQuery,log}) 
     const observations=[];
     for (const choice of eligible) {
       if (context.canContinue && !await context.canContinue()) return {status:'canceled'};
-      const response=await requestCatalog(createCatalogQuery({id:choice.imdbID}),{...context,stage:'series structure metadata'});
+      const response=await requestCatalog(createCatalogQuery({id:CatalogIdentity.recordKey(choice)}),{...context,stage:'series structure metadata'});
       const failure=requestFailure(response);
       if (failure && failure.failure !== 'No results') return {failure};
       const metadata=response && response.data;
-      const valid=!failure && metadata.Type==='series' && metadata.imdbID===choice.imdbID &&
+      const valid=!failure && metadata.Type==='series' && CatalogIdentity.matchesRecord(metadata,CatalogIdentity.recordKey(choice)) &&
         Identity.comparableSeriesTitle(metadata.Title)===Identity.comparableSeriesTitle(choice.Title) &&
         Identity.seriesYearMatches(String(choice.Year || '').match(/^(?:19|20)\d{2}/)?.[0],metadata.Year);
-      const observation={seriesID:choice.imdbID,title:choice.Title,year:choice.Year,
+      const observation={seriesID:CatalogIdentity.recordKey(choice),title:choice.Title,year:choice.Year,
         totalSeasons:valid?Structure.number(metadata.totalSeasons):null,seasons:[],
         metadataStatus:valid?'verified':failure?'missing':'invalid'};
       observations.push(observation);
@@ -47,23 +48,23 @@ function createSeriesStructureResolver({requestCatalog,createCatalogQuery,log}) 
       for (const local of profile.seasons) {
         if (context.canContinue && !await context.canContinue()) return {status:'canceled'};
         if (observation.totalSeasons && local.season > observation.totalSeasons) continue;
-        const listed=await requestCatalog(createCatalogQuery({id:choice.imdbID,season:local.season}),
+        const listed=await requestCatalog(createCatalogQuery({id:CatalogIdentity.recordKey(choice),season:local.season}),
           {...context,stage:'series structure season list'});
         const listFailure=requestFailure(listed);
         if (listFailure && listFailure.failure!=='No results') return {failure:listFailure};
-        const season=Structure.seasonEvidence(listFailure?null:listed.data,local.season,choice.imdbID);
+        const season=Structure.seasonEvidence(listFailure?null:listed.data,local.season,CatalogIdentity.recordKey(choice));
         // A season list can omit its tail. Check the actual observed position
         // before excluding a candidate on that list's apparent upper bound.
         if (season.count !== null && local.maxEpisode > season.count) {
-          const boundary=await requestCatalog(createCatalogQuery({id:choice.imdbID,season:local.season,episode:local.maxEpisode}),
+          const boundary=await requestCatalog(createCatalogQuery({id:CatalogIdentity.recordKey(choice),season:local.season,episode:local.maxEpisode}),
             {...context,stage:'series structure boundary episode'});
           const boundaryFailure=requestFailure(boundary);
           if (boundaryFailure && boundaryFailure.failure!=='No results') return {failure:boundaryFailure};
           if (!boundaryFailure) {
             season.count=null;
             season.reason='season list contradicted by an episode response';
-            if (episodeResponseMatches(boundary.data,choice.imdbID,String(local.season),String(local.maxEpisode)) &&
-                boundary.data.seriesID===choice.imdbID) {
+            if (episodeResponseMatches(boundary.data,CatalogIdentity.recordKey(choice),String(local.season),String(local.maxEpisode)) &&
+                CatalogIdentity.matchesParent(boundary.data,CatalogIdentity.recordKey(choice))) {
               season.positions=[...new Set([...season.positions,local.maxEpisode])].sort((a,b)=>a-b);
               season.maxEpisode=Math.max(season.maxEpisode,local.maxEpisode);
             } else {season.invalid=true;season.reason='inconsistent boundary episode response';}

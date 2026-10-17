@@ -102,7 +102,7 @@ suite.test('ambiguous parent choices use the stored row and mark selection as us
   const result = await service.search(source, 10);
   await service.select({draft: source, choice: {...result.choices[0], imdbID: 'tt999', myndaChoiceType: 'record'}}, 10);
   const {requestControl,...identityOptions} = calls[0].options;
-  assert.deepStrictEqual(identityOptions, {seriesImdbID: 'tt222', seriesSelectionSource: 'user'});
+  assert.deepStrictEqual(identityOptions, {seriesID: 'tt222', seriesSelectionSource: 'user'});
   assert.strictEqual(requestControl.workload, 'interactive');
 });
 suite.test('malformed drafts fail before starting catalog work', async () => {

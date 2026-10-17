@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 const Response = require('./CatalogResponse');
 const {validSeriesImdbID, normalizeEpisodeNumber, predictableFailure, requestFailure, episodeResponseMatches} = Response;
 const {summarizeError, summarizeCatalogResponse} = require('./TaggingDiagnostics');
@@ -28,13 +29,13 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
     if (!found.success) {
       const failure=found.requestFailure;
       check.outcome=found.outcome || (failure && failure.failure === 'No results' ? 'not-found' : 'service-error');
-      if (found.rejectedRecord) Object.assign(check,{imdbID:found.rejectedRecord.imdbID,catalogTitle:found.rejectedRecord.Title});
+      if (found.rejectedRecord) Object.assign(check,{imdbID:found.rejectedRecord.imdbID,recordID:CatalogIdentity.recordKey(found.rejectedRecord),catalogTitle:found.rejectedRecord.Title});
       return failure && failure.failure !== 'No results' ? {success:false,requestFailure:failure} : {success:false};
     }
     const data=found.data;
-    check.imdbID=data && data.imdbID;
+    check.recordID=CatalogIdentity.recordKey(data);check.imdbID=data && data.imdbID;
     check.catalogTitle=data && data.Title;
-    if (!episodeResponseMatches(data,seriesID,probed.season,probed.episode) || data.seriesID !== seriesID) {
+    if (!episodeResponseMatches(data,seriesID,probed.season,probed.episode) || !CatalogIdentity.matchesParent(data,seriesID)) {
       check.outcome='invalid-record';
       return {success:false};
     }
@@ -49,7 +50,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
       match.check.outcome='selected';
       log.warn('Corrected shifted catalog episode number using the local title', {
         searchID:context.searchID,localTitle,requested:{season,episode},
-        matched:{season,episode:match.episode,distance:match.distance,title:match.data.Title,imdbID:match.data.imdbID}
+        matched:{season,episode:match.episode,distance:match.distance,title:match.data.Title,recordID:CatalogIdentity.recordKey(match.data)}
       });
       return {success:true,data:match.data,episode:match.episode};
     };
@@ -190,22 +191,22 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
         episode: match.episode,
         seasonOffset: match.offset,
         title: match.data.Title,
-        imdbID: match.data.imdbID
+        recordID: CatalogIdentity.recordKey(match.data)
       }
     });
     return match;
   }
 
-  async function inferSingleSeason(video, context, selectedSeriesImdbID, validation) {
+  async function inferSingleSeason(video, context, selectedSeriesID, validation) {
     const singleSeasonMetadataCache = context.seriesSession.singleSeasons;
     let seriesResult = validation.seriesResult;
     if (!seriesResult) {
-      if (typeof selectedSeriesImdbID !== 'undefined') {
-        if (!validSeriesImdbID(selectedSeriesImdbID)) {
-          return predictableFailure('Invalid series selection', 'The selected series did not have a valid IMDb ID');
+      if (typeof selectedSeriesID !== 'undefined') {
+        if (!CatalogIdentity.valid(selectedSeriesID)) {
+          return predictableFailure('Invalid series selection', 'The selected series did not have a valid catalog identity');
         }
-        const parentEvidence = Evidence.selectedParent(video,selectedSeriesImdbID.trim(),context);
-        seriesResult = {success:true,data:selectedSeriesImdbID.trim(),
+        const parentEvidence = Evidence.selectedParent(video,selectedSeriesID.trim(),context);
+        seriesResult = {success:true,data:selectedSeriesID.trim(),
           confidentSeries:parentEvidence.confident,parentEvidence};
       } else {
         seriesResult = await resolveSeries(video, 1, normalizeEpisodeNumber(video.episode),
@@ -222,7 +223,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
       const failure = requestFailure(response);
       if (failure) return failure;
       metadata = response.data;
-      if (!metadata || metadata.Type !== 'series' || metadata.imdbID !== seriesID ||
+      if (!metadata || metadata.Type !== 'series' || !CatalogIdentity.matchesRecord(metadata,seriesID) ||
           metadata.Response !== 'True') {
         return predictableFailure('Not enough data', 'The parent record could not confirm a missing season');
       }
@@ -231,8 +232,8 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
       return predictableFailure('Not enough data', 'A missing season can only be inferred from a confirmed single-season series');
     }
     const parts = seriesSearchPartsForVideo(video);
-    const explicitParent = typeof selectedSeriesImdbID !== 'undefined' ||
-      (validSeriesImdbID(video.seriesImdbID) && video.seriesImdbID.trim() === seriesID);
+    const explicitParent = typeof selectedSeriesID !== 'undefined' ||
+      (CatalogIdentity.valid(CatalogIdentity.parentKey(video)) && CatalogIdentity.parentKey(video) === seriesID);
     if (!explicitParent && (!seriesTitlesMatch(parts.title, metadata.Title, false) ||
         !seriesYearMatches(parts.year, metadata.Year))) {
       return predictableFailure('Episode mismatch', 'The full parent record did not confirm the series for a missing season');
@@ -247,15 +248,15 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
   }
 
   async function searchShowEpisode(
-    video, context, selectedSeriesImdbID, seasonOffsetHints, validation = {}
+    video, context, selectedSeriesID, seasonOffsetHints, validation = {}
   ) {
     const seriesIdCache = context.seriesSession.parents;
     if (canInferSingleSeason(video)) {
-      const inferred = await inferSingleSeason(video, context, selectedSeriesImdbID, validation);
+      const inferred = await inferSingleSeason(video, context, selectedSeriesID, validation);
       if (!inferred.success) return inferred;
       // Only the returned, successfully validated episode receives the inferred
       // season. A failed lookup must leave the caller's original tags untouched.
-      return searchShowEpisode({...video, season: '1'}, context, selectedSeriesImdbID,
+      return searchShowEpisode({...video, season: '1'}, context, selectedSeriesID,
         seasonOffsetHints, {...validation, seriesResult: inferred.seriesResult});
     }
     let series = typeof video.series === 'string' ? video.series.trim() : '';
@@ -288,18 +289,18 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
     let seriesResult;
     if (validation.seriesResult) {
       seriesResult = validation.seriesResult;
-    } else if (typeof selectedSeriesImdbID !== 'undefined') {
-      if (!validSeriesImdbID(String(selectedSeriesImdbID))) {
-        return predictableFailure('Invalid series selection', 'The selected series did not have a valid IMDb ID');
+    } else if (typeof selectedSeriesID !== 'undefined') {
+      if (!CatalogIdentity.valid(String(selectedSeriesID))) {
+        return predictableFailure('Invalid series selection', 'The selected series did not have a valid catalog identity');
       }
-      selectedSeriesImdbID = String(selectedSeriesImdbID).trim();
+      selectedSeriesID = String(selectedSeriesID).trim();
       log.debug('Using caller-selected series for episode lookup', {
         searchID: context.searchID,
         series: series,
-        selectedSeriesImdbID: selectedSeriesImdbID
+        selectedSeriesID: selectedSeriesID
       });
-      const parentEvidence = Evidence.selectedParent(video,selectedSeriesImdbID,context);
-      seriesResult = {success:true,data:selectedSeriesImdbID,
+      const parentEvidence = Evidence.selectedParent(video,selectedSeriesID,context);
+      seriesResult = {success:true,data:selectedSeriesID,
         confidentSeries:parentEvidence.confident,parentEvidence};
     } else {
       seriesResult = await resolveSeries(video, season, episode, localTitle, context);
@@ -310,7 +311,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
 
     let seriesID = seriesResult.data;
     try {
-      // The catalog supports Season+Episode with a series IMDb ID. Once a series has
+      // The catalog supports Season+Episode with a catalog series ID. Once a series has
       // been resolved, its ID is cached so every later episode needs one request.
       // If ambiguity was just resolved by episode probes, reuse that full episode
       // response instead of making the same catalog request twice.
@@ -458,7 +459,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
           reason, policyReason, titleAssessment
         });
         return {...predictableFailure('Episode mismatch',reason),policyReason,
-          evidence:{...evidence,catalogTitle:episodeData.Title,imdbID:episodeData.imdbID}};
+          evidence:{...evidence,catalogTitle:episodeData.Title,recordID:CatalogIdentity.recordKey(episodeData)}};
       };
       const evidence = {kind:'episode', localTitle, originalTitle:video.title,
         requested:{season,episode}, matched:{season:matchedSeason,episode:matchedEpisode},
@@ -491,7 +492,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
           confidentSeries:Boolean(seriesResult.confidentSeries),
           parentEvidence:evidence.parentEvidence});
         if (seriesResult.discovery) {
-          const recovered = {storedSeries:series, seriesImdbID:seriesID};
+          const recovered = {storedSeries:series, seriesID};
           if (context.seriesSession) context.seriesSession.recovered.set(cacheKey, recovered);
           log.info('Recovered series through fallback discovery', {...recovered,
             searchID:context.searchID, episodeTitle:episodeData.Title,

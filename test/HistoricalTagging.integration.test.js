@@ -7,6 +7,7 @@ const suite = createSuite('Individual historical tagging regressions', 'integrat
   'Replays recorded Torgo-library searches and individual corrections with catalog IDs checked against the reference library; no network.');
 const queryKey = query => JSON.stringify(Object.keys(query).sort().map(key=>[key,String(query[key])]));
 const supplements = require('./fixtures/HistoricalTaggingSupplements.json');
+const nativePolicyChanges = require('./fixtures/NativeIdentityPolicyChanges.json');
 const precisionChanges = require('./fixtures/Fix80PolicyChanges.json').history;
 
 for (const [index, item] of replay.cases.entries()) suite.test(`[R${String(index+1).padStart(4,'0')}] ${item.label}`, async()=>{
@@ -29,6 +30,13 @@ for (const [index, item] of replay.cases.entries()) suite.test(`[R${String(index
   const video=show({...item.video,filename:path.join(path.parse(__dirname).root,'fixture-media',...item.video.filenameParts)});
   delete video.filenameParts;
   const result=await api.search(video,item.options);
+  const nativeChange=nativePolicyChanges.find(row=>row.caseNumber===index+1);
+  if(nativeChange) {
+    assert.strictEqual(nativeChange.label,item.label);
+    assert.strictEqual(result.status,'ambiguous',nativeChange.explanation);
+    assert(result.data.some(row=>row.imdbID===item.expectedImdbID),'The recorded correct match must remain available for review');
+    return;
+  }
   const change=precisionChanges.find(row=>row.caseNumber===index+1);
   if (change) assert.strictEqual(change.label,item.label,'Policy review must refer to this exact historical case');
   if (change && !change.resolvedBy) {

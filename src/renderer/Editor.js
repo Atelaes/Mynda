@@ -1,3 +1,4 @@
+const CatalogIdentity = require('../tagging/CatalogIdentity');
 // Editor pane, catalog search workflow, and the complete edit form.
 const React = require('react');
 const _ = require('lodash');
@@ -179,12 +180,17 @@ class MynEditor extends MynOpenablePane {
 
     if ((seriesChanged && !suppliedSeriesID && batchWillSaveSeries) || kindChangedAwayFromShow) {
       update.seriesImdbID = '';
+      update.catalogSeriesRef = null;
       // Empty values are normally removed from the batch changed set. This
       // empty value is an intentional clear and must be applied to every video
       // whose series/kind edit invalidated the old parent ID.
       this.state.changed.add('seriesImdbID');
+      this.state.changed.add('catalogSeriesRef');
     }
 
+    if (Object.hasOwn(suppliedChanges,'imdbID') && !suppliedChanges.taggingEvidence) {
+      update.catalogRef=null;this.state.changed.add('catalogRef');
+    }
     if (update.id !== 'batch') update = TaggingEvidence.markUserEdit(update,suppliedChanges);
     this._isMounted && this.setState({video : update});
 
@@ -585,7 +591,7 @@ class MynEditor extends MynOpenablePane {
           // be submitted, against this video's untouched original baseline.
           let temp = _.cloneDeep(video);
           const identityChanges = {};
-          for (const field of ['imdbID','seriesImdbID']) {
+          for (const field of ['imdbID','seriesImdbID','catalogRef','catalogSeriesRef','series','kind']) {
             if (draftState.changed.has(field)) identityChanges[field] = temp[field];
           }
           temp = TaggingEvidence.markUserEdit(temp,identityChanges);
@@ -1002,11 +1008,11 @@ class MynEditorSearch extends React.Component {
       }
 
       return (
-        <tr key={movie.imdbID} onClick={() => (this.chooseResult(movie))}>
+        <tr key={CatalogIdentity.recordKey(movie)} onClick={() => (this.chooseResult(movie))}>
           <td className='artwork'><img src={movie.Poster} /></td>
           <td className='title'>{movie.Title}</td>
           <td className='year'>{movie.Year}</td>
-          <td><ImdbLink imdbID={movie.imdbID}>IMDb</ImdbLink></td>
+          <td>{movie.imdbID ? <ImdbLink imdbID={movie.imdbID}>IMDb</ImdbLink> : CatalogIdentity.recordKey(movie)}</td>
         </tr>
       );
     });

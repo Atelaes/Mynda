@@ -68,7 +68,8 @@ function diffFields(before, after, prefix = '', changes = {}) {
     const left = before && before[key], right = after && after[key];
     const address = prefix ? `${prefix}.${key}` : key;
     if (_.isEqual(left, right)) continue;
-    if (_.isPlainObject(left) && _.isPlainObject(right)) diffFields(left, right, address, changes);
+    // Provider and ID are one identity and must be compared/replaced atomically.
+    if (!['catalogRef','catalogSeriesRef'].includes(address) && _.isPlainObject(left) && _.isPlainObject(right)) diffFields(left, right, address, changes);
     else changes[address] = _.cloneDeep(right);
   }
   return changes;

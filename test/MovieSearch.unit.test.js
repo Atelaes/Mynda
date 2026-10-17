@@ -107,7 +107,7 @@ suite.test('selects one exact compatible OMDb row and preserves real ambiguity',
   assert.strictEqual(selected.confident, exact);
   assert.deepStrictEqual(selected.acceptableResults, [exact]);
 
-  const duplicate = {Title: 'Alien', Year: '1979', Type: 'movie', imdbID: 'tt-other'};
+  const duplicate = {Title: 'Alien', Year: '1979', Type: 'movie', imdbID: 'tt1234567'};
   const ambiguous = MovieSearch.evaluateSearchResults([exact, duplicate], candidate, video);
   assert.strictEqual(ambiguous.confident, null);
   assert.strictEqual(ambiguous.acceptableResults.length, 2);
@@ -115,13 +115,13 @@ suite.test('selects one exact compatible OMDb row and preserves real ambiguity',
 
 suite.test('keeps exact, article-only, and canonical confidence tiers separate', () => {
   const candidate = {title: 'Captain America', year: '2011'};
-  const exact = {Title: 'Captain America', Year: '2011', Type: 'movie', imdbID: 'exact'};
-  const article = {Title: 'The Captain America', Year: '2011', Type: 'movie', imdbID: 'article'};
+  const exact = {Title: 'Captain America', Year: '2011', Type: 'movie', imdbID: 'tt1111111'};
+  const article = {Title: 'The Captain America', Year: '2011', Type: 'movie', imdbID: 'tt2222222'};
   const canonical = {
     Title: 'Captain America: The First Avenger',
     Year: '2011',
     Type: 'movie',
-    imdbID: 'canonical'
+    imdbID: 'tt3333333'
   };
   const result = MovieSearch.evaluateSearchResults(
     [canonical, article, exact],
@@ -155,27 +155,30 @@ suite.test('parses OMDb runtimes and rejects implausible feature matches', () =>
   assert(short.reasons.length >= 1);
 });
 
-suite.test('requires strong runtime and audience evidence for relaxed matches', () => {
+suite.test('requires comparable close runtimes for relaxed matches regardless of vote count', () => {
   const video = {kind: 'movie', filename: '/Movies/Dune.mkv', metadata: {duration: 155 * 60}};
   const candidate = {title: 'Dune', year: ''};
   const obscure = {
-    Title: 'Dune', Year: '2021', Type: 'movie', imdbID: 'obscure',
+    Title: 'Dune', Year: '2021', Type: 'movie', imdbID: 'tt4444444',
     Runtime: '155 min', imdbVotes: '12'
   };
-  const established = Object.assign({}, obscure, {imdbID: 'established', imdbVotes: '900,000'});
+  const established = Object.assign({}, obscure, {imdbID: 'tt5555555', imdbVotes: '900,000'});
 
   assert.strictEqual(MovieSearch.evaluateFullResult(
     obscure,
     candidate,
     video,
     {requireStrongEvidence: true}
-  ).confident, false);
+  ).confident, true);
   assert.strictEqual(MovieSearch.evaluateFullResult(
     established,
     candidate,
     video,
     {requireStrongEvidence: true}
   ).confident, true);
+  for (const Runtime of ['N/A','210 min']) assert.strictEqual(MovieSearch.evaluateFullResult(
+    {...established,Runtime,imdbVotes:'900,000'},candidate,video,{requireStrongEvidence:true}).confident,false);
+  assert.strictEqual(MovieSearch.evaluateFullResult({...obscure,imdbVotes:'N/A'},candidate,video,{requireStrongEvidence:true}).confident,true);
 });
 
 runSuite(suite);

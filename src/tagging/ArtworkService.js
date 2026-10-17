@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 const Response = require('./CatalogResponse');
 const {requestFailure} = Response;
 const {summarizeError, summarizeCatalogResponse} = require('./TaggingDiagnostics');
@@ -44,7 +45,7 @@ function createArtworkService({log, requestCatalog, createCatalogQuery, artworkD
       }
 
       let seriesData = response.data;
-      if (seriesData.Type !== 'series' || seriesData.imdbID !== seriesID) {
+      if (seriesData.Type !== 'series' || !CatalogIdentity.matchesRecord(seriesData,seriesID)) {
         log.warn('Series artwork fallback response did not match the requested series', {
           searchID: context.searchID,
           seriesID: seriesID,

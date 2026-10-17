@@ -1,3 +1,4 @@
+const CatalogIdentity = require('../tagging/CatalogIdentity');
 const electron = require('electron');
 const { ipcMain, dialog } = require('electron');
 const cp = require('child_process');
@@ -1433,6 +1434,8 @@ function deriveFilenameResetChanges(video, watchfolders = library.settings.watch
   const changes = {
     imdbID: '',
     seriesImdbID: '',
+    catalogRef: null,
+    catalogSeriesRef: null,
     title: fileBasename,
     year: '',
     series: '',
@@ -1533,16 +1536,12 @@ function sameSeriesShowBatch(videos) {
     return null;
   }
 
-  const storedIDs = Array.from(new Set(
-    videos
-      .map(video => validSeriesImdbID(video.seriesImdbID) ? video.seriesImdbID.trim() : '')
-      .filter(Boolean)
-  ));
+  const storedIDs = CatalogIdentity.parentKeys(videos);
 
   return {
     series: firstSeries,
     seriesKey: seriesKey,
-    storedSeriesImdbID: storedIDs.length === 1 ? storedIDs[0] : '',
+    storedSeriesID: storedIDs.length === 1 ? storedIDs[0] : '',
     conflictingStoredSeriesIDs: storedIDs.length > 1,
     storedSeriesIDs: storedIDs
   };
@@ -1627,8 +1626,8 @@ async function chooseSeriesForSelectedBatch(seriesBatch, choices, videoCount) {
   const uniqueChoices = [];
   const seenIDs = new Set();
   for (const choice of Array.isArray(choices) ? choices : []) {
-    if (!choice || !validSeriesImdbID(choice.imdbID) || seenIDs.has(choice.imdbID)) continue;
-    seenIDs.add(choice.imdbID);
+    if (!choice || !CatalogIdentity.recordKey(choice) || seenIDs.has(CatalogIdentity.recordKey(choice))) continue;
+    seenIDs.add(CatalogIdentity.recordKey(choice));
     uniqueChoices.push(choice);
   }
   if (uniqueChoices.length === 0) return null;
@@ -1636,7 +1635,7 @@ async function chooseSeriesForSelectedBatch(seriesBatch, choices, videoCount) {
   const buttons = ['Cancel'].concat(uniqueChoices.map(choice => {
     const title = choice.Title || seriesBatch.series;
     const year = choice.Year || 'year unknown';
-    return `${title} (${year}) — ${choice.imdbID}`;
+    return `${title} (${year}) — ${CatalogIdentity.recordKey(choice)}`;
   }));
   const result = await dialog.showMessageBox({
     type: 'question',

@@ -1,10 +1,11 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Presentation of saved observations only. This module must not run discovery,
 // reinterpret acceptance thresholds, make requests, or change video metadata.
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const array = value => Array.isArray(value) ? value : [];
 const text = value => typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
 const present = value => text(value) !== '';
-const id = value => /^tt\d+$/.test(text(value)) ? text(value) : '';
+const id = value => CatalogIdentity.valid(text(value)) ? text(value) : '';
 const minutes = value => present(value) && Number.isFinite(Number(value)) && Number(value) > 0 ?
   `${Number(Number(value).toFixed(1))} min` : '';
 const position = value => {
@@ -14,7 +15,7 @@ const position = value => {
 };
 const recordLabel = value => {
   const r = object(value);
-  return [text(r.Title || r.title || r.catalogTitle), text(r.Year || r.year), id(r.imdbID || r.seriesID)]
+  return [text(r.Title || r.title || r.catalogTitle), text(r.Year || r.year), id(r.recordID || CatalogIdentity.recordKey(r) || r.seriesID)]
     .filter(Boolean).join(' · ');
 };
 
@@ -51,7 +52,7 @@ const REASONS = {
   'unverified-movie': ['The proposed movie did not pass the saved identity checks.',
     'Verify the title, year and runtime before selecting a record in Search.'],
   'identity-mismatch': ['The proposed record did not agree with the requested identity.',
-    'Check the selected IMDb record and identifying fields before retrying.']
+    'Check the selected catalog record and identifying fields before retrying.']
 };
 
 function failureExplanation(status, reason) {
@@ -89,8 +90,8 @@ const PARENTS = {
   'structure-series-selection':'Season and episode numbering supplied the series evidence.',
   'batch-series-selection':'The series was selected during the shared series lookup.',
   'user-series-selection':'You selected this series.',
-  'stored-series-id':'The saved series IMDb ID was reused.',
-  'stored-parent-id':'The saved series IMDb ID was reused.'
+  'stored-series-id':'The saved catalog series identity was reused.',
+  'stored-parent-id':'The saved catalog series identity was reused.'
 };
 
 function parentDescription(parent) {
@@ -146,7 +147,7 @@ function correctionDetails(e) {
     const c=object(value);
     return {label:[names[c.kind] || 'Episode check',position(c.probed),id(c.seriesID)].filter(Boolean).join(' · '),
       record:recordLabel(c),detail:[outcomes[c.outcome] || 'This correction was checked.',
-        c.via === 'season-list' ? 'The season-list/IMDb-ID fallback was also used.' : ''].filter(Boolean).join(' ')};
+        c.via === 'season-list' ? 'The season-list/record-ID fallback was also used.' : ''].filter(Boolean).join(' ')};
   }),more:Math.max(0,checks.length-40)};
 }
 
@@ -155,7 +156,7 @@ function buildTaggingReport(video) {
   const decision = object(video.taggingDecision), saved = object(video.taggingEvidence);
   const hasDecision = ['matched','ambiguous','unmatched','service-error'].includes(decision.status);
   // A saved parent alone, or a manually entered ID, is not a successful attempt.
-  const hasMatch = id(saved.imdbID) && ['episode','movie','explicit-id'].includes(saved.kind);
+  const hasMatch = id(saved.recordID || saved.imdbID) && ['episode','movie','explicit-id'].includes(saved.kind);
   if (!hasDecision && !hasMatch && !video.autotag_tried) return null;
   const e = hasDecision ? object(decision.evidence) : hasMatch ? saved : {};
   const status = hasDecision ? decision.status : hasMatch ? 'matched' : 'unavailable';
@@ -169,18 +170,18 @@ function buildTaggingReport(video) {
   const recordIdentity = object(object(e.identities).record);
   if (matched) {
     report.summary = recordIdentity.origin === 'user' ? 'Tags were applied from a record you selected.' :
-      e.kind === 'explicit-id' || object(e.lookup).kind === 'explicit-id' ? 'Tags were refreshed using an existing IMDb ID.' :
+      e.kind === 'explicit-id' || object(e.lookup).kind === 'explicit-id' ? 'Tags were refreshed using an existing catalog identity.' :
         'The proposed record passed the automatic tagging checks and its tags were applied.';
-    if (recordIdentity.origin === 'legacy') report.notes.push('The original source of the stored IMDb ID is unknown.');
-    if (object(e.lookup).kind === 'explicit-id') report.notes.push('This was an IMDb ID refresh. Retained title and numbering evidence can come from the original match.');
-    if (id(e.imdbID) !== id(video.imdbID)) report.notes.push('The current IMDb ID differs from this saved match. This report describes the earlier result.');
+    if (recordIdentity.origin === 'legacy') report.notes.push('The original source of the stored catalog identity is unknown.');
+    if (object(e.lookup).kind === 'explicit-id') report.notes.push('This was a catalog identity refresh. Retained title and numbering evidence can come from the original match.');
+    if (!CatalogIdentity.matchesRecord(video,e.recordID || e.imdbID)) report.notes.push('The current catalog identity differs from this saved match. This report describes the earlier result.');
   } else if (status === 'unavailable') {
     report.summary = 'An autotag attempt was recorded, but no detailed outcome was saved with this video.';
     report.notes.push('Current tags alone cannot tell us how that attempt ended. A new attempt will save a detailed report.');
     return report;
   } else {
     [report.summary, report.nextStep] = failureExplanation(status, reason);
-    if (id(video.imdbID)) report.notes.push('This attempt did not apply a new match. The video currently has an IMDb ID from another selection or attempt.');
+    if (CatalogIdentity.recordKey(video)) report.notes.push('This attempt did not apply a new match. The video currently has a catalog identity from another selection or attempt.');
     // Service errors get a safe, actionable explanation rather than a raw error.
     const detail = message(reason.message);
     if (status !== 'service-error' && detail && ![report.summary,'Ambiguous results','No results','Not enough data','Episode mismatch'].includes(detail)) {

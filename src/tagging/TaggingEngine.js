@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Application-independent coordinator. Resolvers propose; policy decides;
 // the applier is called only here, after the final decision is matched.
 const Decision = require('./TaggingDecision');
@@ -22,7 +23,7 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
       requestControl:options.requestControl,
       requestBudget:options.requestBudget || createRequestBudget(options.requestBudgetLimit),
       seriesSelectionSource:options.seriesSelectionSource || 'user',
-      selectedSeriesID:options.seriesImdbID,deferSeriesEvidence:Boolean(options.deferSeriesEvidence),
+      selectedSeriesID:(options.seriesID || options.seriesImdbID),deferSeriesEvidence:Boolean(options.deferSeriesEvidence),
       parentEvidence:options.parentEvidence,numberingEvidence:options.numberingEvidence,
       correctionChecks:Evidence.copy(options.priorCorrectionChecks || [])};
   }
@@ -52,19 +53,19 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
   }
 
   async function discover(video,context,options) {
-    if (video && video.kind === 'show' && (options.seriesImdbID || !Decision.hasImdbID(video))) {
-      return episodes.resolve(video,context,options.seriesImdbID,options.seasonOffsetHints);
+    if (video && video.kind === 'show' && ((options.seriesID || options.seriesImdbID) || !Decision.hasIdentity(video))) {
+      return episodes.resolve(video,context,(options.seriesID || options.seriesImdbID),options.seasonOffsetHints);
     }
-    if (!Decision.hasImdbID(video)) return movies.resolve(video,context);
-    const response = await client.requestCatalog(client.createCatalogQuery({id:video.imdbID}),{...context,stage:'exact IMDb lookup'});
+    if (!Decision.hasIdentity(video)) return movies.resolve(video,context);
+    const response = await client.requestCatalog(client.createCatalogQuery({id:CatalogIdentity.recordKey(video)}),{...context,stage:'exact catalog identity lookup'});
     const failure = requestFailure(response);
     if (failure) return failure;
-    if (video.kind === 'show' && response.data.Type === 'series' && response.data.imdbID === video.imdbID.trim()) {
+    if (video.kind === 'show' && response.data.Type === 'series' && CatalogIdentity.matchesRecord(response.data,CatalogIdentity.recordKey(video))) {
       const source = Evidence.identity(video,'imdbID',options.imdbIDSource);
       return episodes.resolve(video,{...context,seriesSelectionSource:source.origin === 'user' ? 'user' : 'stored',
-        parentEvidence:source},response.data.imdbID);
+        parentEvidence:source},CatalogIdentity.recordKey(response.data));
     }
-    return Decision.candidate(video,response.data,{kind:'explicit-id',requestedID:video.imdbID,
+    return Decision.candidate(video,response.data,{kind:'explicit-id',requestedID:CatalogIdentity.recordKey(video),
       source:Evidence.identity(video,'imdbID',options.imdbIDSource).origin});
   }
 
@@ -88,7 +89,7 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
       result = Policy.decide(candidate,context,options);
       if (result.status === 'matched') {
         const applied = await applier.apply(candidate.video,candidate.record,context);
-        if (candidate.evidence.kind === 'episode') applied.data.seriesImdbID = candidate.evidence.seriesID;
+        // TagApplier persists only provider-returned native and external identities.
         // Include requests made for optional artwork, without replacing the
         // original observations or the identity's prior authorship on refresh.
         result.evidence.requests = Evidence.copy(context.requestTrace);

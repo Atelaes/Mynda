@@ -14,6 +14,7 @@ suite.test('single and batch resets derive canonical filenames, preserve user st
     const root = path.resolve(__dirname, '..');
     const mediaRoot = path.join(directory, 'media');
     const movie = videoFixture({id: 'a'.repeat(64), kind: 'show', seriesImdbID: 'tt1111111',
+      catalogRef:{provider:'fixture',id:'episode:1'},catalogSeriesRef:{provider:'fixture',id:'series:1'},
       filename: path.join(mediaRoot, 'Movie (1979).mkv'), new: false,
       ratings: {user: 3, imdb: '8.5', rt: 93, mc: 89}, seen: true, position: 300,
       subtitles: [path.join(mediaRoot, 'Movie.srt')], artwork: '/old/artwork.png'});
@@ -62,6 +63,7 @@ suite.test('single and batch resets derive canonical filenames, preserve user st
     assert.strictEqual(changes.kind, 'movie');
     assert.strictEqual(changes.imdbID, '');
     assert.strictEqual(changes.seriesImdbID, '');
+    assert.strictEqual(changes.catalogRef,null);assert.strictEqual(changes.catalogSeriesRef,null);
     assert.strictEqual(changes.artwork, '');
     assert.strictEqual(changes.new, true);
     assert.strictEqual(changes.autotag_tried, false);

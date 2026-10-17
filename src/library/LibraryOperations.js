@@ -8,7 +8,7 @@ const {applyScanOperation} = require('./LibraryScanOperations');
 const protocol = require('./LibraryProtocol');
 const {ROOTS, FORBIDDEN, failure, parts, getAt, setAt, expectation, diffFields,
   encodePatch, assertExpected} = protocol;
-const IDENTITY_FIELDS = ['kind', 'title', 'year', 'imdbID', 'series', 'seriesImdbID', 'season', 'episode'];
+const IDENTITY_FIELDS = ['kind', 'title', 'year', 'imdbID', 'series', 'seriesImdbID', 'catalogRef', 'catalogSeriesRef', 'season', 'episode'];
 
 function applyFields(record, fields, actor) {
   let next = record;
@@ -70,7 +70,7 @@ function applyOperations(initial, operations, options = {}) {
             for (const field of IDENTITY_FIELDS) assertExpected(old[field], expectation(patch.baseline[field]), field, patch.id);
           }
           let next = applyFields(old, patch.fields, options.actor);
-          if (next.kind !== 'show' && next.seriesImdbID) next = {...next, seriesImdbID: ''};
+          if (next.kind !== 'show' && (next.seriesImdbID || next.catalogSeriesRef)) next = {...next, seriesImdbID: '', catalogSeriesRef:null};
           if (next !== old) {
             data = setAt(data, ['media', String(index)], next);
             edited.push(next);

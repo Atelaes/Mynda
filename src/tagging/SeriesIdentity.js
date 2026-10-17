@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Pure interpretation of series labels and episode identifiers.
 
 const EpisodeMatch = require('./EpisodeMatch');
@@ -195,7 +196,7 @@ function seriesYearMatches(requestedYear, resultYear) {
 
 function matchingSeriesResults(requestedTitle, requestedYear, results) {
   let eligible = (Array.isArray(results) ? results : []).filter(result => {
-    return result && result.Type === 'series' && result.imdbID &&
+    return result && result.Type === 'series' && CatalogIdentity.recordKey(result) &&
       seriesYearMatches(requestedYear, result.Year);
   });
 
@@ -222,6 +223,7 @@ function makeSeriesChoice(result) {
     Type: 'series',
     Year: result.Year,
     imdbID: result.imdbID,
+    catalogRef: CatalogIdentity.native(result.catalogRef),
     myndaChoiceType: 'series'
   };
 }

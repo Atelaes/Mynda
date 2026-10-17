@@ -1,0 +1,17 @@
+[
+  {
+    "caseNumber": 778,
+    "label": "The Conversation: The Conversation",
+    "explanation": "Two exact-title movies have close runtimes (113 and 108 minutes). Popularity no longer breaks the tie."
+  },
+  {
+    "caseNumber": 1072,
+    "label": "Isle of Dogs: Isle of Dogs",
+    "explanation": "Two exact-title movies have close runtimes (101 and 90 minutes). Popularity no longer breaks the tie."
+  },
+  {
+    "caseNumber": 1101,
+    "label": "The Boss Baby: The Boss Baby",
+    "explanation": "No year is supplied and the local 86.45-minute file differs from the 97-minute record by more than the relaxed 10% runtime tolerance."
+  }
+]

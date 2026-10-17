@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Catalog response shapes and predictable failures. No network or application state.
 function validImdbID(value) {
   return typeof value === 'string' && /^tt\d+$/.test(value.trim());
@@ -61,9 +62,9 @@ function requestFailure(response) {
 
 function episodeResponseMatches(data, seriesID, season, episode) {
   return data && data.Response === 'True' && data.Type === 'episode' &&
-    data.imdbID && normalizeEpisodeNumber(data.Season) === season &&
+    CatalogIdentity.recordKey(data) && normalizeEpisodeNumber(data.Season) === season &&
     normalizeEpisodeNumber(data.Episode) === episode &&
-    (!data.seriesID || data.seriesID === seriesID);
+    (!CatalogIdentity.parentKey(data) || CatalogIdentity.matchesParent(data,seriesID));
 }
 
 module.exports = {validImdbID, validSeriesImdbID, normalizeEpisodeNumber, isNotFoundResponse, isTooManyResultsResponse, predictableFailure, requestFailure, episodeResponseMatches};

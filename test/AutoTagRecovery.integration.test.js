@@ -83,9 +83,9 @@ async function runBatch(responder, options={}) {
 }
 
 suite.test('the real loop retries early ambiguity once, saves the final result and counts each file once', async () => {
-  const r=await runBatch((v,o)=>v.episode==='1'&&!o.seriesImdbID?ambiguous():accepted(v));
+  const r=await runBatch((v,o)=>v.episode==='1'&&!o.seriesID?ambiguous():accepted(v));
   assert.strictEqual(r.requests.length,4);
-  assert.strictEqual(r.requests[3].options.seriesImdbID,PARENT);
+  assert.strictEqual(r.requests[3].options.seriesID,PARENT);
   const session = r.requests[0].options.seriesSearchSession;
   assert(session && session.queries instanceof Map);
   assert(r.requests.every(request=>request.options.seriesSearchSession===session),
@@ -106,7 +106,7 @@ suite.test('the real loop retries early ambiguity once, saves the final result a
 });
 
 suite.test('a failed retry saves its final reason without inflating success counts or looping', async () => {
-  const r=await runBatch((v,o)=>v.episode==='1'?(o.seriesImdbID?
+  const r=await runBatch((v,o)=>v.episode==='1'?(o.seriesID?
     {status:'unmatched',failure:'Episode mismatch',reason:{code:'episode-mismatch',message:'Different episode part numbers'}}:ambiguous()):accepted(v));
   assert.strictEqual(r.requests.length,4);
   assert.strictEqual(r.result.statistics.Success,2);
@@ -123,7 +123,7 @@ suite.test('a failed retry saves its final reason without inflating success coun
 });
 
 suite.test('a service error during recovery clears the earlier permanent-attempt flag', async () => {
-  const r=await runBatch((v,o)=>v.episode==='1'?(o.seriesImdbID?
+  const r=await runBatch((v,o)=>v.episode==='1'?(o.seriesID?
     {status:'service-error',retryable:true,failure:'Error',reason:{code:'network-error'}}:ambiguous()):accepted(v));
   const saved=r.saves.flat().filter(v=>v.id==='video-1').pop();
   assert.strictEqual(saved.autotag_tried,false);

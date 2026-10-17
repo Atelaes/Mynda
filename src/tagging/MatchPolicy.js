@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 // Automatic acceptance policy. Discovery supplies records and observations;
 // this module decides whether that evidence permits a match. No requests,
 // caches, library writes or artwork downloads belong here.
@@ -58,7 +59,7 @@ function evaluateEpisodeOrder({anchors, record, evidence}) {
   if (anchors.some(anchor => anchor.localSeason !== anchor.catalogSeason || anchor.localEpisode !== anchor.catalogEpisode)) {
     return reject('Named files in this season use different catalog numbering; this numbered-only file needs verification');
   }
-  if (anchors.some(anchor => anchor.id === record.imdbID && anchor.localEpisode !== String(evidence.requested.episode))) {
+  if (anchors.some(anchor => anchor.id === CatalogIdentity.recordKey(record) && anchor.localEpisode !== String(evidence.requested.episode))) {
     return reject('This catalog episode is independently identified at a different local position');
   }
   const structure=evidence.parentEvidence && evidence.parentEvidence.support && evidence.parentEvidence.support.structure;
@@ -88,13 +89,13 @@ function decide(proposal, context = {}, options = {}) {
   const evidence = Evidence.forMatch(video,record,detail,{...context,recordSelectionSource:options.recordSelectionSource});
   const reject = (message,code='identity-mismatch') => Decision.decision('unmatched',
     {code,message},evidence,{failure:detail.kind === 'movie' ? 'No results' : 'Episode mismatch'});
-  if (!record || record.Response !== 'True' || !validImdbID(record.imdbID) ||
+  if (!record || record.Response !== 'True' || !CatalogIdentity.recordKey(record) ||
       typeof record.Title !== 'string' || !record.Title.trim() || !['movie','series','episode'].includes(record.Type)) {
     return Decision.decision('service-error',
       {code:'malformed-catalog-record',message:'The catalog did not supply a valid identity'},evidence,{failure:'Error'});
   }
   if (detail.kind === 'explicit-id') {
-    if (record.imdbID !== String(detail.requestedID || '').trim()) return reject('The catalog returned a different IMDb identity than requested');
+    if (!CatalogIdentity.matchesRecord(record,detail.requestedID)) return reject('The catalog returned a different catalog identity than requested');
   } else if (detail.kind === 'movie') {
     const assessment = evaluateMovie(record,detail.candidate,video,detail.validationOptions || {});
     evidence.movieAssessment = assessment;

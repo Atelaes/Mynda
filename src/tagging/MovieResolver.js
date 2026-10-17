@@ -1,3 +1,4 @@
+const CatalogIdentity = require('./CatalogIdentity');
 const Response = require('./CatalogResponse');
 const {isNotFoundResponse, isTooManyResultsResponse, predictableFailure, requestFailure} = Response;
 
@@ -40,7 +41,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
     // case another query exposes the real movie.
     async function trySearchChoice(result, candidate, validationOptions, stage) {
       let fetched = await fetchGeneralVideoResult(
-        result.imdbID, context, fullResultCache, stage
+        CatalogIdentity.recordKey(result), context, fullResultCache, stage
       );
       if (!fetched.success) {
         // A lightweight row can outlive its full catalog record. Treat that one row
@@ -66,9 +67,9 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
     // The limit is per result group, not global: an ambiguous early filename
     // interpretation must not consume the probes needed by a later, cleaner
     // parent-folder or spelling variant. The shared full-result cache prevents
-    // duplicate requests when groups contain the same IMDb IDs.
+    // duplicate requests when groups contain the same catalog IDs.
     async function tryAmbiguousChoices(results, candidate, validationOptions, stage) {
-      let uniqueResults = Array.from(new Map(results.map(result => [result.imdbID, result])).values());
+      let uniqueResults = Array.from(new Map(results.map(result => [CatalogIdentity.recordKey(result), result])).values());
       if (uniqueResults.length < 2) return {};
       if (uniqueResults.length > MAX_AMBIGUOUS_DETAIL_PROBES) {
         log.debug('Movie result tier exceeded the bounded detail-probe limit', {
@@ -77,7 +78,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           candidate: candidate,
           resultCount: uniqueResults.length,
           maximumDetailProbes: MAX_AMBIGUOUS_DETAIL_PROBES,
-          consideredImdbIDs: uniqueResults.map(result => result.imdbID)
+          consideredRecordIDs: uniqueResults.map(result => CatalogIdentity.recordKey(result))
         });
         return {unresolvedAmbiguity: true, plausibleCount: null};
       }
@@ -86,7 +87,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
       const evaluations = new Map();
       for (let result of uniqueResults) {
         let fetched = await fetchGeneralVideoResult(
-          result.imdbID, context, fullResultCache, `${stage} candidate detail`
+          CatalogIdentity.recordKey(result), context, fullResultCache, `${stage} candidate detail`
         );
         if (!fetched.success) {
           if (fetched.failure === 'No results') continue;
@@ -97,18 +98,18 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           fetched.data, candidate, video, validationOptions
         );
         logFullMovieEvaluation(context, candidate, fetched.data, evaluation, stage);
-        if (evaluation.confident) { plausible.push(fetched.data); evaluations.set(fetched.data.imdbID,evaluation); }
+        if (evaluation.confident) { plausible.push(fetched.data); evaluations.set(CatalogIdentity.recordKey(fetched.data),evaluation); }
       }
 
       if (plausible.length === 1) {
         log.debug('Runtime evidence resolved otherwise ambiguous movie results', {
           searchID: context.searchID,
           candidate: candidate,
-          selectedImdbID: plausible[0].imdbID,
-          consideredImdbIDs: uniqueResults.map(result => result.imdbID)
+          selectedRecordID: CatalogIdentity.recordKey(plausible[0]),
+          consideredRecordIDs: uniqueResults.map(result => CatalogIdentity.recordKey(result))
         });
         return {
-          terminalResult: Decision.candidate(video, plausible[0], {kind:'movie', candidate, evaluation:evaluations.get(plausible[0].imdbID), validationOptions, stage})
+          terminalResult: Decision.candidate(video, plausible[0], {kind:'movie', candidate, evaluation:evaluations.get(CatalogIdentity.recordKey(plausible[0])), validationOptions, stage})
         };
       }
       if (plausible.length > 1) {
@@ -116,7 +117,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           searchID: context.searchID,
           stage: stage,
           candidate: candidate,
-          plausibleImdbIDs: plausible.map(result => result.imdbID)
+          plausibleRecordIDs: plausible.map(result => CatalogIdentity.recordKey(result))
         });
       }
       return {
@@ -132,7 +133,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
     // otherwise manageable exact-title group.
     async function tryResultTier(results, candidate, validationOptions, stage) {
       let uniqueResults = Array.from(new Map(
-        (results || []).map(result => [result.imdbID, result])
+        (results || []).map(result => [CatalogIdentity.recordKey(result), result])
       ).values());
       if (uniqueResults.length === 0) return {};
       if (uniqueResults.length === 1) {
@@ -178,7 +179,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           response.data.Search, candidate, video, validationOptions
         );
         for (let result of evaluation.rankedResults) {
-          if (!choicesByID.has(result.imdbID)) choicesByID.set(result.imdbID, result);
+          if (!choicesByID.has(CatalogIdentity.recordKey(result))) choicesByID.set(CatalogIdentity.recordKey(result), result);
         }
         log.debug('Evaluated conservative movie tagging results', {
           searchID: context.searchID,
@@ -193,7 +194,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           exactResultCount: evaluation.exactResults.length,
           articleResultCount: evaluation.articleResults.length,
           canonicalResultCount: evaluation.canonicalResults.length,
-          selectedImdbID: evaluation.confident && evaluation.confident.imdbID
+          selectedRecordID: evaluation.confident && CatalogIdentity.recordKey(evaluation.confident)
         });
 
         // During the query phase, only exact normalized titles may finish the
@@ -267,7 +268,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
         };
       }
       if (response.data && response.data.Response === 'True') {
-        if (response.data.imdbID) fullResultCache.set(response.data.imdbID, response.data);
+        if (CatalogIdentity.recordKey(response.data)) fullResultCache.set(CatalogIdentity.recordKey(response.data), response.data);
         let validationOptions = {allowCanonicalTitle: false};
         let evaluation = MatchPolicy.evaluateMovie(
           response.data, candidate, video, validationOptions
@@ -383,8 +384,8 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           };
         }
         if (exactResponse.data && exactResponse.data.Response === 'True') {
-          if (exactResponse.data.imdbID) {
-            fullResultCache.set(exactResponse.data.imdbID, exactResponse.data);
+          if (CatalogIdentity.recordKey(exactResponse.data)) {
+            fullResultCache.set(CatalogIdentity.recordKey(exactResponse.data), exactResponse.data);
           }
           let exactValidationOptions = {
             allowCanonicalTitle: true,
@@ -412,8 +413,8 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
               stage: 'cleaned exact-title lookup article-only tier'
             });
           }
-          if (exactResponse.data.imdbID && !choicesByID.has(exactResponse.data.imdbID)) {
-            choicesByID.set(exactResponse.data.imdbID, exactResponse.data);
+          if (CatalogIdentity.recordKey(exactResponse.data) && !choicesByID.has(CatalogIdentity.recordKey(exactResponse.data))) {
+            choicesByID.set(CatalogIdentity.recordKey(exactResponse.data), exactResponse.data);
           }
         } else if (isTooManyResultsResponse(exactResponse.data)) {
           sawAmbiguousResponse = true;
@@ -441,7 +442,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
       // The primary parsed title gets one bounded year-relaxed retry. A one-year
       // discrepancy retains the established behavior. A two/three-year result
       // is eligible only for an exact normalized title; full validation then
-      // additionally requires a close runtime and meaningful IMDb vote history.
+      // additionally requires a close comparable runtime.
       if (plan.candidateIndex === 0 && candidate.year && titleRequestCount < MAX_TITLE_REQUESTS) {
         let relaxedResult = await runBroadSearch(
           requestCandidate,
@@ -577,28 +578,28 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
     return predictableFailure('No results', 'The catalog found no safely matching title');
   }
 
-  async function fetchGeneralVideoResult(imdbID, context, cache, stage) {
-    if (cache.has(imdbID)) return {success: true, data: cache.get(imdbID)};
+  async function fetchGeneralVideoResult(recordID, context, cache, stage) {
+    if (cache.has(recordID)) return {success: true, data: cache.get(recordID)};
 
     let response;
     try {
-      response = await requestCatalog(createCatalogQuery({id: imdbID}), {...context,
+      response = await requestCatalog(createCatalogQuery({id: recordID}), {...context,
         searchID: context.searchID,
-        stage: stage || 'selected movie IMDb-ID lookup'
+        stage: stage || 'selected movie record lookup'
       });
     } catch(err) {
       return {success: false, failure: 'Error', data: err};
     }
     let failure = requestFailure(response);
     if (failure) return failure;
-    if (!response.data || response.data.imdbID !== imdbID) {
+    if (!response.data || !CatalogIdentity.matchesRecord(response.data,recordID)) {
       return {
         success: false,
         failure: 'Error',
-        data: 'The catalog returned a different record than the selected IMDb ID'
+        data: 'The catalog returned a different record than the selected catalog identity'
       };
     }
-    cache.set(imdbID, response.data);
+    cache.set(recordID, response.data);
     return {success: true, data: response.data};
   }
 
@@ -607,7 +608,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
       searchID: context.searchID,
       stage: stage,
       candidate: candidate,
-      imdbID: catalogData && catalogData.imdbID,
+      recordID: catalogData && CatalogIdentity.recordKey(catalogData),
       catalogTitle: catalogData && catalogData.Title,
       catalogYear: catalogData && catalogData.Year,
       accepted: evaluation.confident,

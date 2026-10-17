@@ -40,7 +40,7 @@ suite.test((storageOnly?'saves access':'activates from the UI')+', restarts with
     const stage=path.join(directory,'app'),data=path.join(directory,'data');
     fs.mkdirSync(stage);fs.mkdirSync(data);
     const include=new FileMatcher(root,stage,value=>value,require('../../package.json').build.files).createFilter();
-    for(const name of ['src/tagging/MetadataCredentials.js','src/tagging/MetadataServerConfig.js','src/tagging/MetadataServerClient.js',
+    for(const name of ['src/tagging/CatalogIdentity.js','src/tagging/MetadataCredentials.js','src/tagging/MetadataServerConfig.js','src/tagging/MetadataServerClient.js',
       'src/tagging/CapacityWait.js','src/platform/FeatureAccess.js','src/main/RendererBridge.js','src/preload/generated/preload.js']) {
       assert(include(path.join(root,name),fs.statSync(path.join(root,name))));
       fs.mkdirSync(path.dirname(path.join(stage,name)),{recursive:true});fs.copyFileSync(path.join(root,name),path.join(stage,name));
