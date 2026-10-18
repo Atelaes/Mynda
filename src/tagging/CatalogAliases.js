@@ -23,7 +23,6 @@ const SERIAL_TITLE_RULES = [{
   seriesKeys:['drwho','doctorwho'],
   replacements:[
     [/\s*\[(?:missing|anim)\]\s*$/i, ''],
-    [/^.+?\s+Pt\.?\s+\d+\s+(.+)$/i, '$1'],
     [/\s+Pt\.?\s+(\d+)$/i, ': Episode $1']
   ]
 }];

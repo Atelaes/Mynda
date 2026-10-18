@@ -1,6 +1,7 @@
 const CatalogIdentity = require('./CatalogIdentity');
 const path = require('path');
 const {fold} = require('./TitleNormalization');
+const CatalogTitles = require('./CatalogTitles');
 
 // Movie filenames commonly append a release description after the real title.
 // Once one of these tokens appears, everything after it is useful to a media
@@ -527,7 +528,9 @@ function deriveCandidates(value, source, explicitYear) {
     if (!candidate || !titleKey(candidate)) return;
     if (!preservesStructuralMarker(candidate, structuralMarker)) return;
     if (!candidates.some(existing => titleKey(existing.title) === titleKey(candidate))) {
-      candidates.push({title: candidate, year: year.year, source: source, reason: reason});
+      candidates.push({title: candidate, year: year.year, source: source, reason: reason,
+        ...(reason === 'before dash suffix' && (/\s[-–—]\s\d+(?:\.\d+)?\s[-–—]\s/.test(title) ||
+          /\b\w*edit(?:ion)?\b|\bdespecialized\b/i.test(title)) ? {identityTitle:cleanDisplayText(title)} : {})});
     }
   }
 
@@ -622,6 +625,14 @@ function buildSearchCandidates(video) {
   let fromParent = (!titleWasEdited && filenameStructuralMarker) ||
     isGenericParent(parent) || parentLooksLikeCollection(parent) ? [] :
     deriveCandidates(parent, 'parent folder', explicitYear);
+  // A descriptive child title may be a featurette inside a film folder. The
+  // enclosing movie is useful for discovery, but cannot replace that identity.
+  const childTitle = (fromEditedTitle[0] || fromFilename[0]);
+  if (childTitle && !childTitle.year && !candidateLooksOpaque(childTitle)) {
+    fromParent = fromParent.map(candidate => !candidate.year && !titleMatchKind(childTitle.title,candidate.title) &&
+      !canonicalTitleMatches(childTitle.title,candidate.title) ?
+      {...candidate,identityTitle:childTitle.title} : candidate);
+  }
 
   // An unnumbered folder such as "Franchise - Subtitle" can contribute the
   // shorter trailing title after the complete filename query fails. If that
@@ -691,7 +702,8 @@ function titleMatchKind(candidateTitle, resultTitle, options = {}) {
 }
 
 function scoreResult(result, candidate, video, options = {}) {
-  let matchKind = titleMatchKind(candidate.title, result.Title, options);
+  const matchingAlias = CatalogTitles.names(result).find(name => titleMatchKind(candidate.title,name) === 'exact');
+  let matchKind = matchingAlias ? 'exact' : titleMatchKind(candidate.title, result.Title, options);
   let candidateYear = validYear(candidate.year);
   let resultYear = firstResultYear(result.Year);
   let yearDifference = candidateYear && resultYear ?
@@ -710,7 +722,8 @@ function scoreResult(result, candidate, video, options = {}) {
     candidateYear: candidateYear,
     resultYear: resultYear,
     yearDifference: yearDifference,
-    compatibleType: compatibleType
+    compatibleType: compatibleType,
+    matchedTitle:matchingAlias || result.Title
   };
 }
 
@@ -874,6 +887,8 @@ function evaluateFullResult(result, candidate, video, options = {}) {
     confident: titleYearConfident && plausibility.plausible,
     titleYearConfident: titleYearConfident,
     matchKind: scored.matchKind,
+    matchedTitle: scored.matchedTitle,
+    providerAlias: scored.matchedTitle !== result.Title ? scored.matchedTitle : null,
     yearDifference: scored.yearDifference,
     plausibility: plausibility,
     reasons: reasons

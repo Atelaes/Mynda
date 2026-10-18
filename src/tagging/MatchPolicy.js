@@ -9,9 +9,21 @@ const Decision = require('./TaggingDecision');
 const {validImdbID,episodeResponseMatches} = require('./CatalogResponse');
 const {scopeFor} = require('./SeriesCollection');
 const Numbering = require('./EpisodeNumbering');
+const CatalogTitles = require('./CatalogTitles');
 
 function evaluateMovie(record, candidate, video, options) {
   const evaluation = MovieSearch.evaluateFullResult(record, candidate, video, options);
+  const refuse = (policyReason,reason) => ({...evaluation,confident:false,policyReason,
+    reasons:[...evaluation.reasons,reason]});
+  if (candidate.identityTitle && !CatalogTitles.names(record).some(name =>
+      MovieSearch.titleKey(name) === MovieSearch.titleKey(candidate.identityTitle))) {
+    return refuse('discarded-movie-title','The shortened query or parent folder does not verify the complete file title');
+  }
+  if (evaluation.yearDifference >= 2) return refuse('unverified-release-year',
+    'A two-or-more-year discrepancy needs independent release evidence or a manual selection');
+  if (MovieSearch.titleKey(candidate.title).length <= 3 && !evaluation.plausibility.catalogRuntimeMinutes) {
+    return refuse('unverified-short-title','A very short movie title needs catalog runtime evidence before automatic selection');
+  }
   if (evaluation.confident && evaluation.matchKind === 'canonical') {
     // Token containment plus a similar year/runtime cannot establish an
     // alternate title. A catalog alias must be evidence, never an inference
@@ -49,7 +61,7 @@ function evaluateEpisode({localTitle, record, titleAssessment, runtimeAssessment
   return {accepted:true};
 }
 
-function evaluateEpisodeOrder({anchors, record, evidence}) {
+function evaluateEpisodeOrder({anchors, record, evidence, conflicts = []}) {
   if (evidence.localTitle) return {accepted:true, basis:'individual-title'};
   const support = Evidence.copy(anchors);
   const reject = reason => ({accepted:false, reason, policyReason:'unverified-episode-order',support});
@@ -72,6 +84,10 @@ function evaluateEpisodeOrder({anchors, record, evidence}) {
       local.positions.every((ep,i)=>ep===i) && !anchors.some(anchor=>Number(anchor.localEpisode)>0)) {
     return {...reject('This release numbers a complete season from zero while the catalog starts at one; verify episode alignment'),
       numberingEvidence:{local:local.positions,catalog:season.positions,basis:'different-numbering-origin'}};
+  }
+  if (conflicts.length && !anchors.some(anchor=>Number(anchor.localEpisode)>0 && anchor.localEpisode===anchor.catalogEpisode)) {
+    return {...reject('This release includes episode zero, which is absent from the complete catalog season; verify the numbering before tagging numbered-only files'),
+      conflicts:Evidence.copy(conflicts),numberingEvidence:{basis:'different-numbering-origin'}};
   }
   const verified = new Set(anchors.map(anchor => anchor.id)).size >= 2 &&
     new Set(anchors.map(anchor => anchor.localEpisode)).size >= 2;
@@ -123,9 +139,12 @@ function decide(proposal, context = {}, options = {}) {
       confidentSeries:Boolean(detail.parentEvidence && detail.parentEvidence.confident),
       remoteTitle:EpisodeMatch.usefulEpisodeTitle(record.Title)});
     if (!assessment.accepted) return reject(assessment.reason,assessment.policyReason || 'episode-mismatch');
+    const previous = video.taggingDecision && video.taggingDecision.evidence;
+    const retainedConflicts = previous && previous.seriesID === detail.seriesID &&
+      JSON.stringify(previous.original) === JSON.stringify(Evidence.snapshot(video)) ? previous.orderAssessment?.conflicts || [] : [];
     const order = numbering ? {accepted:true,basis:'sibling-numbering',support:numbering.support} : options.recordSelectionSource === 'user' ?
       {accepted:true,basis:'user-confirmed-record',support:[]} :
-      evaluateEpisodeOrder({anchors:options.anchors || [],record,evidence});
+      evaluateEpisodeOrder({anchors:options.anchors || [],conflicts:[...retainedConflicts,...(options.orderConflicts || [])],record,evidence});
     evidence.orderAssessment = order;
     if (!order.accepted) return reject(order.reason,order.policyReason);
   } else return reject('The candidate has no recognized source of identity evidence');

@@ -66,6 +66,25 @@ async function withServer(responder, operation) {
   }
 }
 
+suite.test('provider aliases survive HTTP translation and final movie acceptance', async () => {
+  const data = record({ref:{provider:'tvdb',id:'movie:1'},externalIds:{},title:'Appleseed α',aliases:['Appleseed Alpha'],
+    year:{text:'2014',start:2014,end:null},runtimeMinutes:90,artwork:[],ratings:[],votes:[],
+    provenance:{provider:'tvdb',fetchedAt:'2026-10-18T00:00:00.000Z'}});
+  await withServer(()=>({data}),async client=>{
+    const result = await engine(client).tag({id:'alias',kind:'movie',filename:'/Movies/Appleseed Alpha (2014).mkv',
+      title:'Appleseed Alpha',year:'2014',metadata:{duration:90*60}});
+    assert.strictEqual(result.status,'matched',JSON.stringify(result));
+    assert.strictEqual(result.video.title,'Appleseed α');
+    assert.strictEqual(result.evidence.movieAssessment.providerAlias,'Appleseed Alpha');
+  });
+});
+
+suite.test('malformed provider aliases fail validation', async () => {
+  await withServer(()=>({data:record({aliases:[{name:'Not a normalized alias'}]})}),async client=>{
+    await assert.rejects(()=>client.requestCatalog(client.createCatalogQuery({id:'tt0034583'})),{code:'METADATA_INVALID_RESPONSE'});
+  });
+});
+
 suite.test('all five operations send authenticated POSTs with the intended filters and preserve metadata fields', async () => {
   const parent = 'tt4574334';
   await withServer((route, body) => ({data:route === '/v1/search' ? search([record()], {page:body.page, totalResults:31, hasMore:true}) :

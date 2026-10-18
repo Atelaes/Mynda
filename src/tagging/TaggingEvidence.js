@@ -73,7 +73,7 @@ function envelope(video, detail = {}, context = {}) {
     seriesID:context.selectedSeriesID,
     parentEvidence:selectedParent(video,context.selectedSeriesID,context)
   } : {};
-  return {...retained, version:85, schemaVersion:2, original:copy(original),...selected,
+  return {...retained, version:86, schemaVersion:2, original:copy(original),...selected,
     input:snapshot(video), ...copy(detail),
     ...(refreshing && prior ? {kind:prior.kind, lookup:copy(detail)} : {}),
     ...(context.correctionChecks && context.correctionChecks.length ? {correctionChecks:copy(context.correctionChecks)} : {}),
@@ -116,7 +116,7 @@ function markUserEdit(video, changes) {
   if(fields.includes('seriesImdbID'))video={...video,catalogSeriesRef:null};
   if (!fields.length) return video;
   const replacing = fields.includes('imdbID') && video.taggingEvidence && video.taggingEvidence.imdbID !== changes.imdbID;
-  const evidence = copy(!replacing && video.taggingEvidence || {version:85,schemaVersion:2,original:snapshot(video)});
+  const evidence = copy(!replacing && video.taggingEvidence || {version:86,schemaVersion:2,original:snapshot(video)});
   evidence.identities = evidence.identities || {};
   for (const field of fields) {
     const name = field === 'imdbID' ? 'record' : 'series';
@@ -128,7 +128,7 @@ function markUserEdit(video, changes) {
 }
 
 function assignParent(video,seriesID,parentEvidence) {
-  const prior = copy(video.taggingEvidence || {version:85,schemaVersion:2,original:snapshot(video)});
+  const prior = copy(video.taggingEvidence || {version:86,schemaVersion:2,original:snapshot(video)});
   return {...video,...CatalogIdentity.parentFields(seriesID),taggingEvidence:{...prior,seriesID,parentEvidence:copy(parentEvidence),
     identities:{...prior.identities,series:{value:seriesID,origin:parentEvidence.origin,basis:parentEvidence.basis}}}};
 }

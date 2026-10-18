@@ -16,7 +16,7 @@ const sorted = anchors => copy(anchors).sort((a,b) => {
 });
 
 function createEvidence(videos = [], savedVideos = []) {
-  const collections = new Map(), directories = new Map();
+  const collections = new Map(), directories = new Map(), orderConflicts = new Map();
   // Only provider-supplied cross-references can bridge an old IMDb-only library
   // to native IDs. Conflicting cross-references remain separate identities.
   const aliases = new Map();
@@ -52,6 +52,14 @@ function createEvidence(videos = [], savedVideos = []) {
   }
 
   function observe(video, result) {
+    const conflict = result && result.evidence && result.evidence.numberingConflict;
+    const conflictScope = scopeFor(video);
+    if (conflict && conflictScope && conflict.basis === 'catalog-has-no-episode-zero' &&
+        Match.assessEpisodeTitle(video.title,'Episode #0.0',video.series).state !== 'contradiction') {
+      const key = JSON.stringify([conflictScope.directoryKey,normalizeEpisodeNumber(video.season)]);
+      if (!orderConflicts.has(key)) orderConflicts.set(key,[]);
+      orderConflicts.get(key).push({...copy(conflict),videoID:video.id,localEpisode:'0'});
+    }
     if (!result || result.status !== 'matched') return;
     const tagged = result.video, detail = result.evidence;
     const scope = scopeFor(video);
@@ -132,6 +140,16 @@ function createEvidence(videos = [], savedVideos = []) {
     return sorted(normalized((directories.get(directoryKey(video)) || [])
       .filter(anchor => anchor.localSeason === normalizeEpisodeNumber(evidence.requested.season)),evidence.seriesID));
   }
+  function orderConflictsFor(video,result) {
+    const detail = result.candidate.evidence;
+    if (detail.kind !== 'episode') return [];
+    const key = JSON.stringify([directoryKey(video),normalizeEpisodeNumber(detail.requested.season)]);
+    const scope = scopeFor(video), group = scope && collections.get(scope.key);
+    const positions = new Set((group && group.members || []).filter(member=>directoryKey(member)===directoryKey(video) &&
+      normalizeEpisodeNumber(member.season)===normalizeEpisodeNumber(detail.requested.season)).map(member=>normalizeEpisodeNumber(member.episode)));
+    return copy((orderConflicts.get(key) || []).filter(item=>canonical(item.seriesID) === canonical(detail.seriesID) &&
+      !item.catalogPositions.every(position=>positions.has(position))));
+  }
   function structureGroups(pending) {
     const groups=new Map();
     for (const item of pending) {
@@ -164,7 +182,7 @@ function createEvidence(videos = [], savedVideos = []) {
     const parentEvidence=sorted(assessment.support);
     return {assessment,parentEvidence};
   }
-  return {observe,parentFor,anchorsFor,structureGroups,numberingFor};
+  return {observe,parentFor,anchorsFor,orderConflictsFor,structureGroups,numberingFor};
 }
 
 function canRetry(result) {

@@ -131,7 +131,8 @@ function correctionDetails(e) {
       probed:{season:object(r.parameters).season ?? object(r.parameters).Season,
         episode:object(r.parameters).episode ?? object(r.parameters).Episode},
       outcome:r.outcome === 'not-found' ? 'not-found' : 'legacy-response'}));
-  const names={'nearby-episode':'Nearby episode','adjacent-season':'Adjacent season','sibling-numbering':'Sibling-supported numbering'};
+  const names={'nearby-episode':'Nearby episode','adjacent-season':'Adjacent season','sibling-numbering':'Sibling-supported numbering',
+    'season-title':'Complete-season title lookup'};
   const outcomes={
     'not-found':'No episode record was found.',
     'title-mismatch':'A record was returned, but its title did not pass the exact comparison. No correction was selected from this probe.',
@@ -234,6 +235,7 @@ function buildTaggingReport(video) {
     runtime.omdbMinutes || plausibility.omdbRuntimeMinutes);
   if (localRuntime || catalogRuntime) fact('Runtime', `File: ${localRuntime || 'unknown'}; Catalog: ${catalogRuntime || 'unknown'}.`);
   if (movie.matchKind) fact('Movie title check', {exact:'Exact title agreement.',fuzzy:'Fuzzy title agreement.',canonical:'Expanded or alternate title considered.'}[movie.matchKind] || 'Title comparison recorded.');
+  if (movie.providerAlias) fact('Provider alternate title', movie.providerAlias);
   if (movie.yearDifference != null) fact('Movie year check', Number(movie.yearDifference) === 0 ? 'The years agreed.' : `${text(movie.yearDifference)} year difference recorded.`);
   if (array(movie.reasons).length) fact('Movie checks', movie.reasons.map(message).filter(Boolean).join('; '));
 

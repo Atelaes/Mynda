@@ -1,4 +1,5 @@
 const CatalogIdentity = require('./CatalogIdentity');
+const CatalogTitles = require('./CatalogTitles');
 // Fallback discovery only. Queries may change spelling/presentation; a result
 // must still equal the full requested title or an explicitly reviewed alias.
 // Never use this module to rewrite stored tags or to relax episode validation.
@@ -75,9 +76,9 @@ function buildQueries(parts) {
 function candidateRejection(query, candidate) {
   if (!candidate || candidate.Type !== 'series' || !CatalogIdentity.recordKey(candidate)) return 'not a series record';
   if (query.year && !String(candidate.Year || '').startsWith(String(query.year))) return 'different requested premiere year';
-  if (query.imdbID && candidate.imdbID !== query.imdbID) return 'different reviewed alias identity';
+  if (query.imdbID && candidate.imdbID && candidate.imdbID !== query.imdbID) return 'different reviewed alias identity';
   if (query.aliasYear && !String(candidate.Year || '').startsWith(query.aliasYear)) return 'different reviewed alias year';
-  if (!query.identityTitles.some(title => titleKey(title) === titleKey(candidate.Title))) return 'different full series title';
+  if (!query.identityTitles.some(title => CatalogTitles.names(candidate).some(name=>titleKey(title) === titleKey(name)))) return 'different full series title';
   return null;
 }
 
@@ -87,7 +88,8 @@ function regionRejection(parts, candidate) {
   const title = titleKey(cleanSeriesInput(parts).title);
   const alias = ALIASES.find(item => item.titles && item.names.some(name => titleKey(name) === title));
   if (!alias) return null;
-  return candidate.imdbID === alias.imdbID && String(candidate.Year || '').startsWith(alias.year) ?
+  return (!candidate.imdbID || candidate.imdbID === alias.imdbID) && String(candidate.Year || '').startsWith(alias.year) &&
+    CatalogTitles.names(candidate).some(name=>[...alias.names,...alias.titles].some(title=>titleKey(name)===titleKey(title))) ?
     null : 'different explicitly requested region';
 }
 

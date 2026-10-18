@@ -14,6 +14,7 @@ const {episodeTitlesMatch} = EpisodeMatch;
 function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchShowEpisode}) {
 
   async function disambiguateSeriesByEpisode(candidates, season, episode, localTitle, context, video) {
+    if (!localTitle || candidates.length > SeriesSearch.MAX_CANDIDATES) return {success:false,candidates};
     let episodeMatches = [];
     for (let candidate of candidates) {
       let response = await requestCatalog(createCatalogQuery({
@@ -369,12 +370,27 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           continue;
         }
 
+        const found = [...(Array.isArray(response.data.Search) ? response.data.Search : [])];
+        let more = response.data.catalogHasMore === true || Number(response.data.totalResults) > 10;
+        for (let page=2;more && page<=SeriesSearch.MAX_PAGES;page++) {
+          response = await requestSeriesCatalog({title:queryTitle,year:searchParts.year,type:'series',page},context,
+            {stage:'series search continuation'});
+          const pageFailure = requestFailure(response);
+          if (pageFailure) {
+            if (pageFailure.failure !== 'No results') return pageFailure;
+            break;
+          }
+          found.push(...(Array.isArray(response.data.Search) ? response.data.Search : []));
+          more = response.data.catalogHasMore === true || Number(response.data.totalResults) > page*10;
+        }
+
         let currentMatches = matchingSeriesResults(
           searchParts.title,
           searchParts.year,
-          (Array.isArray(response.data.Search) ? response.data.Search : []).filter(candidate =>
+          [...new Map(found.map(candidate=>[CatalogIdentity.recordKey(candidate),candidate])).values()].filter(candidate =>
             !SeriesSearch.regionRejection(searchParts, candidate))
         );
+        if (more && currentMatches.candidates.length) return ambiguousSeriesFailure(series,currentMatches.candidates);
         if (query.terminalAcronym && currentMatches.matchStrength === 'fuzzy') {
           // The prefix query is intentionally broader than the stored title.
           // Never let its mere containment create a new fuzzy match (for example,

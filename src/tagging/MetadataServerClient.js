@@ -47,6 +47,8 @@ function summary(data) {
       typeof data.title !== 'string' || !data.title.trim() ||
       !['movie', 'series', 'episode'].includes(data.kind) || !Array.isArray(data.artwork)) return invalid();
   const ref = reference(data.ref);
+  if (data.aliases !== undefined && (!Array.isArray(data.aliases) ||
+      data.aliases.some(name => typeof name !== 'string' || !name.trim()))) return invalid();
   if (data.year !== null && (!object(data.year) || typeof data.year.text !== 'string' ||
       ![data.year.start, data.year.end].every(value => value === null || integer(value)))) return invalid();
   const poster = data.artwork.find(item => object(item) && item.type === 'poster');
@@ -58,7 +60,8 @@ function summary(data) {
     posterURL = url.href;
   }
   return {Title: data.title, Type: data.kind, Year: data.year === null ? 'N/A' : data.year.text,
-    imdbID: data.externalIds.imdb || '', Poster: posterURL, catalogRef: ref};
+    imdbID: data.externalIds.imdb || '', Poster: posterURL, catalogRef: ref,
+    ...(data.aliases === undefined ? {} : {catalogAliases:[...new Set(data.aliases)]})};
 }
 function record(data) {
   const result = {Response: 'True', ...summary(data)};

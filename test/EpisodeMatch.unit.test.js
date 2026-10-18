@@ -193,7 +193,8 @@ suite.test('keeps numerical titles and short acronym titles as evidence without 
 });
 
 suite.test('normalizes structured Doctor Who titles while preserving parts, edits, and clips', () => {
-  assert.strictEqual(Match.usefulEpisodeTitle('The Daleks Pt 1 The Dead Planet', 'Dr Who'), 'The Dead Planet');
+  assert.strictEqual(Match.usefulEpisodeTitle('The Daleks Pt 1 The Dead Planet', 'Dr Who'), 'The Daleks Pt 1 The Dead Planet');
+  assert(Match.episodeTitlesMatch('The Daleks Pt 1 The Dead Planet','The Dead Planet','Dr Who'));
   assert.strictEqual(Match.usefulEpisodeTitle('The Smugglers Pt 2 [missing]', 'Doctor Who'), 'The Smugglers: Episode 2');
   assert.strictEqual(state('The Smugglers Pt 2 [missing]', 'The Smugglers: Episode 3', 'Dr Who'), 'contradiction');
   assert.strictEqual(Match.usefulEpisodeTitle('Story Pt 2 Specific Title', 'Another Show'), 'Story Pt 2 Specific Title');

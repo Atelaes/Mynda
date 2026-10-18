@@ -241,3 +241,39 @@ mirror a provider database. Native-only test fixtures exercise the groundwork
 without provider credentials or live requests. Reviewed aliases that explicitly
 name an IMDb identity still require that cross-reference; they do not silently
 apply to an unrelated native-only record.
+
+## TVDB matching update (evidence version 86)
+
+The server may include `aliases` in search and record responses. Mynda keeps
+these as `catalogAliases` while matching and records the actual matched alias
+in the saved report. Older servers and OMDb may omit them. Search-row names may
+be combined with a full record only when their native identities agree.
+
+Series discovery compares numeric spellings, provider aliases and unqualified
+versus region/year-qualified peers before choosing a parent. It checks up to
+three search pages; a still-incomplete result set cannot establish uniqueness.
+Explicit years and regions remain constraints. A filename acronym qualified by
+a matching, dated folder can retain a specific series branch (for example,
+S.A.C. / Stand Alone Complex), without rewriting the editable series tag.
+
+Exact title recovery can search a complete season after the nearby-number
+window fails. The title must be unique in that list, and the full episode must
+confirm the same native identity, parent, season and position. Partial or
+ambiguous lists do not authorize a correction. The local numbering stays as
+entered; the saved report records the catalog position.
+
+Serial title comparisons retain the story and part number, including explicit
+`Pt N` and catalog `(N)` formats. A missing catalog episode zero can flag a
+numbering-origin conflict for numbered-only siblings in the same physical
+release and season. A complete ordinary local season or a directly verified
+positive position can establish alignment. Other seasons/releases stay separate.
+
+Movie safeguards reject unsafe franchise-prefix and descriptive child-to-parent
+fallbacks, two-or-more-year discrepancies without independent release evidence,
+and very short titles without a catalog runtime. These cases remain available
+for review. Popularity/vote counts are still not used as identity evidence.
+
+Combined/split files remain subject to the existing coverage check. This update
+does not add multi-episode library records, change TVDB's default season order,
+or silently alter already-tagged videos. Fresh tests or explicit retries are
+needed to assess the new behavior against a real library.

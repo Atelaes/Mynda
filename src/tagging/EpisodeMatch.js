@@ -45,6 +45,15 @@ function comparableEpisodeTitle(title) {
     return number === null ? whole : ` part ${number}`;
   };
 
+  // Serial releases put the part before the chapter, while catalogs often put
+  // it after: "Story Pt 4 The Firemaker" / "Story: The Firemaker (4)".
+  // Move only an explicit part label; retain its value and every title word.
+  normalized = normalized.replace(/^(.+?)\s+(?:part|pt)\.?\s*(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3}|iv|v|vi{0,3}|ix|x)\s+(.+)$/i,
+    (whole,story,part,chapter) => {
+      const number = normalizePartNumber(part);
+      return number === null ? whole : `${story}: ${chapter} part ${number}`;
+    });
+
   normalized = normalized.replace(
     /\s*(?:[:\-–—]\s*)?(?:part|pt)\.?\s*(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3}|iv|v|vi{0,3}|ix|x)\s*$/i,
     replacePartSuffix
@@ -136,6 +145,27 @@ function episodeTitleComparison(localTitle, catalogTitle, series = '') {
   const detail=annotations.normalized ? {annotations} : {};
   if (annotations.conflicts.length) return {matched:false,title:localTitle,...detail};
   if (strictEpisodeTitlesMatch(localTitle,catalogTitle)) return {matched:true,title:localTitle,basis:'exact-normalized-title',...detail};
+  const serialPart = value => {
+    const text = String(value || '');
+    const explicit = text.match(/^(.+?)(?:\s+(?:part|pt)\.?\s+|\s*:\s*Episode\s+)(\d{1,2})(?:\s+(.+))?$/i);
+    if (explicit) return {story:explicit[1],part:Number(explicit[2]),chapter:explicit[3] || null};
+    const suffix = text.match(/^(.+?)\s*\((\d{1,2})\)$/);
+    if (!suffix) return null;
+    const split = suffix[1].split(/:\s+/);
+    return {story:split[0],part:Number(suffix[2]),chapter:split.length>1 ? split.slice(1).join(': ') : null};
+  };
+  const a = serialPart(localTitle), b = serialPart(catalogTitle);
+  const storyKey = title => comparableEpisodeTitle(title.replace(/^(?:the|a|an)\s+/i,''));
+  if (a && b && a.part > 0 && b.part > 0 && storyKey(a.story) === storyKey(b.story)) {
+    if (a.part !== b.part) return {matched:false,title:localTitle,partConflict:true,...detail};
+    if (!a.chapter || !b.chapter || strictEpisodeTitlesMatch(a.chapter,b.chapter)) return {
+      matched:true,title:localTitle,basis:'serial-story-and-part',...detail};
+  }
+  // Older catalogs sometimes contain only the chapter, without the serial or
+  // its part label. Preserve the complete local title for other comparisons.
+  const serial = String(localTitle || '').match(/^.+?\s+(?:part|pt)\.?\s+\d{1,2}\s+(.+)$/i);
+  if (serial && strictEpisodeTitlesMatch(serial[1],catalogTitle)) return {
+    matched:true,title:serial[1],basis:'serial-chapter-title',...detail};
   if (annotations.normalized && strictEpisodeTitlesMatch(annotations.local.core,annotations.catalog.core)) {
     return {matched:true,title:annotations.local.core,basis:'catalog-title-annotation',...detail};
   }
@@ -249,6 +279,7 @@ function assessEpisodeTitle(localTitle, suppliedTitle, series = '') {
   const result = (state, reason) => ({state, reason,...(annotations ? {annotations} : {}),...(prefix ? {
     originalTitle:original,comparedTitle:prefix.title,normalization:prefix.basis
   } : annotations ? {originalTitle:original,comparedTitle:core,normalization:'catalog-title-annotation'} : {})});
+  if (comparison.partConflict) return result('contradiction','different episode part numbers');
   if (annotations && annotations.conflicts.length) return result('contradiction','different explicit episode-title annotations');
   // An introduction/bonus label is positive contrary evidence, even when the
   // returned regular episode has only a placeholder title. Exact matching bonus

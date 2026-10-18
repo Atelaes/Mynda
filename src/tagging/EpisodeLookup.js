@@ -2,6 +2,7 @@ const CatalogIdentity = require('./CatalogIdentity');
 // Shared direct lookup and season-list/record-ID fallback for every episode path.
 const {validImdbID,normalizeEpisodeNumber,requestFailure,episodeResponseMatches} = require('./CatalogResponse');
 const {summarizeCatalogResponse} = require('./TaggingDiagnostics');
+const {episodeTitlesMatch} = require('./EpisodeMatch');
 function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
   function seasonEpisodeIndexKey(seriesID, season) {
     return `${seriesID}|${season}`;
@@ -52,6 +53,7 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
     }
 
     const episodeIndex = new Map();
+    episodeIndex.titles = new Map();
     const ambiguousEpisodes = new Set();
     let unusableEntries = 0;
     for (const listedEpisode of seasonData.Episodes) {
@@ -71,7 +73,10 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
         continue;
       }
       episodeIndex.set(listedNumber, listedRecordID);
+      episodeIndex.titles.set(listedNumber,listedEpisode.Title);
     }
+    episodeIndex.complete = !unusableEntries && !ambiguousEpisodes.size &&
+      seasonData.catalogCompleteness !== 'partial' && seasonData.catalogCompleteness !== 'unknown';
 
     seasonEpisodeIndexCache.set(cacheKey, episodeIndex);
     log.debug('Cached catalog season episode index for fallback', {
@@ -100,7 +105,8 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
         season: season,
         episode: episode
       });
-      return {success: false};
+      return {success: false, ...(episode === '0' && indexResult.data.complete && indexResult.data.has('1') ?
+        {numberingConflict:{basis:'catalog-has-no-episode-zero',seriesID,season,catalogPositions:[...indexResult.data.keys()]}} : {})};
     }
 
     const response = await requestCatalog(createCatalogQuery({id: episodeRecordID}), {...context,
@@ -145,6 +151,20 @@ function createEpisodeLookup({log,requestCatalog,createCatalogQuery}) {
     if (indexed.success) return {...indexed,via:'season-list'};
     return {...indexed,success:false,requestFailure:indexed.requestFailure || failure,via:'season-list'};
   }
-  return {lookup};
+  async function findByTitle(seriesID, season, title, context) {
+    const index = await getSeasonEpisodeIndex(seriesID,season,context);
+    if (!index.success) return index;
+    // An incomplete list cannot prove that a title occurs only once. Full
+    // records must independently confirm the selected parent and position.
+    if (!index.data.complete || !index.data.titles) return {success:false};
+    const series = context.originalInput && context.originalInput.series;
+    const matches = [...index.data].filter(([number])=>episodeTitlesMatch(title,index.data.titles.get(number),series));
+    if (matches.length !== 1) return {success:false};
+    const number = matches[0][0];
+    const result = await findEpisodeViaSeasonIndex(seriesID,season,number,context);
+    if (!result.success || !episodeTitlesMatch(title,result.data.Title,series)) return {...result,success:false};
+    return {...result,episode:number,via:'complete-season-title'};
+  }
+  return {lookup,findByTitle};
 }
 module.exports = {createEpisodeLookup};

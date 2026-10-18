@@ -131,7 +131,8 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     }
     async function finish(video,result) {
       checkLookup();
-      const finished = result.status === 'candidate' ? await catalog.applyMatch(result,{anchors:ledger.anchorsFor(video,result)}) : result;
+      const finished = result.status === 'candidate' ? await catalog.applyMatch(result,{
+        anchors:ledger.anchorsFor(video,result),orderConflicts:ledger.orderConflictsFor(video,result)}) : result;
       checkLookup();
       return finished;
     }
@@ -145,6 +146,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       const disposition = result.status === 'matched' ? 'Success' : result.failure || result.reason.code;
       outcomes.set(index,disposition);
       statistics[disposition] = (statistics[disposition] || 0) + 1;
+      ledger.observe(video,result);
       if (retry && result.status === 'matched') {
         const counter=retry === 'numbering' ? 'recoveredNumberingRetries' : 'recoveredSeriesRetries';
         statistics[counter]=(statistics[counter] || 0)+1;
@@ -154,7 +156,6 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         tagged.autotag_tried = true;
         if (preferences.remove_autotagged_from_new) tagged.new = false;
         delete tagged.taggingDecision;
-        ledger.observe(video,result);
         batchSave.push(tagged);
       } else {
         const parentID = parent ? parent.seriesID : sharedID;

@@ -1,4 +1,5 @@
 const CatalogIdentity = require('./CatalogIdentity');
+const CatalogTitles = require('./CatalogTitles');
 // Pure interpretation of series labels and episode identifiers.
 
 const EpisodeMatch = require('./EpisodeMatch');
@@ -58,6 +59,26 @@ function extractSeriesFolderYear(filename, seriesTitle) {
 function seriesSearchPartsForVideo(video) {
   let series = video && typeof video.series === 'string' ? video.series.trim() : '';
   let searchParts = extractSeriesSearchParts(series);
+  // A filename can explicitly qualify a broad editable series label. Expand
+  // an acronym only when an actual dated folder spells out the same initials.
+  // Never borrow an unrelated folder's title/year or discard the qualifier.
+  const components = String(video && video.filename || '').split(/[\\/]+/);
+  const basename = components[components.length-1] || '';
+  const marker = /\bs\d+[\s._-]*e\d+\b/i.exec(basename);
+  const prefix = marker && basename.slice(0,marker.index).replace(/[\s._-]+$/,'');
+  const qualified = prefix && prefix.match(/^(.+?)\s*\(([A-Za-z. ]{3,12})\)$/);
+  if (qualified && comparableSeriesTitle(qualified[1]) === comparableSeriesTitle(searchParts.title)) {
+    const acronym = qualified[2].replace(/[^a-z]/gi,'').toLowerCase();
+    for (const folder of components.slice(0,-1).reverse()) {
+      const dated = folder.match(/^(.*?)\s*\(((?:19|20)\d{2})(?:[-–—](?:\d{2}|(?:19|20)\d{2}))?\)\s*$/);
+      if (!dated) continue;
+      const name = dated[1].replace(/^[a-z0-9]{1,3}\.\s+/i,'').trim();
+      const initials = (name.match(/[a-z0-9]+/gi) || []).map(word=>word[0]).join('').toLowerCase();
+      if (acronym.length >= 3 && initials === acronym && (!searchParts.year || searchParts.year === dated[2])) {
+        return {title:`${searchParts.title}: ${name}`,year:searchParts.year || dated[2],yearSource:'qualified series folder'};
+      }
+    }
+  }
   searchParts.yearSource = searchParts.year ? 'series field' : null;
   if (!searchParts.year) {
     searchParts.year = extractSeriesFolderYear(video && video.filename, searchParts.title);
@@ -200,19 +221,25 @@ function matchingSeriesResults(requestedTitle, requestedYear, results) {
       seriesYearMatches(requestedYear, result.Year);
   });
 
-  let exact = eligible.filter(result => {
-    return comparableSeriesTitle(requestedTitle) === comparableSeriesTitle(result.Title);
-  });
+  const equivalent = name => {
+    const numbers = {zero:'0',one:'1',two:'2',three:'3',four:'4',five:'5',six:'6',seven:'7',eight:'8',nine:'9',ten:'10'};
+    return comparableSeriesTitle(String(name).replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi,word=>numbers[word.toLowerCase()]));
+  };
+  // An unqualified display title must not hide remakes/region-qualified titles
+  // or a provider's equivalent alias. Keep these peers for episode/season proof.
+  const requested = equivalent(requestedTitle);
+  let exact = eligible.filter(result => CatalogTitles.names(result).some(name =>
+    equivalent(name) === requested || equivalent(name.replace(/\s*\((?:US|UK|AU|CA|(?:19|20)\d{2})\)\s*$/i,'')) === requested));
   if (exact.length > 0) {
     return {matchStrength: 'exact', candidates: exact};
   }
 
-  let acronym = eligible.filter(result => seriesAcronymMatches(requestedTitle, result.Title));
+  let acronym = eligible.filter(result => CatalogTitles.names(result).some(name=>seriesAcronymMatches(requestedTitle, name)));
   if (acronym.length > 0) {
     return {matchStrength: 'acronym', candidates: acronym};
   }
 
-  let fuzzy = eligible.filter(result => seriesTitlesMatch(requestedTitle, result.Title, true));
+  let fuzzy = eligible.filter(result => CatalogTitles.names(result).some(name=>seriesTitlesMatch(requestedTitle, name, true)));
   return {matchStrength: 'fuzzy', candidates: fuzzy};
 }
 
@@ -224,6 +251,7 @@ function makeSeriesChoice(result) {
     Year: result.Year,
     imdbID: result.imdbID,
     catalogRef: CatalogIdentity.native(result.catalogRef),
+    ...(result.catalogAliases ? {catalogAliases:result.catalogAliases.slice()} : {}),
     myndaChoiceType: 'series'
   };
 }

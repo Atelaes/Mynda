@@ -14,7 +14,7 @@ const Evidence = require('./TaggingEvidence');
 const Limits = require('./TaggingLimits');
 const Numbering = require('./EpisodeNumbering');
 function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolveSeries, withEpisodeDuration}) {
-  const {lookup} = require('./EpisodeLookup').createEpisodeLookup({log,requestCatalog,createCatalogQuery});
+  const {lookup,findByTitle} = require('./EpisodeLookup').createEpisodeLookup({log,requestCatalog,createCatalogQuery});
   // These observations survive both rejected discovery and accepted proposals.
   // The report distinguishes finding a candidate from actually applying it.
   async function probe(seriesID, requested, probed, localTitle, context, kind) {
@@ -94,7 +94,15 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
       // the whole existing nearby window before using that core to renumber.
       if (matches.length === 1 && !matches[0].annotations) return accept(matches[0]);
     }
-    return matches.length === 1 ? accept(matches[0]) : {success:false};
+    if (matches.length === 1) return accept(matches[0]);
+    const fullSeason = await findByTitle(seriesID,season,localTitle,context);
+    if (fullSeason.success) {
+      (context.correctionChecks || (context.correctionChecks=[])).push({kind:'season-title',seriesID,
+        requested:{season,episode},probed:{season,episode:fullSeason.episode},
+        recordID:CatalogIdentity.recordKey(fullSeason.data),catalogTitle:fullSeason.data.Title,
+        via:fullSeason.via,outcome:'selected'});
+    }
+    return fullSeason;
   }
 
   function seasonOffsetHintFor(hints, seriesID) {
@@ -319,6 +327,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
       let matchedSeason = seriesResult.matchedSeason || season;
       let matchedEpisode = seriesResult.matchedEpisode || episode;
       let lookupFailure = null;
+      let numberingConflict;
       let numberingMapping;
 
       // A learned offset only orders the adjacent probes after direct lookup
@@ -341,6 +350,7 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
       if (!episodeData) {
         const found=await lookup(seriesID,season,episode,context);
         lookupFailure=found.requestFailure;
+        numberingConflict=found.numberingConflict;
         if (found.success) episodeData=found.data;
       }
 
@@ -385,7 +395,8 @@ function createEpisodeResolver({log, requestCatalog, createCatalogQuery, resolve
           }
         }
         if (!episodeData) {
-          return lookupFailure;
+          return {...lookupFailure,evidence:{seriesID,requested:{season,episode},
+            ...(numberingConflict ? {numberingConflict} : {})}};
         }
       }
 

@@ -1,0 +1,200 @@
+{
+  "source": "TVDB run 02: previously unverified serial titles (original tags and returned catalog titles)",
+  "cases": [
+    {
+      "series": "Dr Who",
+      "local": "An Unearthly Child Pt 4 The Firemaker",
+      "catalog": "An Unearthly Child: The Firemaker (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks Pt 2 The Survivors",
+      "catalog": "The Daleks: The Survivors (2)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks Pt 3 The Escape",
+      "catalog": "The Daleks: The Escape (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks Pt 4 The Ambush",
+      "catalog": "The Daleks: The Ambush (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks Pt 5 The Expedition",
+      "catalog": "The Daleks: The Expedition (5)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks Pt 6 The Ordeal",
+      "catalog": "The Daleks: The Ordeal (6)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks Pt 7 The Rescue",
+      "catalog": "The Daleks: The Rescue (7)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Edge of Destruction Pt 1",
+      "catalog": "The Edge of Destruction: The Edge of Destruction (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Keys of Marinus Pt 6",
+      "catalog": "The Keys of Marinus: The Keys of Marinus (6)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Sensorites Pt 5 Kidnap",
+      "catalog": "The Sensorites: Kidnap (5)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "Planet of Giants Pt 3 Crisis",
+      "catalog": "Planet of Giants: Crisis (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Dalek Invasion of Earth Pt 2 The Daleks",
+      "catalog": "The Dalek Invasion of Earth: The Daleks (2)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Dalek Invasion of Earth Pt 6 Flashpoint",
+      "catalog": "The Dalek Invasion of Earth: Flashpoint (6)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Romans Pt 3 Conspiracy",
+      "catalog": "The Romans: Conspiracy (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Romans Pt 4 Inferno",
+      "catalog": "The Romans: Inferno (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Web Planet Pt 1",
+      "catalog": "The Web Planet: The Web Planet (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Web Planet Pt 2 The Zarbi",
+      "catalog": "The Web Planet: The Zarbi (2)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Web Planet Pt 5 Invasion",
+      "catalog": "The Web Planet: Invasion (5)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Web Planet Pt 6 The Centre",
+      "catalog": "The Web Planet: The Centre (6)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Crusade Pt 1 The Lion",
+      "catalog": "The Crusade: The Lion (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Crusade Pt 4 The Warlords [missing]",
+      "catalog": "The Crusade: The Warlords (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Space Museum Pt 1",
+      "catalog": "The Space Museum: The Space Museum (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Space Museum Pt 3 The Search",
+      "catalog": "The Space Museum: The Search (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Chase Pt 1 The Executioners",
+      "catalog": "The Chase: The Executioners (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Time Meddler Pt 1 The Watcher",
+      "catalog": "The Time Meddler: The Watcher (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Time Meddler Pt 4 Checkmate",
+      "catalog": "The Time Meddler: Checkmate (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks' Master Plan Pt 4 The Traitors [missing]",
+      "catalog": "The Daleks' Master Plan: The Traitors (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Daleks' Master Plan Pt 8 Volcano [missing]",
+      "catalog": "The Daleks' Master Plan: Volcano (8)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Ark Pt 2 The Plague",
+      "catalog": "The Ark: The Plague (2)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Ark Pt 3 The Return",
+      "catalog": "The Ark: The Return (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Ark Pt 4 The Bomb",
+      "catalog": "The Ark: The Bomb (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Celestial Toymaker Pt 1 [missing]",
+      "catalog": "The Celestial Toymaker: The Celestial Toyroom (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "Gunfighters Pt 4 The OK Corral",
+      "catalog": "The Gunfighters: The O. K. Corral (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Savages Pt 1 [missing]",
+      "catalog": "The Savages (1)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Savages Pt 2 [missing]",
+      "catalog": "The Savages (2)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Savages Pt 3 [missing]",
+      "catalog": "The Savages (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Savages Pt 4 [missing]",
+      "catalog": "The Savages (4)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Smugglers Pt 3 [missing]",
+      "catalog": "The Smugglers (3)"
+    },
+    {
+      "series": "Dr Who",
+      "local": "The Smugglers Pt 4 [missing]",
+      "catalog": "The Smugglers (4)"
+    }
+  ]
+}

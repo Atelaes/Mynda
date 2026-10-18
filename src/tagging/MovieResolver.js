@@ -6,6 +6,7 @@ const Identity = require('./SeriesIdentity');
 const {andAmpersandTitleAlternates} = Identity;
 
 const MovieSearch = require('./MovieSearch');
+const CatalogTitles = require('./CatalogTitles');
 
 const MatchPolicy = require('./MatchPolicy');
 const Decision = require('./TaggingDecision');
@@ -50,6 +51,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
         return fetched.failure === 'No results' ? {} : {terminalResult: fetched};
       }
 
+      fetched.data = CatalogTitles.merge(fetched.data,result);
       let evaluation = MatchPolicy.evaluateMovie(
         fetched.data, candidate, video, validationOptions
       );
@@ -94,6 +96,7 @@ function createMovieResolver({log, requestCatalog, createCatalogQuery}) {
           return {terminalResult: fetched};
         }
 
+        fetched.data = CatalogTitles.merge(fetched.data,result);
         let evaluation = MatchPolicy.evaluateMovie(
           fetched.data, candidate, video, validationOptions
         );
