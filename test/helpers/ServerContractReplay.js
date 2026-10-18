@@ -28,7 +28,15 @@ Module._load = function(request, parent, isMain) {
         url.searchParams.delete('r');
         if (config.data.page === undefined && url.searchParams.get('page') === '1') url.searchParams.delete('page');
         const raw = await fixtureAxios({url:url.href});
-        return Response.json(raw.data);
+        // These old response SUMMARIES omitted pagination. Model their saved
+        // rows as an explicitly finite fixture result set so this test remains
+        // a normalization/matching replay. This synthetic total is NOT captured
+        // OMDb evidence or a claim about live search completeness. Real unknown
+        // pagination is tested separately and must remain unresolved when the
+        // episode/collection evidence cannot establish a parent.
+        const data = raw.data;
+        return Response.json(data && data.Response === 'True' && Array.isArray(data.Search) && data.totalResults == null ?
+          {...data,totalResults:String((Number(url.searchParams.get('page') || 1)-1)*10+data.Search.length)} : data);
       }});
       const response = await handleRequest(new Request(config.url, {
         method:config.method, headers:config.headers, body:JSON.stringify(config.data),

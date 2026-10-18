@@ -107,6 +107,15 @@ function assess(profile,observations) {
     if (candidate.contradictions.length || candidate.titleConflicts.length ||
         candidate.supported.length !== profile.seasons.length ||
         (profile.inferredSeason && candidate.totalSeasons !== 1)) continue;
+    const fullSeasons=candidate.exactCounts.filter(season=>{
+      const local=profile.seasons.find(item=>item.season===season);
+      return local.positions.length===local.maxEpisode && local.positions.every((ep,i)=>ep===i+1);
+    });
+    // Unseen search hits cannot be eliminated by comparing only the visible
+    // candidates. Require independent positive evidence: two completely
+    // represented seasons whose catalog totals both agree, with valid metadata.
+    if (profile.searchIncomplete && (fullSeasons.length < 2 || candidate.metadataStatus !== 'verified' ||
+        candidate.seasons.some(item=>item.invalid))) continue;
     const comparisons=[];
     for (const other of candidates.filter(item=>item.seriesID!==candidate.seriesID)) {
       if (other.contradictions.length) {
@@ -138,10 +147,13 @@ function assess(profile,observations) {
       if (!distinguishing.length && positive.length) comparisons.push({alternative:other.seriesID,
         basis:'positive-season-count',seasons:positive,alternativeIncomplete:true});
     }
-    if (candidates.length > 1 && comparisons.length === candidates.length-1) proposed.push({seriesID:candidate.seriesID,comparisons});
+    if ((candidates.length > 1 && comparisons.length === candidates.length-1) ||
+        (profile.searchIncomplete && candidates.length === 1)) proposed.push({seriesID:candidate.seriesID,
+      comparisons, ...(profile.searchIncomplete ? {verifiedFullSeasons:fullSeasons} : {})});
   }
   const choice=proposed.length === 1 ? proposed[0] : null;
   return {selectedID:choice && choice.seriesID,basis:choice?'season-structure':'ambiguous-season-structure',
-    profile,candidates,comparisons:choice?choice.comparisons:[]};
+    profile,candidates,comparisons:choice?choice.comparisons:[],
+    ...(choice && choice.verifiedFullSeasons ? {verifiedFullSeasons:choice.verifiedFullSeasons} : {})};
 }
 module.exports = {number,regularPosition,profileFor,eligibleChoice,seasonEvidence,assess};

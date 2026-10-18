@@ -101,7 +101,7 @@ suite.test('two independently named same-season files support one bounded ambigu
   const recovered = run.saved.get('s1e1');
   assert.strictEqual(recovered.imdbID,records[0].imdbID);
   assert.strictEqual(recovered.taggingEvidence.orderAssessment.basis,'consistent-named-siblings');
-  assert.strictEqual(recovered.taggingEvidence.version,86);
+  assert.strictEqual(recovered.taggingEvidence.version,87);
 });
 
 suite.test('one named neighbor cannot make unique-parent cache order change the result',async () => {

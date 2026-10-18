@@ -523,4 +523,30 @@ suite.test('partial and unknown season lists cannot establish complete episode c
   assert.strictEqual(assess({...season,catalogCompleteness:'complete'},1,'fixture:series:1').count,2);
 });
 
+suite.test('complete-title proof survives the actual decoder with all competing rows',async()=>{
+  const data=nativeRecord({ref:nativeRef('series:1'),kind:'series',title:'Test Series'});
+  data.titleSearch={query:'Test Series',complete:true,items:[data,{...data,ref:nativeRef('series:2'),title:'Test Series (US)'}].map(row=>({...row}))};
+  await withServer(()=>({data}),async client=>{
+    const result=(await client.requestCatalog({exactTitle:'Test Series',type:'series'})).data;
+    assert.strictEqual(result.catalogTitleSearch.complete,true);
+    assert.strictEqual(result.catalogTitleSearch.items.length,2);
+    assert.deepStrictEqual(result.catalogTitleSearch.items[1].catalogRef,nativeRef('series:2'));
+  });
+});
+suite.test('the decoder rejects incomplete, duplicate, unrelated or mismatched complete-title proof',async()=>{
+  const data=nativeRecord({ref:nativeRef('series:1'),kind:'series',title:'Test Series'});
+  const good={query:'Test Series',complete:true,items:[data]};
+  const bad=[{...good,query:'Other'},{...good,complete:false},{...good,items:[]},
+    {...good,items:[data,data]}, {...good,items:[{...data,kind:'movie'}]},
+    {...good,items:[{...data,ref:{provider:'other',id:'series:1'}}]},
+    {...good,items:[{...data,ref:nativeRef('series:2')}]},
+    {...good,items:Array.from({length:101},(_,i)=>({...data,ref:nativeRef('series:'+i)}))}];
+  for(const titleSearch of bad) await withServer(()=>({data:{...data,titleSearch}}),async client=>{
+    await assert.rejects(client.requestCatalog({exactTitle:'Test Series',type:'series'}),{code:'METADATA_INVALID_RESPONSE'});
+  });
+  await withServer(()=>({data:{...data,titleSearch:good}}),async client=>{
+    await assert.rejects(client.requestCatalog({id:'fixture:series:1'}),{code:'METADATA_INVALID_RESPONSE'});
+  });
+});
+
 runSuite(suite);

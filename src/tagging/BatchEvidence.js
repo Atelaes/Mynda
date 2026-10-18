@@ -153,7 +153,8 @@ function createEvidence(videos = [], savedVideos = []) {
   function structureGroups(pending) {
     const groups=new Map();
     for (const item of pending) {
-      if (item.parent || !canRetry(item.result) || !Array.isArray(item.result.choices) || item.result.choices.length < 2) continue;
+      if (item.parent || !canRetry(item.result) || !Array.isArray(item.result.choices) || !item.result.choices.length ||
+          (item.result.choices.length < 2 && item.result.reason.code !== 'series-search-incomplete')) continue;
       const scope=scopeFor(item.video), group=scope && collections.get(scope.key);
       // Counts cannot overrule conflicting independently named episodes or
       // contradict explicit declarations, including failed input records.
@@ -187,6 +188,6 @@ function createEvidence(videos = [], savedVideos = []) {
 
 function canRetry(result) {
   return result && ['ambiguous','unmatched'].includes(result.status) && result.reason &&
-    ['ambiguous-series','unconfirmed-series'].includes(result.reason.code);
+    ['ambiguous-series','unconfirmed-series','series-search-incomplete'].includes(result.reason.code);
 }
 module.exports = {createEvidence,directoryKey,canRetry};

@@ -13,7 +13,8 @@ async function planRecovery({pending,ledger,catalog,session,budgets,canContinue}
     // Keep every discovered alternative in view. Counts cannot override a
     // narrower choice list supported by any episode's title evidence.
     const choices=[...new Map(ordered.flatMap(item=>item.result.choices).map(choice=>[CatalogIdentity.recordKey(choice),choice])).values()];
-    const profile={...group.profile,choiceConstraints:ordered.filter(item=>item.result.choices.length < choices.length)
+    const profile={...group.profile,searchIncomplete:ordered.some(item=>item.result.reason.code === 'series-search-incomplete'),
+      choiceConstraints:ordered.filter(item=>item.result.choices.length < choices.length)
       .map(item=>({videoID:item.video.id,title:item.video.title,candidates:item.result.choices.map(choice=>CatalogIdentity.recordKey(choice))}))};
     const result=await catalog.resolveSeriesStructure(profile,choices,{
       seriesSearchSession:session,requestBudget:budgets[ordered[0].index],canContinue});

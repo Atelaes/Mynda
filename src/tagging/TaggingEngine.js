@@ -120,7 +120,8 @@ function createTaggingEngine({client,applier,log,withEpisodeDuration}) {
     const profile=raw.choiceType === 'series' && raw.choices && profileFor(videos);
     if (profile) {
       let structural;
-      try { structural=await structure({...profile,choiceConstraints:raw.seriesChoiceConstraints || []},raw.choices,context); }
+      try { structural=await structure({...profile,searchIncomplete:raw.policyReason === 'series-search-incomplete',
+        choiceConstraints:raw.seriesChoiceConstraints || []},raw.choices,context); }
       catch(error) { structural={failure:{failure:'Error',data:error}}; }
       if (structural.status === 'parent-resolved') return structural;
       if (structural.failure) raw=structural.failure;

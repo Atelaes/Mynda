@@ -73,7 +73,7 @@ function envelope(video, detail = {}, context = {}) {
     seriesID:context.selectedSeriesID,
     parentEvidence:selectedParent(video,context.selectedSeriesID,context)
   } : {};
-  return {...retained, version:86, schemaVersion:2, original:copy(original),...selected,
+  return {...retained, version:87, schemaVersion:2, original:copy(original),...selected,
     input:snapshot(video), ...copy(detail),
     ...(refreshing && prior ? {kind:prior.kind, lookup:copy(detail)} : {}),
     ...(context.correctionChecks && context.correctionChecks.length ? {correctionChecks:copy(context.correctionChecks)} : {}),

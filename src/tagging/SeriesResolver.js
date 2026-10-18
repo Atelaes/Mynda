@@ -118,7 +118,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     }
     const failure = requestFailure(response);
     const data = response && response.data;
-    const cacheable = failure ? failure.failure === 'No results' :
+    const cacheable = failure ? ['No results','Ambiguous results'].includes(failure.failure) :
       data && (Array.isArray(data.Search) || (data.Type === 'series' && CatalogIdentity.valid(CatalogIdentity.recordKey(data))));
     if (session) {
       if (cacheable) session.queries.set(key, true);
@@ -131,6 +131,54 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
         .slice(0, 10).map(row => ({title:row.Title, year:row.Year, type:row.Type, recordID:CatalogIdentity.recordKey(row)}))
     });
     return response;
+  }
+
+  async function verifyBoundedSearch(candidates, query, filter, video, season, episode, localTitle, context, discovery) {
+    const search = {complete:false,query:query.title,...discovery};
+    // A provider may explicitly attest that /title examined the complete
+    // result set. Keep all those rows: qualified/numeric/alias peers must not
+    // disappear merely because only one has the exact display name.
+    if (candidates.length === 1) {
+      const response = await requestSeriesCatalog({series:query.title,year:query.year,type:'series'},context,
+        {stage:'bounded series search complete-title check'});
+      const failure = requestFailure(response);
+      if (failure && !['No results','Ambiguous results'].includes(failure.failure)) return failure;
+      const data = response && response.data;
+      if (!failure && data.catalogTitleSearch?.complete && data.catalogTitleSearch.query === query.title) {
+        candidates = filter([...candidates,...data.catalogTitleSearch.items,data]);
+        search.complete = true;
+        search.reason = 'complete-title-search';
+        if (candidates.length === 1 && CatalogIdentity.recordKey(candidates[0]) === CatalogIdentity.recordKey(data)) {
+          return {success:true,data:CatalogIdentity.recordKey(data),confidentSeries:Boolean(query.year),
+            parentEvidence:{basis:'complete-title-search',confident:Boolean(query.year),search}};
+        }
+      }
+    }
+    // A bounded discovery list can propose a parent. An independently named
+    // episode can establish it without declaring the broad search exhaustive.
+    // "Pilot" is shared by many unrelated series. It is useful when comparing
+    // a complete candidate set, but cannot identify a parent with unseen peers.
+    const distinctiveTitle = localTitle && !/^pilot(?:\s*(?:episode|part)?\s*\d+)?$/i.test(localTitle.trim());
+    if ((search.complete || distinctiveTitle) && localTitle && candidates.length && candidates.length <= SeriesSearch.MAX_CANDIDATES) {
+      const verified = await disambiguateSeriesByEpisode(candidates,season,episode,localTitle,context,video);
+      if (verified.requestFailure) return verified.requestFailure;
+      if (verified.success) return {success:true,data:CatalogIdentity.recordKey(verified.candidate),confidentSeries:true,
+        episodeData:verified.episodeData,matchedSeason:verified.matchedSeason,matchedEpisode:verified.matchedEpisode,
+        parentEvidence:{basis:'verified-episode-title',confident:true,search}};
+      candidates = verified.candidates;
+    }
+    if (candidates.length === 1 && query.year) {
+      const response = await requestSeriesCatalog({id:CatalogIdentity.recordKey(candidates[0])},context,
+        {stage:'bounded series search title-and-year check'});
+      const failure = requestFailure(response);
+      if (failure && failure.failure !== 'No results') return failure;
+      const verified = !failure && filter([response.data]);
+      if (verified && verified.length === 1 && CatalogIdentity.recordKey(verified[0]) === CatalogIdentity.recordKey(candidates[0]) &&
+          seriesYearMatches(query.year,response.data.Year)) return {
+        success:true,data:CatalogIdentity.recordKey(verified[0]),confidentSeries:true,
+        parentEvidence:{basis:'series-title-and-year',confident:true,search}};
+    }
+    return ambiguousSeriesFailure(video.series,candidates,search);
   }
 
   async function resolveSeries(video, season, episode, localTitle, context, options = {}) {
@@ -184,7 +232,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     let spent = 0;
     for (const query of queries) {
       const candidates = new Map();
-      let incomplete = false;
+      let incomplete = false, pages = 0, continuation;
       for (let page = 1; page <= SeriesSearch.MAX_PAGES && spent < SeriesSearch.MAX_REQUESTS; page++) {
         const parameters = {title:query.title, year:query.year, type:'series'};
         if (page > 1) parameters.page = page;
@@ -206,12 +254,17 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
         const trace = context.seriesTrace[context.seriesTrace.length-1];
         trace.evaluation = rows.slice(0,10).map(row => ({recordID:CatalogIdentity.recordKey(row),
           rejectedBecause:SeriesSearch.candidateRejection(query,row)}));
-        incomplete = Number(response.data.totalResults) > page * 10;
-        if (!incomplete) break;
+        pages = page;
+        continuation = SeriesSearch.hasMore(response.data,page);
+        incomplete = continuation !== false;
+        if (continuation !== true) break;
       }
       // Do not turn a bounded, incomplete result list into false uniqueness.
       if (incomplete && candidates.size && !query.imdbID) {
-        return ambiguousSeriesFailure(video.series, [...candidates.values()]);
+        return verifyBoundedSearch([...candidates.values()],query,
+          rows=>[...new Map(rows.filter(row=>!SeriesSearch.candidateRejection(query,row))
+            .map(row=>[CatalogIdentity.recordKey(row),row])).values()],video,season,episode,localTitle,context,
+          {pages,reason:continuation === null ? 'unknown-pagination' : spent >= SeriesSearch.MAX_REQUESTS ? 'request-limit' : 'page-limit'});
       }
       if (!candidates.size && spent < SeriesSearch.MAX_REQUESTS) {
         spent++;
@@ -371,8 +424,8 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
         }
 
         const found = [...(Array.isArray(response.data.Search) ? response.data.Search : [])];
-        let more = response.data.catalogHasMore === true || Number(response.data.totalResults) > 10;
-        for (let page=2;more && page<=SeriesSearch.MAX_PAGES;page++) {
+        let pages = 1, more = SeriesSearch.hasMore(response.data,1);
+        for (let page=2;more === true && page<=SeriesSearch.MAX_PAGES;page++) {
           response = await requestSeriesCatalog({title:queryTitle,year:searchParts.year,type:'series',page},context,
             {stage:'series search continuation'});
           const pageFailure = requestFailure(response);
@@ -381,7 +434,8 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
             break;
           }
           found.push(...(Array.isArray(response.data.Search) ? response.data.Search : []));
-          more = response.data.catalogHasMore === true || Number(response.data.totalResults) > page*10;
+          pages = page;
+          more = SeriesSearch.hasMore(response.data,page);
         }
 
         let currentMatches = matchingSeriesResults(
@@ -390,7 +444,16 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
           [...new Map(found.map(candidate=>[CatalogIdentity.recordKey(candidate),candidate])).values()].filter(candidate =>
             !SeriesSearch.regionRejection(searchParts, candidate))
         );
-        if (more && currentMatches.candidates.length) return ambiguousSeriesFailure(series,currentMatches.candidates);
+        if (more !== false && currentMatches.candidates.length && currentMatches.matchStrength !== 'fuzzy') {
+          return verifyBoundedSearch(currentMatches.candidates,{title:queryTitle,year:searchParts.year},
+            rows=>matchingSeriesResults(searchParts.title,searchParts.year,
+              [...new Map(rows.filter(row=>!SeriesSearch.regionRejection(searchParts,row))
+                .map(row=>[CatalogIdentity.recordKey(row),row])).values()]).candidates,
+            video,season,episode,localTitle,context,
+            {pages,reason:more === null ? 'unknown-pagination' : 'page-limit'});
+        }
+        if (more !== false && currentMatches.candidates.length) return ambiguousSeriesFailure(series,currentMatches.candidates,
+          {complete:false,query:queryTitle,pages,reason:more === null ? 'unknown-pagination' : 'page-limit'});
         if (query.terminalAcronym && currentMatches.matchStrength === 'fuzzy') {
           // The prefix query is intentionally broader than the stored title.
           // Never let its mere containment create a new fuzzy match (for example,

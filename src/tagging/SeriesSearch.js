@@ -107,5 +107,16 @@ function sessionSummary(session) {
     fallbackRequests:session.fallbackRequests, recoveredSeries:[...session.recovered.values()]};
 }
 
+// A reported total takes precedence over a stale next-link hint. When no
+// total is supplied, retain the provider's explicit continuation information.
+// Undefined supports older OMDb fixtures/servers without inventing more pages.
+function hasMore(data, page) {
+  const total = Number(data && data.totalResults);
+  if (data && data.totalResults != null && data.totalResults !== '' && Number.isSafeInteger(total) && total >= 0) {
+    return total > page * 10;
+  }
+  return data && data.catalogHasMore === null ? null : Boolean(data && data.catalogHasMore === true);
+}
+
 module.exports = {buildQueries, candidateRejection, regionRejection, cleanSeriesInput, titleKey, equivalentTitles,
-  createSession, sessionSummary, MAX_QUERIES, MAX_REQUESTS, MAX_PAGES, MAX_CANDIDATES};
+  createSession, sessionSummary, hasMore, MAX_QUERIES, MAX_REQUESTS, MAX_PAGES, MAX_CANDIDATES};

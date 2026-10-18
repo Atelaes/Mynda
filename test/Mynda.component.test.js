@@ -434,4 +434,97 @@ suite.test('renders all major application panes beneath the grid root', () => {
   });
 });
 
+// Keep the save debounce deterministic: these cases exercise the real root
+// coordinator and save notifications without sleeping or running Electron.
+function withBatchRefresh(operation) {
+  const originalSetTimeout = global.setTimeout, originalClearTimeout = global.clearTimeout;
+  let nextID = 0;
+  const pending = new Map();
+  global.setTimeout = (callback, delay) => {
+    assert.strictEqual(delay, 500);
+    pending.set(++nextID, callback);
+    return nextID;
+  };
+  global.clearTimeout = id => pending.delete(id);
+  try {
+    const data = makeLibrary();
+    data.settings.preferences.include_new_vids_in_playlists = true;
+    withOpenPlaylist(data, instance => {
+      instance.state.playlistRowManifest = data.media.map(video => ({
+        vidID: video.id, rowID: video.id, tableID: 'movies'
+      }));
+      instance.showDetails(['alien', 'arrival'], 'alien');
+      operation(instance, {
+        pending,
+        save(description, address = 'media') {
+          runtimeLibrary.media = runtimeLibrary.media.map(video => ({...video, description}));
+          savedPing.saved(address);
+        },
+        flush() {
+          const callbacks = [...pending.values()];
+          pending.clear();
+          callbacks.forEach(callback => callback());
+        }
+      });
+    });
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+}
+
+suite.test('a delayed batch save cannot replace a newly selected single-video editor', () => {
+  withBatchRefresh((instance, clock) => {
+    clock.save('Saved batch');
+    instance.handleSelectedRows('alien', 'alien', 'movies', true);
+    assert.strictEqual(instance.state.detailVideo.title, 'Alien');
+    clock.flush();
+    assert.strictEqual(instance.state.detailVideo.id, 'alien');
+    assert.strictEqual(paneProps(instance, 'editor').video.title, 'Alien');
+    assert.strictEqual(instance.state.batchVids, null);
+  });
+});
+
+suite.test('batch saves debounce to one refresh using the latest committed data', () => {
+  withBatchRefresh((instance, clock) => {
+    clock.save('First');
+    clock.save('Latest', 'media.0.description');
+    assert.strictEqual(clock.pending.size, 1);
+    // Visible selection can disappear as tables rebuild; the open batch is
+    // still authoritative and must refresh all its original members.
+    instance.state.selectedRows = {};
+    clock.flush();
+    assert.strictEqual(instance.state.detailVideo.description, 'Latest');
+    assert.deepStrictEqual(instance.state.batchVids.map(video => video.id), ['alien', 'arrival']);
+  });
+});
+
+suite.test('a delayed batch save cannot restore an older batch selection', () => {
+  withBatchRefresh((instance, clock) => {
+    clock.save('Saved batch');
+    instance.showDetails(['arrival', 'show'], 'arrival');
+    clock.flush();
+    assert.deepStrictEqual(instance.state.batchVids.map(video => video.id), ['arrival', 'show']);
+  });
+});
+
+suite.test('switching playlists cancels the old batch refresh', () => {
+  withBatchRefresh((instance, clock) => {
+    clock.save('Saved batch');
+    instance.setPlaylist('shows');
+    clock.flush();
+    assert.strictEqual(instance.state.detailVideo, null);
+    assert.strictEqual(clock.pending.size, 0);
+  });
+});
+
+suite.test('unmount cancels the pending batch refresh', () => {
+  withBatchRefresh((instance, clock) => {
+    clock.save('Saved batch');
+    assert.strictEqual(clock.pending.size, 1);
+    instance.componentWillUnmount();
+    assert.strictEqual(clock.pending.size, 0);
+  });
+});
+
 runSuite(suite);

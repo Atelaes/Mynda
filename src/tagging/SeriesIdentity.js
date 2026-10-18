@@ -256,11 +256,16 @@ function makeSeriesChoice(result) {
   };
 }
 
-function ambiguousSeriesFailure(series, candidates) {
+function ambiguousSeriesFailure(series, candidates, search) {
   let failure = predictableFailure(
     'Ambiguous series',
-    `More than one catalog series matches "${series}"`
+    search && !search.complete ? `The series search was incomplete, and "${series}" could not be verified.` :
+      `More than one catalog series matches "${series}"`
   );
+  if (search && !search.complete) {
+    failure.policyReason = 'series-search-incomplete';
+    failure.evidence = {seriesSearch:search};
+  }
   failure.choiceType = 'series';
   failure.choices = candidates.map(makeSeriesChoice);
   return failure;

@@ -174,6 +174,7 @@ class Mynda extends React.Component {
   // selectedVids should be an array of video ids
   // or a single video id
   handleSelectedRows(selectedVids, highestRow, tableID, overwrite, tableVideoIDs) {
+    this.cancelDetailsRefresh();
     if (typeof selectedVids === 'string') {
       selectedVids = [selectedVids];
     }
@@ -254,6 +255,7 @@ class Mynda extends React.Component {
   editSeries(videos) {
     const videoIDs = (videos || []).map(video => video && video.id).filter(Boolean);
     if (videoIDs.length === 0) return;
+    this.cancelDetailsRefresh();
 
     const selectedIDSet = new Set(videoIDs);
     const manifestedIDSet = new Set();
@@ -299,6 +301,7 @@ class Mynda extends React.Component {
   }
 
   showDetails(id, rowID, video, index, callback) { // video, index, and callback are optional
+    this.cancelDetailsRefresh();
     // if (!this.state.detailsPaneShowing) {
     //   return;
     // }
@@ -689,6 +692,7 @@ class Mynda extends React.Component {
     let columns = playlist ? playlist.columns : []; // set the columns state variable to this playlist's columns
     let flatDefaultSort = playlist ? playlist.flatDefaultSort : null; // default sort column for this playlist, but only applies when viewed in flat view
     if (id !== this.state.currentPlaylistID) {
+      this.cancelDetailsRefresh();
       // only erase the selection if we've switched playlists;
       // if we haven't, we're just trying to refresh this playlist,
       // probably because some changes occurred in some of its videos,
@@ -911,10 +915,6 @@ class Mynda extends React.Component {
     // (pass true to only set the ones that don't have values already)
     this.setPlaylistLengths(true);
 
-    // used as a delay timer in savedPing the case of multiple saves,
-    // where we want to wait until they're all done before doing something
-    let timeout;
-
     // this callback function will be executed by Library.js every time
     // something is saved. So here we must take any actions necessary to update
     // the view in real time whenever that happens
@@ -940,7 +940,7 @@ class Mynda extends React.Component {
           // read the newly saved videos rather than the pre-save references.
           this.setPlaylist(this.state.currentPlaylistID);
           this.setPlaylistLengths(true);
-          this.refreshDetails(timeout);
+          this.refreshDetails();
         });
       } else if (address.includes('media')) {
         // Committed updates replace immutable snapshots. Refresh the array
@@ -954,7 +954,7 @@ class Mynda extends React.Component {
         }), () => {
           this.setPlaylist(this.state.currentPlaylistID);
           this.setPlaylistLengths(true);
-          this.refreshDetails(timeout);
+          this.refreshDetails();
         });
       }
 
@@ -1004,8 +1004,20 @@ class Mynda extends React.Component {
     };
   }
 
+  cancelDetailsRefresh() {
+    if (this.detailsRefreshRequest) {
+      clearTimeout(this.detailsRefreshRequest.timer);
+      this.detailsRefreshRequest = null;
+    }
+  }
+
+  componentWillUnmount() {
+    this.cancelDetailsRefresh();
+  }
+
   // REFRESH DETAILS PANE
-  refreshDetails(timeout) {
+  refreshDetails() {
+    this.cancelDetailsRefresh();
     libraryViewLog.debug('Refreshing details pane', {
       videoID: this.state.detailVideo && this.state.detailVideo.id
     });
@@ -1021,8 +1033,14 @@ class Mynda extends React.Component {
         const batchVideoIDs = (this.state.batchVids || [])
           .map(video => video && video.id)
           .filter(Boolean);
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
+        // Own the debounce on the component. A local timeout parameter cannot
+        // cancel earlier saves, and a callback for an old selection must never
+        // restore that batch over the user's newly opened single-video editor.
+        const request = {};
+        this.detailsRefreshRequest = request;
+        request.timer = setTimeout(() => {
+          if (this.detailsRefreshRequest !== request) return;
+          this.detailsRefreshRequest = null;
           libraryViewLog.debug('Refreshing batch details after save', {
             videoCount: batchVideoIDs.length,
             source: batchVideoIDs.length > 0 ? 'open editor batch' : 'selected rows fallback'

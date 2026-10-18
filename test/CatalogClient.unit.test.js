@@ -62,4 +62,19 @@ suite.test('an unsuccessful season hint is not fetched again by the correction f
   assert.strictEqual(result.success,false);
   assert.strictEqual(requests.filter(q=>q.Season==='1'&&q.Episode==='3').length,1);
 });
+suite.test('too-many-results reuses the exact query only within its request session',async()=>{
+  let calls=0;
+  const client=createCatalogClient({log,transport:async()=>{
+    calls++;return {status:200,data:{Response:'False',Error:'Too many results.'}};
+  }});
+  const context={requestSession:createRequestSession(),requestTrace:[]};
+  await client.requestCatalog({exactTitle:'Broad series',type:'series'},context);
+  await client.requestCatalog({exactTitle:'Broad series',type:'series'},context);
+  assert.strictEqual(calls,1);
+  assert.strictEqual(context.requestTrace[1].outcome,'ambiguous');
+  await client.requestCatalog({exactTitle:'Broad series',type:'series',year:2000},context);
+  await client.requestCatalog({exactTitle:'Broad series',type:'series'},{requestSession:createRequestSession()});
+  assert.strictEqual(calls,3);
+});
+
 runSuite(suite);

@@ -2,6 +2,8 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/SeriesSearchLimits.integration.test.js',title:'Bounded series discovery and recovery',
+    protects:'terminal-page hints, complete-title evidence, named episode checks, bounded numbered collections and unresolved searches'},
   {category:'integration',file:'test/TvdbMatching.integration.test.js',title:'TVDB matching regressions',
     protects:'provider aliases, qualified series peers, full-season title correction, zero-origin conflicts and unsafe movie fallbacks'},
   {category:'integration',file:'test/FeatureAccess.integration.test.js',title:'Restricted features and live activation state',

@@ -277,3 +277,40 @@ Combined/split files remain subject to the existing coverage check. This update
 does not add multi-episode library records, change TVDB's default season order,
 or silently alter already-tagged videos. Fresh tests or explicit retries are
 needed to assess the new behavior against a real library.
+
+## Bounded discovery follow-up (evidence version 87)
+
+A known result total now takes precedence over a stale continuation flag. A
+search that still has more pages after the discovery limit is a candidate list,
+not proof of uniqueness. Unknown pagination is also kept distinct from a
+confirmed end. A single candidate can proceed when supported by:
+
+- The server's optional `titleSearch` evidence from a complete exact-title lookup.
+  Every returned summary remains available to the matching rules, including
+  regional, numeric-title and alias peers beyond the first three pages.
+- A distinctive matching episode title, or an explicit premiere year confirmed
+  against full parent metadata. “Pilot” alone is insufficient for an incomplete
+  search. Each episode still passes its final title, runtime and numbering checks.
+- Batch evidence from at least two fully represented local seasons with complete,
+  agreeing catalog totals and verified parent metadata. Holes, duplicates, separate
+  physical collections, known competing matches and contradictory seasons do not
+  supply this evidence. Named sibling evidence is considered first.
+
+An unresolved result uses `series-search-incomplete`, even if only one plausible
+candidate was found. Reports include the discovery boundary and supporting
+season evidence. New records use evidence version 87. Existing tagged records
+and permanent-attempt flags are not reset automatically; use an explicit retry
+or a fresh test library to compare results.
+
+Responses indicating “too many results” are reused for the same query within a
+request session. Changing the query/year or starting another session performs a
+new lookup. Provider/transport errors remain retryable and are not retained.
+
+The normal core/full test catalog includes `SeriesSearchLimits.integration.test.js`.
+From the server checkout, `npm run test:tvdb-desktop -- /path/to/Mynda` runs captured
+and synthetic TVDB responses through both real implementations and batch saving
+into a test-only in-memory map. `npm run test:metadata-server -- /path/to/server`
+continues to replay the historical OMDb matching cases. Those historical response
+summaries omitted pagination; the replay supplies explicitly synthetic totals
+for their saved result sets. This checks record/matching compatibility, not live
+OMDb search coverage. Separate tests retain conservative unknown-pagination behavior.

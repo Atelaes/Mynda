@@ -35,6 +35,8 @@ const REASONS = {
     'Check the video kind and identifying fields. Extras or disc images may need manual tags.'],
   'ambiguous-series': ['More than one series remained possible. The saved evidence did not establish which one this video belongs to.',
     'Select the correct series in Search, or add a verified series year before retrying.'],
+  'series-search-incomplete': ['The series search was incomplete, and the available episode or collection evidence did not establish a safe match. This can happen even when only one plausible candidate was found.',
+    'Add a verified series year or episode title, or select the correct series in Search.'],
   'ambiguous-results': ['Search returned possible records, but none could be accepted automatically. A suggested result is not necessarily a safe match.',
     'Review the candidates in Search and select the correct record.'],
   'unconfirmed-series': ['The series was not sufficiently established, and the returned episode title could not confirm it.',
@@ -83,6 +85,7 @@ function numbers(values) {
 }
 
 const PARENTS = {
+  'complete-title-search':'A complete title search established one matching series; episode checks still applied.',
   'series-title-and-year':'Series title and year agreed with the catalog.',
   'unique-series-title':'One series passed the title search; episode evidence was still checked separately.',
   'verified-episode-title':'An episode title identified this series.',
@@ -205,6 +208,11 @@ function buildTaggingReport(video) {
   if (e.matched && position(e.matched)) fact(matched ? 'Applied numbering' : 'Proposed numbering', position(e.matched));
 
   const parent = object(e.parentEvidence);
+  const search = object(e.seriesSearch || parent.search);
+  if (search.query) fact('Series search', `“${text(search.query)}”: ${text(search.pages)} discovery page(s). ` +
+    (search.complete ? 'The subsequent title lookup covered the complete result set.' :
+      search.reason === 'unknown-pagination' ? 'The provider did not establish whether more results existed.' :
+        'Discovery stopped at its lookup limit; this did not establish a unique series.'));
   const structure = object(object(e.structureAssessment).structure || e.structure || object(parent.support).structure);
   if (id(e.seriesID)) {
     const chosen = array(structure.candidates).find(c => c && c.seriesID === e.seriesID);
@@ -264,6 +272,8 @@ function buildTaggingReport(video) {
     `“${text(w.originalTitle || w.catalogTitle)}”: ${position({season:w.localSeason,episode:w.localEpisode})} → ${position({season:w.catalogSeason,episode:w.catalogEpisode})}`).join('; '));
 
   const profile = object(structure.profile);
+  if (array(structure.verifiedFullSeasons).length) fact('Complete season agreement',
+    `Every episode position in local seasons ${numbers(structure.verifiedFullSeasons)} was present, and their totals matched complete catalog lists.`);
   if (array(profile.seasons).length) fact('Local season counts', profile.seasons.filter(s => s && typeof s === 'object').slice(0,12).map(s =>
     `Season ${text(s.season)}: episode numbers ${numbers(s.positions) || 'unknown'}`).join('; ') + '. Duplicate files do not add episode numbers.');
   if (profile.inferredSeason) fact('Season inference', 'Season 1 was considered because the files did not specify a season.');

@@ -13,7 +13,7 @@ function createSeriesStructureResolver({requestCatalog,createCatalogQuery,log}) 
       .map(choice=>[CatalogIdentity.recordKey(choice),choice])).values()].sort((a,b)=>CatalogIdentity.recordKey(a).localeCompare(CatalogIdentity.recordKey(b)));
     // Never narrow an unreviewed/fuzzy candidate list by silently dropping a
     // competing identity. Discovery must establish the full-title candidates.
-    if (eligible.length < 2 || eligible.length !== new Set(choices.map(choice=>CatalogIdentity.recordKey(choice))).size ||
+    if (eligible.length < (profile.searchIncomplete ? 1 : 2) || eligible.length !== new Set(choices.map(choice=>CatalogIdentity.recordKey(choice))).size ||
         eligible.length > Limits.series.structureCandidates) {
       const assessment={selectedID:null,basis:eligible.length > Limits.series.structureCandidates ?
         'structure-candidate-limit':'ineligible-structure-candidates',profile,

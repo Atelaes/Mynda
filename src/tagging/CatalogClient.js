@@ -3,7 +3,7 @@ const CatalogIdentity = require('./CatalogIdentity');
 // each logical lookup spends it here. Capacity polling stays inside the transport;
 // provider attempts (including retries) are accounted for by the server.
 const {summarizeCatalogResponse,summarizeError} = require('./TaggingDiagnostics');
-const {isNotFoundResponse} = require('./CatalogResponse');
+const {isNotFoundResponse,isTooManyResultsResponse} = require('./CatalogResponse');
 const {createRequestBudget,spendRequest} = require('./RequestBudget');
 const Limits = require('./TaggingLimits');
 const {createMetadataServerClient} = require('./MetadataServerClient');
@@ -70,13 +70,16 @@ function createCatalogClient({axios,log,server,onUnauthorized,
       const response = await pending;
       if (response && response.requestId) observation.requestId = response.requestId;
       const data = response && response.data;
+      // A query that needs narrowing is a stable lookup outcome for this batch,
+      // just like not-found. Reuse it without caching transport/provider errors.
+      const needsRefinement = Boolean(parameters.title || parameters.exactTitle) && isTooManyResultsResponse(data);
       const cacheable = response && response.status === 200 && data &&
-        (isNotFoundResponse(data) || (data.Response === 'True' &&
+        (isNotFoundResponse(data) || needsRefinement || (data.Response === 'True' &&
           (Array.isArray(data.Search) || Array.isArray(data.Episodes) ||
            (CatalogIdentity.recordKey(data) && typeof data.Title === 'string' && data.Title.trim() &&
              ['series','episode','movie'].includes(data.Type)))));
       observation.outcome = data && data.Response === 'True' ? 'response' :
-        isNotFoundResponse(data) ? 'not-found' : 'service-error';
+        isNotFoundResponse(data) ? 'not-found' : needsRefinement ? 'ambiguous' : 'service-error';
       if (!cacheable && session && session.responses.get(key) === pending) session.responses.delete(key);
       return response;
     } catch(error) {
