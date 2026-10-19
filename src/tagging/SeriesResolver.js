@@ -7,14 +7,36 @@ const {seriesSearchPartsForVideo, andAmpersandTitleAlternates, terminalAcronymSe
 const SeriesSearch = require('./SeriesSearch');
 const Evidence = require('./TaggingEvidence');
 const Limits = require('./TaggingLimits');
+const Structure = require('./SeriesStructure');
+const {createSeriesStructureResolver} = require('./SeriesStructureResolver');
 
 const EpisodeMatch = require('./EpisodeMatch');
 const {episodeTitlesMatch} = EpisodeMatch;
 
 function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchShowEpisode}) {
+  const resolveStructure = createSeriesStructureResolver({log,requestCatalog,createCatalogQuery});
 
   async function disambiguateSeriesByEpisode(candidates, season, episode, localTitle, context, video) {
     if (!localTitle || candidates.length > SeriesSearch.MAX_CANDIDATES) return {success:false,candidates};
+    const originalCandidates = candidates;
+    let candidateAssessment;
+    if (candidates.length > Limits.series.directEpisodeCandidates && video) {
+      const profile = Structure.profileFor([video]);
+      if (profile) {
+        // Reuse the same validated bounds and boundary checks as batch recovery.
+        // This stage can reject contradictions, never accept a parent on counts.
+        const checked = await resolveStructure({...profile,searchIncomplete:true},candidates,context);
+        if (checked.failure) return {success:false,requestFailure:checked.failure};
+        if (checked.status === 'canceled') throw Object.assign(new Error('Series verification canceled'),{code:'METADATA_CANCELED'});
+        candidateAssessment = checked.evidence && checked.evidence.structure;
+        if (candidateAssessment && candidateAssessment.candidates) {
+          const rejected = new Set(candidateAssessment.candidates.filter(item=>
+            item.metadataStatus === 'verified' && item.contradictions.length).map(item=>item.seriesID));
+          candidates = candidates.filter(candidate=>!rejected.has(CatalogIdentity.recordKey(candidate)));
+        }
+      }
+    }
+    if (!candidates.length) return {success:false,candidates:originalCandidates,candidateAssessment};
     let episodeMatches = [];
     for (let candidate of candidates) {
       let response = await requestCatalog(createCatalogQuery({
@@ -79,6 +101,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       return {
         success: true,
         candidate: decisiveMatches[0].candidate,
+        candidateAssessment,
         episodeData: decisiveMatches[0].episodeData,
         matchedSeason:decisiveMatches[0].matchedSeason,
         matchedEpisode:decisiveMatches[0].matchedEpisode
@@ -89,6 +112,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       // If more than one title agrees, narrow the choices to those matches. If
       // no title agrees, keep every original candidate available for a manual
       // decision—including one whose episode endpoint may simply be incomplete.
+      candidateAssessment,
       candidates: decisiveMatches.length > 1 ?
         decisiveMatches.map(match => match.candidate) : candidates
     };
@@ -138,7 +162,7 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
     // A provider may explicitly attest that /title examined the complete
     // result set. Keep all those rows: qualified/numeric/alias peers must not
     // disappear merely because only one has the exact display name.
-    if (candidates.length === 1) {
+    if (candidates.length <= SeriesSearch.MAX_CANDIDATES) {
       const response = await requestSeriesCatalog({series:query.title,year:query.year,type:'series'},context,
         {stage:'bounded series search complete-title check'});
       const failure = requestFailure(response);
@@ -164,8 +188,10 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       if (verified.requestFailure) return verified.requestFailure;
       if (verified.success) return {success:true,data:CatalogIdentity.recordKey(verified.candidate),confidentSeries:true,
         episodeData:verified.episodeData,matchedSeason:verified.matchedSeason,matchedEpisode:verified.matchedEpisode,
-        parentEvidence:{basis:'verified-episode-title',confident:true,search}};
+        parentEvidence:{basis:'verified-episode-title',confident:true,search,
+          ...(verified.candidateAssessment ? {candidateAssessment:verified.candidateAssessment} : {})}};
       candidates = verified.candidates;
+      if (verified.candidateAssessment) search.candidateAssessment = verified.candidateAssessment;
     }
     if (candidates.length === 1 && query.year) {
       const response = await requestSeriesCatalog({id:CatalogIdentity.recordKey(candidates[0])},context,
@@ -281,21 +307,14 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
       }
       if (candidates.size > 1) {
         const choices = [...candidates.values()];
-        if (!localTitle || choices.length > SeriesSearch.MAX_CANDIDATES) return ambiguousSeriesFailure(video.series, choices);
-        const verified = [];
-        for (const candidate of choices) {
-          // Use the actual episode workflow, including the historical MST3K
-          // season correction. Speculative probes never seed the parent cache.
-          const check = await searchShowEpisode(video, context, undefined, undefined, {
-            seriesResult:{success:true, data:CatalogIdentity.recordKey(candidate), confidentSeries:false},
-            validateOnly:true, speculative:true
-          });
-          if (!check.success && !check.permanentFailure) return check;
-          if (check.success && check.exactTitle && CatalogIdentity.matchesParent(check.episodeData,CatalogIdentity.recordKey(candidate))) verified.push(check);
-        }
-        if (verified.length !== 1) return ambiguousSeriesFailure(video.series, choices);
-        return {...verified[0], confidentSeries:true, discovery:true,
-          parentEvidence:{basis:'verified-episode-title',confident:true}};
+        const verified = await disambiguateSeriesByEpisode(choices,season,episode,localTitle,context,video);
+        if (verified.requestFailure) return verified.requestFailure;
+        if (!verified.success) return ambiguousSeriesFailure(video.series,verified.candidates);
+        return {success:true,data:CatalogIdentity.recordKey(verified.candidate),
+          episodeData:verified.episodeData,matchedSeason:verified.matchedSeason,matchedEpisode:verified.matchedEpisode,
+          confidentSeries:true,discovery:true,
+          parentEvidence:{basis:'verified-episode-title',confident:true,
+            ...(verified.candidateAssessment ? {candidateAssessment:verified.candidateAssessment} : {})}};
       }
       if (spent >= SeriesSearch.MAX_REQUESTS) break;
     }
@@ -514,7 +533,8 @@ function createSeriesResolver({log, requestCatalog, createCatalogQuery, searchSh
               success: true,
               data: CatalogIdentity.recordKey(episodeResult.candidate),
               confidentSeries: Boolean(localTitle || searchParts.year),
-              parentEvidence:{basis:'verified-episode-title',confident:true},
+              parentEvidence:{basis:'verified-episode-title',confident:true,
+                ...(episodeResult.candidateAssessment ? {candidateAssessment:episodeResult.candidateAssessment} : {})},
               episodeData: episodeResult.episodeData,
               matchedSeason:episodeResult.matchedSeason,
               matchedEpisode:episodeResult.matchedEpisode

@@ -171,4 +171,88 @@ suite.test('the report describes one unresolved candidate without pretending the
   const report=buildTaggingReport({taggingDecision:result});
   assert(JSON.stringify(report).includes('only one plausible candidate'));
 });
+suite.test('four plausible parents are narrowed by verified season bounds before named-episode checks',async()=>{
+  const parents=[parent(1),parent(2),parent(3),parent(4)].map((p,i)=>({...p,totalSeasons:i===3?'6':'1'}));
+  const right=record(parents[3],'A Distinctive Closing',{Season:'6',Episode:'9'});
+  const f=loadSearch(fixture(parents,[right]));
+  const result=await f.api.tag(input(right.Title,{season:'6',episode:'9'}));
+  assert.strictEqual(result.status,'matched',JSON.stringify(result));
+  assert.deepStrictEqual(result.video.catalogSeriesRef,parents[3].catalogRef);
+  assert(f.requests.some(q=>q.i===key(parents[0])&&!q.Season));
+  assert(!f.requests.some(q=>q.Episode && q.i!==key(parents[3])));
+  const report=buildTaggingReport(result.video);
+  assert(JSON.stringify(report).includes('Verified season bounds'));
+  assert.strictEqual(report.candidates.filter(c=>c.selected).length,1);
+});
+suite.test('seven candidates still receive episode verification after season bounds remove contradictions',async()=>{
+  const parents=Array.from({length:7},(_,i)=>({...parent(i+1),totalSeasons:'1'}));
+  const records=parents.flatMap((p,i)=>Array.from({length:i===0?9:i<5?3:10},(_,ep)=>
+    record(p, i===0 && ep===8?'The Distinctive Return':`Other Story ${i}.${ep}`,{
+      Episode:String(ep+1),catalogRef:{provider:'tvdb',id:`episode:${i+1}${String(ep+1).padStart(2,'0')}`}})));
+  const f=loadSearch(fixture(parents,records));
+  const result=await f.api.tag(input('The Distinctive Return',{episode:'9'}));
+  assert.strictEqual(result.status,'matched',JSON.stringify(result));
+  assert.deepStrictEqual(result.video.catalogSeriesRef,parents[0].catalogRef);
+  assert(f.requests.filter(q=>q.i && !q.Season).length>=7);
+});
+suite.test('more than three candidates with equal title evidence remain ambiguous',async()=>{
+  const parents=Array.from({length:4},(_,i)=>({...parent(i+1),totalSeasons:'1'}));
+  const f=loadSearch(fixture(parents,parents.map(p=>record(p,named.Title))));
+  const result=await f.api.tag(input(named.Title));
+  assert.strictEqual(result.status,'ambiguous');
+  assert.strictEqual(result.choices.length,4);
+  assert(f.requests.filter(q=>q.Episode).length>=4);
+});
+suite.test('complete-title lookup is attempted even with multiple preliminary candidates',async()=>{
+  const other=parent(2,'Test Series (US)','2010');
+  const proof={...p,catalogTitleSearch:{query:'Test Series',complete:true,items:[p,other]}};
+  const f=loadSearch(fixture([p,other],[record(p,'Pilot'),record(other,'Another Beginning')],{proof}));
+  const result=await f.api.tag(input('Pilot'));
+  assert.strictEqual(result.status,'matched',JSON.stringify(result));
+  assert.deepStrictEqual(result.video.catalogSeriesRef,p.catalogRef);
+  assert.strictEqual(result.evidence.parentEvidence.search.complete,true);
+});
+suite.test('an incomplete local season can match from complete title discovery without season-count evidence',async()=>{
+  const proof={...p,catalogTitleSearch:{query:'Test Series',complete:true,items:[p]}};
+  const records=[2,5,8].map(n=>record(p,`Story ${n}`,{Episode:String(n),catalogRef:{provider:'tvdb',id:`episode:100${n}`}}));
+  const videos=records.map(r=>input(undefined,{id:`partial-${r.Episode}`,episode:r.Episode,
+    title:`Test Series S01E${r.Episode}`,filename:`/Shows/Test Series/Season 1/${r.Episode}.mkv`}));
+  const run=await runAutoTag(videos,fixture([p],records,{proof}));
+  assert.strictEqual(run.result.statistics.Success,3);
+  assert([...run.saved.values()].every(v=>v.catalogSeriesRef.id==='series:1'));
+  assert.strictEqual(run.requests.filter(q=>q.t).length,1);
+});
+suite.test('decorated season folders supply complete collection evidence in either batch order',async()=>{
+  const catalog=StructureFixture.fixture({[A]:{1:3,2:4},[B]:{1:2}});
+  const videos=videosFor({1:3,2:4}).map(v=>({...v,filename:v.filename.replace(`/Season ${v.season}/`,
+    `/${v.series} Season ${v.season} COMPLETE 720p.BRrip.mrlss.sujaidr (pimprg)/`)}));
+  for(const order of [videos,[...videos].reverse()]){
+    const run=await runAutoTag(order,q=>q.s?rows(catalog.parents):catalog.responder(q));
+    assert.strictEqual(run.result.statistics.Success,7,JSON.stringify(run.result));
+    assert.deepStrictEqual(winner(run),[A]);
+    assertRequestsReused(run);
+  }
+});
+suite.test('unknown parent metadata cannot remove a competing matching episode',async()=>{
+  const parents=Array.from({length:4},(_,i)=>({...parent(i+1),totalSeasons:'1'}));
+  const base=fixture(parents,parents.map(p=>record(p,named.Title)));
+  const f=loadSearch(q=>q.i===key(parents[3])&&!q.Season?notFound:base(q));
+  const result=await f.api.tag(input(named.Title));
+  assert.strictEqual(result.status,'ambiguous');assert.strictEqual(result.choices.length,4);
+});
+suite.test('candidate checks respect the shared request budget without accepting an unchecked winner',async()=>{
+  const parents=Array.from({length:7},(_,i)=>({...parent(i+1),totalSeasons:'1'}));
+  const f=loadSearch(fixture(parents,parents.map(p=>record(p,named.Title))));
+  const result=await f.api.tag(input(named.Title),{requestBudgetLimit:6});
+  assert.notStrictEqual(result.status,'matched');
+  assert.strictEqual(result.reason.code,'request-budget-exhausted');
+  assert.strictEqual(f.requests.length,6);assert.strictEqual(f.downloads.length,0);
+});
+suite.test('more candidates than the bounded verifier allows are retained for manual review',async()=>{
+  const parents=Array.from({length:11},(_,i)=>parent(i+1));
+  const f=loadSearch(fixture(parents,parents.map(p=>record(p,named.Title))));
+  const result=await f.api.tag(input(named.Title));
+  assert.strictEqual(result.status,'ambiguous');assert.strictEqual(result.choices.length,11);
+  assert(!f.requests.some(q=>q.Episode));
+});
 runSuite(suite);

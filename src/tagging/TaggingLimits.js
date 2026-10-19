@@ -3,6 +3,6 @@
 module.exports = Object.freeze({
   networkPerOperation:96, cachedResponses:4096, saveBatchSize:10,
   movie:Object.freeze({titleQueries:8, normalizedQueries:2, detailCandidates:7}),
-  series:Object.freeze({queryForms:6, fallbackRequests:12, pages:3, candidates:3, structureCandidates:10, representatives:3}),
+  series:Object.freeze({queryForms:6, fallbackRequests:12, pages:3, directEpisodeCandidates:3, candidates:10, structureCandidates:10, representatives:3}),
   episode:Object.freeze({nearbyDistances:Object.freeze([1,2]),adjacentSeasonOffsets:Object.freeze([-1,1]),offsetWitnesses:2})
 });

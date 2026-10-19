@@ -190,7 +190,8 @@ suite.test('four same-name candidates are screened without widening speculative 
   assert.deepStrictEqual(winner(run),[A]);
   for (const id of [A,B,C,D]) assert(run.requests.some(q=>q.i===id && !q.Season),id);
   assert.strictEqual(assessment(run.saved.get('s2e1')).candidates.length,4);
-  assert.strictEqual(Limits.series.candidates,3);
+  assert.strictEqual(Limits.series.directEpisodeCandidates,3);
+  assert.strictEqual(Limits.series.candidates,10);
   assertRequestsReused(run);
 });
 

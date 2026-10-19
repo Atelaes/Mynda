@@ -137,7 +137,7 @@ function translate(data, route, body) {
   if (data.titleSearch !== undefined) {
     const proof = data.titleSearch;
     if (route !== '/v1/title' || !object(proof) || proof.query !== body.title || proof.complete !== true ||
-        !Array.isArray(proof.items) || proof.items.length > 100) return invalid();
+        !Array.isArray(proof.items) || proof.items.length > 500) return invalid();
     const items = proof.items.map(summary);
     if (items.some(item=>item.catalogRef.provider !== result.catalogRef.provider || (body.kind && item.Type !== body.kind)) ||
         new Set(items.map(Identity.recordKey)).size !== items.length ||

@@ -50,6 +50,22 @@ suite.test('physical season layouts share only their parent identity scope',()=>
   assert.strictEqual(scopeFor({...target,dvd:true}),null);
 });
 
+suite.test('decorated season folders join their series while preserving years and release boundaries',()=>{
+  const root=`/Shows/${NAME}`, video=input(1,1);
+  for(const folder of [`${NAME} Season 1 COMPLETE 720p.BRrip.sujaidr (pimprg)`,
+    `${NAME} Season 2 Complete.720p.BRrip.mrlss.sujaidr`,
+    `${NAME} (1994) Season 1 S01 + Extras (1080p BluRay x265 HEVC 10bit AAC 5.1 Silence)`]) {
+    const scope=scopeFor({...video,filename:`${root}/${folder}/episode.mkv`});
+    assert.strictEqual(scope.root,root,folder);
+    assert.strictEqual(scope.directory,`${root}/${folder}`);
+    if(folder.includes('(1994)')) assert.deepStrictEqual(scope.years,['1994']);
+  }
+  for(const folder of ['Season 1 Complete fan edit','Season 1 Complete US','Season 1 S02',
+    `${NAME} Special Edition Season 1`, 'Season 1 + Unrelated', 'Season 1 720p unknown-group']) {
+    assert.strictEqual(scopeFor({...video,filename:`${root}/${folder}/episode.mkv`}).root,`${root}/${folder}`,folder);
+  }
+});
+
 suite.test('one independent named episode resolves other seasons and permits their explicit numbering in any order',async()=>{
   const records=[episode('Arrival',3,1),episode('Handicaps',4,3),episode('Opening',1,1)];
   const videos=[input(3,1,'Arrival'),input(4,3,`${NAME} Handicaps`),input(1,1)];

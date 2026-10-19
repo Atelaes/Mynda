@@ -533,6 +533,15 @@ suite.test('complete-title proof survives the actual decoder with all competing 
     assert.deepStrictEqual(result.catalogTitleSearch.items[1].catalogRef,nativeRef('series:2'));
   });
 });
+suite.test('complete-title proof accepts the bounded 500-row series result set',async()=>{
+  const data=nativeRecord({ref:nativeRef('series:1'),kind:'series',title:'Test Series'});
+  data.titleSearch={query:'Test Series',complete:true,items:Array.from({length:500},(_,i)=>
+    ({...data,ref:nativeRef('series:'+(i+1)),title:i?'Unrelated '+i:'Test Series'}))};
+  await withServer(()=>({data}),async client=>{
+    const result=(await client.requestCatalog({exactTitle:'Test Series',type:'series'})).data;
+    assert.strictEqual(result.catalogTitleSearch.items.length,500);
+  });
+});
 suite.test('the decoder rejects incomplete, duplicate, unrelated or mismatched complete-title proof',async()=>{
   const data=nativeRecord({ref:nativeRef('series:1'),kind:'series',title:'Test Series'});
   const good={query:'Test Series',complete:true,items:[data]};
@@ -540,7 +549,7 @@ suite.test('the decoder rejects incomplete, duplicate, unrelated or mismatched c
     {...good,items:[data,data]}, {...good,items:[{...data,kind:'movie'}]},
     {...good,items:[{...data,ref:{provider:'other',id:'series:1'}}]},
     {...good,items:[{...data,ref:nativeRef('series:2')}]},
-    {...good,items:Array.from({length:101},(_,i)=>({...data,ref:nativeRef('series:'+i)}))}];
+    {...good,items:Array.from({length:501},(_,i)=>({...data,ref:nativeRef('series:'+i)}))}];
   for(const titleSearch of bad) await withServer(()=>({data:{...data,titleSearch}}),async client=>{
     await assert.rejects(client.requestCatalog({exactTitle:'Test Series',type:'series'}),{code:'METADATA_INVALID_RESPONSE'});
   });

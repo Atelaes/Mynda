@@ -213,7 +213,10 @@ function buildTaggingReport(video) {
     (search.complete ? 'The subsequent title lookup covered the complete result set.' :
       search.reason === 'unknown-pagination' ? 'The provider did not establish whether more results existed.' :
         'Discovery stopped at its lookup limit; this did not establish a unique series.'));
-  const structure = object(object(e.structureAssessment).structure || e.structure || object(parent.support).structure);
+  const candidateAssessment = object(parent.candidateAssessment || search.candidateAssessment);
+  const structure = object(object(e.structureAssessment).structure || e.structure || object(parent.support).structure || candidateAssessment);
+  if (candidateAssessment.profile) fact('Candidate checks',
+    'Verified season bounds were checked before episode titles. Contradictory candidates could be excluded; missing metadata alone did not exclude a candidate.');
   if (id(e.seriesID)) {
     const chosen = array(structure.candidates).find(c => c && c.seriesID === e.seriesID);
     fact(parent.confident ? 'Identified series' : 'Series candidate', chosen ? recordLabel(chosen) :
@@ -283,13 +286,13 @@ function buildTaggingReport(video) {
     'two-season-counts':'Episode totals in at least two seasons favored this series over a longer alternative.',
     'positive-season-count':'A complete local season matched this series’ reported episode total while an alternative’s total was unknown.'
   }[object(c).basis])).filter(Boolean))].join(' '));
-  if (structure.basis === 'ambiguous-season-structure') fact('Season evidence', 'The recorded season comparison did not resolve the competing series. An exact total in one season alone does not distinguish it from an incomplete copy of a known longer season.');
+  if (structure.basis === 'ambiguous-season-structure' && !candidateAssessment.profile) fact('Season evidence', 'The recorded season comparison did not resolve the competing series. An exact total in one season alone does not distinguish it from an incomplete copy of a known longer season.');
 
   const structuralCandidates = array(structure.candidates);
   const candidates = structuralCandidates.length ? structuralCandidates : array(object(e.discovery).candidates);
   report.candidateHeading = structuralCandidates.length ? 'Series compared' : 'Candidates returned';
   report.candidates = candidates.slice(0,20).map(c => ({label:recordLabel(c), detail:candidateDescription(c),
-    selected:Boolean(structure.selectedID && object(c).seriesID === structure.selectedID)})).filter(c => c.label);
+    selected:Boolean(object(c).seriesID && object(c).seriesID === (structure.selectedID || (matched && e.seriesID)))})).filter(c => c.label);
   report.moreCandidates = Math.max(0,candidates.length-20);
   return report;
 }

@@ -314,3 +314,32 @@ continues to replay the historical OMDb matching cases. Those historical respons
 summaries omitted pagination; the replay supplies explicitly synthetic totals
 for their saved result sets. This checks record/matching compatibility, not live
 OMDb search coverage. Separate tests retain conservative unknown-pagination behavior.
+
+## Collection and small-library recovery (evidence version 88)
+
+Recognized season folders may include a series premiere year, repeated matching
+season marker, COMPLETE / + Extras annotations and known technical release text.
+For example, `Friends Season 1 COMPLETE 720p.BRrip.sujaidr (pimprg)` now shares
+parent identity evidence with other seasons beneath the same Friends root.
+Unknown edition/region text and conflicting years remain boundaries or conflicts;
+episode order evidence stays specific to each directory and season.
+
+Episode-title verification now covers up to ten plausible candidates. Above
+three, existing verified parent/season bounds narrow contradictions before title
+probes. Missing metadata does not eliminate a competitor. All queries still use
+the shared request session and 96-request per-operation budget; no top-N candidate
+is silently selected when the verifier limit is exceeded. Saved reports include
+the bounds checks and alternatives compared.
+
+With the matching server update, TVDB series title lookup can complete up to five
+100-row pages. Every returned summary remains available to desktop identity
+checks. This can establish a parent for one numbered-only episode or an incomplete
+local season without any season-count requirement. Genuine ambiguity, unknown
+pagination and larger result sets remain unresolved unless independent episode,
+year or collection evidence is sufficient. The existing two-complete-season rule
+remains only an optional fallback when discovery is incomplete.
+
+Apply both repository patches before deploying the updated server: older desktop
+versions reject complete-title proofs larger than 100 rows. No dependency changes,
+manual cache reset, stored metadata edits or automatic retry-flag resets are needed.
+The library run may be repeated with a fresh test library or explicitly retried.
