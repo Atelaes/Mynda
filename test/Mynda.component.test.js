@@ -162,14 +162,17 @@ function updateProps(component, props) {
 
 function withOpenPlaylist(data, operation, playlistID = 'movies') {
   const previousDocument = global.document, searchField = {value: ''};
+  let asynchronous = false;
   global.document = {getElementById: id => id === 'search-input' ? searchField :
     {getElementsByTagName: () => [{click() {}}]}};
   try {
     const instance = instanceFor(data);
     instance.componentDidMount();
     instance.setPlaylist(playlistID);
-    return operation(instance, searchField);
-  } finally { global.document = previousDocument; }
+    const result = operation(instance, searchField);
+    asynchronous = Boolean(result && typeof result.then === 'function');
+    return asynchronous ? result.finally(() => { global.document = previousDocument; }) : result;
+  } finally { if (!asynchronous) global.document = previousDocument; }
 }
 
 function commitPreferences(changes, address = 'settings.preferences') {
@@ -177,7 +180,7 @@ function commitPreferences(changes, address = 'settings.preferences') {
   // Mynda. Do not mutate the old state: that would hide a stale-state bug.
   runtimeLibrary.settings = deepFreeze({...runtimeLibrary.settings,
     preferences: {...runtimeLibrary.settings.preferences, ...changes}});
-  savedPing.saved(address);
+  savedPing.saved([address]);
 }
 
 suite.test('normalizes column labels and rating scales for display and sorting', () => {
@@ -351,7 +354,7 @@ suite.test('live column edits retain episode numbers and expansion in series vie
     assert.deepStrictEqual(series.state.columns, ['episode', 'title']);
     runtimeLibrary.playlists = data.playlists.map(playlist => playlist.id === 'shows' ?
       {...playlist, columns: ['title', 'year']} : playlist);
-    savedPing.saved('playlists');
+    savedPing.saved(['playlists']);
     view.props = paneProps(instance, 'library');
     updateProps(series, findElement(view.render(), element => element.type === MynLibSeries).props);
     const table = findElement(series.render(), element => element.type === MynLibTable);
@@ -370,7 +373,7 @@ suite.test('flat column edits update the open table while defaults apply only to
     assert.deepStrictEqual(instance.state.columns, ['title'], 'Default columns must not rewrite an existing playlist');
     runtimeLibrary.playlists = runtimeLibrary.playlists.map(playlist => playlist.id === 'movies' ?
       {...playlist, columns: ['title', 'year']} : playlist);
-    savedPing.saved('playlists');
+    savedPing.saved(['playlists']);
     view.props = paneProps(instance, 'library');
     updateProps(table, findElement(view.render(), element => element.type === MynLibTable).props);
     assert.deepStrictEqual(React.Children.toArray(table.renderHeader().props.children)
@@ -409,7 +412,7 @@ suite.test('displays recently watched updates only after backend commit notifica
   assert.strictEqual(instance.state.recentlyWatched, before);
   assert.strictEqual(runtimeLibrary.replaceCalls.length, 0);
   runtimeLibrary.recently_watched = ['video-5', 'video-0'];
-  savedPing.saved('recently_watched');
+  savedPing.saved(['recently_watched']);
   assert.deepStrictEqual(instance.state.recentlyWatched, ['video-5', 'video-0']);
 });
 
@@ -458,7 +461,7 @@ function withBatchRefresh(operation) {
         pending,
         save(description, address = 'media') {
           runtimeLibrary.media = runtimeLibrary.media.map(video => ({...video, description}));
-          savedPing.saved(address);
+          savedPing.saved([address]);
         },
         flush() {
           const callbacks = [...pending.values()];
@@ -524,6 +527,114 @@ suite.test('unmount cancels the pending batch refresh', () => {
     assert.strictEqual(clock.pending.size, 1);
     instance.componentWillUnmount();
     assert.strictEqual(clock.pending.size, 0);
+  });
+});
+
+suite.test('a real twenty-video commit refreshes the open view once and updates every playlist count', async () => {
+  const LibraryClient = require('../src/library/LibraryClient');
+  const {makeDelta} = require('../src/library/LibraryProtocol');
+  const data = makeLibrary();
+  data.playlists.push({id:'new',name:'New',filter_function:'video.new',view:'flat',columns:['title']});
+  data.media = Array.from({length:20}, (_,i) => videoFixture({id:`batch-${i}`,title:`Video ${i}`,kind:'movie',new:true}));
+  await withOpenPlaylist(data, async instance => {
+    const client = new LibraryClient({initialData:data,log:logger,api:{
+      snapshot:async()=>({session:'test',revision:0,paths:{},data}),
+      onCommitted(){},onCloseCanceled(){},onPrepareClose(){}}});
+    await client.ready;
+    const recordNotifications=[];
+    client.subscribe(address=>recordNotifications.push(address));
+    client.onSavedBatch = addresses => {
+      runtimeLibrary.media = client.media;
+      savedPing.saved(addresses);
+    };
+    let refreshes=0,details=0,counts=0;
+    const setPlaylist=instance.setPlaylist.bind(instance),setCounts=instance.setPlaylistLengths.bind(instance);
+    instance.setPlaylist=(...args)=>{refreshes++;return setPlaylist(...args);};
+    instance.setPlaylistLengths=(...args)=>{counts++;return setCounts(...args);};
+    instance.refreshDetails=()=>{details++;};
+    const revision=instance.state.mediaRevision;
+    const before=client.getSaveObject(),after={...before,media:before.media.map((v,i)=>({...v,new:false,kind:i<12?'movie':'show'}))};
+    const addresses=after.media.map(v=>`media.${v.id}`);
+    const message={session:'test',revision:1,addresses,delta:makeDelta(before,after)};
+    await client.receive(message);
+    assert.strictEqual(refreshes,1);assert.strictEqual(details,1);assert.strictEqual(counts,1);
+    assert.strictEqual(instance.state.mediaRevision,revision+1);
+    assert.strictEqual(instance.state.filteredVideos.length,12);
+    assert.deepStrictEqual(instance.state.playlistLength,{movies:12,shows:8,new:0});
+    assert.deepStrictEqual(recordNotifications,addresses);
+    await client.receive(message);
+    assert.strictEqual(refreshes,1,'The duplicate commit reply must not refresh twice');
+  });
+});
+
+suite.test('mixed media, playlist and preference changes refresh once from a coherent snapshot', () => {
+  const data=makeLibrary();
+  data.settings.preferences.include_new_vids_in_playlists=true;
+  withOpenPlaylist(data,(instance,searchField)=>{
+    searchField.value='Alien';instance.setPlaylist('movies');
+    let refreshes=0,details=0;
+    const setPlaylist=instance.setPlaylist.bind(instance);
+    instance.setPlaylist=(...args)=>{refreshes++;return setPlaylist(...args);};
+    instance.refreshDetails=()=>{details++;};
+    runtimeLibrary.media=runtimeLibrary.media.map(v=>v.id==='alien'?{...v,new:false}:v);
+    runtimeLibrary.settings={...runtimeLibrary.settings,preferences:{...runtimeLibrary.settings.preferences,
+      include_new_vids_in_playlists:false}};
+    runtimeLibrary.playlists=runtimeLibrary.playlists.map(p=>({...p,view:'series'}));
+    savedPing.saved(['media.alien','media.arrival','playlists','settings.preferences']);
+    assert.strictEqual(refreshes,1);assert.strictEqual(details,1);
+    assert.deepStrictEqual(instance.state.filteredVideos.map(v=>v.id),['alien']);
+    assert.deepStrictEqual(instance.state.playlistLength,{movies:2,shows:1});
+    assert.strictEqual(instance.state.view,'series');assert.strictEqual(searchField.value,'Alien');
+  });
+});
+
+suite.test('closed counts follow single edits, removals and playlist filter edits without opening them', () => {
+  const data=makeLibrary();
+  data.playlists.push({id:'new',name:'New',filter_function:'video.new',view:'flat',columns:['title']});
+  withOpenPlaylist(data,instance=>{
+    const priorCounts=instance.state.playlistLength;
+    runtimeLibrary.media=runtimeLibrary.media.map(v=>v.id==='alien'?{...v,new:false,kind:'show'}:v);
+    savedPing.saved(['media.alien']);
+    assert.deepStrictEqual(instance.state.playlistLength,{movies:1,shows:2,new:0});
+    assert.deepStrictEqual(priorCounts,{movies:1,shows:1,new:1},'Earlier count snapshots must not be mutated');
+    runtimeLibrary.media=runtimeLibrary.media.filter(v=>v.id!=='show');
+    savedPing.saved(['media']);
+    assert.deepStrictEqual(instance.state.playlistLength,{movies:1,shows:1,new:0});
+    runtimeLibrary.playlists=runtimeLibrary.playlists.filter(p=>p.id!=='new').map(p=>p.id==='shows'?
+      {...p,filter_function:'false'}:p);
+    savedPing.saved(['playlists']);
+    assert.deepStrictEqual(instance.state.playlistLength,{movies:1,shows:0});
+    assert.strictEqual(instance.state.currentPlaylistID,'movies');
+  });
+});
+
+suite.test('queued React updates publish current closed counts and keep the current search and selection', () => {
+  const data=makeLibrary();
+  withOpenPlaylist(data,(instance,searchField)=>{
+    instance.changePlaylistView('series');searchField.value='Alien';
+    const selectedRows={movies:{arrival:true}};instance.state.selectedRows=selectedRows;
+    const applyState=instance.setState.bind(instance),queued=[];
+    instance.setState=(update,callback)=>queued.push({update,callback});
+    runtimeLibrary.media=runtimeLibrary.media.map(v=>v.id==='alien'?{...v,new:false}:v);
+    savedPing.saved(['media.alien','media.arrival']);
+    while(queued.length){const {update,callback}=queued.shift();applyState(update,callback);}
+    assert.deepStrictEqual(instance.state.playlistLength,{movies:2,shows:1});
+    assert.deepStrictEqual(instance.state.filteredVideos.map(v=>v.id),['alien']);
+    assert.strictEqual(instance.state.view,'series');assert.strictEqual(instance.state.selectedRows,selectedRows);
+  });
+});
+
+suite.test('count-only refresh publishes one state update even with many closed playlists', () => {
+  const data=makeLibrary();
+  data.playlists.push(...Array.from({length:30},(_,i)=>({id:`custom-${i}`,name:`Custom ${i}`,
+    filter_function:"video.kind === 'movie'",view:'flat',columns:['title']})));
+  withOpenPlaylist(data,instance=>{
+    instance.state.playlistLength={};
+    let updates=0;const setState=instance.setState.bind(instance);
+    instance.setState=(...args)=>{updates++;return setState(...args);};
+    instance.setPlaylistLengths();
+    assert.strictEqual(updates,1);assert.strictEqual(Object.keys(instance.state.playlistLength).length,32);
+    assert.strictEqual(instance.state.playlistLength['custom-29'],1);
   });
 });
 

@@ -2,6 +2,10 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'unit',file:'test/LibraryClientNotifications.unit.test.js',title:'Committed library notifications',
+    protects:'one batch notification, complete snapshots, record listeners, duplicate replies, revision resyncs and failed observers'},
+  {category:'unit',file:'test/UiDiagnostics.unit.test.js',title:'Opt-in UI responsiveness diagnostics',
+    protects:'disabled behavior, timer and frame stalls, commit delivery timing, focus/visibility events, bounded samples and cleanup'},
   {category:'integration',file:'test/SeriesSearchLimits.integration.test.js',title:'Bounded series discovery and recovery',
     protects:'terminal-page hints, complete-title evidence, named episode checks, bounded numbered collections and unresolved searches'},
   {category:'integration',file:'test/TvdbMatching.integration.test.js',title:'TVDB matching regressions',
@@ -80,6 +84,8 @@ module.exports = [
     protects:'draft retention, delayed and failed saves, batch field diffs, settings transactions and playback-only patches'},
   {category:'integration',file:'test/AutoTagStorage.integration.test.js',title:'Auto-Tag storage failure and notification',
     protects:'disk-full and permission errors, atomic-write rollback, retry eligibility, queues and visible failure dialogs'},
+  {category:'integration',file:'test/AutoTagResume.integration.test.js',title:'Auto-Tag cancellation and durable resume',
+    protects:'unfinished series/numbering recovery, cancellation boundaries, saved sibling evidence, restart, final failures and completion-save conflicts'},
   {category:'integration',file:'test/RendererStartup.integration.test.js',title:'Browser renderer build and update safety',
     protects:'same-timestamp source updates, browser execution without Node/eval, forbidden imports, CSP and packaging compilation order'},
   {category:'integration',file:'test/SiblingNumbering.integration.test.js',title:'Sibling-supported numbering and correction lookups',

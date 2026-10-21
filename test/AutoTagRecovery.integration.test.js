@@ -114,7 +114,10 @@ suite.test('a failed retry saves its final reason without inflating success coun
   assert.strictEqual(r.result.statistics['Episode mismatch'],1);
   assert.strictEqual(r.result.statistics.recoveredSeriesRetries,undefined);
   const saves=r.saves.flat().filter(v=>v.id==='video-1');
-  assert.strictEqual(saves.length,2);
+  assert.strictEqual(saves.length,3);
+  assert.deepStrictEqual(saves.map(v=>v.autotag_tried),[false,false,true]);
+  assert.deepStrictEqual(saves[2],{...saves[1],autotag_tried:true},
+    'Only the completion flag changes after all recovery passes finish');
   assert.strictEqual(saves[1].taggingDecision.reason.code,'episode-mismatch');
   assert.strictEqual(saves[1].seriesImdbID,PARENT);
   assert.strictEqual(saves[1].taggingEvidence.identities.series.origin,'automatic');
@@ -168,6 +171,11 @@ suite.test('cooperative cancellation prevents the retry pass and preserves compl
   assert.strictEqual(r.result.canceled,true);
   assert.strictEqual(r.result.statistics.Success,2);
   assert.strictEqual(r.saves.flat().length,3);
+  assert.strictEqual(r.saves.flat().find(v=>v.id==='video-1').autotag_tried,false);
+  assert.strictEqual(r.result.statistics.processedVideos,2);
+  assert.strictEqual(r.result.statistics.remainingVideos,1);
+  assert.strictEqual(r.result.statistics.pendingRecoveryVideos,1);
+  assert.strictEqual(r.result.statistics['Ambiguous series'],0);
   assert.strictEqual(r.context.autoTagRunning,false);
 });
 

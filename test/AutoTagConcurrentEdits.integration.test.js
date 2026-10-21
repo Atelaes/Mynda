@@ -5,8 +5,8 @@ const suite=createSuite('Auto-Tag concurrent edit boundaries','integration',
   'Real batch runner retains lookup baselines, exposes save conflicts and keeps slow lookups outside commit work.');
 const original={id:'one',filename:'/Movies/one.mkv',kind:'movie',title:'Original',new:true};
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
-function runner({videos,resolve,save}) {
-  return createAutoTagRunner({state:{running:false,cancelRequested:false},getCandidates:()=>videos,
+function runner({videos,resolve,save,state={running:false,cancelRequested:false}}) {
+  return createAutoTagRunner({state,getCandidates:()=>videos,
     getLibraryVideos:()=>videos,save,notifyStatus:()=>{},chooseSeries:async()=>null,
     preferences:{remove_autotagged_from_new:false},whenIdle:async()=>{},
     log:{info:()=>{},warn:()=>{},error:()=>{},debug:()=>{}},
@@ -34,7 +34,7 @@ suite.test('a delayed lookup retains its original baseline while a user edit com
 
 suite.test('bounded batches await persistence before starting later lookups',async()=>{
   const saves=[],started=deferred(),finishSave=deferred(),requests=[];
-  const videos=Array.from({length:12},(_,i)=>({...original,id:String(i)}));
+  const videos=Array.from({length:45},(_,i)=>({...original,id:String(i)}));
   const run=runner({videos,resolve:async input=>{
     requests.push(input.id);return {status:'matched',video:{...input,title:'Tagged'},evidence:{kind:'movie'}};
   },save:async(batch,options)=>{
@@ -42,10 +42,23 @@ suite.test('bounded batches await persistence before starting later lookups',asy
     if(saves.length===1){started.resolve();await finishSave.promise;}
   }});
   const pending=run();await started.promise;
-  assert.strictEqual(requests.length,10);assert.strictEqual(saves[0].batch.length,10);
+  assert.strictEqual(requests.length,20);assert.strictEqual(saves[0].batch.length,20);
   finishSave.resolve();await pending;
-  assert.deepStrictEqual(saves.map(item=>item.batch.length),[10,2]);
+  assert.deepStrictEqual(saves.map(item=>item.batch.length),[20,20,5]);
   assert(saves.every(item=>item.options.baselines.every(video=>video.title==='Original')));
+});
+
+suite.test('cancellation flushes a partial batch below the new twenty-video boundary',async()=>{
+  const state={running:false,cancelRequested:false},saves=[];
+  const videos=Array.from({length:30},(_,i)=>({...original,id:String(i)}));
+  const run=runner({videos,state,resolve:async input=>{
+    if(input.id==='6')state.cancelRequested=true;
+    return {status:'matched',video:{...input,title:'Tagged'},evidence:{kind:'movie'}};
+  },save:async batch=>saves.push(batch)});
+  const result=await run();
+  assert.strictEqual(result.canceled,true);
+  assert.deepStrictEqual(saves.map(batch=>batch.map(v=>v.id)),[['0','1','2','3','4','5','6']]);
+  assert.strictEqual(state.running,false);
 });
 
 runSuite(suite);

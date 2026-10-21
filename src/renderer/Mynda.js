@@ -11,7 +11,8 @@ const {
   frontendLog,
   libraryViewLog,
   playerLog,
-  savedPing
+  savedPing,
+  uiDiagnostics
 } = require('./RendererRuntime.js');
 const {batchNewState, batchRatingsState, validateVideo} = require('./RendererUtils.js');
 const {
@@ -565,7 +566,7 @@ class Mynda extends React.Component {
 
   // filter the movies we'll hand off to the table component
   // based on the given playlist
-  playlistFilter(id) {
+  playlistFilter(id, updateCount = true) {
     let playlist;
     try {
       playlist = this.state.playlists.filter(playlist => playlist.id == id)[0]
@@ -612,11 +613,10 @@ class Mynda extends React.Component {
       });
     }
 
-    if (playlist.id) {
+    if (playlist.id && updateCount) {
       // update playlist length to trigger any components using this.state.playlistLength
       // (e.g. MynNav uses it to display the lengths of the playlists on the tabs)
-      this.state.playlistLength[playlist.id] = filteredVids.length;
-      this.setState({playlistLength:this.state.playlistLength});
+      this.setState({playlistLength:{...this.state.playlistLength, [playlist.id]:filteredVids.length}});
     }
 
     return filteredVids;
@@ -747,15 +747,17 @@ class Mynda extends React.Component {
 
   // set the lengths of all the playlists
   setPlaylistLengths(shy) {
-    // if shy == true, then we only save the playlist lengths for ones we haven't saved already;
-    // if it's falsy, then we overwrite all of them;
-    this.state.playlists.map(pl => {
-      if (pl.id && (!shy || typeof this.state.playlistLength[pl.id] === "undefined")) {
-        // running the playlistFilter function will set the
-        // value in this.state.playlistLength for that playlist
-        this.playlistFilter(pl.id);
+    // Calculate closed-playlist counts without a separate React update for
+    // each filter. Read committed data, not potentially queued count updates.
+    const playlistLength = {};
+    this.state.playlists.forEach(pl => {
+      if (pl.id) {
+        const cached = this.state.playlistLength[pl.id];
+        playlistLength[pl.id] = shy && cached !== undefined ?
+          cached : this.playlistFilter(pl.id, false).length;
       }
     });
+    if (!_.isEqual(playlistLength, this.state.playlistLength)) this.setState({playlistLength});
   }
 
   // filter videos in current playlist to match search query
@@ -915,92 +917,19 @@ class Mynda extends React.Component {
     // (pass true to only set the ones that don't have values already)
     this.setPlaylistLengths(true);
 
-    // this callback function will be executed by Library.js every time
-    // something is saved. So here we must take any actions necessary to update
-    // the view in real time whenever that happens
-    savedPing.saved = (address) => {
-      frontendLog.debug('Renderer received a library save notification', {
-        address: address
-      });
-
-      // if the whole media array was replaced at one time
-      // (this happens when a watchfolder is removed or a batch is saved),
-      // first put that replacement array into React state. setState() is
-      // asynchronous, so rebuilding the playlist outside its callback would
-      // make playlistFilter() read the old this.state.videos array and leave
-      // the table showing stale data even though library.json was saved.
-      if (address === 'media') {
-        frontendLog.debug('Refreshing renderer state after media replacement');
-
-        this.setState(previousState => ({
-          videos: library.media,
-          mediaRevision: previousState.mediaRevision + 1
-        }), () => {
-          // Now playlistFilter(), the table, and the details/editor refresh all
-          // read the newly saved videos rather than the pre-save references.
-          this.setPlaylist(this.state.currentPlaylistID);
-          this.setPlaylistLengths(true);
-          this.refreshDetails();
-        });
-      } else if (address.includes('media')) {
-        // Committed updates replace immutable snapshots. Refresh the array
-        // reference even when only one video's fields changed.
-        frontendLog.debug('Refreshing renderer state after a video edit', {
-          address: address
-        });
-        this.setState(previousState => ({
-          videos: library.media,
-          mediaRevision: previousState.mediaRevision + 1
-        }), () => {
-          this.setPlaylist(this.state.currentPlaylistID);
-          this.setPlaylistLengths(true);
-          this.refreshDetails();
-        });
-      }
-
-      if (address === 'recently_watched') {
-        this.setState({recentlyWatched: library.recently_watched});
-      }
-
-      // if a playlist was changed
-      if (address.includes('playlists')) {
-        // // change the playlistEditFlag, which components can listen for to find out if a video was edited
-        // // (if they don't care which one or what the change was)
-        // this.setState({playlistEditFlag:uuidv4()});
-
-        frontendLog.debug('Refreshing renderer state after a playlist edit', {
-          address: address
-        });
-        const updatedPlaylists = this.props.library.playlists;
-        const previousCurrentPlaylist = this.state.playlists.find(
-          playlist => playlist && playlist.id === this.state.currentPlaylistID
-        );
-        const updatedCurrentPlaylist = updatedPlaylists.find(
-          playlist => playlist && playlist.id === this.state.currentPlaylistID
-        );
-        const savedViewChanged = Boolean(
-          previousCurrentPlaylist &&
-          updatedCurrentPlaylist &&
-          previousCurrentPlaylist.view !== updatedCurrentPlaylist.view
-        );
-
-        // reload the playlists, and then re-render the current playlist
-        this.setState({playlists:updatedPlaylists}, () => {
-
-          this.setPlaylist(this.state.currentPlaylistID, undefined, savedViewChanged);
-
-          // check all the playlist lengths (pass true to skip the one we just set above)
-          this.setPlaylistLengths(true);
-        });
-      }
-
-      // if the settings were changed
-      if (address.includes('settings')) {
-        frontendLog.debug('Refreshing renderer state after a settings edit', {
-          address: address
-        });
-        this.setState({settings: this.props.library.settings});
-      }
+    // LibraryClient has applied every address in this commit before calling us.
+    // Publish its snapshot once; componentDidUpdate refreshes the dependent view.
+    savedPing.saved = (addresses) => {
+      const changed = new Set(addresses.map(address => address.split('.')[0]));
+      const update = {};
+      if (changed.has('media')) update.videos = library.media;
+      if (changed.has('playlists')) update.playlists = library.playlists;
+      if (changed.has('settings')) update.settings = library.settings;
+      if (changed.has('recently_watched')) update.recentlyWatched = library.recently_watched;
+      if (!Object.keys(update).length) return;
+      this.setState(previousState => ({...update,
+        mediaRevision:previousState.mediaRevision + (changed.has('media') ? 1 : 0)
+      }));
     };
   }
 
@@ -1058,16 +987,23 @@ class Mynda extends React.Component {
   }
 
   componentDidUpdate(oldProps, oldState) {
-    // Filtering reads React state. Compare committed values so individual edits,
-    // whole-settings resyncs and rapidly queued toggles all use the latest pref.
-    // Rating and description changes reach their components directly as props.
+    uiDiagnostics?.rendered({revision:library.revision,mediaRevision:this.state.mediaRevision,
+      stateMatchesLibrary:this.state.videos === library.media,
+      playlistID:this.state.currentPlaylistID,newTabCount:this.state.playlistLength.new ?? null});
+    // Refresh once after the whole commit enters React state, including mixed
+    // media/settings/playlist commits and full snapshot resynchronization.
+    const mediaChanged = oldState.mediaRevision !== this.state.mediaRevision;
+    const playlistsChanged = oldState.playlists !== this.state.playlists;
     const includeNewChanged = Boolean(oldState.settings.preferences.include_new_vids_in_playlists) !==
       Boolean(this.state.settings.preferences.include_new_vids_in_playlists);
-    if (includeNewChanged) {
-      // Refresh the displayed rows as well as the tab counts. Reusing this
-      // playlist preserves its current search and temporary flat/series view.
-      if (this.state.currentPlaylistID !== null) this.setPlaylist(this.state.currentPlaylistID);
-      this.setPlaylistLengths();
+    if (mediaChanged || playlistsChanged || includeNewChanged) {
+      const id = this.state.currentPlaylistID;
+      const before = oldState.playlists.find(playlist => playlist && playlist.id === id);
+      const after = this.state.playlists.find(playlist => playlist && playlist.id === id);
+      const savedViewChanged = Boolean(before && after && before.view !== after.view);
+      if (id !== null) this.setPlaylist(id, undefined, savedViewChanged);
+      this.setPlaylistLengths(false);
+      if (mediaChanged) this.refreshDetails();
     }
   }
 

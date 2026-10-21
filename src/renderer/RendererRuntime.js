@@ -6,8 +6,8 @@ const Logger = require('./RendererLogger.js');
 
 const savedPing = {};
 const library = new LibraryClient({api:window.mynda.library,
-  initialData, log:Logger.child('Library'), onSaved:address => {
-    if (typeof savedPing.saved === 'function') savedPing.saved(address);
+  initialData, log:Logger.child('Library'), onSavedBatch:addresses => {
+    if (typeof savedPing.saved === 'function') savedPing.saved(addresses);
   }});
 
 const frontendLog = Logger.child('Renderer');
@@ -16,6 +16,12 @@ const playerLog = Logger.child('Player');
 const settingsLog = Logger.child('Settings');
 const editorLog = Logger.child('Editor');
 const artworkLog = Logger.child('Artwork');
+const uiDiagnostics = require('./UiDiagnostics').createUiDiagnostics({
+  api:window.mynda.diagnostics,log:Logger.child('UIDiagnostics'),window,document,
+  getState:()=>({revision:library.revision,videoCount:library.media.length,
+    actualNewCount:library.media.filter(video=>video && video.new).length})
+});
+library.diagnostics = uiDiagnostics;
 
 const placeholderImage = "../../images/qmark.png";
 
@@ -62,6 +68,7 @@ function disableConfirmationDialog(dialogName, log = frontendLog) {
 }
 
 module.exports = {
+  uiDiagnostics,
   savedPing,
   library,
   frontendLog,

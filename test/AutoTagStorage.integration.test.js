@@ -8,7 +8,7 @@ const {describeFailure,createFailureReporter}=require('../src/main/AutoTagFailur
 const suite=createSuite('Auto-Tag storage failure and notification','integration',
   'Real atomic writes with injected disk errors, rollback, retry eligibility, queue progress and visible terminal errors.');
 
-function fixture(directory,count=25) {
+function fixture(directory,count=45) {
   const policy={code:null,point:'write',writes:0,failOn:1};
   const primary=path.join(directory,'Library','library.json');
   const descriptors=new Map();
@@ -58,23 +58,23 @@ suite.test('a partial disk-full write preserves earlier saves, rolls back the fa
     let failure;
     try {await f.run();}catch(error){failure=error;await f.report(error);}
     assert(failure);assert.strictEqual(failure.code,'ENOSPC');
-    assert.deepStrictEqual(failure.autoTagFailure,{stage:'save',videoCount:10,committed:false});
+    assert.deepStrictEqual(failure.autoTagFailure,{stage:'save',videoCount:20,committed:false});
     assert.strictEqual(failure.cause.code,'ENOSPC');
-    assert.strictEqual(f.requests.length,20);assert.strictEqual(f.dialogs.length,1);
+    assert.strictEqual(f.requests.length,40);assert.strictEqual(f.dialogs.length,1);
     assert.match(f.dialogs[0].message,/out of space/);assert(f.dialogs[0].detail.includes(f.library.path));
-    assert.match(f.dialogs[0].detail,/last 10 videos were not saved/);
+    assert.match(f.dialogs[0].detail,/last 20 videos were not saved/);
     assert.strictEqual(f.state.running,false);assert.strictEqual(f.statuses[f.statuses.length-1].action,'');
     const disk=f.persistence.readLibraryFile(f.library.path).data;
     assert.deepStrictEqual(disk.media,f.library.media);
-    assert(disk.media.slice(0,10).every(v=>v.imdbID && v.autotag_tried && !v.new));
-    assert.deepStrictEqual(disk.media.slice(10),originals.slice(10));
+    assert(disk.media.slice(0,20).every(v=>v.imdbID && v.autotag_tried && !v.new));
+    assert.deepStrictEqual(disk.media.slice(20),originals.slice(20));
     assert(!fs.readdirSync(path.dirname(f.library.path)).some(name=>name.includes('.tmp-')));
     assert(!f.logs.some(entry=>entry.message==='Automatic tagging batch finished'));
     // The next run includes the unsaved batch without restarting or clearing flags.
     f.policy.code=null;f.requests.length=0;
     const retry=await f.run();
-    assert.strictEqual(retry.statistics.totalVideos,15);assert.strictEqual(retry.statistics.Success,15);
-    assert.strictEqual(f.requests.length,15);assert.strictEqual(f.dialogs.length,1);
+    assert.strictEqual(retry.statistics.totalVideos,25);assert.strictEqual(retry.statistics.Success,25);
+    assert.strictEqual(f.requests.length,25);assert.strictEqual(f.dialogs.length,1);
   }));
 
 suite.test('failure of the final partial batch keeps its videos and primary file unchanged',()=>
@@ -155,5 +155,19 @@ suite.test('failure reporting still displays a dialog when logging fails and con
   assert(!messages[0].message.includes('out of space'));
   assert.match(fallback[0].detail,/Auto-Tag stopped/);
 });
+
+suite.test('diagnostic commit stamps never enter the saved library or change atomic save results',()=>
+  withTemporaryDirectory('autotag-diagnostic-save',async directory=>{
+    const f=fixture(directory,3),published=[];
+    f.library.diagnostics=require('../src/main/UiDiagnostics').createUiDiagnostics({enabled:true,
+      log:{info(){},warn(){}},getState:()=>({})});
+    f.library.renderers.add({send:(_channel,response)=>published.push(response)});
+    const result=await f.run();
+    assert.strictEqual(result.statistics.Success,3);assert.strictEqual(published.length,1);
+    assert(Number.isFinite(published[0].diagnostics.savedAt));assert(Number.isFinite(published[0].diagnostics.commitMs));
+    const disk=f.persistence.readLibraryFile(f.library.path).data;
+    assert.deepStrictEqual(disk.media,f.library.media);assert(disk.media.every(v=>!v.new));
+    assert(!JSON.stringify(disk).includes('diagnostics'));assert(!JSON.stringify(disk).includes('savedAt'));
+  }));
 
 runSuite(suite);

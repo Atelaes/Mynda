@@ -4,6 +4,7 @@ const {capacityMessage} = require('../tagging/CapacityWait');
 const {v4: uuidv4} = require('uuid');
 const {
   frontendLog,
+  uiDiagnostics,
   LOCAL_STATUS_UPDATE_EVENT,
   disableConfirmationDialog
 } = require('./RendererRuntime.js');
@@ -64,6 +65,7 @@ class MynNotify extends React.Component {
   }
 
   statusUpdate(status) {
+    uiDiagnostics?.status(status);
     // console.log(`Running statusUpdate with status: ${JSON.stringify(status)}`);
     // console.log('this.state.on: ' + this.state.on)
     if (status.action === '') {
@@ -158,6 +160,7 @@ class MynNotify extends React.Component {
 
   animateEllipsis() {
     this.setState({ellipsis:".".repeat((this.state.ellipsis.length+1)%4)}, () => {
+      uiDiagnostics?.ellipsis();
       // console.log('setting timeout for ellipsisAnimation')
       this.ellipsisAnimation = setTimeout(this.animateEllipsis,400);
     });

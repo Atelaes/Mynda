@@ -5,10 +5,11 @@ const Operations = require('./LibraryProtocol');
 const commands = require('./LibraryClientCommands');
 
 class LibraryClient {
-  constructor({api, log, initialData, onSaved}) {
+  constructor({api, log, initialData, onSaved, onSavedBatch}) {
     this.env = 'browser';
     this.api = api;
     this.onSaved = onSaved;
+    this.onSavedBatch = onSavedBatch;
     this.log = log;
     this._data = Operations.deepFreeze(_.cloneDeep(initialData));
     for (const key of Object.keys(initialData)) Object.defineProperty(this, key, {enumerable: true, get: () => this._data[key]});
@@ -63,7 +64,19 @@ class LibraryClient {
     await this.api.closeReady({token: request.token, error: failure});
   }
   receive(message) {
-    const delivery = this.delivery.then(() => this.acceptMessage(message));
+    if (!this.diagnostics?.isEnabled()) {
+      const delivery = this.delivery.then(() => this.acceptMessage(message));
+      this.delivery = delivery.catch(() => {});
+      return delivery;
+    }
+    const received = this.diagnostics?.receive(message);
+    const delivery = this.delivery.then(() => {
+      const start = this.diagnostics?.beginDelivery(received);
+      return this.acceptMessage(message).then(result => {
+        this.diagnostics?.applied(start,this.revision);
+        return result;
+      });
+    });
     this.delivery = delivery.catch(() => {});
     return delivery;
   }
@@ -82,6 +95,11 @@ class LibraryClient {
     this.notify(message.addresses || []);
   }
   notify(addresses) {
+    // The root view consumes the complete committed snapshot once. Keep the
+    // individual notifications for consumers that need specific record changes.
+    try {
+      if (this.onSavedBatch && addresses.length) this.onSavedBatch(addresses);
+    } catch (error) { this.log.error('Library display refresh failed after commit', {error}); }
     for (const address of addresses) {
       try {
         if (this.onSaved) this.onSaved(address);

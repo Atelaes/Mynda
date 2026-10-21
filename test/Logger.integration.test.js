@@ -162,4 +162,22 @@ suite.test('rotates large logs and honors the configured backup limit', () => wi
   }
 ));
 
+suite.test('keeps UI diagnostics in a separate redacted file when ordinary tagging logs rotate',()=>withTemporaryDirectory(
+  'logger-ui-diagnostics',async directory=>{
+    const Logger=loadLogger();
+    await withoutConsoleOutput(async()=>{
+      Logger.initialize({logDirectory:directory,maxFileSize:200,maxBackups:1});
+      Logger.child('UIDiagnostics').info('backend sample',{revision:12,token:'diagnostic-secret'});
+      Logger.receiveRenderer({timestamp:'2026-10-19T23:00:00.000Z',level:'warn',scope:'UIDiagnostics',
+        message:'renderer timer delayed',details:JSON.stringify({gapMs:30000})});
+      for(let i=0;i<20;i++)Logger.child('Tagging').info('ordinary lookup '+i,{text:'x'.repeat(200)});
+      await Logger.flush();
+    });
+    const diagnostics=fs.readFileSync(path.join(directory,'mynda-ui-diagnostics.log'),'utf8');
+    assert(diagnostics.includes('backend sample'));assert(diagnostics.includes('renderer timer delayed'));
+    assert(diagnostics.includes('30000'));assert(!diagnostics.includes('ordinary lookup'));
+    assert(!diagnostics.includes('diagnostic-secret'));assert(diagnostics.includes('[REDACTED]'));
+    await Logger.shutdown();
+  }));
+
 runSuite(suite);

@@ -47,6 +47,7 @@ suite.test('the real compiled browser entry initializes without Node or dynamic 
   // This covers loading the complete production dependency graph, not DOM
   // rendering. The native Electron suites own rendering and user workflows.
   const context = vm.createContext({setTimeout, clearTimeout, console, URL, crypto: webcrypto,
+    document: undefined, // Disabled diagnostics can capture this global in the DOM-free fixture.
     mynda: {app: {platform: 'darwin'}, logs: {write: async () => {}}, library: {
       onCommitted() {}, onCloseCanceled() {}, onPrepareClose() {},
       snapshot() { requestedSnapshot = true; return new Promise(() => {}); }

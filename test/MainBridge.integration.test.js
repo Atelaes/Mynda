@@ -49,6 +49,10 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     assert.deepStrictEqual(snapshot.data.media,[]);
     assert(fs.existsSync(snapshot.paths.path));
     const bridge=handlers.get('mynda:invoke');
+    const diagnostics=await bridge(event,'diagnostics.getConfig',[]);
+    assert.strictEqual(diagnostics.value.enabled,process.env.MYNDA_UI_DIAGNOSTICS === '1');
+    assert.strictEqual(prefs.backgroundThrottling,undefined,'Diagnostics must not change background throttling');
+    assert.strictEqual((await bridge({sender:{},senderFrame:sender.mainFrame},'diagnostics.getConfig',[])).error.code,'APP_UNAUTHORIZED');
     assert.strictEqual((await bridge(event,'playback.getState',[])).value.status,'idle');
     assert.strictEqual((await bridge(event,'share.getState',[])).value.ok,true);
     const access=await bridge(event,'metadata.getStatus',[]);

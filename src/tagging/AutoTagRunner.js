@@ -4,7 +4,7 @@ const CatalogIdentity = require('./CatalogIdentity');
 const _ = require('lodash');
 const BatchEvidence = require('./BatchEvidence');
 const {planRecovery} = require('./BatchSeriesRecovery');
-const {planNumberingRecovery} = require('./BatchNumberingRecovery');
+const {planNumberingRecovery,canRetryNumbering} = require('./BatchNumberingRecovery');
 const Evidence = require('./TaggingEvidence');
 const Decision = require('./TaggingDecision');
 const Limits = require('./TaggingLimits');
@@ -18,7 +18,7 @@ function shouldDefer(result) {
     (!result.candidate.evidence.localTitle || result.candidate.evidence.exactTitle === false);
 }
 
-function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,save,notifyStatus,chooseSeries,preferences,whenIdle,
+function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,save,notifyStatus,chooseSeries,preferences,whenIdle,diagnostics,
   requireFeature = async()=>{}}) {
   return async function autoTag(options = {}) {
     if (state.running) return;
@@ -68,8 +68,9 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     const ledger = BatchEvidence.createEvidence(videos,getLibraryVideos ? getLibraryVideos() : []);
     const seasonOffsetHints = new Map();
     const retryCandidates = [], pendingMatches = [], outcomes = new Map(), attempts = new Map();
+    const pendingRecovery = new Map();
     const statistics = {totalVideos:videos.length};
-    let batchSave = [], processed = 0, canceledPending = 0;
+    let batchSave = [], processed = 0;
     let sharedID = seriesBatch && CatalogIdentity.valid((seriesBatch.storedSeriesID || seriesBatch.storedSeriesImdbID)) ? (seriesBatch.storedSeriesID || seriesBatch.storedSeriesImdbID).trim() : '';
     let sharedSource = sharedID ? 'stored' : 'batch', sharedEvidence;
     let seriesSelectionCanceled = false, seriesPreflightFailure = null;
@@ -96,6 +97,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
             const previous = outcomes.get(index);
             if (previous) statistics[previous]--;
             outcomes.set(index, 'Changed during lookup');
+            pendingRecovery.delete(index);
             statistics['Changed during lookup'] = (statistics['Changed during lookup'] || 0) + 1;
             log.warn('Automatic tagging result skipped because the video changed during lookup', {id:video.id});
           }
@@ -114,6 +116,29 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
     async function canContinue() {
       if (state.cancellationDecision) await state.cancellationDecision;
       return !state.cancelRequested;
+    }
+    function summarizeProgress() {
+      // A saved first-pass rejection is not a completed attempt while another
+      // pass can still resolve it. Include that work in the resume count.
+      for (const index of pendingRecovery.keys()) statistics[outcomes.get(index)]--;
+      statistics.processedVideos = outcomes.size - pendingRecovery.size;
+      statistics.remainingVideos = videos.length - statistics.processedVideos;
+      if (pendingRecovery.size) statistics.pendingRecoveryVideos = pendingRecovery.size;
+      const unreviewed = new Set(pendingMatches.filter(item=>!outcomes.has(item.index)).map(item=>item.index));
+      if (unreviewed.size) statistics.unreviewedCandidates = unreviewed.size;
+    }
+    async function completeRecovery() {
+      // The saved false flag is sufficient to resume after cancellation or a
+      // crash. Only publish true once every recovery pass has finished. Use our
+      // own saved baselines so this final bookkeeping cannot overwrite an edit.
+      if (!await canContinue()) return;
+      for (const [index,video] of pendingRecovery) {
+        if (!await canContinue()) break;
+        batchSave.push({...video,autotag_tried:true});
+        pendingRecovery.delete(index);
+        if (batchSave.length >= Limits.saveBatchSize) await flush();
+      }
+      await flush();
     }
     function searchOptions(index) {
       return {seasonOffsetHints,seriesSearchSession:session,requestBudget:budgets[index],deferSeriesEvidence:true,
@@ -152,6 +177,7 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
         statistics[counter]=(statistics[counter] || 0)+1;
       }
       if (result.status === 'matched') {
+        pendingRecovery.delete(index);
         const tagged = result.video;
         tagged.autotag_tried = true;
         if (preferences.remove_autotagged_from_new) tagged.new = false;
@@ -167,18 +193,27 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
             parentEvidence:parent ? parent.evidence : sharedEvidence})) : video;
         // Keep a report for every completed attempt, including first-pass
         // service errors. Their retry eligibility and existing tags stay intact.
-        batchSave.push({...unresolved,autotag_tried:!result.retryable,
-          taggingDecision:Evidence.copy({status:result.status,reason:result.reason,evidence:result.evidence})});
+        const awaitingRecovery = !result.retryable && video.kind === 'show' &&
+          (BatchEvidence.canRetry(result) || (!CatalogIdentity.recordKey(video) && canRetryNumbering(result)));
+        const saved = {...unresolved,autotag_tried:!result.retryable && !awaitingRecovery,
+          taggingDecision:Evidence.copy({status:result.status,reason:result.reason,evidence:result.evidence})};
+        if (awaitingRecovery) pendingRecovery.set(index,saved);
+        else pendingRecovery.delete(index);
+        batchSave.push(saved);
       }
       log[result.status === 'matched' ? 'debug' : result.retryable ? 'error' : 'warn'](
         result.status === 'matched' ? 'Automatic tagging finished for video' :
           result.retryable ? 'Automatic tagging failed for video' : 'Automatic tagging did not tag video',
         {id:video.id,filename:video.filename,title:video.title,disposition,status:result.status,
-          reason:result.reason,evidence:result.evidence,permanentFailure:!result.retryable});
+          reason:result.reason,evidence:result.evidence,permanentFailure:!result.retryable && !pendingRecovery.has(index),
+          pendingRecovery:pendingRecovery.has(index)});
       if (batchSave.length >= Limits.saveBatchSize) await flush();
+      diagnostics?.activity({completedDecisions:outcomes.size,matches:statistics.Success || 0,
+        pendingSaves:batchSave.length,seriesRetries:statistics.seriesRetries || 0});
     }
 
     try {
+      diagnostics?.phase('first-pass',{total:videos.length});
       progress({action:'autotag'});
       log.info('Automatic tagging batch started',{totalVideos:videos.length,scope:state.scope,
         sameSeriesShowBatch:Boolean(seriesBatch),series:seriesBatch && seriesBatch.series});
@@ -228,9 +263,11 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       await flush();
       // Freeze independent parent decisions before dependent retries supply any
       // additional order observations. No retry can bootstrap another parent.
+      diagnostics?.phase('series-recovery-planning',{pending:retryCandidates.length});
       const {retries,structureChecks} = await planRecovery({pending:retryCandidates,ledger,catalog,session,budgets,canContinue});
       checkLookup();
       if (structureChecks) statistics.seriesStructureChecks=structureChecks;
+      diagnostics?.phase('series-retries',{total:retries.length});
       for (const pending of retries) {
         if (!await canContinue()) break;
         const parent = pending.parent;
@@ -257,8 +294,10 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       // parent retries. Later fuzzy recoveries cannot create additional votes.
       await flush();
       const numberingInputs=new Map(attempts);
+      diagnostics?.phase('numbering-recovery-planning');
       pendingMatches.forEach(item=>numberingInputs.set(item.index,item));
       const numberingRetries=planNumberingRecovery([...numberingInputs.values()],ledger);
+      diagnostics?.phase('numbering-retries',{total:numberingRetries.length});
       const numberingCompleted=new Set();
       for (const pending of numberingRetries) {
         if (!await canContinue()) break;
@@ -276,12 +315,10 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       }
       // Named matches supply observations. The final policy alone decides
       // whether they establish the order for a numbered-only proposal.
+      diagnostics?.phase('deferred-verification',{total:pendingMatches.length});
       for (const pending of pendingMatches) {
         if (numberingCompleted.has(pending.index)) continue;
-        if (!await canContinue()) {
-          if (!pending.retry) canceledPending++;
-          continue;
-        }
+        if (!await canContinue()) continue;
         const result = await finish(pending.video,pending.result);
         await record(pending.video,result,pending.index,pending.retry,pending.parent);
         const assessment = result.evidence.orderAssessment || {};
@@ -292,10 +329,10 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
           id:pending.video.id,success:result.status === 'matched',reason:result.reason});
       }
       await flush();
+      diagnostics?.phase('finishing-saves');
+      await completeRecovery();
       await whenIdle();
-      statistics.processedVideos = processed - canceledPending;
-      statistics.remainingVideos = videos.length - statistics.processedVideos;
-      if (canceledPending) statistics.unreviewedCandidates = canceledPending;
+      summarizeProgress();
       if (sharedID) statistics.seriesID = sharedID;
       log.info('Automatic tagging series discovery summary',catalog.seriesSearchSummary(session));
       const status = seriesSelectionCanceled ? 'series-selection-canceled' : seriesPreflightFailure ?
@@ -316,11 +353,11 @@ function createAutoTagRunner({state,catalog,log,getCandidates,getLibraryVideos,s
       state.cancelRequested = true;
       await flush();
       await whenIdle();
-      statistics.processedVideos = outcomes.size;
-      statistics.remainingVideos = videos.length - outcomes.size;
+      summarizeProgress();
       log.info('Automatic tagging canceled while waiting for metadata capacity',{scope:state.scope,statistics});
       return {statistics,canceled:true,seriesSelectionCanceled:false,seriesPreflightFailure:null};
     } finally {
+      diagnostics?.phase('ended',{processed,total:videos.length,canceled:state.cancelRequested});
       state.running = false;
       state.cancelRequested = false;
       state.scope = 'library';

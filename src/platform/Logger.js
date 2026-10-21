@@ -38,6 +38,7 @@ let initialized = false;
 let logDirectory = null;
 let infoSink = null;
 let errorSink = null;
+let uiDiagnosticsSink = null;
 let ipcMainReference = null;
 let ipcListener = null;
 let fileErrorReported = false;
@@ -231,6 +232,15 @@ function persistEntry(entry) {
     return;
   }
   let line = formatEntry(entry);
+  // Keep sparse responsiveness samples available even when verbose tagging
+  // evidence rotates the ordinary logs during a large library run.
+  if (entry.scope === 'UIDiagnostics' && LEVELS[entry.level] >= LEVELS.info) {
+    if (!uiDiagnosticsSink) {
+      uiDiagnosticsSink = new RotatingFileSink(path.join(logDirectory,'mynda-ui-diagnostics.log'),2*1024*1024,2);
+      uiDiagnosticsSink.prepare();
+    }
+    uiDiagnosticsSink.write(line);
+  }
   if (LEVELS[entry.level] >= LEVELS.info) {
     infoSink.write(line);
   }
@@ -360,7 +370,7 @@ function child(scope) {
 }
 
 async function flush() {
-  let sinks = [infoSink, errorSink].filter(Boolean);
+  let sinks = [infoSink, errorSink, uiDiagnosticsSink].filter(Boolean);
   await Promise.all(sinks.map(sink => sink.flush()));
 }
 

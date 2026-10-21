@@ -83,6 +83,13 @@ let watchfolderScanRunning = false;
 let watchfolderScanQueued = false;
 const autoTagState = {running:false, cancelRequested:false, cancellationDecision:null, scope:'library'};
 let autoTagRequestPending = false;
+const uiDiagnostics = require('./UiDiagnostics').createUiDiagnostics({
+  enabled:process.env.MYNDA_UI_DIAGNOSTICS === '1',log:Logger.child('UIDiagnostics'),
+  getState:()=>({tagging:autoTagState.running,cancelRequested:autoTagState.cancelRequested,
+    capacityWaiting:Boolean(autoTagState.capacityWaiting),revision:library.revision,
+    saveQueueLength:library.queue.length,newCount:library.media.filter(video=>video && video.new).length})
+});
+library.diagnostics = uiDiagnostics;
 
 
 
@@ -193,6 +200,7 @@ library.validateRendererCommit = (request,event) => validateRendererCommit(reque
   authorizeArtwork:file=>editor.authorizeArtwork(file,event.sender.id)});
 installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,log:backendLog,
   methods:{...desktop.methods, ...MetadataConnection.methods,
+    'diagnostics.getConfig':()=>uiDiagnostics.config(),
     ...createTaskMethods({scan:requestWatchfolderScan,startTagging:requestAutoTag,requireFeature,
       startSelectedTagging:requestSelectedAutoTag,cancelTagging:requestAutoTagCancellation,
       reportFailure:reportAutoTagFailure}),
@@ -505,6 +513,7 @@ async function createWindow() {
     }
   })
   externalContent.protectWindow(win);
+  uiDiagnostics.attach(win,electron.powerMonitor);
   const owner = win.webContents.id;
   win.webContents.once('destroyed',()=>{
     editor.dispose(owner); desktop.dispose(owner);
@@ -1848,7 +1857,8 @@ async function autoTag(options = {}) {
     state: autoTagState, catalog: TaggingService, log: autoTagLog, requireFeature,
     getCandidates: getAutoTagCandidates, save: saveBatch,
     getLibraryVideos: () => library.media,
-    notifyStatus: status => win.webContents.send('status-update', status),
+    diagnostics:uiDiagnostics,
+    notifyStatus: status => { uiDiagnostics.status(status);win.webContents.send('status-update', status); },
     chooseSeries: chooseSeriesForSelectedBatch, preferences: library.settings.preferences,
     whenIdle: () => library.whenIdle()
   })(options);

@@ -215,6 +215,8 @@ class Library {
     this.foregroundStreak = job.options.priority === 'background' ? 0 : this.foregroundStreak + 1;
     this.running = true;
     let committed = false;
+    const diagnosticStart = this.diagnostics?.beginCommit();
+    let diagnosticFinished = false;
     try {
       const before = this._data;
       const outcome = Operations.applyOperations(before, job.operations, job.options);
@@ -232,6 +234,10 @@ class Library {
       }
       const response = {session: this.session, revision: this.revision, delta, addresses: outcome.addresses,
         requestId: job.options.requestId, skipped: outcome.skipped, conflicts: outcome.skipped};
+      const diagnostics = this.diagnostics?.endCommit(diagnosticStart,{revision:this.revision,committed,
+        changedAddresses:outcome.addresses.length,queueLength:this.queue.length});
+      diagnosticFinished = true;
+      if (diagnostics) response.diagnostics = diagnostics;
       if (committed) {
         for (const renderer of this.renderers) {
           try {
@@ -246,6 +252,8 @@ class Library {
       error.libraryOperation = {phase: committed ? 'publish' : 'commit', committed};
       job.reject(error);
     } finally {
+      if (!diagnosticFinished) this.diagnostics?.endCommit(diagnosticStart,{revision:this.revision,committed,
+        changedAddresses:0,queueLength:this.queue.length,failed:true});
       this.running = false;
       if (this.queue.length) this.schedule();
       else this.resolveIdle();

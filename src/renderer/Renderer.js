@@ -5,8 +5,9 @@ const ReactDOM = require('react-dom');
 // Editor date fields intentionally support DateJS's natural-language parsing
 // and formatting. Keep the extension loaded before importing the components.
 require('datejs');
-const {library, frontendLog} = require('./RendererRuntime.js');
+const {library, frontendLog, uiDiagnostics} = require('./RendererRuntime.js');
 const {Mynda} = require('./Mynda.js');
+void uiDiagnostics.start();
 
 library.ready.then(() => {
   ReactDOM.render(<Mynda library={library}/>, document.getElementById('root'));
