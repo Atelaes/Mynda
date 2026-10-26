@@ -1,5 +1,6 @@
 {
   "name": "mynda",
+  "productName": "Mynda",
   "version": "1.0.0",
   "description": "A media library and player app",
   "main": "src/bootstrap.js",
@@ -41,7 +42,8 @@
     "source:cleanup": "node scripts/finish-source-reorganization.js",
     "test:electron:asar": "npm run build:renderer && node test/electron/run-electron-smoke.js --asar",
     "build:renderer": "node scripts/build-renderer.js",
-    "electron:install": "install-electron"
+    "electron:install": "install-electron",
+    "profile:migrate": "node scripts/migrate-profile.js"
   },
   "author": "TorVor",
   "license": "ISC",
@@ -79,7 +81,6 @@
     "yauzl": "3.4.0"
   },
   "build": {
-    "productName": "Mynda",
     "appId": "com.torvor.mynda",
     "beforeBuild": "./scripts/before-build.js",
     "afterPack": "./scripts/verify-package.js",
@@ -130,9 +131,6 @@
     "icon": "images/mynda-icon.png",
     "mac": {
       "icon": "build/mynda.icns",
-      "extendInfo": {
-        "CFBundleDisplayName": "Mynda"
-      },
       "minimumSystemVersion": "13.0.0"
     }
   },

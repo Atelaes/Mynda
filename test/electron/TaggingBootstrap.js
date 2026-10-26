@@ -16,6 +16,7 @@ assert(fixtures.definitions[scenario],'Unknown scenario');
 app.setPath('userData',directory);
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 const root = app.getAppPath();
+const {resolve:resolveArtwork} = require(path.join(root,'src/platform/ArtworkPaths')).createArtworkPaths({userData:directory});
 const diagnostics = path.dirname(directory);
 const imageBytes = fs.readFileSync(path.join(root,'images/qmark.png'));
 const live = scenario === 'live';
@@ -138,12 +139,12 @@ app.on('browser-window-created',(_event,created)=>{
     try {
       await wait(()=>status.startupReady,'initial scan',20000);
       const originals=JSON.parse(fs.readFileSync(path.join(diagnostics,'originals.json'),'utf8'));
-      const result=await require('./TaggingJourney').run({window,scenario,phase,library,originals,dialogs,network,status,disk,stage:value=>{stage=value;}});
+      const result=await require('./TaggingJourney').run({window,scenario,phase,library,originals,dialogs,network,status,disk,resolveArtwork,stage:value=>{stage=value;}});
       network.assertHealthy();assert.strictEqual(pendingDialogs.length,0);
       stage='graceful-close';
       closeAndVerify(window,()=>{
         const saved=JSON.parse(fs.readFileSync(library.path,'utf8'));
-        checks.verify(scenario,originals.map(video=>saved.media.find(item=>item.id===video.id)));
+        checks.verify(scenario,originals.map(video=>saved.media.find(item=>item.id===video.id)),resolveArtwork);
         return {...result,stage:'complete',gracefulClose:true};
       },finish);
     } catch(error) {void finish(false,{stage,error:error.stack || String(error),issues:network.issues});}

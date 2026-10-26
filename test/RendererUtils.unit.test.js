@@ -35,6 +35,20 @@ suite.test('keeps packaged renderer assets relative while encoding absolute artw
   assert(artworkURL.includes('Poster%20With%20Spaces.jpg'));
 });
 
+suite.test('resolves managed references against the supplied root without changing the saved value', () => {
+  const reference = 'series/Poster #1 50%?.jpg';
+  assert.strictEqual(RendererUtils.artworkSourceURL(reference, '', '/profiles/Mynda/Library/Artwork'),
+    'file:///profiles/Mynda/Library/Artwork/series/Poster%20%231%2050%25%3F.jpg');
+  assert.strictEqual(RendererUtils.artworkSourceURL(reference, '', '/moved-artwork'),
+    'file:///moved-artwork/series/Poster%20%231%2050%25%3F.jpg');
+  assert.strictEqual(RendererUtils.artworkSourceURL('poster.jpg', '', 'C:\\Profile\\Artwork'),
+    'file:///C:/Profile/Artwork/poster.jpg');
+  assert.strictEqual(RendererUtils.artworkSourceURL('series/poster.png', '', '\\\\server\\share\\Mynda\\Library\\Artwork'),
+    'file://server/share/Mynda/Library/Artwork/series/poster.png');
+  assert.strictEqual(RendererUtils.artworkSourceURL('poster.jpg'), '');
+  assert.strictEqual(RendererUtils.artworkSourceURL('', '../../images/qmark.png', '/moved-artwork'), '../../images/qmark.png');
+});
+
 suite.test('uses each desktop platform\'s familiar file-manager name', () => {
   assert.strictEqual(RendererUtils.fileManagerName('darwin'), 'Finder');
   assert.strictEqual(RendererUtils.fileManagerName('win32'), 'Explorer');

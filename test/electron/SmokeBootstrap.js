@@ -136,7 +136,7 @@ async function inspectMainWindow(window) {
       settingsButton: Boolean(document.getElementById('settings-button'))
     }))()`);
 
-    const initialReady = initial.title === 'Mynda' && window.getTitle() === 'Mynda' && initial.rootChildren > 0 && initial.grid && initial.navigation &&
+    const initialReady = app.getName() === 'Mynda' && initial.title === 'Mynda' && window.getTitle() === 'Mynda' && initial.rootChildren > 0 && initial.grid && initial.navigation &&
       initial.library && initial.settingsButton;
     if (!initialReady) {
       finish(false, {

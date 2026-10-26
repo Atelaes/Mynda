@@ -3,7 +3,8 @@ const Response = require('./CatalogResponse');
 const {requestFailure} = Response;
 const {summarizeError, summarizeCatalogResponse} = require('./TaggingDiagnostics');
 
-function createArtworkService({log, requestCatalog, createCatalogQuery, artworkDirectory, dl, fs, path}) {
+function createArtworkService({log, requestCatalog, createCatalogQuery, artworkDirectory,
+  artworkReference = value => value, dl, fs, path}) {
   const seriesArtworkCache = new Map();
   const failedArtworkURLs = new Set();
   function usablePosterURL(poster) {
@@ -193,7 +194,7 @@ function createArtworkService({log, requestCatalog, createCatalogQuery, artworkD
           searchID: context.searchID,
           destination: filePath
         });
-        return resolve(filePath);
+        return resolve(artworkReference(filePath));
       }
 
       dl.download(url,filePath, (args) => {
@@ -205,7 +206,7 @@ function createArtworkService({log, requestCatalog, createCatalogQuery, artworkD
               artworkSource: context.artworkSource,
               destination: args.path
             });
-            resolve(args.path);
+            resolve(artworkReference(args.path));
           } else {
             reject({
               message: args && args.message ? args.message : String(args || 'Download returned no path'),

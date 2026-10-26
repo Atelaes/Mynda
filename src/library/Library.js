@@ -12,9 +12,10 @@ const LibraryPersistence = require('./LibraryPersistence.js');
 const Operations = require('./LibraryOperations');
 const defaultLibrary = require('./LibraryDefaults');
 const commands = require('./LibraryCommands');
+const {createArtworkPaths} = require('../platform/ArtworkPaths');
 const libraryLog = require('../platform/Logger.js').child('Library');
 
-function normalizeLibraryData(data) {
+function normalizeLibraryData(data, artworkPaths) {
   const library = {};
 
     Object.keys(defaultLibrary).map((key) => {
@@ -58,6 +59,7 @@ function normalizeLibraryData(data) {
           video.seriesImdbID = video.kind === 'show' &&
             typeof video.seriesImdbID === 'string' ? video.seriesImdbID : '';
           video.duplicates = normalizeDuplicatePaths(video.duplicates, video.filename);
+          if (typeof video.artwork === 'string') video.artwork = artworkPaths.reference(video.artwork);
         });
       }
     }
@@ -85,6 +87,24 @@ function normalizeLibraryData(data) {
 
   return library;
 }
+// Operations retain unchanged record identities. Only changed records need
+// artwork normalization; never mutate a committed snapshot or lose its deltas.
+function normalizeChangedArtwork(data, before, artworkPaths) {
+  let result = data;
+  for (const group of ['media', 'inactive_media']) {
+    if (data[group] === before[group]) continue;
+    let records = data[group];
+    records.forEach((video, index) => {
+      if (!video || video === before[group][index] || typeof video.artwork !== 'string') return;
+      const artwork = artworkPaths.reference(video.artwork);
+      if (artwork === video.artwork) return;
+      if (records === data[group]) records = [...records];
+      records[index] = {...video, artwork};
+    });
+    if (records !== data[group]) result = {...result, [group]: records};
+  }
+  return result;
+}
 function errorPayload(error) {
   return {message: error.message, code: error.code, address: error.address, id: error.id,
     libraryPath: error.libraryPath, libraryOperation: error.libraryOperation};
@@ -95,9 +115,10 @@ class Library {
     this.validateRendererCommit = validateRendererCommit;
     this.env = 'server';
     this.dataPath = electron.app.getPath('userData');
+    this.artworkPaths = createArtworkPaths({userData: this.dataPath});
     this.libraryDirectory = path.join(this.dataPath, 'Library');
     this.path = path.join(this.libraryDirectory, 'library.json');
-    this.artworkDirectory = path.join(this.libraryDirectory, 'Artwork');
+    this.artworkDirectory = this.artworkPaths.directory;
     this.backupDirectory = path.join(this.libraryDirectory, 'Backups');
     this.recoveryDirectory = path.join(this.libraryDirectory, 'Recovery');
     this.loadIssue = null;
@@ -170,7 +191,7 @@ class Library {
       paths: {dataPath: this.dataPath, libraryDirectory: this.libraryDirectory, path: this.path,
         artworkDirectory: this.artworkDirectory, backupDirectory: this.backupDirectory, recoveryDirectory: this.recoveryDirectory}};
   }
-  applyLibraryData(data) { this._data = Operations.deepFreeze(normalizeLibraryData(_.cloneDeep(data))); }
+  applyLibraryData(data) { this._data = Operations.deepFreeze(normalizeLibraryData(_.cloneDeep(data), this.artworkPaths)); }
   getSaveObject() { return this._data; }
   transaction(operations, callback, options = {}) {
     let prepared;
@@ -224,7 +245,7 @@ class Library {
       if (this.loadIssue) throw new Error('Refusing to overwrite an unreadable library before recovery is resolved.');
       let delta = {sections: {}, records: {}};
       if (outcome.data !== before) {
-        const candidate = Operations.deepFreeze(outcome.data);
+        const candidate = Operations.deepFreeze(normalizeChangedArtwork(outcome.data, before, this.artworkPaths));
         delta = Operations.makeDelta(before, candidate);
         this.maybeCreateAutomaticBackup();
         LibraryPersistence.writeLibraryFile(this.path, candidate);

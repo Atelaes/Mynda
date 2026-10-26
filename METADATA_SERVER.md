@@ -96,7 +96,7 @@ The file is `connection/metadata-credentials.json` under Electron's
 `app.getPath('userData')`. With the current application name, macOS uses:
 
 ```text
-~/Library/Application Support/mynda/connection/metadata-credentials.json
+~/Library/Application Support/Mynda/connection/metadata-credentials.json
 ```
 
 Electron's `safeStorage` encrypts the URL and token together. The encryption key

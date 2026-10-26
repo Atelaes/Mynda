@@ -206,10 +206,10 @@ suite.test('runs preparation and installation through the real CLI, including pa
   }));
 
 suite.test('resolves native default paths and rejects conflicting command options', () => {
-  assert.strictEqual(defaultLibraryPath('darwin',{},'/Users/test'),'/Users/test/Library/Application Support/mynda/Library/library.json');
-  assert.strictEqual(defaultLibraryPath('linux',{XDG_CONFIG_HOME:'/config'},'/home/test'),'/config/mynda/Library/library.json');
+  assert.strictEqual(defaultLibraryPath('darwin',{},'/Users/test'),'/Users/test/Library/Application Support/Mynda/Library/library.json');
+  assert.strictEqual(defaultLibraryPath('linux',{XDG_CONFIG_HOME:'/config'},'/home/test'),'/config/Mynda/Library/library.json');
   assert.strictEqual(defaultLibraryPath('win32',{APPDATA:'C:\\Profile\\Roaming'},'C:\\Profile'),
-    'C:\\Profile\\Roaming\\mynda\\Library\\library.json');
+    'C:\\Profile\\Roaming\\Mynda\\Library\\library.json');
   assert.throws(() => parseArguments(['--input']));
   assert.throws(() => parseArguments(['--install','--archive-missing-inactive']));
 });

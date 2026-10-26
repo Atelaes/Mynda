@@ -11,6 +11,7 @@ const lookup=(client,id='tt19000001')=>client.post(metadata.connection.url+'/v1/
 const {confirmLive}=require('./electron/LiveTaggingConsent');
 const checks=require('./electron/TaggingAssertions');
 const Evidence=require('../src/tagging/TaggingEvidence');
+const {createArtworkPaths}=require('../src/platform/ArtworkPaths');
 const {buildTaggingReport}=require('../src/tagging/TaggingReport');
 const {createAutoTagRunner}=require('../src/tagging/AutoTagRunner');
 const suite=createSuite('Tagging journey catalog and live-test safeguards','integration',
@@ -49,9 +50,9 @@ for(const scenario of ['movies','episode-parents','episode-numbering','selected'
         preferences:{remove_autotagged_from_new:scenario!=='selected'},whenIdle:async()=>{}});
       const selected=scenario==='selected';
       await run(selected?{videos:videos.slice(0,2),scope:'selected',seriesBatch:{series:'Mirror Bay'}}:{});
-      checks.verify(scenario,videos.map(video=>saved.get(video.id)));
+      checks.verify(scenario,videos.map(video=>saved.get(video.id)),createArtworkPaths({userData:directory}).resolve);
       network.assertHealthy();assert(network.requests.length>0);
-      for(const video of saved.values())if(video.artwork)assert.deepStrictEqual(fs.readFileSync(video.artwork),imageBytes);
+      for(const video of saved.values())if(video.artwork)assert.deepStrictEqual(fs.readFileSync(createArtworkPaths({userData:directory}).resolve(video.artwork)),imageBytes);
     } finally {
       network.restore();fs.createWriteStream=originalCreateWriteStream;await Promise.all(writes);
     }
@@ -85,7 +86,7 @@ suite.test('manual movie and episode proposals apply real metadata and authorize
         checks.matched(result.video,index===0?'tt19000002':'tt19000221');
         results.push(result.video);
       }
-      checks.verify('manual',results);network.assertHealthy();
+      checks.verify('manual',results,createArtworkPaths({userData:directory}).resolve);network.assertHealthy();
     } finally {network.restore();}
   }));
 suite.test('a typed IMDb ID becomes completed match evidence only after selection, and survives serialization and refresh',()=>

@@ -214,6 +214,21 @@ suite.test('renderer startup obtains backend state without opening, backing up, 
     assert.strictEqual(f.policy.writes, 0);
   }));
 
+suite.test('artwork normalization preserves committed snapshots and publishes the persisted relative path', () =>
+  withTemporaryDirectory('transaction-artwork-relative', async directory => {
+    const f = pairedLibrary(directory, [videoFixture({id: videoID(1)})]);
+    const client = f.createRenderer();
+    await f.flush();
+    const before = f.main.getSaveObject();
+    const result = operation(f.main, 'replace', 'media.0.artwork', path.join(directory, 'Library', 'Artwork', 'poster.jpg'));
+    await f.flush();
+    assertCommitted(result);
+    assert.strictEqual(before.media[0].artwork, '');
+    for (const data of [f.main, client.renderer, f.disk()]) assert.strictEqual(data.media[0].artwork, 'poster.jpg');
+    assert.notStrictEqual(f.main.getSaveObject(), before);
+    assert(Object.isFrozen(f.main.media[0]));
+  }));
+
 suite.test('overlapping backend and renderer saves both survive delayed IPC and renderer reload', () =>
   withTemporaryDirectory('transaction-overlap', async directory => {
     const f = pairedLibrary(directory);

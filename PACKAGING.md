@@ -122,14 +122,21 @@ platform's layout; it does not locate an arbitrary old build or infer freshness.
    Settings. Diagnostic export is available under Settings → Library; see
    [DIAGNOSTICS.md](DIAGNOSTICS.md).
 
-The visible window/title and macOS menu labels say **Mynda**. The macOS bundle
-uses `build.productName: "Mynda"` so electron-builder consistently names the
-application bundle, native menu and helper executables. Overriding only
-`CFBundleName` leaves helper names inconsistent and can prevent startup.
+The top-level package `name` stays `mynda`, and top-level `productName` is
+`Mynda`. Electron uses the product name for its standard application menu,
+profile directory and secure-storage identity; electron-builder also uses it
+for the application bundle and helper executables. The app and helper bundle
+IDs remain unchanged (`com.torvor.mynda`). There are no separate native-name
+or menu-label overrides.
 
-The top-level package name and runtime `app.getName()` stay `mynda`; there is
-no top-level `productName`. The builder removes its `build` configuration from
-the packaged metadata, so the display name does not change Electron's existing
-profile directory or secure-storage identity. The app and helper bundle IDs
-remain unchanged. Do not add a top-level `productName` or call
-`app.setName('Mynda')` without a separate storage/credential migration plan.
+Existing development profiles named `mynda` must be migrated before running
+this version. Quit Mynda, use the explicit backup/prepare/install procedure in
+[PROFILE_MIGRATION.md](PROFILE_MIGRATION.md), then enter the license key again.
+The script does not modify system Keychain entries. New installations start
+with the `Mynda` profile directly.
+
+Managed artwork references in the library are relative to a single backend
+root defined in `src/platform/ArtworkPaths.js`. Downloads, editor saves,
+legacy library loading and the renderer all use that root. Moving artwork in
+the future requires moving the files and changing this root, not rewriting
+relative references in the library.

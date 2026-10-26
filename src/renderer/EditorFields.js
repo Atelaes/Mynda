@@ -3,12 +3,13 @@ const React = require('react');
 const _ = require('lodash');
 const {v4: uuidv4} = require('uuid');
 const {
+  library,
   editorLog,
   artworkLog,
   confirmationDialogIsDisabled,
   disableConfirmationDialog
 } = require('./RendererRuntime.js');
-const {isValidURL, findNearestOfClass} = require('./RendererUtils.js');
+const {isValidURL, findNearestOfClass, artworkFilePath} = require('./RendererUtils.js');
 const {MynOverflowTextMarquee} = require('./SharedComponents.js');
 const ArtworkImage = require('./ArtworkImage');
 
@@ -602,7 +603,7 @@ class MynEditArtwork extends MynEdit {
     const canRemove = Boolean(artwork || this.props.hasArtwork);
     return (
       <div ref={this.container}>
-        <ArtworkImage source={artwork} placeholder={this.props.placeholderImage}
+        <ArtworkImage source={artwork} artworkDirectory={library && library.artworkDirectory} placeholder={this.props.placeholderImage}
           imageID="edit-artwork-image" showStatus allowRetry>
           <div id="edit-field-artwork-buttons">
             <button type="button" className="artwork-remove" disabled={!canRemove}
@@ -614,7 +615,7 @@ class MynEditArtwork extends MynEdit {
               <details key={`${this.props.movie.id}:${artwork}`} className="artwork-file-details">
                 <summary>File info</summary>
                 <div className="artwork-file-popover">
-                  <textarea className="artwork-file-path" aria-label="Artwork path" readOnly rows="3" value={artwork} />
+                  <textarea className="artwork-file-path" aria-label="Artwork path" readOnly rows="3" value={artworkFilePath(artwork, library && library.artworkDirectory)} />
                 </div>
               </details>
             )}

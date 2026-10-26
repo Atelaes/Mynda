@@ -9,7 +9,8 @@ function defaultLibraryPath(platform = process.platform, env = process.env, user
   const config = platform === 'darwin' ? api.join(userHome, 'Library', 'Application Support') :
     platform === 'win32' ? (env.APPDATA || api.join(userHome, 'AppData', 'Roaming')) :
       (env.XDG_CONFIG_HOME || api.join(userHome, '.config'));
-  return api.join(config, 'mynda', 'Library', 'library.json');
+  const appName = require('../package.json').productName || require('../package.json').name;
+  return api.join(config, appName, 'Library', 'library.json');
 }
 
 function usage() {

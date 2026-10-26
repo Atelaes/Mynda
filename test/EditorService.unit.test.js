@@ -4,10 +4,12 @@ const path = require('path');
 const {serialize, deserialize} = require('v8');
 const {assert, createSuite, runSuite} = require('./helpers/TestHarness');
 const {createEditorService} = require('../src/main/EditorService');
+const {createArtworkPaths} = require('../src/platform/ArtworkPaths');
 const Evidence = require('../src/tagging/TaggingEvidence');
 const suite = createSuite('Isolated editor backend', 'unit',
   'Backend-owned catalog evidence, canonical file identities, bounded artwork writes and staged edits.');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mynda-editor-service-'));
+const artworkFile = (reference, userData = root) => createArtworkPaths({userData}).resolve(reference);
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aVdMAAAAASUVORK5CYII=', 'base64');
 const original = () => ({id: 'library-video', filename: '/media/Series S01E01.mkv', kind: 'show',
   title: 'Arrival', series: 'A Series', season: 1, episode: 1, tags: ['original'],
@@ -128,9 +130,10 @@ suite.test('local artwork uses content signatures and backend-generated destinat
   const accepted = await service.inspectArtwork(source);
   assert.strictEqual(accepted, fs.realpathSync(source));
   const managed = await service.prepareArtwork(accepted);
-  assert.strictEqual(path.dirname(managed), fs.realpathSync(path.join(root, 'Library', 'Artwork')));
+  assert.strictEqual(path.isAbsolute(managed), false);
+  assert.strictEqual(path.dirname(managed), '.');
   assert.strictEqual(path.extname(managed), '.png');
-  assert.deepStrictEqual(fs.readFileSync(managed), image);
+  assert.deepStrictEqual(fs.readFileSync(artworkFile(managed)), image);
   assert.strictEqual(await service.prepareArtwork(managed), managed);
   await assert.rejects(service.prepareArtwork('../../anything.png'));
   const fake = path.join(root, 'fake.png'); fs.writeFileSync(fake, '<html>not an image</html>');
@@ -147,7 +150,7 @@ suite.test('symlinked artwork is copied rather than keeping an unmanaged target'
   const accepted = await service.inspectArtwork(link, 10);
   const managed = await service.prepareArtwork(accepted, 10);
   assert.notStrictEqual(managed, source); assert.notStrictEqual(managed, link);
-  assert.deepStrictEqual(fs.readFileSync(managed), image);
+  assert.deepStrictEqual(fs.readFileSync(artworkFile(managed)), image);
 });
 suite.test('artwork paths and grants remain stable through an aliased user-data directory', async () => {
   const target = path.join(root, 'alias-target');
@@ -169,9 +172,9 @@ suite.test('artwork paths and grants remain stable through an aliased user-data 
   const inspected = await service.inspectArtwork(local, 10);
   assert.strictEqual(inspected, chosen);
   const managed = await service.prepareArtwork(inspected, 10);
-  assert.strictEqual(managed, fs.realpathSync(managed));
-  assert.strictEqual(path.dirname(managed), fs.realpathSync(path.join(alias, 'Library', 'Artwork')));
-  assert.deepStrictEqual(fs.readFileSync(managed), image);
+  assert.strictEqual(path.isAbsolute(managed), false);
+  assert.strictEqual(path.dirname(managed), '.');
+  assert.deepStrictEqual(fs.readFileSync(artworkFile(managed, alias)), image);
   assert.strictEqual(service.authorizeArtwork(managed, 10), true);
   assert.strictEqual(await service.prepareArtwork(managed, 10), managed);
   const downloaded = await service.downloadArtwork('https://artwork.example/alias.png', 10);
@@ -182,7 +185,7 @@ suite.test('artwork paths and grants remain stable through an aliased user-data 
   assert.strictEqual(service.authorizeArtwork(downloaded.message, 10), true);
   const savedDownload = await service.prepareArtwork(downloaded.message, 10);
   assert.strictEqual(await service.prepareArtwork(savedDownload, 10), savedDownload);
-  fs.writeFileSync(managed, 'changed since approval');
+  fs.writeFileSync(artworkFile(managed, alias), 'changed since approval');
   assert.strictEqual(service.authorizeArtwork(managed, 10), false);
   await assert.rejects(service.prepareArtwork(managed, 10));
   service.dispose(10);
@@ -198,6 +201,59 @@ suite.test('downloads accept HTTP images only and ignore any caller-supplied des
   assert.strictEqual(path.dirname(result.message), fs.realpathSync(path.join(root, 'temp')));
   assert.strictEqual(path.extname(result.message), '.png');
   assert.strictEqual(calls.filter(call => call[0] === 'download').length, 1);
+});
+suite.test('managed references survive moving the profile and nested artwork does not need to be recopied', async () => {
+  const previousProfile = path.join(root, 'previous-profile');
+  const nextProfile = path.join(root, 'next-profile');
+  const reference = 'series/season one #1%.png';
+  const oldImage = artworkFile(reference, previousProfile);
+  fs.mkdirSync(path.dirname(oldImage), {recursive: true});
+  fs.writeFileSync(oldImage, image);
+  fs.renameSync(previousProfile, nextProfile);
+  const source = {...original(), artwork: reference};
+  const {service} = setup({app: {getPath: () => nextProfile},
+    library: {media: [source], inactive_media: []},
+    dialog: {showMessageBox: async () => { throw new Error('Existing library artwork does not need consent again'); }}});
+  const accepted = await service.inspectArtwork(reference, 10);
+  assert.strictEqual(accepted, reference);
+  assert.strictEqual(await service.prepareArtwork(accepted, 10), reference);
+  assert.deepStrictEqual(fs.readFileSync(artworkFile(reference, nextProfile)), image);
+  assert.deepStrictEqual(fs.readdirSync(createArtworkPaths({userData:nextProfile}).directory), ['series']);
+  assert.strictEqual(service.authorizeArtwork(reference, 10), true);
+  assert.strictEqual(service.authorizeArtwork(reference, 11), false);
+});
+suite.test('a relative spelling alone cannot authorize another managed image or a traversal', async () => {
+  const reference = 'not-chosen.png';
+  fs.writeFileSync(artworkFile(reference), image);
+  const {service} = setup({dialog: {showMessageBox: async () => ({response: 0})}});
+  assert.strictEqual(service.authorizeArtwork(reference, 10), false);
+  await assert.rejects(service.prepareArtwork(reference, 10));
+  assert.strictEqual(await service.inspectArtwork(reference, 10), null);
+  for (const escaped of ['../outside.png', 'nested/../../outside.png', '..\\outside.png']) {
+    await assert.rejects(service.inspectArtwork(escaped, 10));
+    await assert.rejects(service.prepareArtwork(escaped, 10));
+    assert.strictEqual(service.authorizeArtwork(escaped, 10), false);
+  }
+});
+suite.test('an explicitly selected image in a separate legacy profile is imported before it gets a relative reference', async () => {
+  const parent = path.join(root, 'two-profiles');
+  const oldProfile = path.join(parent, 'mynda');
+  const newProfile = path.join(parent, 'Mynda');
+  const previous = artworkFile('old-picked.png', oldProfile);
+  fs.mkdirSync(path.dirname(previous), {recursive: true}); fs.writeFileSync(previous, image);
+  // Both spellings name the same profile on case-insensitive filesystems. The
+  // separate-profile case exists on Linux and case-sensitive macOS volumes.
+  if (fs.existsSync(newProfile)) return;
+  const {service} = setup({app: {getPath: () => newProfile}, dialog: {
+    showOpenDialog: async () => ({canceled:false, filePaths:[previous]})
+  }});
+  const chosen = await service.chooseArtwork(10);
+  assert.strictEqual(chosen, fs.realpathSync(previous));
+  assert.strictEqual(service.authorizeArtwork(chosen, 10), true);
+  const prepared = await service.prepareArtwork(chosen, 10);
+  assert.strictEqual(path.isAbsolute(prepared), false);
+  assert.deepStrictEqual(fs.readFileSync(artworkFile(prepared, newProfile)), image);
+  assert(fs.existsSync(previous), 'Importing artwork must preserve the original image');
 });
 suite.test('a downloaded non-image is removed and cannot enter the renderer', async () => {
   let destination;

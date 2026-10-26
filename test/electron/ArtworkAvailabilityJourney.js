@@ -7,8 +7,10 @@ const {browserDriver, wait} = require('./BrowserDriver');
 // reference in this disposable library, then exercise the ordinary UI/bridge.
 async function inspectArtworkAvailability({window, videoId, userData, library}) {
   const ui = browserDriver(window);
+  const resolveArtwork = value => path.isAbsolute(value) ? value : path.join(library.artworkDirectory, value);
   const original = library.media.find(video => video.id === videoId);
-  const missing = path.join(userData, 'Library', 'Artwork', 'temporarily unavailable #1.png');
+  const missingReference = 'temporarily unavailable #1.png';
+  const missing = path.join(library.artworkDirectory, missingReference);
   const readSaved = () => JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'))
     .media.find(video => video.id === videoId);
   await library.patchMedia(videoId, {artwork: missing});
@@ -34,9 +36,9 @@ async function inspectArtworkAvailability({window, videoId, userData, library}) 
   await ui.click('.artwork-file-details summary');
   await ui.type('#edit-container .edit-field-title', 'Artwork availability test');
   await ui.save(() => readSaved().title === 'Artwork availability test');
-  assert.strictEqual(readSaved().artwork, missing, 'Unrelated edits must retain the unavailable reference');
+  assert.strictEqual(readSaved().artwork, missingReference, 'Unrelated edits must retain the unavailable reference');
 
-  fs.copyFileSync(original.artwork, missing);
+  fs.copyFileSync(resolveArtwork(original.artwork), missing);
   await ui.click('#editor-pane .artwork-unavailable button');
   await wait(() => ui.inspect(() => {
     const image = document.getElementById('edit-artwork-image');
@@ -47,9 +49,9 @@ async function inspectArtworkAvailability({window, videoId, userData, library}) 
   await ui.click('#editor-pane .artwork-remove');
   await wait(() => ui.inspect(() => document.getElementById('edit-artwork-image')
     .parentElement.dataset.artworkState === 'empty'), 'cleared artwork draft');
-  assert.strictEqual(readSaved().artwork, missing, 'Removal must wait for Save');
+  assert.strictEqual(readSaved().artwork, missingReference, 'Removal must wait for Save');
   await ui.save(() => readSaved().artwork === '');
-  assert(fs.existsSync(missing) && fs.existsSync(original.artwork), 'Clearing a reference must not delete image files');
+  assert(fs.existsSync(missing) && fs.existsSync(resolveArtwork(original.artwork)), 'Clearing a reference must not delete image files');
   await ui.closeEditor();
   await ui.edit(videoId);
   assert.strictEqual(await ui.inspect(() => document.querySelector('#editor-pane .artwork-remove').disabled), true);

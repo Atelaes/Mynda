@@ -178,6 +178,7 @@ suite.test(libraryJourney ? 'edits through the UI during scan and tagging, batch
     }
     fs.writeFileSync(path.join(appDirectory, 'package.json'), JSON.stringify({
       name: 'mynda-electron-smoke',
+      productName: require('../../package.json').productName,
       version: '1.0.0',
       main: libraryJourney ? 'LibraryJourneyBootstrap.js' : 'SmokeBootstrap.js'
     }, null, 2));

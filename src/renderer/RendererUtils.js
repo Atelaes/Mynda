@@ -1,6 +1,7 @@
 // Pure and near-pure helpers shared by renderer component groups.
 const _ = require('lodash');
 const {displayDuplicatePaths} = require('../library/DuplicateDisplay.js');
+const {isRelativeArtwork} = require('../platform/ArtworkReference');
 const {isVideoID} = require('../library/VideoIdentity.js');
 
 // Sort display titles by their meaningful first word while preserving the
@@ -11,11 +12,18 @@ function removeLeadingArticle(value) {
   return value.replace(/^(?:a\s|an\s|the\s)/i, '');
 }
 
-// Preserve renderer-relative assets such as ../../images/qmark.png so they stay
-// inside app.asar. Only absolute artwork paths from a user's library need
-// conversion to file: URLs.
-function artworkSourceURL(artwork, placeholder = '') {
-  const source = typeof artwork === 'string' && artwork ? artwork : placeholder;
+// The snapshot supplies the root; renderer code never chooses a storage location.
+function artworkFilePath(artwork, artworkDirectory = '') {
+  if (isRelativeArtwork(artwork)) {
+    return artworkDirectory ? artworkDirectory.replace(/[\\/]$/, '') + '/' + artwork : '';
+  }
+  return typeof artwork === 'string' ? artwork : '';
+}
+
+// App placeholders stay relative to app.asar; external/legacy images remain
+// readable while the editor imports replacements into managed storage.
+function artworkSourceURL(artwork, placeholder = '', artworkDirectory = '') {
+  const source = artwork ? artworkFilePath(artwork, artworkDirectory) : placeholder;
   if (typeof source !== 'string' || !source) return '';
   // A stored path is data; encoding every segment prevents literal %, # and ?
   // in filenames from changing URL interpretation. Windows drive and UNC
@@ -25,7 +33,7 @@ function artworkSourceURL(artwork, placeholder = '') {
       .split('/').map(encodeURIComponent).join('/');
   }
   if (/^\\\\[^\\]+\\/.test(source)) {
-    const parts = source.slice(2).split('\\');
+    const parts = source.slice(2).replace(/\\/g, '/').split('/');
     const host = parts.shift();
     return 'file://' + encodeURIComponent(host) + '/' + parts.map(encodeURIComponent).join('/');
   }
@@ -422,6 +430,7 @@ function isEqualIgnoreFuncs(obj1,obj2) {
 module.exports = {
   removeLeadingArticle,
   artworkSourceURL,
+  artworkFilePath,
   fileManagerName,
   editorSelectionKey,
   batchNewState,

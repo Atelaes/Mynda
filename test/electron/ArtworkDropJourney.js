@@ -10,6 +10,7 @@ async function inspectArtworkDrop({app, dialog, window, videoId, userData, libra
   fs.copyFileSync(path.join(app.getAppPath(), 'images', 'mynda-icon.png'), source);
   const canonical = fs.realpathSync(source);
   const ui = browserDriver(window), contents = window.webContents;
+  const resolveArtwork = value => path.isAbsolute(value) ? value : path.join(library.artworkDirectory, value);
   const originalArtwork = library.media.find(video => video.id === videoId).artwork;
   const previousDialog = dialog.showMessageBox;
   let approvals = 0;
@@ -55,12 +56,13 @@ async function inspectArtworkDrop({app, dialog, window, videoId, userData, libra
       'A drop must remain an editor draft until Save');
     await ui.save(() => {
       const artwork = library.media.find(video => video.id === videoId).artwork;
-      return artwork !== originalArtwork && artwork && fs.existsSync(artwork);
+      return artwork !== originalArtwork && artwork && fs.existsSync(resolveArtwork(artwork));
     });
     const saved = JSON.parse(fs.readFileSync(path.join(userData, 'Library', 'library.json'), 'utf8'));
     const artwork = saved.media.find(video => video.id === videoId).artwork;
-    assert.strictEqual(path.dirname(artwork), fs.realpathSync(path.join(userData, 'Library', 'Artwork')));
-    assert(fs.readFileSync(artwork).equals(fs.readFileSync(source)), 'Saved artwork bytes changed');
+    assert(!path.isAbsolute(artwork), 'Saved managed artwork must be relative');
+    assert.strictEqual(path.dirname(resolveArtwork(artwork)), library.artworkDirectory);
+    assert(fs.readFileSync(resolveArtwork(artwork)).equals(fs.readFileSync(source)), 'Saved artwork bytes changed');
     await ui.closeEditor();
     return true;
   } finally {

@@ -9,6 +9,7 @@ const {copyDirectory,launchElectron} = require('./run-electron-smoke');
 const {confirmLive} = require('./LiveTaggingConsent');
 const {redact} = require('./TaggingNetwork');
 const {verify} = require('./TaggingAssertions');
+const {createArtworkPaths} = require('../../src/platform/ArtworkPaths');
 const {definitions} = require('./TaggingFixtures');
 const {connection} = require('./MetadataFixtures');
 const {validateServerConfig} = require('../../src/tagging/MetadataServerConfig');
@@ -42,7 +43,7 @@ async function runScenario(scenario,{useAsar,server = connection,keep}) {
       assert.strictEqual(result.gracefulClose,true);
       const original=JSON.parse(fs.readFileSync(path.join(directory,'originals.json'),'utf8'));
       const saved=JSON.parse(fs.readFileSync(path.join(userData,'Library','library.json'),'utf8'));
-      verify(scenario,original.map(video=>saved.media.find(item=>item.id===video.id)));
+      verify(scenario,original.map(video=>saved.media.find(item=>item.id===video.id)),createArtworkPaths({userData}).resolve);
     }
     passed=true;
   } finally {

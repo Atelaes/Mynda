@@ -15,8 +15,10 @@ const client = createCatalogClient({axios:require('axios'),server:async()=>{
   return connection.getConfig();
 },onUnauthorized:config=>connection.reject(config),log});
 const path = require('path');
+const {createArtworkPaths} = require('../platform/ArtworkPaths');
+const artworkPaths = createArtworkPaths({userData:app.getPath('userData')});
 const artwork = createArtworkService({...client,log,
-  artworkDirectory:path.join(app.getPath('userData'),'Library','Artwork'),
+  artworkDirectory:artworkPaths.directory, artworkReference:artworkPaths.reference,
   dl:require('../platform/download'),fs:require('fs'),path});
 const rawEngine = createTaggingEngine({client,log,applier:createTagApplier({log,...artwork}),
   withEpisodeDuration:require('./EpisodeRuntime.js').withEpisodeDuration});

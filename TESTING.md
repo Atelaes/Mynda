@@ -52,6 +52,14 @@ through `package:verify`. The portable packaging suite uses synthetic media
 fixtures and does not replace `test:package` on the target operating system.
 See [PACKAGING.md](PACKAGING.md) for the package layout and beta readiness checks.
 
+Profile migration tests use disposable profiles to verify complete checksum
+backups, case-only rename installation, interruption recovery and credential
+reset. Artwork path tests cover relocation without library rewrites, legacy
+backup recovery, traversal/symlink rejection and revision-consistent saves.
+Native startup and tagging journeys assert that managed artwork persists as
+relative references and still renders after saves/restarts. See
+[PROFILE_MIGRATION.md](PROFILE_MIGRATION.md) for the offline migration procedure.
+
 The source and ASAR startup journeys also verify the capitalized window/page
 title and click **Export Diagnostics** through the real Settings interface.
 The native save dialog is replaced with a destination in the disposable test

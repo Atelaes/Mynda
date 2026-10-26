@@ -26,7 +26,7 @@ async function waitForChosenMetadata(ui, imdbID, previousDescription, timeout = 
   }
 }
 
-async function run({window,scenario,phase,library,originals,dialogs,network,status,disk,stage}) {
+async function run({window,scenario,phase,library,originals,dialogs,network,status,disk,stage,resolveArtwork}) {
   const ui = browserDriver(window);
   const ids = originals.map(video=>video.id);
   const current = () => ids.map(id=>library.media.find(video=>video.id===id));
@@ -114,14 +114,14 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
   }
   await ui.start(); await all();
   if (phase === 'restart') {
-    stage('restart-and-disk'); checks.verify(scenario,current()); await settled();
+    stage('restart-and-disk'); checks.verify(scenario,current(),resolveArtwork); await settled();
     for (let index=0; index<ids.length; index++) await assertEditor(index);
     if(current()[0].taggingEvidence || current()[0].taggingDecision)await report(0);
     return {restartVerified:true};
   }
   stage(scenario);
   if (['movies','episode-parents','episode-numbering','failures'].includes(scenario)) {
-    const finish=await startAuto(); await finish(); checks.verify(scenario,current());
+    const finish=await startAuto(); await finish(); checks.verify(scenario,current(),resolveArtwork);
     for(let index=0;index<ids.length;index++)await report(index);
   } else if (scenario === 'manual') {
     const hold=network.hold(({query})=>[query.s,query.t].includes(originals[0].title));
@@ -135,7 +135,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     assert.deepStrictEqual(saved(),originals);
     await ui.closeEditor();
     await manual(0,'tt19000002',true); await manual(1,'tt19000221',false);
-    checks.verify(scenario,current());
+    checks.verify(scenario,current(),resolveArtwork);
     await report(0);
   } else if (scenario === 'batch') {
     const untouched = copy(current()[2]);
@@ -168,7 +168,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     assert(current().slice(0,2).every(video=>video.artwork),'Removal must remain a draft until Save');
     await ui.save(()=>current().slice(0,2).every(video=>video.country==='' && video.artwork===''));
     assert.deepStrictEqual(current()[2],untouched);
-    originals.slice(0,2).forEach(video=>assert(fs.existsSync(video.artwork),'Shared artwork must not be deleted'));
+    originals.slice(0,2).forEach(video=>assert(fs.existsSync(resolveArtwork(video.artwork)),'Shared artwork must not be deleted'));
     await ui.closeEditor();
   } else if (scenario === 'selected' || scenario === 'live') {
     if (scenario === 'live') {const finish=await startAuto();await finish();await manual(1,'tt2543164',false);}
@@ -218,7 +218,7 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     await wait(()=>ui.exists('.playlist-bar .autotag:not(.cancel)'),'tagging controls recover after failed save');
     const finish=await startAuto();await finish();
   }
-  await dialogs.drained(); await settled(); checks.verify(scenario,current());
+  await dialogs.drained(); await settled(); checks.verify(scenario,current(),resolveArtwork);
   await all(); await assertEditor(0);
   return {taggingVerified:true};
 }

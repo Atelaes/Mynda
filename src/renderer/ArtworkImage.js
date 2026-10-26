@@ -27,7 +27,7 @@ class ArtworkImage extends React.Component {
     const {source, failed, loaded, placeholderFailed, attempt} = this.state;
     const actualImage = Boolean(source && !failed);
     const url = artworkSourceURL(actualImage ? source : '',
-      this.props.placeholder || '../../images/qmark.png');
+      this.props.placeholder || '../../images/qmark.png', this.props.artworkDirectory);
     const current = () => source === this.state.source && attempt === this.state.attempt &&
       actualImage === Boolean(this.state.source && !this.state.failed);
     return (

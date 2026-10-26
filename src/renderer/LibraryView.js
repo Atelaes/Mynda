@@ -1296,7 +1296,7 @@ class MynDetails extends React.Component {
       const video = this.props.video;
       details = (
         <ul>
-          <li className="detail" id="detail-artwork"><ArtworkImage source={video.artwork}
+          <li className="detail" id="detail-artwork"><ArtworkImage source={video.artwork} artworkDirectory={library.artworkDirectory}
             placeholder="../../images/qmark-details.png" imageID="detail-artwork-img" backdrop showStatus /></li>
           {/* <li className="detail" id="detail-title"><MynOverflowTextMarquee class="detail-title-text" text={video.title} /></li> */}
           <li className="detail" id="detail-title">{video.title}</li>
@@ -1473,7 +1473,7 @@ class MynRecentlyWatched extends MynDropdown {
         return (
           <div className='container' key={id}>
             <div className={`video${nextVidID ? '' : ' no-next'}`} onClick={() => this.props.playVideo(video.id)}>
-              <ArtworkImage className="artwork" source={video.artwork} placeholder={placeholderImage} />
+              <ArtworkImage className="artwork" source={video.artwork} artworkDirectory={library.artworkDirectory} placeholder={placeholderImage} />
               <div className='title-position-container'>
                 <div className='title'><MynOverflowTextMarquee text={video.title} /></div>
                 {video.position > 0 ? <MynShowPositionWidget video={video} /> : null}

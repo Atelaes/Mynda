@@ -1,5 +1,6 @@
 const assert = require('assert');
 const fs = require('fs');
+const path = require('path');
 function matched(video, imdbID, parent) {
   assert.strictEqual(video.imdbID,imdbID,video.title);
   if (parent) assert.strictEqual(video.seriesImdbID,parent);
@@ -13,14 +14,16 @@ function unchangedPersonal(video) {
   assert.strictEqual(video.watchlater,true);
   assert.strictEqual(video.position,42);
 }
-function artwork(video) {
-  assert(video.artwork && fs.statSync(video.artwork).size > 0,'Downloaded artwork must exist on disk');
+function artwork(video, resolveArtwork) {
+  assert.strictEqual(path.isAbsolute(video.artwork), false, 'Saved managed artwork must use a relative reference');
+  assert.strictEqual(typeof resolveArtwork, 'function', 'Artwork checks need the current profile resolver');
+  assert(video.artwork && fs.statSync(resolveArtwork(video.artwork)).size > 0,'Downloaded artwork must exist on disk');
   assert(!/^https?:/.test(video.artwork),'Saved artwork must be local');
 }
-function verify(scenario, videos) {
+function verify(scenario, videos, resolveArtwork) {
   const [a,b,c] = videos;
   if (scenario === 'movies') {
-    matched(a,'tt19000001'); artwork(a); unchangedPersonal(a);
+    matched(a,'tt19000001'); artwork(a,resolveArtwork); unchangedPersonal(a);
     assert.deepStrictEqual(a.ratings,{user:4,imdb:7.8,rt:84,mc:72});
     assert.strictEqual(a.new,false);
     for (const video of [b,c]) {
@@ -40,7 +43,7 @@ function verify(scenario, videos) {
       assert.strictEqual(String(video.taggingEvidence.original.season),'1');
     });
   } else if (scenario === 'manual') {
-    matched(a,'tt19000002'); matched(b,'tt19000221','tt19000104'); artwork(a); artwork(b);
+    matched(a,'tt19000002'); matched(b,'tt19000221','tt19000104'); artwork(a,resolveArtwork); artwork(b,resolveArtwork);
     assert.strictEqual(a.new,true); assert.strictEqual(b.new,true); unchangedPersonal(a);
     assert.strictEqual(a.taggingEvidence.identities.record.origin,'user');
   } else if (scenario === 'batch') {
@@ -74,7 +77,7 @@ function verify(scenario, videos) {
   } else if (scenario === 'disk-full') {
     matched(a,'tt19000009'); matched(b,'tt19000010');
   } else if (scenario === 'live') {
-    matched(a,'tt0133093'); matched(b,'tt2543164'); artwork(a); artwork(b);
+    matched(a,'tt0133093'); matched(b,'tt2543164'); artwork(a,resolveArtwork); artwork(b,resolveArtwork);
     for (const video of videos.slice(2)) {
       assert(/^tt\d+$/.test(video.imdbID)); assert.strictEqual(video.seriesImdbID,'tt0903747');
       assert.strictEqual(String(video.season),'1'); assert(video.taggingEvidence);

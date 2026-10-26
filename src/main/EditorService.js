@@ -7,6 +7,7 @@ const {randomBytes} = require('crypto');
 const Evidence = require('../tagging/TaggingEvidence');
 const {subtitleExtensions} = require('../scanning/SubtitleMatcher');
 const {createArtworkDownloader, artworkURL, MAX_ARTWORK_BYTES} = require('./EditorArtworkDownload');
+const {createArtworkPaths} = require('../platform/ArtworkPaths');
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const scalarFields = ['kind', 'title', 'series', 'year', 'season', 'episode', 'imdbID',
@@ -34,6 +35,7 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   deriveFilenameResetChanges, isAutoTagRunning = () => false,
   confirmationDialogIsDisabled = () => false, disableConfirmationDialog = () => {},
   now = Date.now, notifyLookup = () => {}, requireFeature = async()=>{}}) {
+  const artworkPaths = createArtworkPaths({userData: app.getPath('userData')});
   const proposals = new Map();
   const grants = new Map();
   const closedOwners = new Set();
@@ -87,18 +89,31 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   }
   function grant(owner, kind, value) {
     requireOwner(owner);
-    // Every artwork entry point returns the same canonical spelling, including
-    // newly copied/downloaded files under an aliased user-data directory.
-    if (kind === 'artwork') value = fs.realpathSync(value);
+    // Managed files use portable references, while an approved external or
+    // temporary image keeps its canonical absolute path until it is imported.
+    const filename = kind === 'artwork' ? fs.realpathSync(artworkPaths.resolve(value)) : value;
+    if (kind === 'artwork') {
+      value = filename;
+      // A legacy profile may still exist beside the current one. A picker
+      // selection from it is an external input until prepareArtwork copies it;
+      // the load-time legacy-reference conversion must not grant a different
+      // current-profile file that merely has the same name.
+      try {
+        const relative = path.relative(fs.realpathSync(artworkPaths.directory), filename);
+        if (relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)) {
+          value = artworkPaths.reference(filename);
+        }
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
     if (!grants.has(owner)) grants.set(owner, {artwork: new Map(), subtitles: new Map(), urls: new Set()});
     if (kind === 'urls') grants.get(owner).urls.add(value);
-    else grants.get(owner)[kind].set(value, fileIdentity(value));
+    else grants.get(owner)[kind].set(value, fileIdentity(filename));
     return value;
   }
   function authorizedFile(value, owner, kind) {
     const records = grants.get(owner) && grants.get(owner)[kind];
     if (!records || !records.has(value)) return false;
-    try { return records.get(value) === fileIdentity(value); }
+    try { return records.get(value) === fileIdentity(kind === 'artwork' ? artworkPaths.resolve(value) : value); }
     catch (_) { return false; }
   }
   const authorizeArtwork = (value, owner) => authorizedFile(value, owner, 'artwork');
@@ -106,7 +121,7 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   const knownArtwork = value => [...(library.media || []), ...(library.inactive_media || [])].some(video => video && video.artwork === value);
   const knownSubtitle = value => [...(library.media || []), ...(library.inactive_media || [])].some(video =>
     video && Array.isArray(video.subtitles) && video.subtitles.includes(value));
-  const artworkFolder = path.join(app.getPath('userData'), 'Library', 'Artwork');
+  const artworkFolder = artworkPaths.directory;
   const temporaryFolder = path.join(app.getPath('userData'), 'temp');
 
   function catalogArtwork(owner, row) {
@@ -234,8 +249,9 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
 
   async function artworkBytes(value) {
     boundedText(value, 'artwork path');
-    if (!path.isAbsolute(value)) throw new TypeError('Artwork must be an absolute file path.');
-    const source = await fs.promises.realpath(value);
+    const filename = artworkPaths.resolve(value);
+    if (!path.isAbsolute(filename)) throw new TypeError('Artwork must be a local file path.');
+    const source = await fs.promises.realpath(filename);
     const handle = await fs.promises.open(source, 'r');
     try {
       const stat = await handle.stat();
@@ -256,10 +272,11 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
   }
   async function inspectArtwork(value, owner) {
     boundedText(value, 'artwork path');
-    if (!path.isAbsolute(value)) throw new TypeError('Artwork must be an absolute file path.');
+    const filename = artworkPaths.resolve(value);
+    if (!path.isAbsolute(filename)) throw new TypeError('Artwork must be a local file path.');
     if (!authorizeArtwork(value, owner) && !knownArtwork(value)) {
       const result = await dialog.showMessageBox({type: 'question', buttons: ['Cancel', 'Use Image'],
-        defaultId: 0, cancelId: 0, noLink: true, message: 'Use this image as artwork?', detail: value});
+        defaultId: 0, cancelId: 0, noLink: true, message: 'Use this image as artwork?', detail: filename});
       if (result.response !== 1) return null;
     }
     return grant(owner, 'artwork', (await artworkBytes(value)).source);
@@ -269,7 +286,10 @@ function createEditorService({library, catalog, dialog, app, downloadFile = crea
     if (!authorizeArtwork(value, owner) && !knownArtwork(value)) throw new Error('Choose or confirm this image before saving it.');
     const {source, bytes, extension} = await artworkBytes(value);
     await fs.promises.mkdir(artworkFolder, {recursive: true});
-    if (path.dirname(source) === await fs.promises.realpath(artworkFolder)) return grant(owner, 'artwork', source);
+    const relative = path.relative(await fs.promises.realpath(artworkFolder), source);
+    if (relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)) {
+      return grant(owner, 'artwork', source);
+    }
     const destination = path.join(artworkFolder, randomBytes(24).toString('hex') + extension);
     await fs.promises.writeFile(destination, bytes, {flag: 'wx'});
     return grant(owner, 'artwork', destination);

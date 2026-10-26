@@ -66,4 +66,11 @@ suite.test('the blurred details background loads only after the actual image suc
   image(component).props.onError();
   assert(!markup(component).includes('optional-artwork-duplicate'));
 });
+suite.test('managed artwork follows a new root while its saved reference stays relative', () => {
+  const component = fixture('nested/poster #1.png', {artworkDirectory: '/profile/Mynda/Library/Artwork'});
+  assert.strictEqual(image(component).props.src, 'file:///profile/Mynda/Library/Artwork/nested/poster%20%231.png');
+  component.props = {...component.props, artworkDirectory: '/relocated-artwork'};
+  assert.strictEqual(image(component).props.src, 'file:///relocated-artwork/nested/poster%20%231.png');
+  assert.strictEqual(component.props.source, 'nested/poster #1.png');
+});
 runSuite(suite);

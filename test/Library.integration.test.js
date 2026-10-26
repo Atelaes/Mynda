@@ -362,4 +362,46 @@ suite.test('requires conversion of an old recovery backup before replacing a dam
     assert.strictEqual(fs.readFileSync(libraryPath,'utf8'),'{damaged primary');
   }));
 
+suite.test('managed artwork becomes portable on load and survives a profile move without library edits', () =>
+  withTemporaryDirectory('library-relative-artwork', parent => {
+    const oldProfile = path.join(parent, 'mynda');
+    const current = path.join(parent, 'Mynda');
+    const libraryPath = path.join(current, 'Library', 'library.json');
+    const external = path.join(parent, 'external.jpg');
+    Persistence.writeLibraryFile(libraryPath, libraryFixture({videoIdScheme: 2,
+      media: [videoFixture({id: 'a'.repeat(64), artwork: path.join(oldProfile, 'Library', 'Artwork', 'poster.jpg')})],
+      inactive_media: [videoFixture({id: 'b'.repeat(64), artwork: path.join(current, 'Library', 'Artwork', 'series', 'poster.png')}),
+        videoFixture({id: 'c'.repeat(64), artwork: external})]}));
+    let {Library} = loadLibraryClass(current);
+    const instance = new Library();
+    assert.strictEqual(instance.media[0].artwork, 'poster.jpg');
+    assert.strictEqual(instance.inactive_media[0].artwork, 'series/poster.png');
+    assert.strictEqual(instance.inactive_media[1].artwork, external);
+    instance.save();
+    const beforeMove = fs.readFileSync(libraryPath);
+    const moved = path.join(parent, 'moved-profile');
+    fs.renameSync(current, moved);
+    ({Library} = loadLibraryClass(moved));
+    const reloaded = new Library();
+    assert.strictEqual(reloaded.media[0].artwork, 'poster.jpg');
+    assert.strictEqual(reloaded.artworkPaths.resolve(reloaded.media[0].artwork), path.join(moved, 'Library', 'Artwork', 'poster.jpg'));
+    assert.deepStrictEqual(fs.readFileSync(reloaded.path), beforeMove);
+  }));
+
+suite.test('restoring a legacy backup normalizes managed artwork before committing recovered data', () =>
+  withTemporaryDirectory('library-relative-artwork-recovery', parent => {
+    const current = path.join(parent, 'Mynda');
+    const libraryPath = path.join(current, 'Library', 'library.json');
+    const backup = path.join(current, 'Library', 'Backups', 'library-2026-09-07T01-00-00-000Z-p1-1.json');
+    Persistence.writeLibraryFile(backup, libraryFixture({videoIdScheme: 2,
+      media: [videoFixture({id: 'a'.repeat(64), artwork: path.join(parent, 'mynda', 'Library', 'Artwork', 'poster.jpg')})]}));
+    fs.writeFileSync(libraryPath, '{damaged');
+    const {Library} = loadLibraryClass(current);
+    const instance = new Library();
+    instance.restoreLatestAutomaticBackup();
+    assert.strictEqual(Persistence.readLibraryFile(libraryPath).data.media[0].artwork, 'poster.jpg');
+    assert.strictEqual(Persistence.readLibraryFile(backup).data.media[0].artwork,
+      path.join(parent, 'mynda', 'Library', 'Artwork', 'poster.jpg'));
+  }));
+
 runSuite(suite);
