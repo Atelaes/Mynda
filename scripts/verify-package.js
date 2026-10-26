@@ -135,6 +135,10 @@ function verifyPackage(resourcesDirectory, {platform = process.platform, expecte
     'THIRD_PARTY_NOTICES.md', 'licenses/fonts.txt', 'licenses/OFL-1.1.txt',
     ...[...REQUIRED_MEDIA_NOTICES, ...mediaExecutables].map(name => `media-tools/${name}`)
   ];
+  if (platform === 'darwin' && expected.build?.mac?.icon?.endsWith('.icon')) {
+    // Both the layered icon and Apple's flattened fallback must ship.
+    required.push('Assets.car', 'icon.icns');
+  }
   for (const name of required) {
     const filename = path.join(root, name);
     if (!fs.existsSync(filename) || !fs.statSync(filename).isFile() || fs.statSync(filename).size === 0) {

@@ -130,7 +130,7 @@
     },
     "icon": "images/mynda-icon.png",
     "mac": {
-      "icon": "build/mynda.icns",
+      "icon": "build/Mynda.icon",
       "minimumSystemVersion": "13.0.0"
     }
   },

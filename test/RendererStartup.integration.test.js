@@ -70,6 +70,38 @@ suite.test('the production packaging hook awaits the bundle before media verific
   assert.deepStrictEqual(calls, ['production', 'media']);
 });
 
+suite.test('Mac packaging selects full Xcode for the build while respecting an explicit selection', async () => {
+  const original = process.env.DEVELOPER_DIR;
+  const xcode = '/Applications/Xcode.app/Contents/Developer';
+  let selections = 0;
+  const hook = loadFreshWithMocks(require.resolve('../scripts/before-build'), {
+    './build-renderer.js': {buildRenderer: async () => {}},
+    './verify-media-tools.js': async () => true,
+    fs: {existsSync: filename => filename === path.join(xcode, 'usr/bin/actool')},
+    child_process: {execFileSync: (executable, args) => {
+      assert.strictEqual(executable, '/usr/bin/xcode-select');
+      assert.deepStrictEqual(args, ['-p'], 'Do not change the global developer tools selection');
+      selections++;
+      return '/Library/Developer/CommandLineTools\n';
+    }}
+  });
+  try {
+    delete process.env.DEVELOPER_DIR;
+    await hook({platform: {nodeName: 'win32'}});
+    assert.strictEqual(process.env.DEVELOPER_DIR, undefined);
+    await hook({platform: {nodeName: 'darwin'}});
+    assert.strictEqual(process.env.DEVELOPER_DIR, process.platform === 'darwin' ? xcode : undefined);
+    assert.strictEqual(selections, process.platform === 'darwin' ? 1 : 0);
+    process.env.DEVELOPER_DIR = '/custom/Xcode.app/Contents/Developer';
+    await hook({platform: {nodeName: 'darwin'}});
+    assert.strictEqual(process.env.DEVELOPER_DIR, '/custom/Xcode.app/Contents/Developer');
+    assert.strictEqual(selections, process.platform === 'darwin' ? 1 : 0);
+  } finally {
+    if (original === undefined) delete process.env.DEVELOPER_DIR;
+    else process.env.DEVELOPER_DIR = original;
+  }
+});
+
 suite.test('the page permits only external local scripts and no renderer network requests', () => {
   const html = fs.readFileSync(path.join(root, 'src/renderer/index.html'), 'utf8');
   const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];

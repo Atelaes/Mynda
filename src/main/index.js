@@ -496,8 +496,9 @@ function eraseTempImages() {
 async function createWindow() {
   const iconFilename = process.platform === 'darwin' ? 'mynda-icon-mac.png' : 'mynda-icon.png';
   const appIcon = path.join(app.getAppPath(), 'images', iconFilename);
-  // Packaged macOS apps use their embedded ICNS. Source launches otherwise
-  // inherit Electron's Dock icon; Windows/Linux use the window icon below.
+  // Packaged macOS apps use their layered icon or embedded ICNS fallback.
+  // Source launches otherwise inherit Electron's Dock icon; Windows/Linux
+  // use the window icon below. Do not replace the packaged Mac icon at runtime.
   if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
     app.dock.setIcon(appIcon);
   }

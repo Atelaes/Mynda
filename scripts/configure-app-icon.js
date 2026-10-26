@@ -1,11 +1,10 @@
-// Run once after extracting the icon update. Merge only icon settings into
-// the user's package.json, preserving dependencies and other build options.
+// Synchronize the platform icon settings without changing other build options.
 const fs = require('fs');
 const path = require('path');
 
 const icons = {
   default: 'images/mynda-icon.png',
-  mac: 'build/mynda.icns',
+  mac: 'build/Mynda.icon',
   win: 'build/mynda.ico',
   linux: 'build/icons'
 };
@@ -16,7 +15,7 @@ function configureAppIcon(root) {
   const original = fs.readFileSync(filename, 'utf8');
   const config = JSON.parse(original);
   if (config.name !== 'mynda') throw new Error('Run this script inside the Mynda project.');
-  const assets = [icons.default, icons.mac, icons.win,
+  const assets = [icons.default, `${icons.mac}/icon.json`, icons.win,
     ...[16, 32, 48, 64, 128, 256, 512, 1024].map(size => `${icons.linux}/${size}x${size}.png`)];
   for (const asset of assets) {
     if (!fs.statSync(path.join(root, asset)).isFile()) throw new Error(`Missing icon: ${asset}`);

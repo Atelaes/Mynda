@@ -39,6 +39,7 @@ finished archive and external resources before signing. It checks:
 - unexpected application paths and known private filenames, including local
   server credentials, library snapshots, environment files and Mynda logs;
 - platform media executable paths and required font/media notices;
+- the compiled Mac icon catalog and flattened ICNS fallback;
 - resource symlinks that point outside the application.
 
 Dependency collection fails if production dependencies cannot be resolved.
@@ -86,6 +87,39 @@ npm run package:verify -- "dist/mac-arm64/Mynda.app/Contents/Resources"
 Use the actual output directory from your builder run. On Windows/Linux pass
 the unpacked application's `resources` directory. The command checks the host
 platform's layout; it does not locate an arbitrary old build or infer freshness.
+
+## Application icons
+
+The editable Mac icon is `build/Mynda.icon`, copied from the Icon Composer
+document originally saved in `sandbox/`. Open this version-controlled copy
+in Icon Composer for future edits; its `Assets/` directory belongs with it.
+
+`build.mac.icon` points to that document. electron-builder compiles it with
+Xcode's `actool` into `Contents/Resources/Assets.car` and `icon.icns`, and sets
+`CFBundleIconName` and `CFBundleIconFile` in the application Info.plist. macOS
+26 and later use the layered Liquid Glass icon; older supported macOS versions
+use Apple's flattened rendering of the same design. Both ship in the same
+Mac application. The minimum macOS version remains 13.0.0. The DMG volume icon
+also uses the generated ICNS. See the [electron-builder icon documentation](https://www.electron.build/v26/docs/features/icons-and-images/).
+
+Mac packaging requires full Xcode 26 or newer; standalone Command Line Tools
+do not include `actool`. The build respects `DEVELOPER_DIR` or the selected full
+Xcode. If only Command Line Tools are selected, it uses `/Applications/Xcode.app`
+for that build process. It never changes the system-wide `xcode-select` setting.
+For a differently named Xcode installation, set `DEVELOPER_DIR` to that app's
+`Contents/Developer` directory when running the build.
+
+Windows retains `build/mynda.ico`; Linux retains `build/icons/`. Those assets
+and the original `images/mynda-icon.png` are unchanged. The original
+`build/mynda.icns` is retained as artwork and as input to the existing Mac
+development-image script; it is no longer the packaged Mac fallback.
+
+Source launches (`npm start`) still set a static development Dock icon because
+they run inside Electron's development app bundle. Packaged Mynda leaves the
+Dock icon to macOS, preserving its layered rendering and appearance variants.
+Inspect the built `.app` to check the Liquid Glass icon. Verify the older-Mac
+appearance on an older macOS installation before release; inspecting the
+generated fallback here does not replace that native check.
 
 ## Remaining beta release checks
 

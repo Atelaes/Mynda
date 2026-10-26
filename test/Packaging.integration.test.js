@@ -22,6 +22,10 @@ async function fixture(directory, {platform = 'linux', change} = {}) {
   const resources = path.join(directory, 'resources');
   const expected = {name:'mynda', version:'1.0.0', main:'src/bootstrap.js',
     dependencies:{'runtime-fixture':'1.0.0'}, devDependencies:{'build-fixture':'1.0.0'}};
+  if (platform === 'darwin') {
+    expected.build = {mac: {icon: config.build.mac.icon}};
+    for (const name of ['Assets.car', 'icon.icns']) write(resources, name);
+  }
   for (const name of verify.REQUIRED_APP_FILES) write(app, name);
   write(app, 'package.json', JSON.stringify(expected));
   write(app, 'node_modules/runtime-fixture/package.json', '{"name":"runtime-fixture"}');
@@ -50,6 +54,7 @@ suite.test('builder includes the runtime and excludes unrelated/private files at
       'src/legacy/Stream.js', 'images/library-real.json', 'images/.env', 'licenses/.env',
       'test/fixture.js', 'scripts/private.js', 'devtools/extension.js', 'sandbox/library.json',
       'dist/old-app.zip', 'vendor/media-tools/win-x64/mpv.exe', '.git/config',
+      'build/Mynda.icon/icon.json', 'build/Mynda.icon/Assets/Rainbow.png',
       'THIRD_PARTY_NOTICES.md', 'licenses/fonts.txt'];
     for (const filename of [...wanted, ...unwanted]) {
       write(directory, filename);
@@ -111,6 +116,16 @@ suite.test('finished archives reject missing startup files, assets and productio
       write(app,'src/renderer/styles/main.css','@font-face {src:url("themes/_fonts/Missing.ttf")}')});
     assert.throws(()=>verify.verifyPackage(value.resources,value), /Packaged asset.*Missing.ttf/);
   });
+});
+
+suite.test('Mac packages require both the layered icon and its flattened fallback', async () => {
+  for (const missing of ['Assets.car', 'icon.icns']) {
+    await withTemporaryDirectory('package-mac-icon', async directory => {
+      const value = await fixture(directory, {platform: 'darwin',
+        change: ({resources}) => fs.unlinkSync(path.join(resources, missing))});
+      assert.throws(() => verify.verifyPackage(value.resources, value), /Required packaged resource is missing/);
+    });
+  }
 });
 
 suite.test('finished archives reject leaked development files, credentials and library snapshots', async () => {
