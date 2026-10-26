@@ -40,6 +40,16 @@ The complete command set is:
 | `npm run media:verify` | Checks license flags, versions, architecture, DVD/video support, and native dependency closure | Before diagnosing a media build or package failure |
 | `npm run test:media` | Strict staged FFmpeg/FFprobe checks plus real node-mpv → MPV graphical video over JSON IPC | After preparing or changing media dependencies; briefly opens MPV |
 | `npm run test:package` | Fast tests, strict media verification, unpacked production build, then packaged decode/probe/graphical-MPV checks with an empty `PATH` | Before a release; briefly opens MPV and writes under `dist/` |
+| `npm run test:packaging` | Builder inclusion rules, finished ASAR/resource inspection, missing-file/privacy regressions, and source/resource path checks | Portable packaging checks; does not build an installer or run native media |
+| `npm run package:verify -- /path/to/resources` | Inspects an existing native package's `app.asar` and external resources | Recheck the exact package directory you specify |
+
+Both `test:package` and `dist` run the production bundle/media preparation hook
+and a finished-payload check before signing. The latter rejects unexpected app
+files, known credential/library filenames, missing direct production dependencies,
+missing startup/UI assets, and missing font/media notices. It is also available
+through `package:verify`. The portable packaging suite uses synthetic media
+fixtures and does not replace `test:package` on the target operating system.
+See [PACKAGING.md](PACKAGING.md) for the package layout and beta readiness checks.
 
 The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
 

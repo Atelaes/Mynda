@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const {FileMatcher} = require('app-builder-lib/out/fileMatcher');
 const {
   assert,
   createSuite,
@@ -14,6 +15,11 @@ const buildFiles = packageJson.build && packageJson.build.files;
 const extraResources = packageJson.build && packageJson.build.extraResources;
 const dependencies = packageJson.dependencies || {};
 const devDependencies = packageJson.devDependencies || {};
+const projectRoot = path.resolve(__dirname, '..');
+const includeFile = new FileMatcher(projectRoot, path.join(projectRoot, 'dist'),
+  value => value, buildFiles).createFilter();
+const fileStat = fs.statSync(__filename);
+const ships = filename => includeFile(path.join(projectRoot, filename), fileStat);
 
 const suite = createSuite(
   'Production package file boundaries',
@@ -21,33 +27,28 @@ const suite = createSuite(
   'Checks the declarative electron-builder rules without creating an application bundle.'
 );
 
-suite.test('includes the application tree in production builds', () => {
+suite.test('includes runtime entry points without a catch-all application rule', () => {
   assert(Array.isArray(buildFiles), 'package.json build.files must be an array');
-  assert(buildFiles.includes('**/*'), 'the application inclusion rule is missing');
+  assert(!buildFiles.includes('**/*'), 'new checkout files must not ship by default');
+  for (const filename of ['src/bootstrap.js', 'src/main/index.js',
+    'src/renderer/generated/renderer.js', 'src/preload/generated/preload.js']) {
+    assert(ships(filename), `missing runtime entry point: ${filename}`);
+  }
 });
 
-suite.test('excludes the complete root sandbox tree after the broad inclusion', () => {
-  const includeIndex = buildFiles.indexOf('**/*');
-  const excludeIndex = buildFiles.indexOf('!sandbox{,/**/*}');
-  assert(excludeIndex >= 0, 'the sandbox exclusion is missing');
-  assert(excludeIndex > includeIndex, 'the sandbox exclusion must follow the broad inclusion');
+suite.test('excludes the complete root sandbox tree', () => {
+  for (const filename of ['sandbox/library.json', 'sandbox/fixture.js',
+    'sandbox/test-results/app/src/main/index.js']) assert(!ships(filename), filename);
 });
 
 suite.test('continues to exclude development-only files', () => {
   [
-    '!devtools/**/*',
-    '!scripts/**/*',
-    '!src/legacy{,/**/*}',
-    '!themes{,/**/*}',
-    '!SOURCE_LAYOUT.md',
-    '!test/**/*',
-    '!vendor/**/*',
-    '!TESTING.md',
-    '!MEDIA_TOOLS.md',
-    '!metadata-server.local.json',
-    '!METADATA_SERVER.md'
-  ].forEach(pattern => {
-    assert(buildFiles.includes(pattern), `missing production exclusion: ${pattern}`);
+    'devtools/extension.js', 'scripts/build-renderer.js', 'src/legacy/Stream.js',
+    'themes/old.css', 'SOURCE_LAYOUT.md', 'test/fixture.js',
+    'vendor/media-tools/linux-x64/mpv', 'TESTING.md', 'MEDIA_TOOLS.md',
+    'metadata-server.local.json', 'METADATA_SERVER.md', 'unrelated-new-file.txt'
+  ].forEach(filename => {
+    assert(!ships(filename), `development file would enter the app archive: ${filename}`);
   });
 });
 
@@ -97,16 +98,20 @@ suite.test('does not ship an opaque npm FFmpeg binary package', () => {
 suite.test('does not ship the retired HLS player or its dependencies', () => {
   assert.strictEqual(dependencies['hls-server'], undefined);
   assert.strictEqual(dependencies['hls.js'], undefined);
-  assert(buildFiles.includes('!src/legacy{,/**/*}'));
+  assert(!ships('src/legacy/Stream.js'));
 });
 
 suite.test('copies only the matching staged platform media directory into Resources', () => {
   assert(Array.isArray(extraResources), 'package.json build.extraResources must be an array');
-  assert.deepStrictEqual(extraResources, [{
+  assert.deepStrictEqual(extraResources.filter(resource => resource.to === 'media-tools'), [{
     from: 'vendor/media-tools/${os}-${arch}',
     to: 'media-tools',
     filter: ['**/*']
   }]);
+  assert.deepStrictEqual(extraResources.filter(resource => resource.to !== 'media-tools'), [
+    {from: 'THIRD_PARTY_NOTICES.md', to: 'THIRD_PARTY_NOTICES.md'},
+    {from: 'licenses', to: 'licenses', filter: ['*.txt']}
+  ]);
   assert.strictEqual(packageJson.build.asarUnpack, undefined);
 });
 

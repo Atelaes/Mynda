@@ -108,9 +108,15 @@ suite.test('packages relocated modules, themes, fonts, and images at their refer
     for (const filename of included) assert(packaged.has(filename), `ASAR omitted ${filename}`);
     for (const entry of (audit || auditReferences(root)).references) {
       if (!entry.owner.startsWith(`src${path.sep}`) || entry.owner.startsWith(`src${path.sep}legacy${path.sep}`)) continue;
+      // Source renderer/preload modules are compiled into their entry bundles.
+      // Their assets still need shipping, but their authored imports do not.
+      if (entry.kind === 'module' && !packaged.has(entry.owner.split(path.sep).join('/'))) continue;
       assert(packaged.has(entry.target.split(path.sep).join('/')), `Packaged reference is missing: ${entry.owner} -> ${entry.target}`);
     }
     assert(![...packaged].some(name => name.startsWith('src/legacy/') || name.startsWith('themes/')));
+    assert(!packaged.has('src/renderer/Renderer.js'));
+    assert(!packaged.has('src/preload/index.js'));
+    assert(!packaged.has(`${OUTPUT_PATH}.map`));
     for (const filename of included.filter(name => /\.(ttf|png|gif)$/.test(name))) {
       assert(asar.extractFile(archive, filename).equals(fs.readFileSync(path.join(root, filename))),
         `Packaged asset bytes changed: ${filename}`);

@@ -1,0 +1,61 @@
+Fonts distributed with Mynda
+============================
+
+The notices below are transcribed from the bundled, unmodified font files.
+All five font families identify their license as SIL Open Font License 1.1.
+The full license is included alongside this file as OFL-1.1.txt.
+
+License text source: https://github.com/google/fonts/blob/main/ofl/dorsa/OFL.txt
+Source revision: 1d28839b9dcbb842014b1d406881b2c2b3c8bb38 (file blob SHA)
+
+Baloo Tamma 2
+-------------
+Files: BalooTamma2-Bold.ttf, BalooTamma2-ExtraBold.ttf, BalooTamma2-Medium.ttf, BalooTamma2-Regular.ttf, BalooTamma2-SemiBold.ttf
+
+Copyright 2019 The Baloo 2 Project Authors (https://github.com/EkType/Baloo2)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL
+
+Dorsa
+-----
+Files: Dorsa-Regular.ttf
+
+Copyright (c) 2011, Santiago Orozco (hi@typemade.mx), with Reserved Font Name "Dorsa"
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL
+
+HK Grotesk
+----------
+Files: HKGrotesk-Black.ttf, HKGrotesk-Bold.ttf, HKGrotesk-BoldItalic.ttf, HKGrotesk-ExtraBold.ttf, HKGrotesk-Italic.ttf, HKGrotesk-Light.ttf, HKGrotesk-LightItalic.ttf, HKGrotesk-Medium.ttf, HKGrotesk-MediumItalic.ttf, HKGrotesk-Regular.ttf, HKGrotesk-SemiBold.ttf, HKGrotesk-SemiBoldItalic.ttf
+
+Copyright © 2018 by Alfredo Marco Pradil. All rights reserved.
+Copyright © 2019 by Alfredo Marco Pradil. All rights reserved.
+
+Copyright (c) 2015, Alfredo Marco Pradil (<http://behance.net/pradil | ammpradil@gmail.com>),
+with Reserved Font Name HK Grotesk.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+Copyright (c) 2015, Alfredo Marco Pradil (<https://www.behance.net/pradil | ammpradil@gmail.com>),
+with Reserved Font Name HK Grotesk.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+Source Code Pro
+---------------
+Files: SourceCodePro-Black.ttf, SourceCodePro-BlackItalic.ttf, SourceCodePro-Bold.ttf, SourceCodePro-BoldItalic.ttf, SourceCodePro-ExtraLight.ttf, SourceCodePro-ExtraLightItalic.ttf, SourceCodePro-Italic.ttf, SourceCodePro-Light.ttf, SourceCodePro-LightItalic.ttf, SourceCodePro-Medium.ttf, SourceCodePro-MediumItalic.ttf, SourceCodePro-Regular.ttf, SourceCodePro-SemiBold.ttf, SourceCodePro-SemiBoldItalic.ttf
+
+Copyright 2010, 2012 Adobe Systems Incorporated (http://www.adobe.com/), with Reserved Font Name ‘Source’.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL. This Font Software is distributed on an ‘AS IS’ BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software.
+
+Wire One
+--------
+Files: WireOne-Regular.ttf
+
+Copyright (c) 2011, Cyreal Type Foundry (a@cyreal.org), with Reserved Font Name 'Wire'
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL

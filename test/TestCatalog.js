@@ -2,6 +2,8 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/Packaging.integration.test.js',title:'Production package boundaries',
+    protects:'real builder filtering and ASAR inspection, private-file exclusion, required runtime files and dependencies, and bundled notices'},
   {category:'unit',file:'test/LibraryClientNotifications.unit.test.js',title:'Committed library notifications',
     protects:'one batch notification, complete snapshots, record listeners, duplicate replies, revision resyncs and failed observers'},
   {category:'unit',file:'test/UiDiagnostics.unit.test.js',title:'Opt-in UI responsiveness diagnostics',

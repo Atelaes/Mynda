@@ -40,7 +40,9 @@ async function buildRenderer(options = {}) {
     loader: {'.js': 'jsx'},
     define: {'process.env.NODE_ENV': JSON.stringify(mode)},
     minify: mode === 'production',
-    sourcemap: 'linked',
+    // Keep release maps for developer debugging without shipping them or
+    // pointing the packaged browser at a map that is deliberately excluded.
+    sourcemap: mode === 'production' ? 'external' : 'linked',
     sourcesContent: mode !== 'production',
     legalComments: 'eof',
     metafile: true,
