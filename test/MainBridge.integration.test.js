@@ -12,7 +12,7 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     const ipcMain=new EventEmitter();ipcMain.handle=(name,fn)=>{assert(!handlers.has(name),'Duplicate handler '+name);handlers.set(name,fn);};
     const presentation=[];
     const app=new EventEmitter();Object.assign(app,{isPackaged:true,getAppPath:()=>root,
-      setAboutPanelOptions:value=>presentation.push(value),
+      getName:()=> 'Test Product Name',setAboutPanelOptions:value=>presentation.push(value),
       getPath:()=>directory,getVersion:()=> 'test',quit:()=>{},isReady:()=>true});
     let start;app.whenReady=()=>({then:callback=>{start=callback;}});
     class Window extends EventEmitter {
@@ -30,7 +30,7 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     const tools={ffmpegPath:null,ffprobePath:null,status:()=>({ffmpeg:{available:true},ffprobe:{available:true}})};
     loadFreshWithMocks(path.join(root,'src/main/index.js'),{
       electron:{app,ipcMain,BrowserWindow:Window,webContents:{fromId:id=>windows.find(win=>win.webContents.id===id)?.webContents},
-        Menu:{buildFromTemplate:value=>value,setApplicationMenu:()=>{}},
+        Menu:{buildFromTemplate:value=>value,setApplicationMenu:value=>presentation.push(value)},
         dialog:{showSaveDialog:async()=>({canceled:false,filePath:path.join(directory,'report.zip')}),showMessageBox:async(...args)=>{
         dialogs.push(args.at(-1));return {response:0};
       }},shell:{}},
@@ -42,8 +42,8 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     await start();
     assert.strictEqual(windows.length,1);
     const win=windows[0],prefs=win.options.webPreferences, sender=win.webContents;
-    assert.strictEqual(win.options.title,'Mynda');
-    assert.deepStrictEqual(presentation,[{applicationName:'Mynda'}]);
+    assert.strictEqual(win.options.title,'Test Product Name','Initial window title follows the application name');
+    assert.deepStrictEqual(presentation,[],'Standard application/menu names need no presentation override');
     assert.strictEqual(prefs.nodeIntegration,false);assert.strictEqual(prefs.contextIsolation,true);
     assert.strictEqual(prefs.sandbox,true);
     assert.strictEqual(prefs.preload,path.join(root,'src/preload/generated/preload.js'));

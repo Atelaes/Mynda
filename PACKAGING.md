@@ -127,7 +127,9 @@ The top-level package `name` stays `mynda`, and top-level `productName` is
 profile directory and secure-storage identity; electron-builder also uses it
 for the application bundle and helper executables. The app and helper bundle
 IDs remain unchanged (`com.torvor.mynda`). There are no separate native-name
-or menu-label overrides.
+or menu-label overrides. The About panel also uses the native defaults. The
+window starts with `app.getName()` and then follows the HTML document title;
+Electron does not automatically derive page/window titles from `productName`.
 
 Existing development profiles named `mynda` must be migrated before running
 this version. Quit Mynda, use the explicit backup/prepare/install procedure in

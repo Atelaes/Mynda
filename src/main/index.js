@@ -39,7 +39,6 @@ const {createPlaybackService} = require('./PlaybackService');
 const {createEditorService} = require('./EditorService');
 const {createDesktopService} = require('./DesktopService');
 const {createDiagnosticExporter} = require('./DiagnosticExport');
-const {installApplicationPresentation} = require('./ApplicationPresentation');
 const {createTaskMethods} = require('./TaskService');
 const checkDiskSpace = require('check-disk-space').default
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
@@ -231,7 +230,6 @@ installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,l
 app.whenReady().then(start);
 
 async function start() {
-  installApplicationPresentation({app, Menu: electron.Menu});
   await MetadataConnection.initialize();
   Logger.initialize({
     app: app,
@@ -504,7 +502,7 @@ async function createWindow() {
     app.dock.setIcon(appIcon);
   }
   win = new BrowserWindow({
-    title: 'Mynda',
+    title: app.getName(),
     width: 1440,
     height: 900,
     icon: appIcon,
