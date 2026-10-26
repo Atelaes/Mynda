@@ -1,6 +1,7 @@
 // Settings pane and its major settings views.
 const React = require('react');
 const {LicenseActivation} = require('./LicenseActivation');
+const {DiagnosticExport} = require('./DiagnosticExport');
 const _ = require('lodash');
 const {reportSaveFailure} = require('./LibraryEdits.js');
 const {v4: uuidv4} = require('uuid');
@@ -2057,6 +2058,7 @@ class MynSettingsLibrary extends React.Component {
             </div>
           ) : null}
         </div>
+        <DiagnosticExport />
         <div className='subsection library-stats-section'>
           <h2>Library Statistics</h2>
           <div className='viewing-stats'>

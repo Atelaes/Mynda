@@ -36,7 +36,7 @@ function sameIdentity(first, second) {
 }
 
 function createDesktopService({app, dialog, shell, library, getWindow = () => null,
-  scan = () => {}, removeWatchfolder, shareService,
+  scan = () => {}, removeWatchfolder, shareService, exportDiagnostics,
   confirmationDialogIsDisabled = () => false, disableConfirmationDialog = () => {},
   log = console, shareLog = log, scanLog = log}) {
   const owners = new Map();
@@ -219,9 +219,27 @@ function createDesktopService({app, dialog, shell, library, getWindow = () => nu
     },
     'files.revealExport': async (event, filename) => {
       const state = scope(event), selected = absolute(filename), saved = state.exports.get(selected);
-      if (!saved || !sameIdentity(saved, identity(selected))) throw failure('FILE_NOT_AUTHORIZED', 'Only a library export made in this window can be revealed.');
+      if (!saved || !sameIdentity(saved, identity(selected))) throw failure('FILE_NOT_AUTHORIZED', 'Only an export made in this window can be revealed.');
       shell.showItemInFolder(selected);
       return true;
+    },
+    'diagnostics.export': async (event, value) => {
+      const state = scope(event), options = object(value, ['includeLibrary']);
+      if (typeof options.includeLibrary !== 'boolean') throw failure('INVALID_APP_REQUEST', 'Choose whether to include a diagnostic library snapshot.');
+      try {
+        const result = await exportDiagnostics({includeLibrary: options.includeLibrary,
+          parentWindow: getWindow(event), assertAlive: () => alive(event, state)});
+        alive(event, state);
+        if (!result.canceled) {
+          state.exports.set(absolute(result.filePath), identity(result.filePath));
+          log.info('Diagnostic export saved', {includedLibrary: result.includedLibrary, warnings: result.warnings.length});
+        }
+        return {ok: true, value: result};
+      } catch (error) {
+        log.error('Could not export diagnostics', {code: error.code});
+        return {ok: false, error: {code: error.code || 'DIAGNOSTIC_EXPORT_FAILED',
+          message: error.code ? error.message : 'Mynda could not export diagnostics. Please try again.'}};
+      }
     },
     'library.export': async event => {
       const state = scope(event);

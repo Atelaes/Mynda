@@ -10,7 +10,9 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
   withTemporaryDirectory('main-bridge',async directory=>{
     const root=path.resolve(__dirname,'..'), handlers=new Map(),windows=[],logs=[],dialogs=[];
     const ipcMain=new EventEmitter();ipcMain.handle=(name,fn)=>{assert(!handlers.has(name),'Duplicate handler '+name);handlers.set(name,fn);};
+    const presentation=[];
     const app=new EventEmitter();Object.assign(app,{isPackaged:true,getAppPath:()=>root,
+      setAboutPanelOptions:value=>presentation.push(value),
       getPath:()=>directory,getVersion:()=> 'test',quit:()=>{},isReady:()=>true});
     let start;app.whenReady=()=>({then:callback=>{start=callback;}});
     class Window extends EventEmitter {
@@ -24,11 +26,12 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
       async loadFile(file){this.webContents.mainFrame.url=pathToFileURL(file).href;}
     }
     const quiet=Object.fromEntries(['debug','info','warn','error'].map(level=>[level,(...args)=>logs.push([level,...args])]));
-    const Logger={child:()=>quiet,initialize:()=>{},receiveRenderer:()=>{},flush:async()=>{}};
+    const Logger={child:()=>quiet,initialize:()=>{},receiveRenderer:()=>{},flush:async()=>{},getLogDirectory:()=>path.join(directory,'logs')};
     const tools={ffmpegPath:null,ffprobePath:null,status:()=>({ffmpeg:{available:true},ffprobe:{available:true}})};
     loadFreshWithMocks(path.join(root,'src/main/index.js'),{
       electron:{app,ipcMain,BrowserWindow:Window,webContents:{fromId:id=>windows.find(win=>win.webContents.id===id)?.webContents},
-        dialog:{showMessageBox:async(...args)=>{
+        Menu:{buildFromTemplate:value=>value,setApplicationMenu:()=>{}},
+        dialog:{showSaveDialog:async()=>({canceled:false,filePath:path.join(directory,'report.zip')}),showMessageBox:async(...args)=>{
         dialogs.push(args.at(-1));return {response:0};
       }},shell:{}},
       [path.join(root,'src/platform/Logger.js')]:Logger,
@@ -39,6 +42,8 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     await start();
     assert.strictEqual(windows.length,1);
     const win=windows[0],prefs=win.options.webPreferences, sender=win.webContents;
+    assert.strictEqual(win.options.title,'Mynda');
+    assert.deepStrictEqual(presentation,[{applicationName:'Mynda'}]);
     assert.strictEqual(prefs.nodeIntegration,false);assert.strictEqual(prefs.contextIsolation,true);
     assert.strictEqual(prefs.sandbox,true);
     assert.strictEqual(prefs.preload,path.join(root,'src/preload/generated/preload.js'));
@@ -58,6 +63,9 @@ suite.test('startup installs isolation and the complete named API, rejecting unr
     const access=await bridge(event,'metadata.getStatus',[]);
     assert.strictEqual(access.ok,true); assert.strictEqual(access.value.hasCredential,false);
     assert.strictEqual(access.value.token,undefined);
+    const diagnosticExport=await bridge(event,'diagnostics.export',[{includeLibrary:false}]);
+    assert.strictEqual(diagnosticExport.value.ok,true,'Diagnostic export must work without activation');
+    assert.strictEqual(fs.readFileSync(diagnosticExport.value.value.filePath).readUInt32LE(0),0x04034b50);
     assert.strictEqual((await bridge({sender:{},senderFrame:sender.mainFrame},'metadata.save',[{token:'secret'}])).error.code,'APP_UNAUTHORIZED');
     const failed=await bridge(event,'editor.select',[{draft:{id:'a'.repeat(64)},choice:{myndaProposalID:'forged'}},999]);
     assert.strictEqual(failed.ok,false);

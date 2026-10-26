@@ -2,6 +2,12 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'integration',file:'test/DiagnosticExport.integration.test.js',title:'Diagnostic ZIP export',
+    protects:'real ZIP contents, credential/path redaction, opt-in library evidence, limits, failure cleanup and restricted export IPC'},
+  {category:'component',file:'test/DiagnosticExport.component.test.js',title:'Diagnostic export settings',
+    protects:'privacy explanation, optional snapshot, cancellation, repeated clicks, failure messages and unmounts'},
+  {category:'unit',file:'test/ApplicationPresentation.unit.test.js',title:'Mynda display names and stable application identity',
+    protects:'capitalized title/menu labels and unchanged userData/keychain identity'},
   {category:'integration',file:'test/Packaging.integration.test.js',title:'Production package boundaries',
     protects:'real builder filtering and ASAR inspection, private-file exclusion, required runtime files and dependencies, and bundled notices'},
   {category:'unit',file:'test/LibraryClientNotifications.unit.test.js',title:'Committed library notifications',

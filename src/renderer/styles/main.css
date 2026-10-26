@@ -1790,6 +1790,16 @@ table.compact .movie-row {
   color: var(--colorful-text);
 }
 
+#settings-library .diagnostic-library-option {
+  display: block;
+  margin: .7em 0 .35em;
+}
+
+#settings-library .diagnostic-library-detail,
+#settings-library .diagnostic-export-notes {
+  margin: .4em 0 .8em;
+}
+
 #settings-library .library-export-message.success {
   border-left-color: var(--lighter-colorful-bg);
 }

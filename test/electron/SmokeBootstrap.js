@@ -136,7 +136,7 @@ async function inspectMainWindow(window) {
       settingsButton: Boolean(document.getElementById('settings-button'))
     }))()`);
 
-    const initialReady = initial.rootChildren > 0 && initial.grid && initial.navigation &&
+    const initialReady = initial.title === 'Mynda' && window.getTitle() === 'Mynda' && initial.rootChildren > 0 && initial.grid && initial.navigation &&
       initial.library && initial.settingsButton;
     if (!initialReady) {
       finish(false, {
@@ -206,6 +206,28 @@ async function inspectMainWindow(window) {
       });
       return;
     }
+
+    activeStage='diagnostic-export';
+    const diagnosticPath = path.join(userData, 'smoke-diagnostics.zip');
+    const previousSaveDialog = dialog.showSaveDialog;
+    let exportDialogs = 0;
+    dialog.showSaveDialog = async (...args) => {
+      const options = args[args.length - 1];
+      if (options.title !== 'Export Mynda Diagnostics') throw new Error('Unexpected save dialog');
+      exportDialogs++;
+      return {canceled: false, filePath: diagnosticPath};
+    };
+    try {
+      const snapshotSelected = await ui.inspect(() => document.querySelector('.diagnostic-library-option input').checked);
+      if (snapshotSelected) throw new Error('Diagnostic library snapshot must default to off');
+      await ui.click('.diagnostic-export-section > button');
+      await wait(() => ui.inspect(() => document.querySelector('.diagnostic-export-section .library-export-message')?.textContent
+        .includes('Diagnostic ZIP saved')), 'diagnostic ZIP saved');
+      if (exportDialogs !== 1 || fs.readFileSync(diagnosticPath).readUInt32LE(0) !== 0x04034b50) {
+        throw new Error('Diagnostic export did not produce a ZIP through the native chooser');
+      }
+      if (library.getSaveObject().media.length !== 1) throw new Error('Diagnostic export changed the library');
+    } finally {dialog.showSaveDialog = previousSaveDialog;}
 
     activeStage='close-settings';
     await window.webContents.executeJavaScript(

@@ -41,6 +41,7 @@ The complete command set is:
 | `npm run test:media` | Strict staged FFmpeg/FFprobe checks plus real node-mpv → MPV graphical video over JSON IPC | After preparing or changing media dependencies; briefly opens MPV |
 | `npm run test:package` | Fast tests, strict media verification, unpacked production build, then packaged decode/probe/graphical-MPV checks with an empty `PATH` | Before a release; briefly opens MPV and writes under `dist/` |
 | `npm run test:packaging` | Builder inclusion rules, finished ASAR/resource inspection, missing-file/privacy regressions, and source/resource path checks | Portable packaging checks; does not build an installer or run native media |
+| `npm run test:diagnostics` | Real diagnostic ZIPs, redaction, limits, write failures, trusted-window IPC, Settings controls and display-name checks | Focused diagnostic export regression suite; also included in `test:core` |
 | `npm run package:verify -- /path/to/resources` | Inspects an existing native package's `app.asar` and external resources | Recheck the exact package directory you specify |
 
 Both `test:package` and `dist` run the production bundle/media preparation hook
@@ -50,6 +51,12 @@ missing startup/UI assets, and missing font/media notices. It is also available
 through `package:verify`. The portable packaging suite uses synthetic media
 fixtures and does not replace `test:package` on the target operating system.
 See [PACKAGING.md](PACKAGING.md) for the package layout and beta readiness checks.
+
+The source and ASAR startup journeys also verify the capitalized window/page
+title and click **Export Diagnostics** through the real Settings interface.
+The native save dialog is replaced with a destination in the disposable test
+profile; the production IPC, log collector and ZIP writer run unchanged.
+See [DIAGNOSTICS.md](DIAGNOSTICS.md) for report contents and manual checks.
 
 The Electron test briefly opens Mynda and its DevTools. That is expected. Both source and ASAR runs verify startup, the first render, creation of an isolated first-launch library, opening Settings and its Library statistics, and closing Settings. They then save a preference through the real renderer-to-backend connection and confirm it in the temporary library file. Finally, they request normal window closure and verify that the graceful-close handshake flushes a deferred renderer save before closing. Unexpected dialogs fail the test without opening an interactive modal; failure teardown records the result and exits the isolated process directly. The tests never use your real library.
 

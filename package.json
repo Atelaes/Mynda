@@ -31,6 +31,7 @@
     "test:media": "npm run media:verify && node test/MediaDependencies.integration.test.js --require-bundled",
     "test:package": "npm run test:fast && npm run media:verify && electron-builder --dir --publish never && node test/package/run-packaged-media-smoke.js",
     "test:packaging": "node test/Packaging.integration.test.js && node test/SourceLayout.integration.test.js",
+    "test:diagnostics": "node test/DiagnosticExport.integration.test.js && node test/DiagnosticExport.component.test.js && node test/ApplicationPresentation.unit.test.js",
     "package:verify": "node scripts/verify-package.js",
     "start": "npm run build:renderer && electron .",
     "metadata:setup": "node scripts/setup-metadata-server.js",
@@ -64,7 +65,8 @@
     "react-beautiful-dnd": "^13.0.0",
     "react-dom": "^16.13.1",
     "react-virtuoso": "4.18.12",
-    "uuid": "^8.3.0"
+    "uuid": "^8.3.0",
+    "yazl": "3.3.1"
   },
   "devDependencies": {
     "@babel/core": "^7.12.3",
@@ -73,9 +75,11 @@
     "@electron/asar": "4.3.1",
     "electron": "44.7.0",
     "electron-builder": "26.17.0",
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "yauzl": "3.4.0"
   },
   "build": {
+    "productName": "Mynda",
     "appId": "com.torvor.mynda",
     "beforeBuild": "./scripts/before-build.js",
     "afterPack": "./scripts/verify-package.js",
@@ -96,7 +100,9 @@
       {
         "from": "licenses",
         "to": "licenses",
-        "filter": ["*.txt"]
+        "filter": [
+          "*.txt"
+        ]
       }
     ],
     "files": [
@@ -124,6 +130,9 @@
     "icon": "images/mynda-icon.png",
     "mac": {
       "icon": "build/mynda.icns",
+      "extendInfo": {
+        "CFBundleDisplayName": "Mynda"
+      },
       "minimumSystemVersion": "13.0.0"
     }
   },

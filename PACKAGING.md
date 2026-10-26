@@ -80,7 +80,7 @@ journeys use disposable libraries; live server tagging tests remain separate.
 To inspect a specific existing macOS build without rebuilding:
 
 ```bash
-npm run package:verify -- "dist/mac-arm64/mynda.app/Contents/Resources"
+npm run package:verify -- "dist/mac-arm64/Mynda.app/Contents/Resources"
 ```
 
 Use the actual output directory from your builder run. On Windows/Linux pass
@@ -119,4 +119,17 @@ platform's layout; it does not locate an arbitrary old build or infer freshness.
    `https://mynda-server-dev.torvor-dev.workers.dev`. Decide which deployment
    beta clients should use when preparing beta infrastructure. No developer
    token or `metadata-server.local.json` is bundled; users activate through
-   Settings. Diagnostic export is the next desktop step.
+   Settings. Diagnostic export is available under Settings → Library; see
+   [DIAGNOSTICS.md](DIAGNOSTICS.md).
+
+The visible window/title and macOS menu labels say **Mynda**. The macOS bundle
+uses `build.productName: "Mynda"` so electron-builder consistently names the
+application bundle, native menu and helper executables. Overriding only
+`CFBundleName` leaves helper names inconsistent and can prevent startup.
+
+The top-level package name and runtime `app.getName()` stay `mynda`; there is
+no top-level `productName`. The builder removes its `build` configuration from
+the packaged metadata, so the display name does not change Electron's existing
+profile directory or secure-storage identity. The app and helper bundle IDs
+remain unchanged. Do not add a top-level `productName` or call
+`app.setName('Mynda')` without a separate storage/credential migration plan.

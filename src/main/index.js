@@ -38,6 +38,8 @@ const {validateRendererCommit} = require('../library/LibraryRendererPolicy');
 const {createPlaybackService} = require('./PlaybackService');
 const {createEditorService} = require('./EditorService');
 const {createDesktopService} = require('./DesktopService');
+const {createDiagnosticExporter} = require('./DiagnosticExport');
+const {installApplicationPresentation} = require('./ApplicationPresentation');
 const {createTaskMethods} = require('./TaskService');
 const checkDiskSpace = require('check-disk-space').default
 const MIN_SCAN_RESULT_STATUS_MS = 2000;
@@ -193,6 +195,11 @@ const editor = createEditorService({library,catalog:TaggingService,dialog,app,re
   },
   confirmationDialogIsDisabled,disableConfirmationDialog,log:backendLog});
 const desktop = createDesktopService({app,dialog,shell:electron.shell,library,getWindow:()=>win,
+  exportDiagnostics: createDiagnosticExporter({app,dialog,library,logger:Logger,
+    getStatus:()=>MetadataConnection.credentials().getStatus(),
+    getKnownSecrets:async()=>{try{return [(await MetadataConnection.getConfig()).token];}catch(_){return [];}},
+    getRuntime:()=>({taggingRunning:autoTagState.running,scanRunning:watchfolderScanRunning,
+      capacityWaiting:Boolean(autoTagState.capacityWaiting),uiDiagnostics:uiDiagnostics.config(),mediaTools:MediaTools.status()})}),
   scan:checkWatchFolders,removeWatchfolder,shareService,
   confirmationDialogIsDisabled,disableConfirmationDialog,log:backendLog,shareLog,scanLog});
 library.validateRendererCommit = (request,event) => validateRendererCommit(request,{library,
@@ -224,6 +231,7 @@ installRendererBridge({ipcMain,isTrustedSender:externalContent.isTrustedSender,l
 app.whenReady().then(start);
 
 async function start() {
+  installApplicationPresentation({app, Menu: electron.Menu});
   await MetadataConnection.initialize();
   Logger.initialize({
     app: app,
@@ -496,6 +504,7 @@ async function createWindow() {
     app.dock.setIcon(appIcon);
   }
   win = new BrowserWindow({
+    title: 'Mynda',
     width: 1440,
     height: 900,
     icon: appIcon,

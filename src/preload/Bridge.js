@@ -7,7 +7,7 @@ function createBridge({invoke, subscribe, platform, getPathForFile}) {
   const on = channel => callback => subscribe(channel, callback);
   return Object.freeze({
     app:Object.freeze({platform}),
-    diagnostics:Object.freeze({getConfig:call('diagnostics.getConfig')}),
+    diagnostics:Object.freeze({getConfig:call('diagnostics.getConfig'), export:call('diagnostics.export')}),
     metadata:Object.freeze({...Object.fromEntries(['getStatus','save','check','remove']
       .map(name=>[name,call('metadata.'+name)]))}),
     library:Object.freeze({snapshot:call('library.snapshot'), commit:call('library.commit'),
