@@ -9,6 +9,7 @@ const configuration = require('../package.json');
 const REQUIRED_APP_FILES = [
   'src/bootstrap.js', 'src/main/index.js', 'src/main/RendererBridge.js',
   'src/main/MetadataConnection.js', 'src/main/FeatureAccess.js',
+  'src/main/PackagedMediaSmoke.js', 'src/main/LinuxSandboxCheck.js',
   'src/library/Library.js', 'src/library/LibraryPersistence.js',
   'src/tagging/MetadataCredentials.js', 'src/tagging/MetadataServerClient.js',
   'src/renderer/index.html', 'src/renderer/generated/renderer.js',

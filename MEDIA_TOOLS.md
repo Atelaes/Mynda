@@ -12,7 +12,7 @@ the packaged application.
 |---|---|---|---|
 | `mac-arm64` | Apple Silicon, macOS 13+ | `gpu-next` + Vulkan/`macvk` | macOS application |
 | `win-x64` | Windows 10+ x64, MSYS2 UCRT64 for building | `gpu-next` + Direct3D 11 | NSIS installer |
-| `linux-x64` | Ubuntu 24.04 x64 | `gpu-next` + Wayland and X11 | AppImage |
+| `linux-x64` | Ubuntu 24.04 x64 | `gpu-next` + Wayland and X11 | DEB installer |
 
 These are native builds, not cross-compiles. Windows ARM, Linux ARM, Intel
 macOS, and Mojave are not claimed yet. Ubuntu 24.04 is the first explicit
@@ -62,6 +62,9 @@ Generated stages are ignored by Git; do not
 commit native binaries or `dist/`.
 
 `test:core` checks the application without requiring media executables. `npm test` includes two suites that really execute FFmpeg/FFprobe against generated fixtures, so those tools must be available first. `test:package` consumes a prepared stage; it does not build the media tools for you.
+
+On Ubuntu, use the installed-DEB workflow below for release validation. The
+unpacked `test:package` launch does not exercise installer sandbox setup.
 
 ## macOS preparation
 
@@ -209,6 +212,43 @@ unchanged by fix75. No new npm or MSYS2 dependencies are required.
 
 ## Linux preparation
 
+The default Linux artifact is a DEB for Ubuntu/Debian-family desktops. It
+installs under `/opt/Mynda`, adds the application-menu entry, and uses
+electron-builder's standard post-install script to configure the Chromium
+sandbox helper and, where supported, Mynda's AppArmor user-namespace profile.
+It does not use FUSE. Keep Electron sandboxing enabled; do not add
+`--no-sandbox` or disable Ubuntu's namespace restrictions globally.
+
+With an already prepared media bundle, build, install, and validate it:
+
+```bash
+npm run dist
+sudo apt install ./dist/mynda_1.0.0_amd64.deb
+npm run test:installed
+mynda
+```
+
+Use the DEB filename emitted by the build if the application version changes.
+Run each command only after the preceding one succeeds. Close other Mynda
+instances before the final manual launch. Only the package installation uses
+sudo. `test:installed` targets `/opt/Mynda/mynda`, uses a disposable profile
+and an empty PATH, and requires a native Linux renderer sandbox check before
+running the existing bundled-media smoke checks. It rejects root execution
+and missing sandbox evidence. The hidden renderer probe checks `/proc` for
+NoNewPrivs, an additional seccomp filter, and an additional PID namespace;
+restrictions merely inherited from a container are insufficient. This verifies
+the installed binary's sandbox capability, not a complete application-security
+audit. Also manually test the ordinary installed UI and its saved state.
+
+The DEB maintainer is currently the project name, TorVor. Before public
+distribution, set `build.linux.maintainer` to the project's chosen contact in
+`Name <email>` form. The local test package requires no invented contact address.
+
+AppImage is no longer the default release target. Its FUSE runtime and
+automatic `--no-sandbox` fallback need separate work and clean-machine
+validation before offering it as a portable release. A successful unpacked
+smoke test is not evidence about an AppImage launcher.
+
 Build the distributable bundle on x64 Ubuntu 24.04. The preparation command
 checks prerequisites and prints the exact missing subset. A fresh machine can
 install the complete set with:
@@ -260,8 +300,14 @@ target is not release-validated until these steps pass on that target:
 6. `npm run test:package`
 7. Manually scan a fixture watchfolder and play a normal video, subtitles, and
    one representative unencrypted DVD folder.
-8. Run `npm run dist` and test the installer or AppImage on a clean machine
+8. Run `npm run dist` and test the installer on a clean machine
    without development tools.
+
+For Ubuntu, installation plus `npm run test:installed` replaces the unpacked
+launch in step 6 and additionally verifies native renderer sandbox evidence.
+The final clean-machine check should have no Node, MPV, FFmpeg, or libfuse2
+installed; ordinary system dependencies are resolved by APT when installing
+the DEB.
 
 The Windows and Linux recipes in this change are ready for those native passes;
 they are not represented as already executed merely because their portable

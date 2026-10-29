@@ -26,6 +26,25 @@ async function waitForChosenMetadata(ui, imdbID, previousDescription, timeout = 
   }
 }
 
+async function waitForRevertedBatch(ui, expectedCountry, timeout = 10000) {
+  // The main-process dialog queue drains before its IPC response has reached
+  // the renderer. Wait for the actual form state before clicking Auto-Tag.
+  let observed;
+  try {
+    await wait(async()=>{
+      observed=await ui.inspect(()=>{
+        const field=document.querySelector('.edit-field-country');
+        const button=document.getElementById('edit-search-button');
+        return {country:field ? field.value : null, buttonPresent:Boolean(button),
+          buttonEnabled:Boolean(button && !button.disabled)};
+      });
+      return observed.country===expectedCountry && observed.buttonEnabled;
+    },'Revert restores the batch draft and enables Auto-Tag Selected',timeout);
+  } catch(error) {
+    throw new Error(`${error.message}; observed batch state: ${JSON.stringify(observed)}`);
+  }
+}
+
 async function run({window,scenario,phase,library,originals,dialogs,network,status,disk,stage,resolveArtwork}) {
   const ui = browserDriver(window);
   const ids = originals.map(video=>video.id);
@@ -175,10 +194,13 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
     const indices=scenario==='live'?[2,3]:[0,1];
     await batch(indices);
     if (scenario === 'selected') {
+      const countryBeforeEdit=await value('.edit-field-country');
+      const before=copy(current());
       await ui.type('.edit-field-country','Unsaved batch change');
       assert(await ui.inspect(()=>document.getElementById('edit-search-button').disabled));
       await revert();
-      const before=copy(current());
+      await waitForRevertedBatch(ui,countryBeforeEdit);
+      assert.deepStrictEqual(current(),before,'Reverting a draft must not save it');
       dialogs.expect(options=>options.title==='Auto-Tag Selected' && options.buttons.length===2,1);
       dialogs.expect(options=>options.title==='Choose Series',0);
       dialogs.expect(options=>options.title==='Auto-Tag Selected' && /no series was chosen/.test(options.message),0);
@@ -222,4 +244,4 @@ async function run({window,scenario,phase,library,originals,dialogs,network,stat
   await all(); await assertEditor(0);
   return {taggingVerified:true};
 }
-module.exports={run,waitForChosenMetadata};
+module.exports={run,waitForChosenMetadata,waitForRevertedBatch};

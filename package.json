@@ -3,6 +3,7 @@
   "productName": "Mynda",
   "version": "1.0.0",
   "description": "A media library and player app",
+  "homepage": "https://github.com/Atelaes/Mynda",
   "main": "src/bootstrap.js",
   "scripts": {
     "test": "npm run test:fast",
@@ -31,6 +32,7 @@
     "media:verify": "node scripts/verify-media-tools.js",
     "test:media": "npm run media:verify && node test/MediaDependencies.integration.test.js --require-bundled",
     "test:package": "npm run test:fast && npm run media:verify && electron-builder --dir --publish never && node test/package/run-packaged-media-smoke.js",
+    "test:installed": "node test/package/run-packaged-media-smoke.js --executable=/opt/Mynda/mynda --require-sandbox",
     "test:packaging": "node test/Packaging.integration.test.js && node test/SourceLayout.integration.test.js",
     "test:diagnostics": "node test/DiagnosticExport.integration.test.js && node test/DiagnosticExport.component.test.js && node test/ApplicationPresentation.unit.test.js",
     "package:verify": "node scripts/verify-package.js",
@@ -124,7 +126,8 @@
       "icon": "build/mynda.ico"
     },
     "linux": {
-      "target": "AppImage",
+      "target": "deb",
+      "maintainer": "TorVor",
       "category": "AudioVideo",
       "icon": "build/icons"
     },

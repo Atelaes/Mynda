@@ -127,7 +127,7 @@ suite.test('builds the browser bundle and verifies media even when electron-buil
 
 suite.test('declares native Windows and Linux distributable targets', () => {
   assert.strictEqual(packageJson.build.win.target, 'nsis');
-  assert.strictEqual(packageJson.build.linux.target, 'AppImage');
+  assert.strictEqual(packageJson.build.linux.target, 'deb');
   assert.strictEqual(packageJson.build.linux.category, 'AudioVideo');
 });
 

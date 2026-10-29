@@ -2,6 +2,8 @@
 // command. Keep each file in exactly one primary category even when a test
 // touches more than one layer; the category describes its broadest boundary.
 module.exports = [
+  {category:'unit',file:'test/LinuxSandboxCheck.unit.test.js',title:'Installed Linux sandbox evidence',
+    protects:'renderer-specific kernel restrictions, inherited-container false positives, disabling flags, and normal-user installed checks'},
   {category:'unit',file:'test/ArtworkPaths.unit.test.js',title:'Portable managed artwork paths',
     protects:'relative managed references, root changes, legacy paths, and traversal/symlink boundaries'},
   {category:'integration',file:'test/ProfileMigration.integration.test.js',title:'Offline profile migration',

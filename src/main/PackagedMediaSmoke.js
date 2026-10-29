@@ -1,8 +1,14 @@
-const {app} = require('electron');
+const {app, BrowserWindow} = require('electron');
+
+// The hidden sandbox probe is short-lived; this smoke mode exits explicitly
+// after reporting all results rather than when its last window is destroyed.
+app.on('window-all-closed', () => {});
 
 async function run() {
   let result;
   try {
+    const sandbox = process.env.MYNDA_REQUIRE_SANDBOX === '1'
+      ? await require('./LinuxSandboxCheck').run({app, BrowserWindow}) : null;
     const MediaDependencyCheck = require('../media/MediaDependencyCheck.js');
     result = await MediaDependencyCheck.run({
       requireMpv: true,
@@ -10,6 +16,7 @@ async function run() {
       requireLgpl: true,
       requireDvd: true
     });
+    if (sandbox) result.checks.sandbox = {ok: true, value: sandbox};
   } catch(error) {
     result = {
       ok: false,

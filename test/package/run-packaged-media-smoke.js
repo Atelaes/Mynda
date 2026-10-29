@@ -84,10 +84,29 @@ function tail(value, maximum = 16000) {
   return text.length <= maximum ? text : text.slice(text.length - maximum);
 }
 
-function launch(executable, userData) {
+function parseOptions(args) {
+  const options = {requireSandbox: false, executable: null};
+  for (const arg of args) {
+    if (arg === '--require-sandbox') options.requireSandbox = true;
+    else if (arg.startsWith('--executable=') && arg.slice('--executable='.length)) {
+      options.executable = path.resolve(arg.slice('--executable='.length));
+    } else throw new Error(`Unknown or incomplete packaged smoke option: ${arg}`);
+  }
+  return options;
+}
+
+function assertSandboxTestUser(options, platform = process.platform,
+  uid = typeof process.getuid === 'function' ? process.getuid() : null) {
+  if (!options.requireSandbox) return;
+  if (platform !== 'linux') throw new Error('--require-sandbox requires Linux.');
+  if (uid === 0 || uid === null) throw new Error('Run npm run test:installed as your normal desktop user, without sudo.');
+}
+
+function launch(executable, userData, options = {}) {
+  assertSandboxTestUser(options);
   return new Promise((resolve, reject) => {
     const args = [`--user-data-dir=${userData}`];
-    if (process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0) {
+    if (!options.requireSandbox && process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0) {
       args.push('--no-sandbox');
     }
     const cleanEnvironment = Object.assign({}, process.env, {
@@ -99,8 +118,10 @@ function launch(executable, userData) {
       MYNDA_FFPROBE_PATH: '',
       MYNDA_MPV_PATH: '',
       MYNDA_PACKAGED_MEDIA_SMOKE: '1',
+      MYNDA_REQUIRE_SANDBOX: options.requireSandbox ? '1' : '0',
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
     });
+    delete cleanEnvironment.ELECTRON_RUN_AS_NODE;
     const child = spawn(executable, args, {
       cwd: path.dirname(executable),
       env: cleanEnvironment,
@@ -155,17 +176,29 @@ function launch(executable, userData) {
         ));
         return;
       }
+      if (options.requireSandbox && result.checks?.sandbox?.ok !== true) {
+        reject(new Error('The installed application did not report a successful sandbox check. Rebuild and reinstall the current DEB.'));
+        return;
+      }
       resolve(result);
     });
   });
 }
 
-async function main() {
-  const executable = packagedExecutable();
+async function main(argv = process.argv.slice(2)) {
+  const options = parseOptions(argv);
+  assertSandboxTestUser(options);
+  const executable = options.executable || packagedExecutable();
+  fs.accessSync(executable, fs.constants.X_OK);
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'mynda-packaged-smoke-'));
   try {
-    const result = await launch(executable, userData);
+    const result = await launch(executable, userData, options);
     console.log('  • packaged media smoke test passed');
+    console.log(`    executable: ${executable}`);
+    if (options.requireSandbox) {
+      console.log('    Linux renderer sandbox: PID namespace, seccomp filtering, and NoNewPrivs verified');
+      console.log(`    sandbox evidence: ${JSON.stringify(result.checks.sandbox.value)}`);
+    }
     ['ffmpeg', 'ffprobe', 'mpv'].forEach(name => {
       const value = result.checks[name] && result.checks[name].value;
       if (value && value.version) console.log(`    ${name}: ${value.version}`);
@@ -182,7 +215,9 @@ async function main() {
   }
 }
 
-main().catch(error => {
+if (require.main === module) main().catch(error => {
   console.error(error && error.stack ? error.stack : error);
   process.exitCode = 1;
 });
+
+module.exports = {parseOptions, assertSandboxTestUser, launch, main};
