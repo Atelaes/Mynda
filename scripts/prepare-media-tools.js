@@ -28,17 +28,18 @@ function preparationCommand(options = {}) {
       target: 'win-x64'
     };
   }
-  if (platform === 'linux' && arch === 'x64') {
+  if (platform === 'linux' && ['x64', 'arm64'].includes(arch)) {
     return {
       command: 'bash',
       args: [path.join(scriptsDirectory, 'prepare-media-tools-linux.sh')],
-      target: 'linux-x64'
+      target: `linux-${arch}`
     };
   }
 
   const error = new Error(
     `Mynda cannot prepare bundled media tools for ${platform}-${arch}. ` +
-    'Supported preparation hosts are Apple Silicon macOS, x64 Windows, and x64 Linux.'
+    'Supported preparation hosts are Apple Silicon macOS, x64 Windows, and x64 or ARM64 Linux. ' +
+    'Linux ARM requires a 64-bit OS and 64-bit Node.js.'
   );
   error.code = 'MYNDA_MEDIA_PLATFORM_UNSUPPORTED';
   throw error;

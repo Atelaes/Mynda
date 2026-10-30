@@ -26,8 +26,26 @@ probing, and runtime-verification operations.
 MPV is packaged as a separate child-process executable (`mpv.app` on macOS,
 `mpv.exe` on Windows, and `mpv` on Linux). These builds enable `dvdnav` so
 Mynda can play unencrypted DVD folders. MPV's private FFmpeg libraries and
-other runtime dependencies are distinct from the standalone LGPL-only FFmpeg
-and FFprobe listed above.
+other runtime dependencies are separate from Mynda's JavaScript runtime.
+On macOS, Windows and Linux x64 the player's FFmpeg libraries are distinct
+from the standalone LGPL-only tools. The Linux ARM64 recipe instead builds
+one private, shared LGPL-only FFmpeg 6.1.6 library set used by both the player
+and standalone tools; it does not use Bookworm's older system FFmpeg.
+
+## Linux ARM64 rendering dependencies
+
+The Bookworm ARM64 recipe builds libplacebo 6.338.2 privately from
+https://github.com/haasn/libplacebo/tree/v6.338.2 (LGPL-2.1-or-later).
+Its exact GLAD, fast_float and Vulkan-Headers submodule revisions and the
+SHA-256 values of all downloaded archives are pinned in
+`scripts/lib/linux-arm64-dependencies.sh`. Their license texts accompany
+the staged library. The build uses a private Meson 1.3.2 source tree;
+Meson and Python build tools are not shipped as runtime dependencies.
+
+Bookworm's glslang/SPIRV-Tools are linked into libplacebo; their package
+versions and copyright files are recorded even though `ldd` cannot discover
+statically linked components. libdav1d supplies AV1 decoding. Other copied
+runtime packages are recorded under `licenses/linux-packages/`.
 
 ## DVD navigation libraries
 

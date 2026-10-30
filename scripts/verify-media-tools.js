@@ -215,12 +215,16 @@ async function verifyStage(options = {}) {
   const runner = options.runExecutable || runExecutable;
   const paths = toolPaths(stage, platform);
 
-  const supportedTargets = new Set(['darwin-arm64', 'win32-x64', 'linux-x64']);
+  const supportedTargets = new Set(['darwin-arm64', 'win32-x64', 'linux-x64', 'linux-arm64']);
   if (!supportedTargets.has(`${platform}-${arch}`)) {
     throw new Error(
       `Mynda does not yet prepare ${builderPlatform(platform)}-${arch} media tools. ` +
-      'The current targets are mac-arm64, win-x64, and linux-x64. Build each target on its native host.'
+      'The current targets are mac-arm64, win-x64, linux-x64, and linux-arm64. Build each target on its native host.'
     );
+  }
+  if (!options.runExecutable && (platform !== process.platform || arch !== process.arch)) {
+    throw new Error(`Verify and build ${builderPlatform(platform)}-${arch} on a native ${platform}-${arch} host. ` +
+      `This Node.js process is ${process.platform}-${process.arch}; cross-compilation is not supported.`);
   }
   if (!fs.existsSync(stage) || !fs.statSync(stage).isDirectory()) {
     throw new Error(
@@ -241,7 +245,22 @@ async function verifyStage(options = {}) {
   ].forEach(filename => {
     if (!fs.existsSync(filename)) throw new Error(`Required media license file is missing: ${filename}`);
   });
+  if (platform === 'linux' && arch === 'arm64') {
+    for (const name of ['libplacebo-LICENSE', 'glad-LICENSE', 'fast_float-LICENSE-MIT',
+      'fast_float-LICENSE-APACHE', 'Vulkan-Headers-LICENSE', 'linux-packages/packages.txt']) {
+      const filename = path.join(stage, 'licenses', name);
+      if (!fs.existsSync(filename)) throw new Error(`Required ARM64 dependency notice is missing: ${filename}`);
+    }
+  }
   assertNoDvdCss(stage);
+
+  // Inspect Linux headers before attempting execution: a stale x64 stage
+  // should produce an architecture error, not an opaque exec-format failure.
+  if (platform === 'linux' && options.skipLinuxChecks !== true) {
+    await MediaBundleInspection.assertLinuxBundle(stage, paths, arch, runner, {
+      readFile: options.readFile
+    });
+  }
 
   const ffmpegSidecars = await verifyFfmpegSidecars({
     stage,
@@ -270,10 +289,6 @@ async function verifyStage(options = {}) {
     await assertRelocatableMacBinaries(stage, paths, arch, runner);
   } else if (platform === 'win32' && options.skipWindowsChecks !== true) {
     MediaBundleInspection.assertWindowsBundle(stage, paths, arch, {
-      readFile: options.readFile
-    });
-  } else if (platform === 'linux' && options.skipLinuxChecks !== true) {
-    await MediaBundleInspection.assertLinuxBundle(stage, paths, arch, runner, {
       readFile: options.readFile
     });
   }

@@ -30,8 +30,11 @@ function directoriesMatching(prefix) {
     .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 }
 
-function packagedExecutable() {
-  if (process.platform === 'darwin') {
+function packagedExecutable(options = {}) {
+  const platform = options.platform || process.platform;
+  const arch = options.arch || process.arch;
+  const outputDirectory = options.distDirectory || distDirectory;
+  if (platform === 'darwin') {
     for (const directory of directoriesMatching('mac')) {
       const applications = fs.readdirSync(directory, {withFileTypes: true})
         .filter(entry => entry.isDirectory() && entry.name.endsWith('.app'));
@@ -51,7 +54,7 @@ function packagedExecutable() {
     }
   }
 
-  if (process.platform === 'win32') {
+  if (platform === 'win32') {
     for (const directory of directoriesMatching('win')) {
       const executable = fs.readdirSync(directory)
         .filter(name => name.toLowerCase().endsWith('.exe'))
@@ -61,22 +64,15 @@ function packagedExecutable() {
     }
   }
 
-  for (const directory of directoriesMatching('linux')) {
-    const preferred = path.join(directory, 'mynda');
-    if (fs.existsSync(preferred) && fs.statSync(preferred).isFile()) return preferred;
-    const executable = fs.readdirSync(directory)
-      .map(name => path.join(directory, name))
-      .find(filename => {
-        try {
-          return fs.statSync(filename).isFile() && (fs.statSync(filename).mode & 0o111) !== 0;
-        } catch(err) {
-          return false;
-        }
-      });
-    if (executable) return executable;
+  if (platform === 'linux') {
+    // x64 and ARM64 builds may coexist. Never launch whichever directory
+    // happens to be newest, or an unrelated bundled executable.
+    const directory = arch === 'x64' ? 'linux-unpacked' : `linux-${arch}-unpacked`;
+    const executable = path.join(outputDirectory, directory, 'mynda');
+    if (fs.existsSync(executable) && fs.statSync(executable).isFile()) return executable;
   }
 
-  throw new Error(`Could not find the packaged ${process.platform} application under ${distDirectory}`);
+  throw new Error(`Could not find the packaged ${platform}-${arch} application under ${outputDirectory}`);
 }
 
 function tail(value, maximum = 16000) {
@@ -220,4 +216,4 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = {parseOptions, assertSandboxTestUser, launch, main};
+module.exports = {parseOptions, assertSandboxTestUser, packagedExecutable, launch, main};

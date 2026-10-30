@@ -27,6 +27,13 @@ The package's name, app ID and version remain unchanged in this pass, so this
 change does not deliberately move the user's library or saved activation.
 The author metadata is TorVor.
 
+Linux's default installer is a DEB. Native ARM64 packaging is available via
+`npm run dist:linux:arm64`, using `vendor/media-tools/linux-arm64/` and producing
+`dist/mynda_1.0.0_arm64.deb` at the current package version. The Linux ARM64
+baseline is Debian 12 Bookworm; Raspberry Pi 5 installation/playback acceptance
+is still pending. See [LINUX_ARM64.md](LINUX_ARM64.md). This target does not
+change the x64 Ubuntu DEB or introduce an AppImage/sandbox bypass.
+
 ## Checks performed while building
 
 The existing `beforeBuild` hook compiles a fresh production renderer/preload

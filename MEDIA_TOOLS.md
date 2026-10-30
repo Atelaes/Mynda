@@ -1,8 +1,8 @@
 # Preparing Mynda's bundled media tools
 
 Mynda has native media-bundle contracts for Apple Silicon macOS, x64 Windows,
-and x64 Linux. End users do not install MPV, FFmpeg, FFprobe, Homebrew, MSYS2,
-or Ubuntu build packages. A developer prepares the matching bundle on each
+and x64/ARM64 Linux. End users do not install MPV, FFmpeg, FFprobe, Homebrew, MSYS2,
+or media build packages. A developer prepares the matching bundle on each
 native build machine, and Electron Builder copies only that target's files into
 the packaged application.
 
@@ -13,10 +13,13 @@ the packaged application.
 | `mac-arm64` | Apple Silicon, macOS 13+ | `gpu-next` + Vulkan/`macvk` | macOS application |
 | `win-x64` | Windows 10+ x64, MSYS2 UCRT64 for building | `gpu-next` + Direct3D 11 | NSIS installer |
 | `linux-x64` | Ubuntu 24.04 x64 | `gpu-next` + Wayland and X11 | DEB installer |
+| `linux-arm64` | Debian 12 Bookworm ARM64, including 64-bit Raspberry Pi OS | `gpu-next` + Wayland and X11 | ARM64 DEB installer; native acceptance pending |
 
-These are native builds, not cross-compiles. Windows ARM, Linux ARM, Intel
-macOS, and Mojave are not claimed yet. Ubuntu 24.04 is the first explicit
-Linux/glibc baseline, not a promise that every distribution has been tested.
+These are native builds, not cross-compiles. Windows ARM, 32-bit Linux ARM,
+Intel macOS, and Mojave are not claimed. The build baselines are Ubuntu 24.04
+for x64 and Debian 12/glibc 2.36 for ARM64; this is not a promise that every
+distribution or ARM board has been tested. See [LINUX_ARM64.md](LINUX_ARM64.md)
+for setup, compatibility limits, and the native acceptance checklist.
 
 ## Which executables development uses
 
@@ -265,6 +268,17 @@ RUNPATHs, and records the Ubuntu package/version and copyright file for each
 copied library. GPU drivers remain supplied by the user's system.
 
 ## What preparation and verification enforce
+
+ARM64 preparation uses private, checksummed Meson 1.3.2 and libplacebo 6.338.2
+sources because Bookworm's system versions are too old for MPV 0.41. Its
+FFmpeg/FFprobe and MPV share a private LGPL FFmpeg 6.1.6 library set. System
+media libraries and Python environments are not replaced. The ARM64 verifier
+checks every staged ELF executable/library for AArch64 and rejects glibc
+requirements newer than 2.36. Other targets retain their existing recipes.
+
+Linux builds accept `MYNDA_MEDIA_BUILD_JOBS` as a positive integer. ARM64
+defaults to two compiler jobs to limit load on small machines; x64 keeps the
+host CPU-count default. Both Make and Meson compilation use this limit.
 
 All targets use these pinned top-level sources:
 

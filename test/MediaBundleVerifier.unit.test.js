@@ -194,7 +194,7 @@ suite.test('accepts a complete staged bundle with the real tool output formats',
 });
 
 suite.test('applies the Windows and Linux graphical-video policies to complete stages', async () => {
-  async function verifyPlatform(directory, platform, contexts, skipOption) {
+  async function verifyPlatform(directory, platform, contexts, skipOption, arch = 'x64') {
     const toolPaths = MediaBundleVerifier.toolPaths(directory, platform);
     const requiredFiles = [
       'THIRD_PARTY_NOTICES.md',
@@ -202,7 +202,11 @@ suite.test('applies the Windows and Linux graphical-video policies to complete s
       'licenses/MPV-LICENSE.GPL',
       'licenses/libdvdread-COPYING',
       'licenses/libdvdnav-COPYING',
-      'licenses/libdvdread-no-libdvdcss.patch'
+      'licenses/libdvdread-no-libdvdcss.patch',
+      'licenses/libplacebo-LICENSE', 'licenses/glad-LICENSE',
+      'licenses/fast_float-LICENSE-MIT', 'licenses/fast_float-LICENSE-APACHE',
+      'licenses/Vulkan-Headers-LICENSE',
+      'licenses/linux-packages/packages.txt'
     ].map(filename => path.join(directory, filename));
     [...Object.values(toolPaths), ...requiredFiles].forEach(filename => {
       fs.mkdirSync(path.dirname(filename), {recursive: true});
@@ -229,7 +233,7 @@ suite.test('applies the Windows and Linux graphical-video policies to complete s
     const options = {
       stage: directory,
       platform,
-      arch: 'x64',
+      arch,
       runExecutable: runner
     };
     options[skipOption] = true;
@@ -251,6 +255,17 @@ suite.test('applies the Windows and Linux graphical-video policies to complete s
     assert.strictEqual(report.platform, 'linux');
     assert.deepStrictEqual(report.mpv.gpuContexts, ['waylandvk', 'x11egl']);
   });
+  await withTemporaryDirectory('media-linux-arm64-stage', async directory => {
+    const report = await verifyPlatform(directory, 'linux', 'wayland\nx11egl', 'skipLinuxChecks', 'arm64');
+    assert.strictEqual(report.arch, 'arm64');
+    assert.deepStrictEqual(report.mpv.gpuContexts, ['wayland', 'x11egl']);
+  });
+});
+
+suite.test('refuses to execute a different native target during verification', async () => {
+  const target = process.platform === 'linux' && process.arch === 'arm64' ?
+    {platform: 'linux', arch: 'x64'} : {platform: 'linux', arch: 'arm64'};
+  await assert.rejects(MediaBundleVerifier.verifyStage(target), /cross-compilation is not supported/);
 });
 
 suite.test('accepts app-relative and Apple system Mach-O dependencies', async () => {

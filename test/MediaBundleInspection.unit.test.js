@@ -105,12 +105,35 @@ suite.test('rejects the MSYS runtime and wrong Windows architecture', async () =
 
 suite.test('parses ELF architecture, dependencies, and RUNPATH', () => {
   assert.strictEqual(Inspection.elfArchitecture(elfFixture()), 'x64');
+  assert.strictEqual(Inspection.elfArchitecture(elfFixture(Inspection.ELF_MACHINES.arm64)), 'arm64');
   assert.deepStrictEqual(Inspection.parseElfDynamic([
     ' 0x0000000000000001 (NEEDED)             Shared library: [libhelper.so.1]',
     ' 0x000000000000001d (RUNPATH)            Library runpath: [$ORIGIN/lib:$ORIGIN]'
   ].join('\n')), {
     needed: ['libhelper.so.1'],
     searchPaths: ['$ORIGIN/lib', '$ORIGIN']
+  });
+});
+
+suite.test('accepts ARM64 ELF bundles and rejects x64 contamination or a newer glibc ABI', async () => {
+  await withTemporaryDirectory('arm64-media-bundle', async directory => {
+    const paths = Object.fromEntries(['ffmpeg', 'ffprobe', 'mpv'].map(name => [name, path.join(directory, name)]));
+    const library = path.join(directory, 'lib', 'libhelper.so.1');
+    fs.mkdirSync(path.dirname(library), {recursive: true});
+    for (const filename of [...Object.values(paths), library]) {
+      fs.writeFileSync(filename, elfFixture(Inspection.ELF_MACHINES.arm64));
+    }
+    let version = '2.36';
+    const runner = async (command, args) => ({stdout: args[0] === '--version-info' ?
+      `Name: GLIBC_${version}` :
+      ' (NEEDED) Shared library: [libhelper.so.1]\n (NEEDED) Shared library: [ld-linux-aarch64.so.1]\n (RUNPATH) Library runpath: [$ORIGIN/lib:$ORIGIN]', stderr: ''});
+    assert.deepStrictEqual(await Inspection.assertLinuxBundle(directory, paths, 'arm64', runner),
+      {files: 4, architecture: 'arm64'});
+    version = '2.38';
+    await assert.rejects(Inspection.assertLinuxBundle(directory, paths, 'arm64', runner), /glibc 2.36 baseline/);
+    version = '2.36';
+    fs.writeFileSync(library, elfFixture());
+    await assert.rejects(Inspection.assertLinuxBundle(directory, paths, 'arm64', runner), /ELF architecture x64/);
   });
 });
 

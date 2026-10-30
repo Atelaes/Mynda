@@ -40,6 +40,7 @@
     "metadata:setup": "node scripts/setup-metadata-server.js",
     "metadata:connect": "node scripts/connect-metadata-server.js",
     "dist": "npm run media:verify && electron-builder --publish never",
+    "dist:linux:arm64": "npm run media:verify -- --platform linux --arch arm64 && electron-builder --linux deb --arm64 --publish never",
     "test:paths": "npm run build:renderer && node test/SourceLayout.integration.test.js",
     "source:cleanup": "node scripts/finish-source-reorganization.js",
     "test:electron:asar": "npm run build:renderer && node test/electron/run-electron-smoke.js --asar",

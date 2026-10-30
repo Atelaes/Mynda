@@ -257,6 +257,24 @@ function parseElfDynamic(output) {
   return {needed, searchPaths};
 }
 
+function assertGlibcBaseline(output, maximum, filename) {
+  const limit = maximum.split('.').map(Number);
+  const versions = [...String(output).matchAll(/\bGLIBC_(\d+(?:\.\d+)+)\b/g)]
+    .map(match => match[1]);
+  const newer = versions.filter(version => {
+    const parts = version.split('.').map(Number);
+    for (let index = 0; index < Math.max(parts.length, limit.length); index++) {
+      const difference = (parts[index] || 0) - (limit[index] || 0);
+      if (difference !== 0) return difference > 0;
+    }
+    return false;
+  });
+  if (newer.length) {
+    throw new Error(`${filename} requires GLIBC_${newer[0]}, newer than the Linux ARM64 ` +
+      `glibc ${maximum} baseline. Rebuild on Debian 12 ARM64.`);
+  }
+}
+
 function assertLinuxBundle(stage, paths, arch, runner, options = {}) {
   const readFile = options.readFile || (filename => fs.readFileSync(filename));
   const libraryDirectory = path.join(stage, 'lib');
@@ -289,6 +307,10 @@ function assertLinuxBundle(stage, paths, arch, runner, options = {}) {
     if (details.needed.some(name => /libdvdcss/i.test(name))) {
       throw new Error(`${filename} imports prohibited libdvdcss`);
     }
+    if (arch === 'arm64') {
+      const versions = await runner('/usr/bin/readelf', ['--version-info', '--wide', filename]);
+      assertGlibcBaseline(versions.stdout, '2.36', filename);
+    }
     return filename;
   })).then(() => ({files: files.length, architecture: arch}));
 }
@@ -299,6 +321,7 @@ module.exports = {
   PE_MACHINES,
   WINDOWS_SYSTEM_DLLS,
   assertLinuxBundle,
+  assertGlibcBaseline,
   assertWindowsBundle,
   elfArchitecture,
   isWindowsSystemDll,

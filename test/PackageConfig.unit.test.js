@@ -129,6 +129,8 @@ suite.test('declares native Windows and Linux distributable targets', () => {
   assert.strictEqual(packageJson.build.win.target, 'nsis');
   assert.strictEqual(packageJson.build.linux.target, 'deb');
   assert.strictEqual(packageJson.build.linux.category, 'AudioVideo');
+  assert.strictEqual(packageJson.scripts['dist:linux:arm64'],
+    'npm run media:verify -- --platform linux --arch arm64 && electron-builder --linux deb --arm64 --publish never');
 });
 
 suite.test('pins the upgraded runtime and packaging tools with a supported build host and macOS floor', () => {

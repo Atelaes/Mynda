@@ -1,4 +1,4 @@
-const {assert, createSuite, runSuite} = require('./helpers/TestHarness');
+const {assert, createSuite, runSuite, withTemporaryDirectory} = require('./helpers/TestHarness');
 const check = require('../src/main/LinuxSandboxCheck');
 const runner = require('./package/run-packaged-media-smoke');
 const config = require('../package.json');
@@ -127,6 +127,22 @@ suite.test('Ubuntu defaults to DEB and the installed check requests mandatory sa
   for (const preference of [/sandbox:\s*true/, /contextIsolation:\s*true/, /nodeIntegration:\s*false/]) {
     assert.match(mainSource, preference);
   }
+});
+
+suite.test('Linux smoke test selects the matching architecture when both packages exist', async () => {
+  await withTemporaryDirectory('linux-smoke-targets', root => {
+    for (const directory of ['linux-unpacked', 'linux-arm64-unpacked']) {
+      fs.mkdirSync(path.join(root, directory));
+      fs.writeFileSync(path.join(root, directory, 'mynda'), 'fixture');
+    }
+    for (const [arch, directory] of [['x64', 'linux-unpacked'], ['arm64', 'linux-arm64-unpacked']]) {
+      assert.strictEqual(runner.packagedExecutable({platform:'linux',arch,distDirectory:root}),
+        path.join(root, directory, 'mynda'));
+    }
+    fs.unlinkSync(path.join(root, 'linux-arm64-unpacked/mynda'));
+    assert.throws(() => runner.packagedExecutable({platform:'linux',arch:'arm64',distDirectory:root}),
+      /Could not find.*linux-arm64/);
+  });
 });
 
 runSuite(suite);

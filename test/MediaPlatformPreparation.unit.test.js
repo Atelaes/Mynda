@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const {spawnSync} = require('child_process');
 const Preparation = require('../scripts/prepare-media-tools.js');
 const {
   assert,
@@ -18,10 +19,13 @@ suite.test('dispatches each supported host to its native preparation script', ()
   const mac = Preparation.preparationCommand({platform: 'darwin', arch: 'arm64', scriptsDirectory});
   const windows = Preparation.preparationCommand({platform: 'win32', arch: 'x64', scriptsDirectory});
   const linux = Preparation.preparationCommand({platform: 'linux', arch: 'x64', scriptsDirectory});
+  const arm = Preparation.preparationCommand({platform: 'linux', arch: 'arm64', scriptsDirectory});
   assert.strictEqual(mac.args[0], path.join(scriptsDirectory, 'prepare-media-tools-macos.sh'));
   assert.strictEqual(windows.command, 'powershell.exe');
   assert(windows.args.includes(path.join(scriptsDirectory, 'prepare-media-tools-windows.ps1')));
   assert.strictEqual(linux.args[0], path.join(scriptsDirectory, 'prepare-media-tools-linux.sh'));
+  assert.strictEqual(arm.target, 'linux-arm64');
+  assert.strictEqual(arm.args[0], linux.args[0]);
 });
 
 suite.test('rejects unsupported host and architecture combinations explicitly', () => {
@@ -33,7 +37,34 @@ suite.test('rejects unsupported host and architecture combinations explicitly', 
     () => Preparation.preparationCommand({platform: 'freebsd', arch: 'x64'}),
     error => error && error.code === 'MYNDA_MEDIA_PLATFORM_UNSUPPORTED'
   );
+  assert.throws(() => Preparation.preparationCommand({platform: 'linux', arch: 'arm'}),
+    /64-bit OS and 64-bit Node/);
 });
+
+// Exercise the same shell functions the real build uses. No compilers,
+// downloads, /etc changes, or spoofed machine architecture are needed.
+if (process.platform !== 'win32') {
+  const policy = path.resolve(__dirname, '../scripts/lib/linux-media-target.sh');
+  const run = (script, ...args) => spawnSync('bash', ['-c',
+    'set -euo pipefail; source "$1"; shift; ' + script, 'policy-test', policy, ...args], {encoding: 'utf8'});
+  suite.test('selects separate Bookworm ARM64 and Ubuntu x64 baselines', () => {
+    for (const machine of ['aarch64', 'arm64']) {
+      const result = run('select_linux_media_target "$1"; linux_media_baseline_matches debian 12; printf "%s" "$TARGET"', machine);
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.strictEqual(result.stdout, 'linux-arm64');
+    }
+    assert.strictEqual(run('select_linux_media_target x86_64; linux_media_baseline_matches ubuntu 24.04').status, 0);
+    assert.notStrictEqual(run('select_linux_media_target aarch64; linux_media_baseline_matches ubuntu 24.04').status, 0);
+    assert.notStrictEqual(run('select_linux_media_target armv7l').status, 0);
+  });
+  suite.test('limits ARM compilation by default and validates an explicit job count', () => {
+    assert.strictEqual(run('select_linux_media_target aarch64; linux_media_build_jobs').stdout.trim(), '2');
+    assert.strictEqual(run('select_linux_media_target aarch64; linux_media_build_jobs 4').stdout.trim(), '4');
+    for (const jobs of ['0', '-1', 'all', '2; echo unsafe']) {
+      assert.notStrictEqual(run('select_linux_media_target aarch64; linux_media_build_jobs "$1"', jobs).status, 0);
+    }
+  });
+}
 
 suite.test('keeps all native recipes on the same checksummed source versions', () => {
   ['macos', 'windows-msys2', 'linux'].forEach(platform => {
@@ -82,7 +113,7 @@ suite.test('uses UCRT64/Direct3D on Windows and an Ubuntu 24.04 Wayland/X11 base
   assert(windows.includes('objdump -p'));
   assert(windows.includes('${TMPDIR:-/tmp}'));
   assert.strictEqual(windows.includes('${TEMP:-/tmp}'), false);
-  assert(linux.includes('VERSION_ID:-}') && linux.includes('24.04'));
+  assert(linux.includes('linux_media_baseline_matches'));
   assert(linux.includes('-Dwayland=enabled'));
   assert(linux.includes('-Dx11=enabled'));
   assert(linux.includes("patchelf --set-rpath '$ORIGIN/lib:$ORIGIN'"));

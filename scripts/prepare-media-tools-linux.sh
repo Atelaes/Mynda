@@ -20,7 +20,12 @@ fail() {
 }
 
 [[ "$PLATFORM" == "Linux" ]] || fail "Linux media preparation must run on Linux."
-[[ "$MACHINE_ARCH" == "x86_64" ]] || fail "The Linux media bundle currently targets x64, not $MACHINE_ARCH."
+source "$PROJECT_ROOT/scripts/lib/linux-media-target.sh"
+select_linux_media_target "$MACHINE_ARCH"
+command -v node >/dev/null 2>&1 || fail "Install 64-bit Node.js (see .nvmrc) before preparing media tools."
+[[ "$(node -p 'process.arch')" == "$TARGET_ARCH" ]] || fail "Node.js must match $TARGET_ARCH; a 64-bit kernel alone is not sufficient."
+[[ "$(getconf LONG_BIT)" == 64 ]] || fail "The build requires a 64-bit Linux userland."
+JOBS="$(linux_media_build_jobs "${MYNDA_MEDIA_BUILD_JOBS:-}")"
 
 if [[ -r /etc/os-release ]]; then
   # shellcheck disable=SC1091
@@ -28,44 +33,51 @@ if [[ -r /etc/os-release ]]; then
 else
   fail "Cannot identify the Linux distribution because /etc/os-release is missing."
 fi
-if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
+if ! linux_media_baseline_matches "${ID:-}" "${VERSION_ID:-}"; then
   if [[ "${MYNDA_ALLOW_UNSUPPORTED_LINUX_BUILD:-0}" != "1" ]]; then
-    fail "Build linux-x64 on Ubuntu 24.04 so its glibc baseline is reproducible. Set MYNDA_ALLOW_UNSUPPORTED_LINUX_BUILD=1 only for an experimental local build."
+    fail "Build $TARGET on $BUILD_DISTRO $BUILD_VERSION so its glibc baseline is reproducible. Set MYNDA_ALLOW_UNSUPPORTED_LINUX_BUILD=1 only for an experimental local build."
   fi
   printf 'WARNING: building an experimental Linux bundle on %s %s.\n' "${ID:-unknown}" "${VERSION_ID:-unknown}" >&2
 fi
 
 required_packages=(
   build-essential ca-certificates curl libasound2-dev libass-dev
-  libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev
-  libegl1-mesa-dev libluajit-5.1-dev libplacebo-dev libpulse-dev
-  libswresample-dev libswscale-dev libvulkan-dev libwayland-dev
+  libegl1-mesa-dev libluajit-5.1-dev libpulse-dev libvulkan-dev libwayland-dev
   libx11-dev libxext-dev libxkbcommon-dev libxpresent-dev libxrandr-dev libxss-dev
-  meson nasm ninja-build patchelf pkg-config python3 wayland-protocols xz-utils zlib1g-dev
+  ninja-build patchelf pkg-config python3 wayland-protocols xz-utils zlib1g-dev
 )
+required_commands=(curl dpkg-query gcc ldd make ninja node patch patchelf pkg-config python3 readelf sha256sum tar)
+MESON=(meson)
+if [[ "$TARGET_ARCH" == arm64 ]]; then
+  required_packages+=(glslang-dev liblcms2-dev libdav1d-dev libdrm-dev python3-jinja2)
+else
+  required_packages+=(libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev
+    libswresample-dev libswscale-dev libplacebo-dev meson nasm)
+  required_commands+=(meson nasm)
+fi
 missing_packages=()
 for package_name in "${required_packages[@]}"; do
   dpkg-query -W -f='${Status}' "$package_name" 2>/dev/null | grep -q 'install ok installed' || \
     missing_packages+=("$package_name")
 done
 if (( ${#missing_packages[@]} > 0 )); then
-  printf 'The one-time Ubuntu 24.04 build prerequisites are missing:\n  %s\n' "${missing_packages[*]}" >&2
+  printf 'The one-time %s %s %s build prerequisites are missing:\n  %s\n' "$BUILD_DISTRO" "$BUILD_VERSION" "$TARGET_ARCH" "${missing_packages[*]}" >&2
   printf 'Install them with:\n\n  sudo apt update\n  sudo apt install %s\n\n' "${missing_packages[*]}" >&2
   exit 1
 fi
 
-for command_name in curl dpkg-query gcc ldd make meson nasm ninja node patch patchelf pkg-config python3 readelf sha256sum tar; do
+for command_name in "${required_commands[@]}"; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Required command is missing: $command_name"
 done
 
-CACHE_PARENT="${MYNDA_MEDIA_BUILD_CACHE:-${TMPDIR:-/tmp}/mynda-media-tools-cache-linux-x64}"
+CACHE_PARENT="${MYNDA_MEDIA_BUILD_CACHE:-${TMPDIR:-/tmp}/mynda-media-tools-cache-$TARGET}"
 mkdir -p "$CACHE_PARENT/downloads"
 WORK_ROOT="$(mktemp -d "$CACHE_PARENT/work.XXXXXX")"
 DOWNLOAD_ROOT="$CACHE_PARENT/downloads"
 STAGE_PARENT="$PROJECT_ROOT/vendor/media-tools"
-FINAL_STAGE="$STAGE_PARENT/linux-x64"
-CANDIDATE_STAGE="$STAGE_PARENT/.linux-x64.candidate"
-NEW_STAGE="$STAGE_PARENT/.linux-x64.new.$$"
+FINAL_STAGE="$STAGE_PARENT/$TARGET"
+CANDIDATE_STAGE="$STAGE_PARENT/.$TARGET.candidate"
+NEW_STAGE="$STAGE_PARENT/.$TARGET.new.$$"
 PACKAGE_INVENTORY="$WORK_ROOT/linux-packages.txt"
 printf '%s\n' zlib1g > "$PACKAGE_INVENTORY"
 
@@ -75,7 +87,7 @@ cleanup() {
 trap cleanup EXIT
 
 promote_candidate() {
-  local old_stage="$STAGE_PARENT/.linux-x64.old.$$"
+  local old_stage="$STAGE_PARENT/.$TARGET.old.$$"
   if [[ -d "$FINAL_STAGE" ]]; then mv "$FINAL_STAGE" "$old_stage"; fi
   mv "$CANDIDATE_STAGE" "$FINAL_STAGE"
   rm -rf "$old_stage"
@@ -85,7 +97,7 @@ mkdir -p "$STAGE_PARENT"
 if [[ -d "$CANDIDATE_STAGE" ]]; then
   printf 'Checking the completed Linux media build preserved from the previous attempt...\n'
   if node "$PROJECT_ROOT/scripts/verify-media-tools.js" \
-    --stage "$CANDIDATE_STAGE" --platform linux --arch x64 \
+    --stage "$CANDIDATE_STAGE" --platform linux --arch "$TARGET_ARCH" \
     --write-info "$CANDIDATE_STAGE/build-info.json"; then
     promote_candidate
     printf '\nPrepared Mynda media tools at:\n  %s\n' "$FINAL_STAGE"
@@ -125,7 +137,17 @@ tar -xzf "$MPV_ARCHIVE" -C "$WORK_ROOT"
 tar -xzf "$DVDREAD_ARCHIVE" -C "$WORK_ROOT"
 tar -xzf "$DVDNAV_ARCHIVE" -C "$WORK_ROOT"
 
-JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '4')"
+FFMPEG_LINK_OPTIONS=(--enable-static --disable-shared)
+PRIVATE_PKG_CONFIG_PATH=""
+if [[ "$TARGET_ARCH" == arm64 ]]; then
+  source "$PROJECT_ROOT/scripts/lib/linux-arm64-dependencies.sh"
+  prepare_arm64_build_dependencies
+  build_arm64_libplacebo
+  # Use one private LGPL FFmpeg build for the tools and MPV. Bookworm's
+  # system libavcodec 59 cannot satisfy MPV 0.41's libavcodec 60 requirement.
+  FFMPEG_LINK_OPTIONS=(--disable-static --enable-shared --arch=aarch64 --cpu=generic
+    --enable-libdav1d --enable-libdrm --enable-v4l2-m2m)
+fi
 FFMPEG_SOURCE="$WORK_ROOT/ffmpeg-$FFMPEG_VERSION"
 FFMPEG_PREFIX="$WORK_ROOT/ffmpeg-install"
 printf '\nBuilding LGPL-only Linux FFmpeg and FFprobe %s...\n' "$FFMPEG_VERSION"
@@ -135,7 +157,7 @@ printf '\nBuilding LGPL-only Linux FFmpeg and FFprobe %s...\n' "$FFMPEG_VERSION"
     --prefix="$FFMPEG_PREFIX" \
     --disable-gpl --disable-nonfree --disable-version3 \
     --disable-doc --disable-debug --disable-ffplay --disable-autodetect \
-    --enable-static --disable-shared --enable-zlib
+    "${FFMPEG_LINK_OPTIONS[@]}" --enable-zlib
   make -j"$JOBS"
   make install
 )
@@ -153,33 +175,36 @@ printf '\nBuilding Linux libdvdread %s without libdvdcss...\n' "$DVDREAD_VERSION
   cd "$DVDREAD_SOURCE"
   patch -p1 < "$DVDREAD_PATCH"
 )
-meson setup "$DVDREAD_BUILD" "$DVDREAD_SOURCE" \
+"${MESON[@]}" setup "$DVDREAD_BUILD" "$DVDREAD_SOURCE" \
   --prefix="$DVD_PREFIX" --libdir=lib --buildtype=release --default-library=shared \
   -Dc_args=-DMYNDA_DISABLE_LIBDVDCSS -Dlibdvdcss=disabled -Denable_docs=false
-meson compile -C "$DVDREAD_BUILD"
-meson install -C "$DVDREAD_BUILD"
+"${MESON[@]}" compile -C "$DVDREAD_BUILD" -j "$JOBS"
+"${MESON[@]}" install -C "$DVDREAD_BUILD"
 
 printf '\nBuilding Linux libdvdnav %s...\n' "$DVDNAV_VERSION"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" meson setup "$DVDNAV_BUILD" "$DVDNAV_SOURCE" \
+PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" "${MESON[@]}" setup "$DVDNAV_BUILD" "$DVDNAV_SOURCE" \
   --prefix="$DVD_PREFIX" --libdir=lib --buildtype=release --default-library=shared \
   -Denable_docs=false -Denable_examples=false
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" meson compile -C "$DVDNAV_BUILD"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" meson install -C "$DVDNAV_BUILD"
+PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" "${MESON[@]}" compile -C "$DVDNAV_BUILD" -j "$JOBS"
+PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig" "${MESON[@]}" install -C "$DVDNAV_BUILD"
 
 MPV_SOURCE="$WORK_ROOT/mpv-$MPV_VERSION"
 MPV_BUILD="$WORK_ROOT/mpv-build"
 MPV_PREFIX="$WORK_ROOT/mpv-install"
+if [[ "$TARGET_ARCH" == arm64 ]]; then
+  PRIVATE_PKG_CONFIG_PATH="$FFMPEG_PREFIX/lib/pkgconfig:$PLACEBO_PREFIX/lib/pkgconfig:"
+fi
 printf '\nBuilding Linux MPV %s with X11, Wayland, and unencrypted-DVD support...\n' "$MPV_VERSION"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}" meson setup "$MPV_BUILD" "$MPV_SOURCE" \
-  --prefix="$MPV_PREFIX" --buildtype=release --auto-features=disabled \
+PKG_CONFIG_PATH="$PRIVATE_PKG_CONFIG_PATH$DVD_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}" "${MESON[@]}" setup "$MPV_BUILD" "$MPV_SOURCE" \
+  --prefix="$MPV_PREFIX" --buildtype=release --auto-features=disabled --wrap-mode=nofallback \
   -Dbuild-date=false -Dgpl=true -Dcplayer=true -Dlibmpv=false -Dtests=false \
   -Ddvdnav=enabled -Dalsa=enabled -Dpulse=enabled \
   -Dwayland=enabled -Dx11=enabled -Degl=enabled \
   -Degl-wayland=enabled -Degl-x11=enabled -Dgl=enabled -Dvulkan=enabled \
   -Diconv=enabled -Dzlib=enabled -Dlua=luajit \
   -Dhtml-build=disabled -Dmanpage-build=disabled -Dpdf-build=disabled
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}" meson compile -C "$MPV_BUILD"
-PKG_CONFIG_PATH="$DVD_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}" meson install -C "$MPV_BUILD"
+PKG_CONFIG_PATH="$PRIVATE_PKG_CONFIG_PATH$DVD_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}" "${MESON[@]}" compile -C "$MPV_BUILD" -j "$JOBS"
+PKG_CONFIG_PATH="$PRIVATE_PKG_CONFIG_PATH$DVD_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}" "${MESON[@]}" install -C "$MPV_BUILD"
 
 mkdir -p "$NEW_STAGE/lib" "$NEW_STAGE/licenses/linux-packages"
 install -m 755 "$FFMPEG_PREFIX/bin/ffmpeg" "$NEW_STAGE/ffmpeg"
@@ -189,10 +214,18 @@ while IFS= read -r library; do
   cp -L "$library" "$NEW_STAGE/lib/$(basename "$library")"
   chmod 755 "$NEW_STAGE/lib/$(basename "$library")"
 done < <(find "$DVD_PREFIX/lib" -maxdepth 1 \( -type f -o -type l \) -name '*.so*')
+if [[ "$TARGET_ARCH" == arm64 ]]; then
+  for private_lib in "$FFMPEG_PREFIX/lib" "$PLACEBO_PREFIX/lib"; do
+    while IFS= read -r library; do
+      cp -L "$library" "$NEW_STAGE/lib/$(basename "$library")"
+      chmod 755 "$NEW_STAGE/lib/$(basename "$library")"
+    done < <(find "$private_lib" -maxdepth 1 \( -type f -o -type l \) -name '*.so*')
+  done
+fi
 
 is_core_linux_library() {
   case "$1" in
-    ld-linux-x86-64.so.2|libc.so.6|libdl.so.2|libm.so.6|libpthread.so.0|librt.so.1|linux-vdso.so.1) return 0 ;;
+    ld-linux-x86-64.so.2|ld-linux-aarch64.so.1|libc.so.6|libdl.so.2|libm.so.6|libpthread.so.0|librt.so.1|linux-vdso.so.1) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -248,6 +281,7 @@ install -m 644 "$MPV_SOURCE/Copyright" "$NEW_STAGE/licenses/MPV-Copyright"
 install -m 644 "$DVDREAD_SOURCE/COPYING" "$NEW_STAGE/licenses/libdvdread-COPYING"
 install -m 644 "$DVDNAV_SOURCE/COPYING" "$NEW_STAGE/licenses/libdvdnav-COPYING"
 install -m 644 "$DVDREAD_PATCH" "$NEW_STAGE/licenses/libdvdread-no-libdvdcss.patch"
+if [[ "$TARGET_ARCH" == arm64 ]]; then install_arm64_dependency_notices; fi
 
 if [[ -s "$PACKAGE_INVENTORY" ]]; then
   sort -u "$PACKAGE_INVENTORY" -o "$PACKAGE_INVENTORY"
@@ -263,7 +297,7 @@ fi
 
 mv "$NEW_STAGE" "$CANDIDATE_STAGE"
 node "$PROJECT_ROOT/scripts/verify-media-tools.js" \
-  --stage "$CANDIDATE_STAGE" --platform linux --arch x64 \
+  --stage "$CANDIDATE_STAGE" --platform linux --arch "$TARGET_ARCH" \
   --write-info "$CANDIDATE_STAGE/build-info.json"
 promote_candidate
 
